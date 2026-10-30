@@ -37,10 +37,26 @@ encoders have been identified and measured.
 - active release symlink: `/opt/openr4d10/current`
 - ephemeral runtime output: `/run/openr4d10`
 - persistent application state: `/var/lib/openr4d10`
+- non-secret SQLite state: `/var/lib/openr4d10/openr4d10.sqlite3`
 - service logs: system journal, unit `openr4d10.service`
 
 The installer never overwrites live configuration. It refreshes only the
-`.dist` files. No credential store exists in the application.
+`.dist` files. `StateStore` applies explicit SQLite migrations and stores only
+non-secret state: settings, service readiness, stations, channels, media and
+recording metadata. Secret-like setting keys are rejected. No credential store
+exists in the application; future credentials require a separate protected
+mechanism.
+
+## Service catalog
+
+`ServiceCatalog` is the single inventory for device and web UI. It currently
+covers system, web radio, local media, recorder, BrandMeister, remote SDR,
+private PTT, Mumble, Discord, Telegram, feeds, webcams, YouTube audio, Spotify,
+ARD/ZDF/international media, speech, Bluetooth, remote Codex and TeamSpeak.
+Each entry declares capabilities, implementation boundary, external executable
+requirements and whether an individual local login is required. Status output
+never contains a credential value and does not describe an external adapter as
+ready merely because its menu entry exists.
 
 For a fresh machine, `bootstrap.sh` downloads a GitHub-generated source archive
 over HTTPS into a private temporary directory. It checks paths and archive
@@ -55,13 +71,15 @@ not an installation dependency.
    `openr4d10` user.
 3. The CLI parses and validates both TOML files.
 4. Adapters are created from explicit backend names.
-5. The read-only web dashboard binds to the configured local address and port.
-6. The semantic text boot manifest is rendered when enabled.
-7. The semantic dashboard state is refreshed at the configured interval and
+5. The service catalog migrates the non-secret state database and evaluates
+   local dependencies.
+6. The read-only web dashboard binds to the configured local address and port.
+7. The semantic text boot manifest is rendered when enabled.
+8. The semantic dashboard state is refreshed at the configured interval and
    exposed through `/api/status`.
-8. The Whisplay UI calls `claim_display()`, waits for the boot player to close
+9. The Whisplay UI calls `claim_display()`, waits for the boot player to close
    SPI/GPIO and keeps the ownership lock for its entire lifetime.
-9. `SIGTERM` or `SIGINT` stops the loop and HTTP server cleanly.
+10. `SIGTERM` or `SIGINT` stops the loop, database and HTTP server cleanly.
 
 An unconfigured display consumes semantic frames without touching GPIO. An
 unconfigured power adapter returns an explicit state that the UI surfaces as

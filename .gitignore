@@ -15,6 +15,15 @@ dist/
 run/
 state/
 work/
+recordings/
+media/
+backups/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
 config/*.local.toml
 config/hardware.override.toml
 
@@ -30,4 +39,6 @@ Thumbs.db
 !.env.example
 *.key
 *.pem
+*.p12
+*.pfx
 secrets/

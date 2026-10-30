@@ -12,6 +12,7 @@ from .app import OpenR4d10App
 from .config import ConfigError, load_app_config, load_hardware_config
 from .device_ui import DeviceUiState, render_device_ui
 from .doctor import exit_code, run_checks
+from .services import ServiceCatalog
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -81,12 +82,18 @@ def main(argv: list[str] | None = None) -> int:
         return code
 
     display, power, receiver = build_adapters(hardware_config)
+    services = (
+        ServiceCatalog(app_config.state_directory)
+        if args.command == "run"
+        else None
+    )
     application = OpenR4d10App(
         app_config,
         display=display,
         power=power,
         receiver=receiver,
         hardware=hardware_config,
+        services=services,
     )
     if args.command == "render-once":
         try:

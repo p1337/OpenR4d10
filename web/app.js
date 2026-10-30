@@ -32,6 +32,48 @@ function setAdapter(id, value) {
   element.dataset.state = value === "unconfigured" ? "open" : "ready";
 }
 
+function readinessLabel(value) {
+  const labels = {
+    ready: "Bereit",
+    configuration_required: "Konfiguration nötig",
+    missing_dependency: "Paket fehlt",
+  };
+  return labels[value] || value;
+}
+
+function renderServices(catalog) {
+  const grid = byId("service-grid");
+  const items = Array.isArray(catalog?.items) ? catalog.items : [];
+  grid.replaceChildren();
+  setText("service-count", items.length ? `${catalog.ready}/${catalog.total} bereit` : "Keine Daten");
+  for (const service of items) {
+    const card = document.createElement("article");
+    card.className = "service-card";
+    card.dataset.readiness = service.readiness;
+
+    const heading = document.createElement("div");
+    heading.className = "service-card-heading";
+    const name = document.createElement("strong");
+    name.textContent = service.name;
+    const state = document.createElement("span");
+    state.textContent = readinessLabel(service.readiness);
+    heading.append(name, state);
+
+    const description = document.createElement("p");
+    description.textContent = service.description;
+    const detail = document.createElement("small");
+    detail.textContent = service.missing_executables?.length
+      ? `Fehlt: ${service.missing_executables.join(", ")}`
+      : service.implementation === "native"
+        ? "OpenR4d10 Core"
+        : service.implementation === "official_api"
+          ? "Offizielle Anmeldung erforderlich"
+          : "Lokaler Adapter";
+    card.append(heading, description, detail);
+    grid.append(card);
+  }
+}
+
 function render(data) {
   const frame = data.frame || {};
   const fields = frame.fields || {};
@@ -70,6 +112,7 @@ function render(data) {
   setAdapter("display-adapter", adapters.display);
   setAdapter("power-adapter", adapters.power);
   setText("footer-status", `Letzte Aktualisierung: ${new Date().toLocaleTimeString("de-DE")}`);
+  renderServices(data.services || {});
 }
 
 function renderOffline() {

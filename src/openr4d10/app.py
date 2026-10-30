@@ -12,6 +12,7 @@ from .adapters import AdapterError, Display, Telemetry
 from .boot import load_boot_sequence
 from .config import AppConfig, ConfigError, HardwareConfig
 from .models import Frame
+from .services import ServiceCatalog
 from .ui import dashboard_frame
 from .web import WebServer
 
@@ -26,12 +27,14 @@ class OpenR4d10App:
         power: Telemetry,
         receiver: Telemetry,
         hardware: HardwareConfig | None = None,
+        services: ServiceCatalog | None = None,
     ) -> None:
         self.config = config
         self.display = display
         self.power = power
         self.receiver = receiver
         self.hardware = hardware
+        self.services = services
         self.stop_event = threading.Event()
         self._status_lock = threading.Lock()
         self._latest_frame = Frame(
@@ -61,12 +64,15 @@ class OpenR4d10App:
             "power": self.hardware.power.backend if self.hardware else "unknown",
             "receiver": self.hardware.receiver.backend if self.hardware else "unknown",
         }
-        return {
+        snapshot = {
             "service": "online" if not self.stop_event.is_set() else "stopping",
             "version": __version__,
             "frame": frame,
             "adapters": adapters,
         }
+        if self.services is not None:
+            snapshot["services"] = self.services.snapshot()
+        return snapshot
 
     def show_boot(self) -> None:
         if not self.config.boot_enabled:
@@ -100,6 +106,9 @@ class OpenR4d10App:
         close_display = getattr(self.display, "close", None)
         if callable(close_display):
             close_display()
+        if self.services is not None:
+            self.services.close()
+            self.services = None
 
     def run(self) -> None:
         self.install_signal_handlers()

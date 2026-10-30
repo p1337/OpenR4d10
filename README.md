@@ -23,12 +23,17 @@ the installer report exactly which adapters still need configuration.
 - built-in Linux system status and optional external-command status/power adapters
 - persistent configuration in `/etc/openr4d10`
 - runtime data in `/run/openr4d10` and state in `/var/lib/openr4d10`
+- versioned SQLite state for non-secret settings, services, stations, channels,
+  media and recordings
+- central catalog covering all specified service modules with honest dependency,
+  adapter and local-login readiness
 - standard-library-only test suite and GitHub Actions CI
 
-Not included yet:
+Hardware-specific integration still pending:
 
 - the Whisplay audio adapter
 - PiSugar API details
+- physical Whisplay audio codec setup and encoder GPIO input
 - credentials, WLAN settings, tokens or secrets
 
 Those values must come from the exact hardware documentation. See
@@ -85,7 +90,8 @@ For an inspect-first installation, download `bootstrap.sh`, review it, and run
 it with `sudo bash bootstrap.sh`. Regardless of how the bootstrap is started,
 it downloads and validates the complete project archive before installation.
 
-PiSugar telemetry is still reported as configuration-required. The Whisplay
+PiSugar telemetry and hardware audio are still reported as
+configuration-required. The Whisplay
 display backend is installed and selected automatically. Its early-boot log is
 available with `journalctl -u openr4d10-boot -b --no-pager`.
 

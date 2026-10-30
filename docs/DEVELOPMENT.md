@@ -39,6 +39,11 @@ PYTHONPATH=src python3 -m openr4d10 \
   preview-ui --output /tmp/openr4d10-ui.png
 ```
 
+The normal `run` command also creates a migrated non-secret state database in
+the configured state directory. Tests must always point this at a temporary
+absolute directory. Never add tokens, passwords or keys to this database; its
+setting API rejects secret-like keys by design.
+
 ## Web dashboard
 
 The installed service listens on port 80 by default. It serves only the tracked
