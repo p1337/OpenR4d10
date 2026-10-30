@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+
+APP_ROOT=/opt/openr4d10/current
+export PYTHONPATH="$APP_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+exec /usr/bin/python3 -m openr4d10 "$@"

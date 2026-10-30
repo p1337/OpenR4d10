@@ -1,0 +1,17 @@
+# Text-only fallback sequence. No binary animation is bundled or implied.
+version = 1
+
+[[frames]]
+duration_ms = 700
+title = "OpenR4d10"
+body = "Starting service"
+
+[[frames]]
+duration_ms = 700
+title = "OpenR4d10"
+body = "Checking adapters"
+
+[[frames]]
+duration_ms = 500
+title = "OpenR4d10"
+body = "Opening dashboard"

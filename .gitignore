@@ -1,0 +1,32 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+build/
+dist/
+
+# Local runtime output and machine-specific overrides
+*.log
+run/
+state/
+config/*.local.toml
+config/hardware.override.toml
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Never commit common secret/env files
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets/

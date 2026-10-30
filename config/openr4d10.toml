@@ -1,0 +1,12 @@
+[application]
+log_level = "INFO"
+refresh_interval_seconds = 2.0
+
+[ui]
+title = "OpenR4d10"
+boot_manifest = "/opt/openr4d10/current/assets/boot/text-sequence.toml"
+boot_enabled = true
+
+[paths]
+runtime_directory = "/run/openr4d10"
+state_directory = "/var/lib/openr4d10"

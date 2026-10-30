@@ -1,0 +1,41 @@
+[Unit]
+Description=OpenR4d10 receiver UI
+Documentation=https://github.com/p1337/OpenR4d10
+After=local-fs.target
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=openr4d10
+Group=openr4d10
+ExecStart=/usr/local/bin/openr4d10 --config /etc/openr4d10/openr4d10.toml --hardware-config /etc/openr4d10/hardware.toml run
+Restart=on-failure
+RestartSec=3s
+RuntimeDirectory=openr4d10
+RuntimeDirectoryMode=0750
+StateDirectory=openr4d10
+StateDirectoryMode=0750
+UMask=0027
+
+# Conservative defaults. A documented hardware adapter can add only the device
+# and group access it actually needs through a systemd drop-in.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+MemoryDenyWriteExecute=true
+CapabilityBoundingSet=
+RestrictNamespaces=true
+ReadWritePaths=/run/openr4d10 /var/lib/openr4d10
+
+[Install]
+WantedBy=multi-user.target

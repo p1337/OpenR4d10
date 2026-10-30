@@ -1,0 +1,21 @@
+# Intentionally contains no Whisplay pins, controller names or PiSugar protocol.
+# Replace "unconfigured" only after checking the exact hardware documentation.
+
+[display]
+backend = "unconfigured"
+# Generic choices: "file" or "command".
+# output_path = "/run/openr4d10/display.json"
+# command = ["/absolute/path/to/whisplay-helper", "render"]
+# timeout_seconds = 2.0
+
+[power]
+backend = "unconfigured"
+# Generic choice: "command".
+# command = ["/absolute/path/to/pisugar-helper", "status-json"]
+# timeout_seconds = 2.0
+
+[receiver]
+backend = "system"
+# Generic alternative: "command".
+# command = ["/absolute/path/to/receiver-helper", "status-json"]
+# timeout_seconds = 2.0
