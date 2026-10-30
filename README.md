@@ -33,12 +33,17 @@ Those values must come from the exact hardware documentation. See
 
 ## Install
 
-On a fresh Debian installation, use this one command. It installs only the
-download prerequisite, fetches the bootstrap completely into a temporary file,
-and runs it only after the download succeeded. Git is not needed.
+On a fresh Debian installation with `curl`, use this one command. Git is not
+needed; `bootstrap.sh` performs the complete download and installation.
 
 ```bash
-sudo bash -c 'set -Eeuo pipefail; export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y --no-install-recommends ca-certificates curl; d=$(mktemp -d); trap "rm -rf -- \"$d\"" EXIT; curl --proto "=https" --tlsv1.2 -fsSLo "$d/bootstrap.sh" https://raw.githubusercontent.com/p1337/OpenR4d10/main/bootstrap.sh; bash "$d/bootstrap.sh"'
+curl -fsSL https://raw.githubusercontent.com/p1337/OpenR4d10/main/bootstrap.sh | sudo bash
+```
+
+If the image has `wget` instead of `curl`, the equivalent command is:
+
+```bash
+wget -qO- https://raw.githubusercontent.com/p1337/OpenR4d10/main/bootstrap.sh | sudo bash
 ```
 
 The bootstrap downloads a complete GitHub source archive, validates the archive
@@ -54,9 +59,9 @@ If the repository files are already present, the local command remains:
 sudo ./install.sh
 ```
 
-The documented online command deliberately does not use `curl | sudo bash`:
-the bootstrap must download completely before Bash starts it, and it likewise
-downloads and validates the complete project archive before installation.
+For an inspect-first installation, download `bootstrap.sh`, review it, and run
+it with `sudo bash bootstrap.sh`. Regardless of how the bootstrap is started,
+it downloads and validates the complete project archive before installation.
 
 If the final hardware adapter is not configured yet, installation still
 succeeds and the service runs headless. The final output clearly says
