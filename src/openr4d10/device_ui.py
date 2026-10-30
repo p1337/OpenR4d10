@@ -275,4 +275,3 @@ def image_to_rgb565(image: Image.Image) -> bytes:
         output[target + 1] = value & 0xFF
         target += 2
     return bytes(output)
-

@@ -208,4 +208,3 @@ class WhisplayPanel:
             except Exception:
                 pass
             self._owner = None
-

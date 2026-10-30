@@ -36,4 +36,3 @@ class InputEvent:
             raise ValueError("press input cannot contain rotary steps")
         if self.held_seconds < 0:
             raise ValueError("held_seconds cannot be negative")
-
