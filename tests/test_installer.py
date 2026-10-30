@@ -9,7 +9,9 @@ class InstallerContractTests(unittest.TestCase):
 
         self.assertIn("vendor/pisugar-whisplay/audio/scripts/install.sh", installer)
         self.assertIn("WHISPLAY_PLATFORM=raspberry_pi", installer)
-        self.assertIn("raspberrypi-kernel-headers", installer)
+        self.assertIn('"linux-headers-$kernel_release"', installer)
+        self.assertIn("scripts/basic/fixdep", installer)
+        self.assertNotIn("raspberrypi-kernel-headers", installer)
         self.assertIn("REBOOT REQUIRED: sudo reboot", installer)
         self.assertNotIn("git clone", installer)
 

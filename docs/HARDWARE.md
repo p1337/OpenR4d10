@@ -173,6 +173,9 @@ Source, Apache-2.0 license and provenance are retained below
 The main installer enables I2C and I2S, builds the module for the running
 kernel, installs the device-tree overlay, makes ALSA card `whisplaysound` the
 default and enables the manufacturer's warm-up service. A reboot is mandatory.
+On Raspberry Pi OS Debian 13 it installs the exact
+`linux-headers-$(uname -r)` package; the obsolete package name
+`raspberrypi-kernel-headers` is not available on the verified target.
 Before reboot, `doctor` reports the installed-but-inactive state; afterwards it
 requires the card to appear in `/proc/asound/cards`. Actual speaker operation
 still needs a real listening test and is not claimed merely from the card name.

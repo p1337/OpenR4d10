@@ -778,6 +778,20 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-30 – Trixie-Kernel-Headerpaket am realen Pi korrigiert
+
+- Der erste Lauf von 0.10.5 wurde vor der Treiberinstallation von APT mit
+  `Unable to locate package raspberrypi-kernel-headers` beendet. Dieser ältere
+  Paketname ist in Roberts Debian-13-/Raspberry-Pi-Repository nicht vorhanden.
+- Auf dem realen System mit Kernel `6.18.50+rpt-rpi-v8` ist das passende Paket
+  `linux-headers-6.18.50+rpt-rpi-v8` in Version `1:6.18.50-1+rpt1` installiert;
+  sein Metapaket heißt `linux-headers-rpi-v8`. Der Build-Link zeigt auf
+  `/usr/src/linux-headers-6.18.50+rpt-rpi-v8`.
+- Der Hauptinstaller muss deshalb `linux-headers-$(uname -r)` installieren und
+  anschließend `Makefile` sowie `scripts/basic/fixdep` im tatsächlichen
+  Kernel-Buildverzeichnis prüfen. Ein allgemeines oder geratenes Headerpaket
+  darf die passend zum laufenden Kernel erforderlichen Header nicht ersetzen.
+
 ### 2026-10-30 – Offiziellen Whisplay-Audiotreiber in den Hauptinstaller aufnehmen
 
 - Robert beauftragt ausdrücklich, die fehlende interne Audioausgabe jetzt in

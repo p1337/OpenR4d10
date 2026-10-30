@@ -106,7 +106,7 @@ file, helper, manifest or platform check failed.
 
 For Whisplay audio, `doctor` has three explicit states: missing driver,
 installed overlay awaiting reboot, and active ALSA card `whisplaysound`. After
-installing 0.10.5, reboot before judging playback, then verify:
+installing 0.10.6, reboot before judging playback, then verify:
 
 ```bash
 aplay -l | grep -i whisplay

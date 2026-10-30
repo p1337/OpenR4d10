@@ -90,12 +90,19 @@ fi
 
 note "Installing required operating-system package"
 export DEBIAN_FRONTEND=noninteractive
+kernel_release="$(uname -r)"
 apt-get update
 apt-get install -y --no-install-recommends \
     python3 python3-pil python3-libgpiod python3-spidev fonts-dejavu-core \
     mpv ffmpeg ca-certificates gcc make kmod libc6-dev zlib1g-dev \
-    raspberrypi-kernel-headers device-tree-compiler alsa-utils \
+    "linux-headers-$kernel_release" device-tree-compiler alsa-utils \
     libasound2-plugins sox
+
+kernel_build_root="/lib/modules/$kernel_release/build"
+[[ -f "$kernel_build_root/Makefile" ]] \
+    || die "Matching kernel headers are incomplete: $kernel_build_root/Makefile is missing"
+[[ -x "$kernel_build_root/scripts/basic/fixdep" ]] \
+    || die "Matching kernel headers are incomplete: $kernel_build_root/scripts/basic/fixdep is missing"
 
 for system_group in openr4d10 gpio spi audio; do
     if ! getent group "$system_group" >/dev/null; then

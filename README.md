@@ -78,8 +78,9 @@ Pillow/libgpiod/spidev/mpv/ffmpeg packages, enables SPI, builds the pinned
 official unified Whisplay sound-card driver for the running kernel, enables
 I²C/I²S, installs its overlay and ALSA configuration, installs and enables
 the systemd services, and runs a final diagnostic. The official driver supports
-both WM8960 and ES8389 without guessing the fitted revision. Neither script
-collects or writes credentials.
+both WM8960 and ES8389 without guessing the fitted revision. The installer
+requests the exact `linux-headers-$(uname -r)` package and validates its kernel
+build tools before compilation. Neither script collects or writes credentials.
 
 Reboot after installation; the sound-card kernel module and overlay cannot
 become active before that reboot. The native Whisplay animation starts on the
