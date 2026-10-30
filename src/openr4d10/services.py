@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 import logging
 from pathlib import Path
 import shutil
+import threading
 from typing import Callable
 from urllib.parse import urlsplit
 
@@ -75,6 +76,7 @@ class ServiceCatalog:
         recorder: StreamRecorder | None = None,
         feed_reader: FeedReader | None = None,
         camera: CameraSnapshot | None = None,
+        artwork: PresetArtwork | None = None,
         adapter_directory: Path | None = None,
         adapter_registry: ServiceAdapterRegistry | None = None,
     ) -> None:
@@ -88,7 +90,9 @@ class ServiceCatalog:
         )
         self.feed_reader = feed_reader or FeedReader()
         self.camera = camera or CameraSnapshot(state_directory / "cache")
-        self.artwork = PresetArtwork(state_directory / "cache")
+        self.artwork = artwork or PresetArtwork(state_directory / "cache")
+        self._artwork_pending: set[str] = set()
+        self._artwork_guard = threading.Lock()
         external_ids = {
             item.service_id
             for item in BUILTIN_SERVICES
@@ -104,6 +108,7 @@ class ServiceCatalog:
             "cameras": {},
         }
         self.active_service = "system"
+        self.active_preset_id: str | None = None
         self.store.ensure_services(
             tuple(item.service_id for item in BUILTIN_SERVICES),
             DEFAULT_ENABLED_SERVICES,
@@ -174,6 +179,7 @@ class ServiceCatalog:
             "total": len(services),
             "ready": sum(item["readiness"] == "ready" for item in services),
             "active_service": self.active_service,
+            "selected_preset": self._selected_preset(),
             "playback": self.player.state.as_dict(),
             "recording": self.recorder.state.as_dict(),
             "content": self.content_state,
@@ -204,6 +210,7 @@ class ServiceCatalog:
                 if self.active_service == service_id:
                     self.player.stop()
                     self.active_service = "system"
+                    self.active_preset_id = None
                 if service_id == "recorder":
                     self.recorder.stop()
             self.store.set_service_enabled(service_id, enabled)
@@ -223,13 +230,28 @@ class ServiceCatalog:
                 raise ValueError("play action requires a media source")
             self.player.load(source)
             self.active_service = service_id
+            self.active_preset_id = None
         elif action == "pause":
+            if self.player.state.state not in {"playing", "paused"}:
+                raise ValueError("no active media to pause or resume")
             self.player.toggle_pause()
         elif action == "stop":
             self.player.stop()
             self.active_service = "system"
+            self.active_preset_id = None
         elif action == "volume":
             self.player.set_volume(request.get("value"))  # type: ignore[arg-type]
+        elif action == "volume_step":
+            steps = request.get("steps")
+            if (
+                isinstance(steps, bool)
+                or not isinstance(steps, int)
+                or steps == 0
+                or abs(steps) > 10
+            ):
+                raise ValueError("volume steps must be between -10 and 10, excluding zero")
+            volume = max(0, min(100, self.player.state.volume + steps * 10))
+            self.player.set_volume(volume)
         elif action == "record_start":
             self._require_enabled("recorder")
             source = request.get("source")
@@ -265,14 +287,29 @@ class ServiceCatalog:
                 raise ValueError("station was not found")
             self.player.load(str(station["stream_url"]))
             self.active_service = "webradio"
+            self.active_preset_id = None
         elif action == "preset_play":
             self._require_enabled("webradio")
             preset_id = request.get("preset_id")
             if not isinstance(preset_id, str) or preset_id not in RADIO_BY_ID:
                 raise ValueError("unknown radio preset")
-            preset = RADIO_BY_ID[preset_id]
-            self.player.load(preset.stream_url)
-            self.active_service = "webradio"
+            self._play_preset(preset_id)
+        elif action == "preset_step":
+            self._require_enabled("webradio")
+            steps = request.get("steps")
+            if (
+                isinstance(steps, bool)
+                or not isinstance(steps, int)
+                or steps == 0
+                or abs(steps) > 10
+            ):
+                raise ValueError("preset steps must be between -10 and 10, excluding zero")
+            preset_ids = tuple(RADIO_BY_ID)
+            if self.active_preset_id in RADIO_BY_ID:
+                current = preset_ids.index(self.active_preset_id)
+            else:
+                current = -1 if steps > 0 else 0
+            self._play_preset(preset_ids[(current + steps) % len(preset_ids)])
         elif action == "preset_save":
             self._require_enabled("webradio")
             preset_id = request.get("preset_id")
@@ -296,6 +333,7 @@ class ServiceCatalog:
                 raise ValueError("media item was not found")
             self.player.load(str(media["path"]))
             self.active_service = "local_media"
+            self.active_preset_id = None
         elif action == "adapter_call":
             service_id = request.get("service_id")
             operation = request.get("operation")
@@ -361,6 +399,47 @@ class ServiceCatalog:
             "active_service": self.active_service,
             "playback": self.player.state.as_dict(),
             "recording": self.recorder.state.as_dict(),
+            "selected_preset": self._selected_preset(),
+        }
+
+    def _play_preset(self, preset_id: str) -> None:
+        preset = RADIO_BY_ID[preset_id]
+        self.player.load(preset.stream_url)
+        self.active_service = "webradio"
+        self.active_preset_id = preset_id
+        self._cache_preset_artwork(preset_id)
+
+    def _cache_preset_artwork(self, preset_id: str) -> None:
+        with self._artwork_guard:
+            if preset_id in self._artwork_pending:
+                return
+            self._artwork_pending.add(preset_id)
+
+        def cache() -> None:
+            preset = RADIO_BY_ID[preset_id]
+            try:
+                self.artwork.ensure(preset_id, preset.artwork_url)
+            except (ContentError, OSError, ValueError) as exc:
+                LOG.warning("Station artwork unavailable for %s: %s", preset_id, exc)
+            finally:
+                with self._artwork_guard:
+                    self._artwork_pending.discard(preset_id)
+
+        threading.Thread(
+            target=cache,
+            name=f"openr4d10-artwork-{preset_id}",
+            daemon=True,
+        ).start()
+
+    def _selected_preset(self) -> dict[str, object] | None:
+        preset = RADIO_BY_ID.get(self.active_preset_id or "")
+        if preset is None:
+            return None
+        return {
+            "preset_id": preset.preset_id,
+            "name": preset.name,
+            "channel": tuple(RADIO_BY_ID).index(preset.preset_id) + 1,
+            "artwork": f"/api/radio-art/{preset.preset_id}",
         }
 
     def _require_enabled(self, service_id: str) -> None:
@@ -416,17 +495,26 @@ class ServiceCatalog:
         playback = self.player.state
         if playback.state not in {"playing", "paused"}:
             return {}
+        selected = self._selected_preset()
+        station = (
+            str(selected["name"])
+            if selected is not None
+            else playback.source or self.active_service
+        )
         service_label = {
             "local_media": "PLAYER",
             "recorder": "REC",
         }.get(self.active_service, "RADIO")
         return {
             "service": service_label,
-            "station": playback.source or self.active_service,
-            "title": playback.source or self.active_service,
+            "station": station,
+            "title": station,
             "subtitle": "Paused" if playback.paused else "Audio stream active",
             "playing": not playback.paused,
             "recording": self.recorder.state.state == "recording",
+            "volume": playback.volume,
+            "preset_id": selected["preset_id"] if selected is not None else None,
+            "channel": selected["channel"] if selected is not None else None,
         }
 
     def close(self) -> None:

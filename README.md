@@ -120,6 +120,13 @@ right click. Holding `Q` exposes the logical PTT input; until a verified PTT
 service adapter is configured it deliberately shows input state without
 claiming audio transmission.
 
+For an active radio stream, `W`/`S` changes the actual mpv output volume in
+10-percentage-point steps, up/down immediately loads the previous or next
+curated station, and Enter
+pauses or resumes the real stream. The native radio view uses the station name
+and locally cached safe artwork (or an initials fallback), not a raw stream URL
+or a decorative fake equalizer.
+
 The service section accepts an explicit `http` or `https` audio URL for local
 playback and recording. It rejects credentials embedded in URLs and does not
 persist URL query strings in public status. Actual sound requires an ALSA

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import tempfile
+import threading
 import unittest
 from urllib.parse import urlsplit
 
@@ -63,6 +64,7 @@ class ServiceCatalogTests(unittest.TestCase):
             state = "stopped"
             source = None
             paused = False
+            volume = 36
 
             def as_dict(self):
                 return {"state": self.state, "source": self.source, "paused": self.paused}
@@ -85,19 +87,41 @@ class ServiceCatalogTests(unittest.TestCase):
             def close(self):
                 pass
 
+        class Artwork:
+            def __init__(self):
+                self.loaded = []
+                self.ready = threading.Event()
+
+            def ensure(self, preset_id, _url):
+                self.loaded.append(preset_id)
+                self.ready.set()
+                return Path(f"/{preset_id}.jpg")
+
         with tempfile.TemporaryDirectory() as raw:
             player = Player()
+            artwork = Artwork()
             catalog = ServiceCatalog(
-                Path(raw).resolve(), player=player, recorder=Recorder()
+                Path(raw).resolve(),
+                player=player,
+                recorder=Recorder(),
+                artwork=artwork,
             )
             try:
                 catalog.control({"action": "preset_play", "preset_id": "swr3"})
+                selected = catalog.snapshot()["selected_preset"]
+                swr3_source = player.loaded
+                stepped = catalog.control({"action": "preset_step", "steps": 1})
                 first = catalog.control({"action": "preset_save", "preset_id": "swr3"})
                 second = catalog.control({"action": "preset_save", "preset_id": "swr3"})
                 stations = catalog.snapshot()["stations"]
+                self.assertTrue(artwork.ready.wait(1))
             finally:
                 catalog.close()
-        self.assertEqual(player.loaded, RADIO_BY_ID["swr3"].stream_url)
+        self.assertEqual(swr3_source, RADIO_BY_ID["swr3"].stream_url)
+        self.assertEqual(selected["name"], "SWR3")
+        self.assertEqual(player.loaded, RADIO_BY_ID["sunshine_live"].stream_url)
+        self.assertEqual(stepped["selected_preset"]["name"], "sunshine live")
+        self.assertIn("swr3", artwork.loaded)
         self.assertEqual(first["station_id"], second["station_id"])
         self.assertEqual(len(stations), 1)
 
@@ -176,6 +200,8 @@ class ServiceCatalogTests(unittest.TestCase):
                 Path(raw).resolve(), adapter_registry=Registry()
             )
             try:
+                with self.assertRaisesRegex(ValueError, "no active media"):
+                    catalog.control({"action": "pause"})
                 catalog.control(
                     {
                         "action": "service_set_enabled",
@@ -242,12 +268,14 @@ class ServiceCatalogTests(unittest.TestCase):
 
         class Player:
             def __init__(self):
-                self.state = State(state="stopped", source=None, paused=False)
+                self.state = State(
+                    state="stopped", source=None, paused=False, volume=36
+                )
 
             def load(self, source):
                 self.state = State(
                     state="playing", source="https://radio.example/live",
-                    paused=False,
+                    paused=False, volume=self.state.volume,
                 )
 
             def toggle_pause(self):
@@ -255,7 +283,8 @@ class ServiceCatalogTests(unittest.TestCase):
                 self.state.values["paused"] = True
 
             def set_volume(self, value):
-                pass
+                self.state.volume = value
+                self.state.values["volume"] = value
 
             def stop(self):
                 self.state = State(state="stopped", source=None, paused=False)
@@ -292,11 +321,16 @@ class ServiceCatalogTests(unittest.TestCase):
                     }
                 )
                 overlay = catalog.receiver_overlay()
+                volume = catalog.control({"action": "volume_step", "steps": 4})
+                catalog.control({"action": "pause"})
+                paused_overlay = catalog.receiver_overlay()
             finally:
                 catalog.close()
         self.assertEqual(overlay["service"], "RADIO")
         self.assertEqual(overlay["station"], "https://radio.example/live")
         self.assertTrue(overlay["playing"])
+        self.assertEqual(volume["playback"]["volume"], 76)
+        self.assertFalse(paused_overlay["playing"])
 
     def test_station_library_is_persistent_and_never_exposes_query_values(self) -> None:
         class State:

@@ -34,6 +34,12 @@ class DeviceUiTests(unittest.TestCase):
         self.assertEqual(image.mode, "RGB")
         self.assertNotEqual(image.getpixel((2, 120)), image.getpixel((120, 120)))
 
+    def test_radio_artwork_replaces_the_local_initials_tile(self) -> None:
+        state = DeviceUiState(source="SWR3", service_index=1, playing=True)
+        artwork = Image.new("RGB", (32, 32), (220, 20, 40))
+        image = render_device_ui(state, artwork)
+        self.assertEqual(image.getpixel((50, 180)), (220, 20, 40))
+
     def test_rgb565_uses_big_endian_wire_order(self) -> None:
         for color, expected in (
             ((255, 0, 0), b"\xF8\x00"),
@@ -54,7 +60,7 @@ class DeviceUiTests(unittest.TestCase):
         state.apply(InputEvent(Control.RIGHT_INNER, steps=1))
         state.apply(InputEvent(Control.RIGHT_PRESS))
         state.apply(InputEvent(Control.PTT, active=True))
-        self.assertEqual(state.volume, 53)
+        self.assertEqual(state.volume, 80)
         self.assertEqual(state.squelch, 2)
         self.assertEqual(state.channel, 15)
         self.assertEqual(state.service, "RADIO")
@@ -75,6 +81,27 @@ class DeviceUiTests(unittest.TestCase):
         self.assertEqual(state.service, "RADIO")
         self.assertTrue(state.playing)
         self.assertEqual(state.right_action, "PAUSE")
+
+        state.update_from_frame(
+            Frame(
+                screen="dashboard",
+                title="Radio",
+                fields={
+                    "receiver": {
+                        "service": "RADIO",
+                        "station": "sunshine live",
+                        "preset_id": "sunshine_live",
+                        "channel": 2,
+                        "volume": 73,
+                        "playing": True,
+                    }
+                },
+            )
+        )
+        self.assertEqual(state.source, "sunshine live")
+        self.assertEqual(state.preset_id, "sunshine_live")
+        self.assertEqual(state.channel, 2)
+        self.assertEqual(state.volume, 73)
 
     def test_invalid_input_shapes_are_rejected(self) -> None:
         with self.assertRaises(ValueError):
@@ -133,8 +160,8 @@ class WhisplayDisplayTests(unittest.TestCase):
         display = WhisplayDisplay(panel=panel)  # type: ignore[arg-type]
         display.render(Frame(screen="dashboard", title="OpenR4d10"))
         state = display.apply_input(InputEvent(Control.LEFT_OUTER, steps=4))
-        self.assertEqual(state["volume"], 40)
-        self.assertEqual(display.snapshot()["volume"], 40)
+        self.assertEqual(state["volume"], 76)
+        self.assertEqual(display.snapshot()["volume"], 76)
         self.assertEqual(len(panel.frames), 2)
         display.close()
 

@@ -7,11 +7,14 @@ import json
 import logging
 import os
 from pathlib import Path
+import re
 import socket
 import subprocess
 import tempfile
 import threading
 from typing import Any, Protocol
+
+from PIL import Image
 
 from .config import AdapterConfig, HardwareConfig
 from .device_ui import DeviceUiState, image_to_rgb565, render_device_ui
@@ -114,14 +117,31 @@ class CommandDisplay:
 class WhisplayDisplay:
     """Render semantic frames as the agreed native 240 x 280 device UI."""
 
-    def __init__(self, panel: WhisplayPanel | None = None) -> None:
+    def __init__(
+        self,
+        panel: WhisplayPanel | None = None,
+        artwork_cache_root: Path | None = None,
+    ) -> None:
         self.panel = panel or WhisplayPanel()
         self.state = DeviceUiState()
+        self.artwork_cache_root = artwork_cache_root
         self._lock = threading.Lock()
 
     def _show_state(self) -> None:
         try:
-            self.panel.show(image_to_rgb565(render_device_ui(self.state)))
+            artwork = None
+            if (
+                self.artwork_cache_root is not None
+                and self.state.preset_id is not None
+                and re.fullmatch(r"[a-z][a-z0-9_]{1,63}", self.state.preset_id)
+            ):
+                path = self.artwork_cache_root / f"radio-{self.state.preset_id}.jpg"
+                try:
+                    with Image.open(path) as source:
+                        artwork = source.convert("RGB").copy()
+                except OSError:
+                    artwork = None
+            self.panel.show(image_to_rgb565(render_device_ui(self.state, artwork)))
         except (OSError, RuntimeError, WhisplayError) as exc:
             raise AdapterError(f"Whisplay display failed: {exc}") from exc
 
@@ -201,6 +221,7 @@ class CommandTelemetry:
 
 def build_adapters(
     config: HardwareConfig,
+    state_directory: Path | None = None,
 ) -> tuple[Display, Telemetry, Telemetry]:
     if config.display.backend == "file":
         assert config.display.output_path is not None
@@ -208,7 +229,10 @@ def build_adapters(
     elif config.display.backend == "command":
         display = CommandDisplay(config.display)
     elif config.display.backend == "whisplay":
-        display = WhisplayDisplay()
+        cache_root = (
+            state_directory / "cache" if state_directory is not None else None
+        )
+        display = WhisplayDisplay(artwork_cache_root=cache_root)
     else:
         display = UnconfiguredDisplay()
 

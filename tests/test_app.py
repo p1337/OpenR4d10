@@ -76,6 +76,143 @@ class AppTests(unittest.TestCase):
                 with self.subTest(request=request), self.assertRaises(ValueError):
                     app.control(request)
 
+    def test_right_short_press_toggles_real_media_before_display_state(self) -> None:
+        class InputDisplay:
+            def __init__(self) -> None:
+                self.events = []
+
+            def render(self, _frame) -> None:
+                pass
+
+            def apply_input(self, event):
+                self.events.append(event)
+                return {"playing": False, "right_action": "PLAY"}
+
+        class Services:
+            def __init__(self) -> None:
+                self.requests = []
+                self.active_service = "webradio"
+
+            def control(self, request):
+                self.requests.append(request)
+                return {
+                    "playback": {"state": "paused", "paused": True},
+                    "recording": {"state": "stopped"},
+                    "selected_preset": None,
+                }
+
+            def receiver_overlay(self):
+                return {
+                    "service": "RADIO",
+                    "station": "SWR3",
+                    "title": "SWR3",
+                    "playing": False,
+                    "volume": 36,
+                    "channel": 1,
+                    "preset_id": "swr3",
+                }
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            display = InputDisplay()
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=display,
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,
+            )
+
+            paused = app.control(
+                {"action": "device_input", "control": "right_press"}
+            )
+            menu = app.control(
+                {
+                    "action": "device_input",
+                    "control": "right_press",
+                    "held_seconds": 2,
+                }
+            )
+
+        self.assertEqual(services.requests, [{"action": "pause"}])
+        self.assertEqual(paused["playback"]["state"], "paused")
+        self.assertEqual(menu["device_ui"]["right_action"], "PLAY")
+        self.assertEqual(len(display.events), 2)
+
+    def test_volume_and_channel_inputs_route_to_real_media_controls(self) -> None:
+        class InputDisplay:
+            def render(self, _frame) -> None:
+                pass
+
+            def apply_input(self, event):
+                return {"control": event.control.value}
+
+        class Services:
+            def __init__(self) -> None:
+                self.requests = []
+                self.active_service = "webradio"
+
+            def control(self, request):
+                self.requests.append(request)
+                selected = (
+                    {"preset_id": "sunshine_live", "name": "sunshine live", "channel": 2}
+                    if request["action"] == "preset_step"
+                    else None
+                )
+                return {
+                    "playback": {"state": "playing", "paused": False, "volume": 46},
+                    "recording": {"state": "stopped"},
+                    "selected_preset": selected,
+                }
+
+            def receiver_overlay(self):
+                return {}
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=InputDisplay(),
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,
+            )
+
+            volume = app.control(
+                {"action": "device_input", "control": "left_outer", "steps": 1}
+            )
+            station = app.control(
+                {"action": "device_input", "control": "right_outer", "steps": 1}
+            )
+
+        self.assertEqual(
+            services.requests,
+            [
+                {"action": "volume_step", "steps": 1},
+                {"action": "preset_step", "steps": 1},
+            ],
+        )
+        self.assertEqual(volume["playback"]["volume"], 46)
+        self.assertEqual(station["selected_preset"]["name"], "sunshine live")
+
     def test_application_unit_provides_display_handoff_runtime(self) -> None:
         unit = (
             Path(__file__).resolve().parents[1]

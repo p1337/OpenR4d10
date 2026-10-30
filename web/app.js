@@ -346,9 +346,19 @@ async function postDeviceInput(request, button = null) {
     if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
     renderDeviceState(payload.device_ui);
     const state = payload.device_ui || {};
-    output.textContent = request.control === "ptt"
-      ? (state.ptt_active ? "PTT-Eingabe aktiv · kein PTT-Audioadapter verbunden" : "PTT-Eingabe beendet")
-      : `${state.service || "Gerät"} · ${state.title || "Eingabe übernommen"}`;
+    if (payload.selected_preset && request.control === "right_outer") {
+      output.textContent = `Kanal ${payload.selected_preset.channel} · ${payload.selected_preset.name}`;
+    } else if (payload.playback && request.control === "left_outer") {
+      output.textContent = `Wiedergabelautstärke ${payload.playback.volume}%`;
+    } else if (payload.playback && request.control === "right_press") {
+      output.textContent = payload.playback.paused
+        ? "Wiedergabe pausiert"
+        : "Wiedergabe läuft";
+    } else {
+      output.textContent = request.control === "ptt"
+        ? (state.ptt_active ? "PTT-Eingabe aktiv · kein PTT-Audioadapter verbunden" : "PTT-Eingabe beendet")
+        : `${state.service || "Gerät"} · ${state.title || "Eingabe übernommen"}`;
+    }
   } catch (error) {
     output.textContent = `Fehler: ${error.message}`;
   } finally {

@@ -778,6 +778,51 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-30 – Encoderwerte müssen reale Medienfunktionen steuern
+
+- Der reale Test zeigt zusätzlich: Die virtuelle Lautstärke lief sichtbar von
+  ungefähr 30 bis 100 Prozent, ohne die hörbare Lautstärke zu ändern. Ebenso
+  veränderte die Kanalachse nur eine Zahl, nicht den abgespielten Radiosender.
+  Beides sind Präsentationszustände ohne bisherige Verbindung zum Medienkern
+  und damit derselbe Architekturfehler wie beim zunächst wirkungslosen Enter.
+- `left_outer` muss die echte `mpv`-Lautstärke begrenzt von 0 bis 100 ändern.
+  Jede Encoder-Rastung beziehungsweise jeder W/S-Tastendruck verändert sie
+  verbindlich um 10 Prozentpunkte, nicht in langsamen Ein-Prozent-Schritten.
+  Schnell aufeinanderfolgende virtuelle oder spätere physische Eingaben werden
+  zentral serialisiert, damit keine Lautstärke- oder Sender-Rastung durch
+  parallele Browseranfragen verloren geht.
+  `right_outer` wählt im Radio-Dienst zyklisch den vorherigen beziehungsweise
+  nächsten kuratierten Sender und lädt dessen echten Stream. Tastatur,
+  Webtasten und spätere GPIO-Encoder verwenden dafür weiterhin ausschließlich
+  den gemeinsamen `device_input`-Pfad.
+- Im Radio-Hauptbild ist der verständliche Sendername statt der technischen
+  Stream-Adresse darzustellen. Das bereits sicher lokal zwischengespeicherte
+  Senderbild wird groß genutzt; wenn es fehlt, erscheint eine klare lokale
+  Initialenkachel. Der bisherige künstliche Equalizer wird entfernt. Bei einem
+  Live-Stream darf keine erfundene Fortschritts- oder Audiodatenanzeige
+  suggeriert werden.
+- Die Auswahl eines kuratierten Senders stößt das bereits begrenzte, dekodierte
+  und lokal neu codierte Senderbild-Caching im Hintergrund an. Der Streamstart
+  darf weder auf das Bild warten noch bei dessen Ausfall scheitern; bis zum
+  nächsten Display-Refresh bleibt die Initialenkachel sichtbar.
+
+### 2026-10-30 – Enter/ rechter Kurzklick steuert den echten Audioplayer
+
+- Der reale Browsertest hat gezeigt: Enter erreichte zwar als logischer
+  `right_press` die Geräteanzeige und wechselte dort das Play/Pause-Symbol,
+  der laufende Webradio-Stream wurde jedoch nicht pausiert. Ursache war eine
+  fehlende Verbindung zwischen dem bereits gemeinsamen Eingabepfad und dem
+  vorhandenen Medienkern.
+- Ein kurzer rechter Klick muss über den zentralen Anwendungskern denselben
+  echten Play/Pause-Befehl an `mpv` senden wie die Web-Schaltfläche. Erst nach
+  erfolgreicher Medienaktion darf die Geräteanzeige den neuen Zustand zeigen.
+  Enter, der spätere Encoder und der Browserknopf bleiben dabei ein gemeinsamer
+  logischer Eingabepfad; eine zweite Tastatur-Mediensteuerung ist verboten.
+- Ein langer rechter Klick bleibt ausschließlich das Quick-Menü und darf den
+  Stream nicht pausieren. Ohne aktiven oder pausierten Stream wird kein
+  erfundener Wiedergabezustand erzeugt, sondern eine klare Fehlermeldung
+  zurückgegeben.
+
 ### 2026-10-30 – Ein-Befehl-Installation startet nach Erfolg selbst neu
 
 - Robert verlangt, dass der Ein-Befehl-Installer den für neue Kernelmodule und

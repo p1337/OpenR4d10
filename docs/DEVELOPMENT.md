@@ -74,11 +74,22 @@ The `device_input` action is the hardware-free input source for the native
 display. It accepts only the checked-in logical control names, rotary steps
 from -10 through 10 excluding zero, press hold durations from 0 through 5
 seconds, and an explicit boolean `active` state for `ptt`. The application
-passes the resulting `InputEvent` directly to the Whisplay adapter; the normal
-render loop and browser inputs share its display lock. No GPIO number is
-accepted by this endpoint. Browser PTT must release on key-up, focus loss and
-tab hiding. It remains an input indication, not an audio claim, until a real
-authorized service adapter consumes it.
+passes the resulting `InputEvent` through its semantic action router and then
+to the Whisplay adapter; the normal render loop and browser inputs share its
+display lock. A short `right_press`/Enter must be verified to change both the
+public playback state and the actual `mpv` pause state, not merely the display
+icon. A held right press opens the quick menu without touching playback. No
+GPIO number is accepted by this endpoint. Browser PTT must release on key-up,
+focus loss and tab hiding. It remains an input indication, not an audio claim,
+until a real authorized service adapter consumes it.
+
+Volume and radio-channel regression tests must make the same distinction:
+`left_outer` changes `MpvEngine.state.volume` by ten percentage points per
+logical step through its IPC command, and
+`right_outer` loads the selected curated stream rather than only incrementing a
+display counter. Radio frames expose the preset ID, channel and display name,
+but no remote artwork URL, stream URL or local cache path. The physical
+renderer may read only `radio-<preset-id>.jpg` below the configured cache root.
 
 Curated controls are `preset_play`, `preset_save` and `feed_fetch_preset`.
 They accept only a checked-in preset ID and never a client-supplied internal

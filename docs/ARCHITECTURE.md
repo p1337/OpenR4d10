@@ -39,6 +39,30 @@ added; it is not a second navigation model. Browser keyboard bindings translate
 WASD, arrow keys, Space, Enter and held Q into this same contract and are
 disabled while the user edits a form field.
 
+Semantic actions are resolved by the application before the display reflects
+them. In particular, a short `right_press` routes through `ServiceCatalog` to
+the same `MpvEngine.toggle_pause()` operation as the HTTP media control; only a
+successfully active or paused stream may be toggled. A held `right_press`
+remains display navigation for the quick menu. This prevents keyboard or future
+GPIO input from changing a presentation-only `playing` flag while audio keeps
+running.
+
+The same router maps each `left_outer` detent to a bounded ten-percentage-point
+change of the real mpv volume and `right_outer` to cyclic preset selection
+while the radio service is active.
+`ServiceCatalog` owns the active preset identity, human-readable station name,
+channel number and reviewed artwork ID. The public semantic frame contains only
+that safe metadata; the Whisplay adapter resolves an artwork ID against its
+configured private cache root and otherwise draws a local initials tile. It
+never receives a remote image URL or exposes the private cache path.
+Selecting a curated preset starts its existing bounded decode/re-encode cache
+operation in a daemon worker after audio loading succeeds. Artwork latency or
+failure therefore cannot delay or fail stream switching; a later normal frame
+refresh picks up the completed local JPEG.
+The application serializes the semantic media action, device-state update and
+immediate repaint as one device-input transaction so keyboard repeat and future
+GPIO events cannot lose volume or channel steps through concurrent requests.
+
 ## Configuration and storage
 
 - repository defaults: `config/*.toml`

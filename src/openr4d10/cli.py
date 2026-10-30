@@ -110,7 +110,10 @@ def main(argv: list[str] | None = None) -> int:
             print("[WARN] HARDWARE CONFIGURATION REQUIRED")
         return code
 
-    display, power, receiver = build_adapters(hardware_config)
+    display, power, receiver = build_adapters(
+        hardware_config,
+        app_config.state_directory,
+    )
     services = (
         ServiceCatalog(
             app_config.state_directory,

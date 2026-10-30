@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Mapping
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from .input_events import Control, InputEvent
 from .models import Frame
@@ -33,6 +33,7 @@ class DeviceUiState:
     ip_address: str = "--"
     battery_percent: int | None = None
     source: str = "OPENR4D10"
+    preset_id: str | None = None
     title: str = "System online"
     subtitle: str = "Receiver ready"
     playing: bool = False
@@ -60,11 +61,12 @@ class DeviceUiState:
             "ptt_active": self.ptt_active,
             "title": self.title,
             "subtitle": self.subtitle,
+            "preset_id": self.preset_id,
         }
 
     def apply(self, event: InputEvent) -> None:
         if event.control == Control.LEFT_OUTER:
-            self.volume = max(0, min(100, self.volume + event.steps))
+            self.volume = max(0, min(100, self.volume + event.steps * 10))
         elif event.control == Control.LEFT_INNER:
             self.squelch = max(0, min(9, self.squelch + event.steps))
         elif event.control == Control.RIGHT_OUTER:
@@ -110,6 +112,8 @@ class DeviceUiState:
             or receiver.get("hostname")
             or "OPENR4D10"
         )[:28]
+        preset_id = receiver.get("preset_id")
+        self.preset_id = preset_id if isinstance(preset_id, str) else None
         if not self.menu_open:
             self.title = str(receiver.get("title") or frame.title)[:48]
             self.subtitle = str(receiver.get("subtitle") or frame.body)[:72]
@@ -118,6 +122,12 @@ class DeviceUiState:
         self.playing = bool(receiver.get("playing", self.playing))
         self.right_action = "PAUSE" if self.playing else "PLAY"
         self.recording = bool(receiver.get("recording", False))
+        volume = receiver.get("volume")
+        if isinstance(volume, int) and not isinstance(volume, bool):
+            self.volume = max(0, min(100, volume))
+        channel = receiver.get("channel")
+        if isinstance(channel, int) and not isinstance(channel, bool):
+            self.channel = max(1, min(999, channel))
         service = str(receiver.get("service") or "").upper()
         if service in SERVICES:
             self.service_index = SERVICES.index(service)
@@ -207,7 +217,10 @@ def _control_value(
     draw.text((x + 58, y - 1), value, font=large, fill=accent)
 
 
-def render_device_ui(state: DeviceUiState) -> Image.Image:
+def render_device_ui(
+    state: DeviceUiState,
+    artwork: Image.Image | None = None,
+) -> Image.Image:
     image = Image.new("RGBA", (WIDTH, HEIGHT), (4, 8, 10, 255))
     draw = ImageDraw.Draw(image)
     accent = state.accent
@@ -241,30 +254,69 @@ def render_device_ui(state: DeviceUiState) -> Image.Image:
     draw.rectangle((0, 89, WIDTH - 1, HEIGHT - 1), fill=(6, 12, 15))
     draw.rectangle((0, 89, 3, HEIGHT - 1), fill=accent)
     draw.text((14, 101), state.service, font=_font(8, bold=True), fill=accent)
-    draw.text(
-        (14, 114),
-        _fit_text(draw, state.source.upper(), _font(11, bold=True), 210),
-        font=_font(11, bold=True),
-        fill=(237, 242, 243),
-    )
-    title = _fit_text(draw, state.title, _font(15, bold=True), 210)
-    draw.text((14, 136), title, font=_font(15, bold=True), fill=(245, 248, 249))
-    subtitle = _fit_text(draw, state.subtitle, _font(8), 210)
-    draw.text((14, 158), subtitle, font=_font(8), fill=(130, 148, 153))
+    station_font = _font(15, bold=True)
+    station = _fit_text(draw, state.source, station_font, 210)
+    draw.text((14, 114), station, font=station_font, fill=(245, 248, 249))
 
-    base_y = 215
-    for index, height in enumerate((9, 18, 29, 16, 35, 24, 12, 27, 19, 8, 15, 11)):
-        x = 15 + index * 11
-        active = state.playing or index % 3 == 1
-        bar = accent if active else (44, 61, 66)
-        draw.rounded_rectangle((x, base_y - height, x + 5, base_y), radius=2, fill=bar)
-
-    draw.ellipse((166, 183, 214, 231), fill=(12, 23, 27), outline=accent, width=2)
-    if state.playing:
-        draw.rectangle((183, 197, 187, 217), fill=accent)
-        draw.rectangle((193, 197, 197, 217), fill=accent)
+    tile_size = 88
+    tile_xy = (14, 139)
+    if artwork is not None:
+        tile = ImageOps.fit(
+            artwork.convert("RGB"),
+            (tile_size, tile_size),
+            method=Image.Resampling.LANCZOS,
+        )
+        mask = Image.new("L", (tile_size, tile_size), 0)
+        ImageDraw.Draw(mask).rounded_rectangle(
+            (0, 0, tile_size - 1, tile_size - 1),
+            radius=9,
+            fill=255,
+        )
+        image.paste(tile, tile_xy, mask)
     else:
-        draw.polygon(((184, 195), (184, 219), (201, 207)), fill=accent)
+        draw.rounded_rectangle(
+            (14, 139, 101, 226),
+            radius=10,
+            fill=(13, 31, 35),
+            outline=accent,
+            width=2,
+        )
+        initials = "".join(part[:1] for part in state.source.split()[:2]).upper() or "OR"
+        initials_font = _font(24, bold=True)
+        bounds = draw.textbbox((0, 0), initials, font=initials_font)
+        draw.text(
+            (58 - (bounds[2] - bounds[0]) / 2, 183 - (bounds[3] - bounds[1]) / 2),
+            initials,
+            font=initials_font,
+            fill=accent,
+        )
+    draw.rounded_rectangle((13, 138, 102, 227), radius=10, outline=(75, 92, 96), width=1)
+
+    if state.playing:
+        status = "LIVE RADIO" if state.service == "RADIO" else "PLAYING"
+    else:
+        status = "PAUSED" if state.service == "RADIO" else "READY"
+    draw.text((111, 142), status, font=_font(8, bold=True), fill=accent)
+    title = state.title if state.title.casefold() != state.source.casefold() else state.subtitle
+    draw.text(
+        (111, 158),
+        _fit_text(draw, title, _font(8), 111),
+        font=_font(8),
+        fill=(156, 173, 177),
+    )
+    draw.text(
+        (111, 171),
+        f"CHANNEL {state.channel:03d}",
+        font=_font(7, bold=True),
+        fill=(105, 122, 126),
+    )
+
+    draw.ellipse((166, 184, 214, 232), fill=(12, 23, 27), outline=accent, width=2)
+    if state.playing:
+        draw.rectangle((183, 198, 187, 218), fill=accent)
+        draw.rectangle((193, 198, 197, 218), fill=accent)
+    else:
+        draw.polygon(((184, 196), (184, 220), (201, 208)), fill=accent)
     if state.recording:
         draw.ellipse((207, 178, 216, 187), fill=(255, 78, 78))
 

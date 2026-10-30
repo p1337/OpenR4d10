@@ -37,6 +37,7 @@ class OpenR4d10App:
         self.hardware = hardware
         self.services = services
         self.stop_event = threading.Event()
+        self._device_input_lock = threading.Lock()
         self._status_lock = threading.Lock()
         self._latest_frame = Frame(
             screen="startup", title=config.title, body="Dienst wird gestartet"
@@ -134,8 +135,35 @@ class OpenR4d10App:
             held_seconds=held_seconds,
             active=raw_active if control == Control.PTT else None,
         )
+        with self._device_input_lock:
+            return self._apply_device_event(event, handler)
+
+    def _apply_device_event(self, event: InputEvent, handler: Any) -> dict[str, object]:
+        """Resolve one logical input and repaint it as one serialized action."""
+        media_result: dict[str, object] | None = None
+        if self.services is not None and event.control == Control.LEFT_OUTER:
+            media_result = self.services.control(
+                {"action": "volume_step", "steps": event.steps}
+            )
+        elif (
+            self.services is not None
+            and event.control == Control.RIGHT_OUTER
+            and self.services.active_service == "webradio"
+        ):
+            media_result = self.services.control(
+                {"action": "preset_step", "steps": event.steps}
+            )
+        elif event.control == Control.RIGHT_PRESS and event.held_seconds < 2.0:
+            if self.services is None:
+                raise RuntimeError("media control is unavailable")
+            media_result = self.services.control({"action": "pause"})
         device_state = handler(event)
-        return {
+        if media_result is not None:
+            self.render_once()
+            snapshot = getattr(self.display, "snapshot", None)
+            if callable(snapshot):
+                device_state = snapshot()
+        response: dict[str, object] = {
             "accepted": {
                 "control": event.control.value,
                 "steps": event.steps,
@@ -144,6 +172,10 @@ class OpenR4d10App:
             },
             "device_ui": device_state,
         }
+        if media_result is not None:
+            response["playback"] = media_result["playback"]
+            response["selected_preset"] = media_result.get("selected_preset")
+        return response
 
     def show_boot(self) -> None:
         if not self.config.boot_enabled:
