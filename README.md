@@ -40,7 +40,7 @@ the installer report exactly which adapters still need configuration.
   stream recording through shell-free ffmpeg/Opus
 - bounded RSS/Atom reader and two-slot camera snapshots with image validation
   and safe JPEG re-encoding
-- persistent web-radio favorites and bounded local-media library scanning
+- persistent, ordered web-radio library and bounded local-media library scanning
 - curated one-click radio and news-feed presets with locally re-encoded artwork
 - standard-library-only test suite and GitHub Actions CI
 
@@ -111,7 +111,9 @@ releases without SSH. It requires an explicit browser confirmation, shows
 queued/running/failure/reboot status and uses a fixed root-owned systemd helper.
 The web service itself receives no sudo or arbitrary command capability. A
 successful web update follows the same bootstrap/installer checks and automatic
-reboot as the one-command installation.
+reboot as the one-command installation. Before an existing installation is
+changed, the installer must successfully create a consistent secret-free state
+backup below `/var/lib/openr4d10/backups`; a backup failure aborts the update.
 
 The dashboard shows live service, system and adapter status. Until verified
 Whisplay and PiSugar adapters are configured, it labels those components as
@@ -128,10 +130,11 @@ right click. Holding `Q` exposes the logical PTT input; until a verified PTT
 service adapter is configured it deliberately shows input state without
 claiming audio transmission.
 
-For an active radio stream, `W`/`S` changes the actual mpv output volume in
-10-percentage-point steps, up/down immediately loads the previous or next
-curated station, and Enter
-pauses or resumes the real stream. The native radio view uses the station name
+For the radio service, `W`/`S` changes the actual mpv output volume in
+10-percentage-point steps and up/down immediately loads the previous or next
+station in the personal order. Enter pauses or resumes the real stream; while
+radio is selected and playback is stopped, it starts the first station in that
+list. The native radio view uses the station name
 and locally cached safe artwork (or an initials fallback), not a raw stream URL
 or a decorative fake equalizer.
 
@@ -144,9 +147,12 @@ the real speaker is verified after reboot.
 RSS/Atom URLs and camera snapshot URLs can be loaded in the same local panel.
 Feed downloads are size-limited; camera responses are decoded, dimension-
 checked, resized and re-encoded before the browser can retrieve them.
-Saved radio stations can be managed in the same dashboard. Station URLs with a
-query are intentionally refused for persistent storage, while direct temporary
-playback remains possible. Local files copied below
+Saved radio stations can be managed in the same dashboard. On first use the six
+curated stations are copied once into this persistent library. All entries can
+then be reordered, deleted or extended; an intentionally deleted default is not
+recreated by a restart or update. Station URLs with a query are intentionally
+refused for persistent storage, while direct temporary playback remains possible.
+Local files copied below
 `/var/lib/openr4d10/media` appear after selecting **Neu einlesen**; their full
 paths never appear in the public status response.
 

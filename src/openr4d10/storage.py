@@ -224,6 +224,65 @@ class StateStore:
                 for row in rows
             }
 
+    def seed_stations_once(
+        self,
+        service_id: str,
+        stations: tuple[tuple[str, str], ...],
+        *,
+        marker: str,
+    ) -> bool:
+        """Seed a persistent ordered station list once, never after deletion."""
+        if not service_id or not marker or _SECRET_KEY.search(marker):
+            raise ValueError("station seed service and non-secret marker are required")
+        with self.transaction():
+            seeded = self.connection.execute(
+                "SELECT value_json FROM settings WHERE key = ?", (marker,)
+            ).fetchone()
+            if seeded is not None and json.loads(seeded["value_json"]) is True:
+                return False
+
+            existing = self.connection.execute(
+                """
+                SELECT id, stream_url FROM stations
+                WHERE service_id = ? ORDER BY position, id
+                """,
+                (service_id,),
+            ).fetchall()
+            by_url = {str(row["stream_url"]): int(row["id"]) for row in existing}
+            ordered_ids: list[int] = []
+            now = _now()
+            for name, stream_url in stations:
+                station_id = by_url.get(stream_url)
+                if station_id is None:
+                    cursor = self.connection.execute(
+                        """
+                        INSERT INTO stations(
+                            service_id, name, stream_url, position, created_at
+                        ) VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (service_id, name, stream_url, len(ordered_ids), now),
+                    )
+                    station_id = int(cursor.lastrowid)
+                ordered_ids.append(station_id)
+            ordered_ids.extend(
+                int(row["id"])
+                for row in existing
+                if int(row["id"]) not in ordered_ids
+            )
+            self.connection.executemany(
+                "UPDATE stations SET position = ? WHERE id = ?",
+                ((position, station_id) for position, station_id in enumerate(ordered_ids)),
+            )
+            self.connection.execute(
+                """
+                INSERT INTO settings(key, value_json, updated_at) VALUES (?, 'true', ?)
+                ON CONFLICT(key) DO UPDATE SET
+                    value_json = 'true', updated_at = excluded.updated_at
+                """,
+                (marker, now),
+            )
+            return True
+
     def add_station(self, service_id: str, name: str, stream_url: str) -> int:
         if not service_id or not name.strip() or len(name) > 160:
             raise ValueError("station service and name are required")
@@ -234,21 +293,74 @@ class StateStore:
             ).fetchone()
             if existing is not None:
                 return int(existing["id"])
+            last = self.connection.execute(
+                "SELECT MAX(position) AS position FROM stations WHERE service_id = ?",
+                (service_id,),
+            ).fetchone()
+            position = 0 if last is None or last["position"] is None else int(last["position"]) + 1
             cursor = self.connection.execute(
                 """
-                INSERT INTO stations(service_id, name, stream_url, created_at)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO stations(service_id, name, stream_url, position, created_at)
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                (service_id, name.strip(), stream_url, _now()),
+                (service_id, name.strip(), stream_url, position, _now()),
             )
             return int(cursor.lastrowid)
 
     def delete_station(self, station_id: int) -> bool:
         with self.transaction():
+            row = self.connection.execute(
+                "SELECT service_id FROM stations WHERE id = ?", (station_id,)
+            ).fetchone()
+            if row is None:
+                return False
             cursor = self.connection.execute(
                 "DELETE FROM stations WHERE id = ?", (station_id,)
             )
+            self._resequence_stations(str(row["service_id"]))
             return cursor.rowcount == 1
+
+    def move_station(self, station_id: int, direction: int) -> bool:
+        if direction not in {-1, 1}:
+            raise ValueError("station direction must be -1 or 1")
+        with self.transaction():
+            selected = self.connection.execute(
+                "SELECT service_id FROM stations WHERE id = ?", (station_id,)
+            ).fetchone()
+            if selected is None:
+                return False
+            service_id = str(selected["service_id"])
+            rows = self.connection.execute(
+                """
+                SELECT id FROM stations WHERE service_id = ?
+                ORDER BY position, id
+                """,
+                (service_id,),
+            ).fetchall()
+            ordered = [int(row["id"]) for row in rows]
+            current = ordered.index(station_id)
+            target = current + direction
+            if target < 0 or target >= len(ordered):
+                return False
+            ordered[current], ordered[target] = ordered[target], ordered[current]
+            self.connection.executemany(
+                "UPDATE stations SET position = ? WHERE id = ?",
+                ((position, item_id) for position, item_id in enumerate(ordered)),
+            )
+            return True
+
+    def _resequence_stations(self, service_id: str) -> None:
+        rows = self.connection.execute(
+            """
+            SELECT id FROM stations WHERE service_id = ?
+            ORDER BY position, id
+            """,
+            (service_id,),
+        ).fetchall()
+        self.connection.executemany(
+            "UPDATE stations SET position = ? WHERE id = ?",
+            ((position, int(row["id"])) for position, row in enumerate(rows)),
+        )
 
     def station(self, station_id: int) -> dict[str, Any] | None:
         with self._lock:
@@ -264,7 +376,7 @@ class StateStore:
                 """
                 SELECT id, service_id, name, stream_url, favorite, position
                 FROM stations WHERE service_id = ?
-                ORDER BY favorite DESC, position, name COLLATE NOCASE LIMIT 500
+                ORDER BY position, id LIMIT 500
                 """,
                 (service_id,),
             ).fetchall()

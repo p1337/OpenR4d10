@@ -109,9 +109,15 @@ class ServiceCatalog:
         }
         self.active_service = "system"
         self.active_preset_id: str | None = None
+        self.active_station_id: int | None = None
         self.store.ensure_services(
             tuple(item.service_id for item in BUILTIN_SERVICES),
             DEFAULT_ENABLED_SERVICES,
+        )
+        self.store.seed_stations_once(
+            "webradio",
+            tuple((item.name, item.stream_url) for item in RADIO_PRESETS),
+            marker="radio.defaults_seeded_v1",
         )
 
     def snapshot(self) -> dict[str, object]:
@@ -157,15 +163,26 @@ class ServiceCatalog:
             if manifest.implementation in {"external", "official_api"}:
                 item["adapter"] = adapter_state
             services.append(item)
-        stations = [
-            {
-                "id": item["id"],
-                "name": item["name"],
-                "source": public_source_label(str(item["stream_url"])),
-                "favorite": bool(item["favorite"]),
-            }
-            for item in self.store.stations()
-        ]
+        stations = []
+        for channel, item in enumerate(self.store.stations(), start=1):
+            preset = self._preset_for_station(item)
+            stations.append(
+                {
+                    "id": item["id"],
+                    "name": item["name"],
+                    "source": public_source_label(str(item["stream_url"])),
+                    "favorite": bool(item["favorite"]),
+                    "position": channel - 1,
+                    "channel": channel,
+                    "preset_id": preset.preset_id if preset is not None else None,
+                    "country": preset.country if preset is not None else "Eigener Sender",
+                    "genre": preset.genre if preset is not None else "Webradio",
+                    "artwork": (
+                        f"/api/radio-art/{preset.preset_id}"
+                        if preset is not None else None
+                    ),
+                }
+            )
         media = [
             {
                 "id": item["id"],
@@ -211,6 +228,7 @@ class ServiceCatalog:
                     self.player.stop()
                     self.active_service = "system"
                     self.active_preset_id = None
+                    self.active_station_id = None
                 if service_id == "recorder":
                     self.recorder.stop()
             self.store.set_service_enabled(service_id, enabled)
@@ -231,6 +249,7 @@ class ServiceCatalog:
             self.player.load(source)
             self.active_service = service_id
             self.active_preset_id = None
+            self.active_station_id = None
         elif action == "pause":
             if self.player.state.state not in {"playing", "paused"}:
                 raise ValueError("no active media to pause or resume")
@@ -239,6 +258,7 @@ class ServiceCatalog:
             self.player.stop()
             self.active_service = "system"
             self.active_preset_id = None
+            self.active_station_id = None
         elif action == "volume":
             self.player.set_volume(request.get("value"))  # type: ignore[arg-type]
         elif action == "volume_step":
@@ -276,7 +296,21 @@ class ServiceCatalog:
             station_id = request.get("station_id")
             if isinstance(station_id, bool) or not isinstance(station_id, int):
                 raise ValueError("station_delete requires an integer station_id")
-            return {"deleted": self.store.delete_station(station_id)}
+            deleted = self.store.delete_station(station_id)
+            if deleted and self.active_station_id == station_id:
+                self.player.stop()
+                self.active_service = "system"
+                self.active_station_id = None
+                self.active_preset_id = None
+            return {"deleted": deleted}
+        elif action == "station_move":
+            station_id = request.get("station_id")
+            direction = request.get("direction")
+            if isinstance(station_id, bool) or not isinstance(station_id, int):
+                raise ValueError("station_move requires an integer station_id")
+            if isinstance(direction, bool) or not isinstance(direction, int):
+                raise ValueError("station_move requires an integer direction")
+            return {"moved": self.store.move_station(station_id, direction)}
         elif action == "station_play":
             self._require_enabled("webradio")
             station_id = request.get("station_id")
@@ -285,9 +319,19 @@ class ServiceCatalog:
             station = self.store.station(station_id)
             if station is None:
                 raise ValueError("station was not found")
-            self.player.load(str(station["stream_url"]))
-            self.active_service = "webradio"
-            self.active_preset_id = None
+            self._play_station(station)
+        elif action == "radio_toggle":
+            self._require_enabled("webradio")
+            if (
+                self.active_service == "webradio"
+                and self.player.state.state in {"playing", "paused"}
+            ):
+                self.player.toggle_pause()
+            else:
+                stations = self.store.stations()
+                if not stations:
+                    raise ValueError("the radio station list is empty")
+                self._play_station(stations[0])
         elif action == "preset_play":
             self._require_enabled("webradio")
             preset_id = request.get("preset_id")
@@ -304,12 +348,15 @@ class ServiceCatalog:
                 or abs(steps) > 10
             ):
                 raise ValueError("preset steps must be between -10 and 10, excluding zero")
-            preset_ids = tuple(RADIO_BY_ID)
-            if self.active_preset_id in RADIO_BY_ID:
-                current = preset_ids.index(self.active_preset_id)
+            stations = self.store.stations()
+            if not stations:
+                raise ValueError("the radio station list is empty")
+            station_ids = [int(item["id"]) for item in stations]
+            if self.active_station_id in station_ids:
+                current = station_ids.index(self.active_station_id)
             else:
                 current = -1 if steps > 0 else 0
-            self._play_preset(preset_ids[(current + steps) % len(preset_ids)])
+            self._play_station(stations[(current + steps) % len(stations)])
         elif action == "preset_save":
             self._require_enabled("webradio")
             preset_id = request.get("preset_id")
@@ -334,6 +381,7 @@ class ServiceCatalog:
             self.player.load(str(media["path"]))
             self.active_service = "local_media"
             self.active_preset_id = None
+            self.active_station_id = None
         elif action == "adapter_call":
             service_id = request.get("service_id")
             operation = request.get("operation")
@@ -404,10 +452,25 @@ class ServiceCatalog:
 
     def _play_preset(self, preset_id: str) -> None:
         preset = RADIO_BY_ID[preset_id]
-        self.player.load(preset.stream_url)
+        station = next(
+            (
+                item for item in self.store.stations()
+                if item["stream_url"] == preset.stream_url
+            ),
+            None,
+        )
+        if station is None:
+            raise ValueError("radio preset is not in the personal station list")
+        self._play_station(station)
+
+    def _play_station(self, station: dict[str, object]) -> None:
+        self.player.load(str(station["stream_url"]))
         self.active_service = "webradio"
-        self.active_preset_id = preset_id
-        self._cache_preset_artwork(preset_id)
+        self.active_station_id = int(station["id"])
+        preset = self._preset_for_station(station)
+        self.active_preset_id = preset.preset_id if preset is not None else None
+        if preset is not None:
+            self._cache_preset_artwork(preset.preset_id)
 
     def _cache_preset_artwork(self, preset_id: str) -> None:
         with self._artwork_guard:
@@ -432,15 +495,32 @@ class ServiceCatalog:
         ).start()
 
     def _selected_preset(self) -> dict[str, object] | None:
-        preset = RADIO_BY_ID.get(self.active_preset_id or "")
-        if preset is None:
+        if self.active_station_id is None:
             return None
+        station = self.store.station(self.active_station_id)
+        if station is None:
+            return None
+        stations = self.store.stations()
+        station_ids = [int(item["id"]) for item in stations]
+        if self.active_station_id not in station_ids:
+            return None
+        preset = self._preset_for_station(station)
         return {
-            "preset_id": preset.preset_id,
-            "name": preset.name,
-            "channel": tuple(RADIO_BY_ID).index(preset.preset_id) + 1,
-            "artwork": f"/api/radio-art/{preset.preset_id}",
+            "preset_id": preset.preset_id if preset is not None else None,
+            "name": str(station["name"]),
+            "channel": station_ids.index(self.active_station_id) + 1,
+            "artwork": (
+                f"/api/radio-art/{preset.preset_id}" if preset is not None else None
+            ),
         }
+
+    @staticmethod
+    def _preset_for_station(station: dict[str, object]):
+        stream_url = str(station["stream_url"])
+        return next(
+            (item for item in RADIO_PRESETS if item.stream_url == stream_url),
+            None,
+        )
 
     def _require_enabled(self, service_id: str) -> None:
         if not self.store.service_enabled(service_id):

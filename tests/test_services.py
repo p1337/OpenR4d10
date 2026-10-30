@@ -123,7 +123,7 @@ class ServiceCatalogTests(unittest.TestCase):
         self.assertEqual(stepped["selected_preset"]["name"], "sunshine live")
         self.assertIn("swr3", artwork.loaded)
         self.assertEqual(first["station_id"], second["station_id"])
-        self.assertEqual(len(stations), 1)
+        self.assertEqual(len(stations), len(RADIO_BY_ID))
 
     def test_feed_preset_uses_curated_address_and_returns_credit(self) -> None:
         class Reader:
@@ -389,8 +389,81 @@ class ServiceCatalogTests(unittest.TestCase):
             finally:
                 catalog.close()
         self.assertEqual(player.loaded, "https://radio.example/live")
-        self.assertEqual(snapshot["stations"][0]["name"], "Open Radio")
-        self.assertNotIn("stream_url", snapshot["stations"][0])
+        saved = next(item for item in snapshot["stations"] if item["name"] == "Open Radio")
+        self.assertNotIn("stream_url", saved)
+
+    def test_personal_radio_order_drives_enter_and_survives_restart(self) -> None:
+        class State:
+            def __init__(self, state="stopped", source=None, paused=False):
+                self.state = state
+                self.source = source
+                self.paused = paused
+                self.volume = 36
+
+            def as_dict(self):
+                return {
+                    "state": self.state,
+                    "source": self.source,
+                    "paused": self.paused,
+                    "volume": self.volume,
+                }
+
+        class Player:
+            def __init__(self):
+                self.state = State()
+                self.loaded = None
+
+            def load(self, source):
+                self.loaded = source
+                self.state = State("playing", source, False)
+
+            def toggle_pause(self):
+                self.state.paused = not self.state.paused
+                self.state.state = "paused" if self.state.paused else "playing"
+
+            def stop(self):
+                self.state = State()
+
+            def close(self):
+                pass
+
+        class Recorder:
+            def __init__(self):
+                self.state = State()
+
+            def close(self):
+                pass
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            player = Player()
+            catalog = ServiceCatalog(root, player=player, recorder=Recorder())
+            stations = catalog.snapshot()["stations"]
+            swr3 = next(item for item in stations if item["preset_id"] == "swr3")
+            sunshine = next(
+                item for item in stations if item["preset_id"] == "sunshine_live"
+            )
+            catalog.control(
+                {
+                    "action": "station_move",
+                    "station_id": sunshine["id"],
+                    "direction": -1,
+                }
+            )
+            catalog.control({"action": "radio_toggle"})
+            self.assertEqual(player.loaded, RADIO_BY_ID["sunshine_live"].stream_url)
+            catalog.control({"action": "station_delete", "station_id": swr3["id"]})
+            catalog.close()
+
+            reopened = ServiceCatalog(root, player=Player(), recorder=Recorder())
+            try:
+                persisted = reopened.snapshot()["stations"]
+            finally:
+                reopened.close()
+
+        self.assertEqual(persisted[0]["preset_id"], "sunshine_live")
+        self.assertNotIn("swr3", {item["preset_id"] for item in persisted})
+        self.assertEqual(len(persisted), len(RADIO_BY_ID) - 1)
 
     def test_media_scan_indexes_only_approved_files_and_removes_stale_rows(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

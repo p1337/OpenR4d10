@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 readonly INSTALL_ROOT=/opt/openr4d10
 readonly CONFIG_ROOT=/etc/openr4d10
+readonly STATE_ROOT=/var/lib/openr4d10
 readonly SERVICE_FILE=/etc/systemd/system/openr4d10.service
 readonly WRAPPER_FILE=/usr/local/bin/openr4d10
 readonly UPDATE_SERVICE_FILE=/etc/systemd/system/openr4d10-update.service
@@ -94,6 +95,38 @@ if [[ "$platform_ok" != true && "$ALLOW_UNSUPPORTED" != true ]]; then
     die "Expected Debian 13/aarch64 on Raspberry Pi Zero 2 W; found ${PRETTY_NAME:-unknown}, $machine, ${model:-unknown}. Use --allow-unsupported only for deliberate development installs."
 fi
 
+version="$(tr -d '[:space:]' <"$SOURCE_ROOT/VERSION")"
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]] \
+    || die "VERSION has an unsafe format"
+
+state_database="$STATE_ROOT/openr4d10.sqlite3"
+if [[ -f "$state_database" ]]; then
+    command -v python3 >/dev/null 2>&1 \
+        || die "Cannot back up the existing OpenR4d10 state because python3 is unavailable"
+    backup_root="$STATE_ROOT/backups"
+    install -d -m 0750 -o root -g root "$backup_root"
+    backup_stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+    backup_file="$backup_root/pre-update-${backup_stamp}-v${version}.openr4d10.zip"
+    note "Backing up persistent OpenR4d10 state before the update"
+    PYTHONPATH="$SOURCE_ROOT/src" python3 - "$state_database" "$backup_file" <<'PY'
+from pathlib import Path
+import sys
+
+from openr4d10.backup import create_backup
+
+manifest = create_backup(Path(sys.argv[1]), Path(sys.argv[2]))
+print(
+    "Pre-update backup created: "
+    f"{sys.argv[2]} (schema {manifest['schema_version']})"
+)
+PY
+    if getent group openr4d10 >/dev/null 2>&1; then
+        chown root:openr4d10 "$backup_root" "$backup_file"
+    fi
+    chmod 0750 "$backup_root"
+    chmod 0600 "$backup_file"
+fi
+
 note "Installing required operating-system package"
 export DEBIAN_FRONTEND=noninteractive
 kernel_release="$(uname -r)"
@@ -121,9 +154,6 @@ if ! id -u openr4d10 >/dev/null 2>&1; then
 fi
 usermod --append --groups gpio,spi,audio openr4d10
 
-version="$(tr -d '[:space:]' <"$SOURCE_ROOT/VERSION")"
-[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]] \
-    || die "VERSION has an unsafe format"
 release_root="$INSTALL_ROOT/releases/$version"
 
 note "Installing OpenR4d10 $version"

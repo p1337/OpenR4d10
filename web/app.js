@@ -100,27 +100,29 @@ function initials(value) {
 
 function renderPresets(catalog) {
   const presets = catalog?.presets || {};
-  const stations = Array.isArray(presets.stations) ? presets.stations : [];
+  const stations = Array.isArray(catalog?.stations) ? catalog.stations : [];
   const feeds = Array.isArray(presets.feeds) ? presets.feeds : [];
   const signature = JSON.stringify([stations, feeds]);
   if (signature === presetSignature) return;
   presetSignature = signature;
   const grid = byId("radio-preset-grid");
   grid.replaceChildren();
-  for (const station of stations) {
+  stations.forEach((station, index) => {
     const card = document.createElement("article");
     card.className = "radio-preset-card";
 
     const artwork = document.createElement("div");
     artwork.className = "radio-artwork";
     artwork.dataset.initials = initials(station.name);
-    const image = document.createElement("img");
-    image.src = station.artwork;
-    image.alt = `${station.name} Senderbild`;
-    image.loading = "lazy";
-    image.addEventListener("load", () => artwork.classList.add("has-image"));
-    image.addEventListener("error", () => image.remove());
-    artwork.append(image);
+    if (station.artwork) {
+      const image = document.createElement("img");
+      image.src = station.artwork;
+      image.alt = `${station.name} Senderbild`;
+      image.loading = "lazy";
+      image.addEventListener("load", () => artwork.classList.add("has-image"));
+      image.addEventListener("error", () => image.remove());
+      artwork.append(image);
+    }
 
     const copy = document.createElement("div");
     copy.className = "radio-preset-copy";
@@ -132,17 +134,23 @@ function renderPresets(catalog) {
 
     const actions = document.createElement("div");
     actions.className = "radio-preset-actions";
+    const up = libraryButton("↑", "station_move", { station_id: station.id, direction: -1 });
+    const down = libraryButton("↓", "station_move", { station_id: station.id, direction: 1 });
+    up.disabled = index === 0;
+    down.disabled = index === stations.length - 1;
     actions.append(
-      libraryButton("Play", "preset_play", { preset_id: station.preset_id }),
-      libraryButton("Speichern", "preset_save", { preset_id: station.preset_id }),
+      libraryButton("Play", "station_play", { station_id: station.id }),
+      up,
+      down,
+      libraryButton("Löschen", "station_delete", { station_id: station.id }),
     );
     card.append(artwork, copy, actions);
     grid.append(card);
-  }
+  });
   if (!stations.length) {
     const empty = document.createElement("p");
     empty.className = "services-note";
-    empty.textContent = "Die Senderliste wird geladen.";
+    empty.textContent = "Die Senderliste ist leer. Unten kann ein Sender angelegt werden.";
     grid.append(empty);
   }
 
@@ -176,19 +184,25 @@ function renderLibrary(catalog) {
   const stations = Array.isArray(catalog?.stations) ? catalog.stations : [];
   const stationList = byId("station-list");
   stationList.replaceChildren();
-  for (const station of stations) {
+  stations.forEach((station, index) => {
     const row = document.createElement("li");
     const label = document.createElement("span");
     label.textContent = `${station.name} · ${station.source}`;
     const actions = document.createElement("span");
     actions.className = "library-actions";
+    const up = libraryButton("↑", "station_move", { station_id: station.id, direction: -1 });
+    const down = libraryButton("↓", "station_move", { station_id: station.id, direction: 1 });
+    up.disabled = index === 0;
+    down.disabled = index === stations.length - 1;
     actions.append(
       libraryButton("Play", "station_play", { station_id: station.id }),
+      up,
+      down,
       libraryButton("Löschen", "station_delete", { station_id: station.id }),
     );
     row.append(label, actions);
     stationList.append(row);
-  }
+  });
   if (!stations.length) {
     const row = document.createElement("li");
     row.textContent = "Noch keine Sender gespeichert.";
@@ -341,6 +355,8 @@ async function sendControl(action, extra = {}) {
       output.textContent = "Sender gespeichert.";
     } else if (typeof payload.deleted === "boolean") {
       output.textContent = payload.deleted ? "Sender gelöscht." : "Sender nicht gefunden.";
+    } else if (typeof payload.moved === "boolean") {
+      output.textContent = payload.moved ? "Senderreihenfolge gespeichert." : "Sender ist bereits am Listenrand.";
     } else {
       output.textContent = `${payload.playback?.state || "stopped"} · ${payload.recording?.state || "stopped"}`;
     }

@@ -165,7 +165,18 @@ class OpenR4d10App:
         elif event.control == Control.RIGHT_PRESS and event.held_seconds < 2.0:
             if self.services is None:
                 raise RuntimeError("media control is unavailable")
-            media_result = self.services.control({"action": "pause"})
+            display_snapshot = getattr(self.display, "snapshot", None)
+            current_ui = display_snapshot() if callable(display_snapshot) else {}
+            radio_selected = (
+                isinstance(current_ui, dict)
+                and current_ui.get("service") == "RADIO"
+            )
+            action = (
+                "radio_toggle"
+                if radio_selected or self.services.active_service == "webradio"
+                else "pause"
+            )
+            media_result = self.services.control({"action": action})
         device_state = handler(event)
         if media_result is not None:
             self.render_once()

@@ -78,7 +78,9 @@ passes the resulting `InputEvent` through its semantic action router and then
 to the Whisplay adapter; the normal render loop and browser inputs share its
 display lock. A short `right_press`/Enter must be verified to change both the
 public playback state and the actual `mpv` pause state, not merely the display
-icon. A held right press opens the quick menu without touching playback. No
+icon. If radio is selected while the player is stopped, the same event starts
+the first persistent station. A held right press opens the quick menu without
+touching playback. No
 GPIO number is accepted by this endpoint. Browser PTT must release on key-up,
 focus loss and tab hiding. It remains an input indication, not an audio claim,
 until a real authorized service adapter consumes it.
@@ -86,8 +88,10 @@ until a real authorized service adapter consumes it.
 Volume and radio-channel regression tests must make the same distinction:
 `left_outer` changes `MpvEngine.state.volume` by ten percentage points per
 logical step through its IPC command, and
-`right_outer` loads the selected curated stream rather than only incrementing a
-display counter. Radio frames expose the preset ID, channel and display name,
+`right_outer` loads the selected entry from the persistent station order rather
+than only incrementing a display counter. Deleting and reordering default
+stations must survive a new `ServiceCatalog` instance. Radio frames expose the
+optional preset ID, channel and display name,
 but no remote artwork URL, stream URL or local cache path. The physical
 renderer may read only `radio-<preset-id>.jpg` below the configured cache root.
 
@@ -99,10 +103,15 @@ ownership/modes, the exact systemd path, the helper's fixed HTTPS source and
 absence of `sudo`/shell interpolation in the web process. Update progress is
 reported in `/api/status` under `update` and the browser disables its button
 for `queued`, `running` and `rebooting` states.
+`install.sh` must create a portable state backup before `apt-get update` whenever
+the live SQLite database exists. A failed backup is a hard stop; do not move this
+protection behind package installation or release-symlink replacement.
 
-Curated controls are `preset_play`, `preset_save` and `feed_fetch_preset`.
-They accept only a checked-in preset ID and never a client-supplied internal
-stream or feed URL. Update presets and their evidence together in
+Compatibility controls `preset_play` and `preset_save` and the feed control
+`feed_fetch_preset` accept only a checked-in preset ID and never a client-supplied
+internal stream or feed URL. Normal radio UI control uses `station_play`,
+`station_move`, `station_delete` and `radio_toggle` against the persistent list.
+Update source definitions and their evidence together in
 [`PRESETS.md`](PRESETS.md), then test the current addresses without adding
 cookies, tokens or signed URLs.
 

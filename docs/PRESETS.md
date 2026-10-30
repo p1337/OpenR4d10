@@ -3,7 +3,10 @@
 The preset catalog is intentionally small and reviewable. It contains no
 credentials, cookies, signed download URLs or user-specific parameters. The
 runtime reads it from `src/openr4d10/presets.py`; playback and feed parsing do
-not contain station-specific branches.
+not contain station-specific branches. On a new database the radio catalog is
+copied once into the ordered personal station library. Its seed marker is then
+permanent, so user reordering and deletion survive restarts and updates; this
+source catalog remains evidence for artwork and intentional re-adding only.
 
 The addresses below were reviewed on 2026-10-30. Broadcasters may change
 public endpoints, formats or availability. A preset update must be checked

@@ -171,7 +171,7 @@ class AppTests(unittest.TestCase):
                 }
             )
 
-        self.assertEqual(services.requests, [{"action": "pause"}])
+        self.assertEqual(services.requests, [{"action": "radio_toggle"}])
         self.assertEqual(paused["playback"]["state"], "paused")
         self.assertEqual(menu["device_ui"]["right_action"], "PLAY")
         self.assertEqual(len(display.events), 2)
@@ -240,6 +240,60 @@ class AppTests(unittest.TestCase):
         )
         self.assertEqual(volume["playback"]["volume"], 46)
         self.assertEqual(station["selected_preset"]["name"], "sunshine live")
+
+    def test_enter_starts_radio_when_radio_ui_is_selected_and_player_stopped(self) -> None:
+        class InputDisplay:
+            def render(self, _frame) -> None:
+                pass
+
+            def snapshot(self):
+                return {"service": "RADIO", "playing": False}
+
+            def apply_input(self, _event):
+                return self.snapshot()
+
+        class Services:
+            active_service = "system"
+
+            def __init__(self):
+                self.requests = []
+
+            def control(self, request):
+                self.requests.append(request)
+                self.active_service = "webradio"
+                return {
+                    "playback": {"state": "playing", "paused": False},
+                    "recording": {"state": "stopped"},
+                    "selected_preset": {"name": "SWR3", "channel": 1},
+                }
+
+            def receiver_overlay(self):
+                return {"service": "RADIO", "station": "SWR3", "playing": True}
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=InputDisplay(),
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,
+            )
+            result = app.control(
+                {"action": "device_input", "control": "right_press"}
+            )
+
+        self.assertEqual(services.requests, [{"action": "radio_toggle"}])
+        self.assertEqual(result["selected_preset"]["name"], "SWR3")
 
     def test_application_unit_provides_display_handoff_runtime(self) -> None:
         unit = (

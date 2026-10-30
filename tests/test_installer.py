@@ -20,6 +20,12 @@ class InstallerContractTests(unittest.TestCase):
         self.assertIn("bin/openr4d10-update", installer)
         self.assertIn("systemd/openr4d10-update.path", installer)
         self.assertIn("systemctl enable --now openr4d10-update.path", installer)
+        self.assertIn("Backing up persistent OpenR4d10 state before the update", installer)
+        self.assertIn("from openr4d10.backup import create_backup", installer)
+        self.assertLess(
+            installer.index("Backing up persistent OpenR4d10 state before the update"),
+            installer.index("apt-get update"),
+        )
 
     def test_web_updater_has_a_fixed_privilege_boundary(self) -> None:
         repository = Path(__file__).resolve().parents[1]

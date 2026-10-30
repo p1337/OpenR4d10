@@ -18,6 +18,9 @@ class BackupTests(unittest.TestCase):
             store = StateStore(database)
             store.ensure_services(("system", "webradio"), {"system", "webradio"})
             store.set_setting("ui.accent", "cyan")
+            first = store.add_station("webradio", "First", "https://radio.example/1")
+            second = store.add_station("webradio", "Second", "https://radio.example/2")
+            store.move_station(second, -1)
             store.close()
 
             manifest = create_backup(database, archive)
@@ -32,6 +35,10 @@ class BackupTests(unittest.TestCase):
             restored = StateStore(database)
             try:
                 self.assertEqual(restored.get_setting("ui.accent"), "cyan")
+                self.assertEqual(
+                    [item["id"] for item in restored.stations()],
+                    [second, first],
+                )
             finally:
                 restored.close()
 

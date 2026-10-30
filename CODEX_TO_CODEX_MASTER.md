@@ -523,6 +523,14 @@ In der Datenbank liegen:
 - lokale Einwilligungszustände für das freiwillige Aktivierungsregister,
 - ausschließlich Secret-Metadaten, niemals Tokenwerte.
 
+Die kuratierte Radio-Grundausstattung wird beim ersten Lauf genau einmal in
+die dauerhafte Senderbibliothek übernommen. Danach ist ausschließlich diese
+Datenbankliste für Reihenfolge und Gerätebedienung maßgeblich: Standardsender
+und später angelegte Sender können gleichberechtigt sortiert und gelöscht
+werden; neue Einträge werden am Listenende ergänzt. Ein absichtlich gelöschter
+Standardsender darf bei Dienstneustart oder Softwareupdate nicht automatisch
+wieder erscheinen.
+
 Große Audio- und Videodateien bleiben im Dateisystem. Die Datenbank enthält
 Pfad, Quelle, Zeit, Dauer, Codec, Größe und Prüfsumme. Keine unnötigen großen
 BLOBs in SQLite.
@@ -578,6 +586,14 @@ einen begrenzten Status und nutzt weiterhin den einzigen vorhandenen
 `bootstrap.sh`-/`install.sh`-Installationsweg. Die Oberfläche muss Start,
 laufende Installation, Fehler und den anschließenden automatischen Neustart
 verständlich anzeigen und Mehrfachstarts verhindern.
+
+Vor jeder tatsächlichen Installation eines Updates muss der vorhandene
+secret-freie SQLite-Zustand mit der bestehenden konsistenten Backup-Funktion
+gesichert werden. Schlägt diese Sicherung fehl, darf das Update nicht beginnen.
+Damit bleiben insbesondere die persönliche Senderliste und ihre Reihenfolge
+auch dann wiederherstellbar, wenn eine spätere Migration oder Installation
+fehlschlägt; Git-/Archivdateien dürfen den Zustand unter `/var/lib/openr4d10`
+niemals ersetzen.
 
 Bei verbundenem Browser kann der Benutzer die Ausgabe zwischen Gerät,
 Webbrowser und Bluetooth wählen. Das Gerät kann gleichzeitig lokal spielen,
@@ -789,6 +805,24 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-30 – Dauerhafte, sortierbare Radios und Pflichtbackup vor Updates
+
+- Robert legt fest: Befindet sich die Geräteoberfläche im Dienst `RADIO` und
+  läuft noch kein Stream, startet ein kurzer rechter Klick beziehungsweise
+  Enter immer den ersten Eintrag der aktuellen Senderliste. Bei laufendem oder
+  pausiertem Stream bleibt dieselbe Taste echtes Play/Pause.
+- Die sechs kuratierten Standardsender werden einmalig in die dauerhafte
+  SQLite-Senderbibliothek übernommen. Ab dann dürfen sie wie eigene Sender
+  umsortiert und gelöscht werden; neue Sender werden über die Weboberfläche
+  angelegt. Ein gelöschter Standardsender darf weder beim Neustart noch nach
+  einem Update erneut erzwungen werden. Kanalwahl und Anzeige verwenden diese
+  persönliche Reihenfolge statt einer unveränderlichen Preset-Reihenfolge.
+- Vor jedem Update über den vorhandenen Bootstrap-/Installerpfad muss zwingend
+  ein konsistentes, secret-freies Kernbackup der vorhandenen Datenbank erzeugt
+  werden. Bei einem Backupfehler bricht die Installation vor jeder Änderung
+  ab. Das persistente Zustandsverzeichnis bleibt zusätzlich grundsätzlich
+  außerhalb der aus GitHub geladenen Release-Dateien.
 
 ### 2026-10-30 – Systemupdate direkt aus der Weboberfläche
 

@@ -48,11 +48,13 @@ GPIO input from changing a presentation-only `playing` flag while audio keeps
 running.
 
 The same router maps each `left_outer` detent to a bounded ten-percentage-point
-change of the real mpv volume and `right_outer` to cyclic preset selection
-while the radio service is active.
-`ServiceCatalog` owns the active preset identity, human-readable station name,
-channel number and reviewed artwork ID. The public semantic frame contains only
-that safe metadata; the Whisplay adapter resolves an artwork ID against its
+change of the real mpv volume and `right_outer` to cyclic selection in the
+persistent personal station order while the radio service is active. A short
+right press toggles actual playback; if the selected service is radio and the
+player is stopped, it loads position one.
+`ServiceCatalog` owns the active station identity, human-readable station name,
+channel number and optional reviewed artwork ID. The public semantic frame contains
+only that safe metadata; the Whisplay adapter resolves an artwork ID against its
 configured private cache root and otherwise draws a local initials tile. It
 never receives a remote image URL or exposes the private cache path.
 Selecting a curated preset starts its existing bounded decode/re-encode cache
@@ -134,8 +136,11 @@ markup to bounded text. Camera slots accept at most 5 MiB, reject excessive
 pixel dimensions and always decode, resize and atomically re-encode JPEG rather
 than serving untrusted remote bytes.
 
-Curated radio and news entries are immutable data in `presets.py`, separate
-from playback and parser logic. Public status includes display metadata and a
+Curated radio and news source definitions remain reviewable data in `presets.py`,
+separate from playback and parser logic. Radio definitions are seeded exactly
+once into the ordered SQLite station library; the seed marker prevents deleted
+defaults from returning. Channel stepping, Enter-at-stop and the web editor all
+use this persistent list. Public status includes display metadata and a
 local artwork route, but omits the underlying stream, feed and remote artwork
 addresses. Selecting a radio resolves the reviewed stream only inside the
 core. Preset artwork uses the same bounded-download boundary as camera images,
@@ -172,6 +177,12 @@ release so the dashboard can report the failure.
 Success records `rebooting`; the installer performs the already-defined
 automatic reboot. No arbitrary command, repository, branch or installer option
 crosses the web/root boundary.
+
+The sole installer detects an existing state database before package or release
+changes. It uses the existing SQLite online-backup format to create a dated,
+secret-free archive below `/var/lib/openr4d10/backups`. Backup failure is fatal,
+so the update never starts without a recoverable copy of station order and all
+other non-secret state.
 
 ## Startup sequence
 

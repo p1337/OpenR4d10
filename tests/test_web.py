@@ -45,6 +45,8 @@ class WebTests(unittest.TestCase):
         self.assertIn('ArrowLeft: { control: "right_inner", steps: -1 }', script)
         self.assertIn('Space: { control: "left_press" }', script)
         self.assertIn('Enter: { control: "right_press" }', script)
+        self.assertIn('"station_move"', script)
+        self.assertIn('"station_delete"', script)
         self.assertIn("Wiedergabelautstärke", script)
         self.assertIn("payload.selected_preset", script)
         self.assertIn('window.addEventListener("blur"', script)
