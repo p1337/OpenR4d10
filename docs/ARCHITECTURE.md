@@ -16,11 +16,17 @@ CLI -> configuration -> application loop -> semantic UI Frame
 ```
 
 A `Frame` describes intent (`screen`, `title`, `body`, fields and severity), not
-pixels. The native early-boot player is a separate, deliberately narrow path:
-it initializes the verified Whisplay ST7789 panel and streams the checked-in
-240 x 280 RGB565 animation before the application is ready. The final physical
-application renderer is still responsible for mapping semantic frames onto the
-panel and then claiming display ownership from the boot player.
+pixels. `WhisplayDisplay` maps it onto the agreed 240 x 280 device layout with
+Pillow and streams big-endian RGB565 to the verified ST7789 transport. The
+native early-boot player is a separate, deliberately narrow path: it initializes
+the same panel and streams the checked-in animation until the application has
+its first complete dashboard frame and claims display ownership.
+
+Encoder hardware is isolated behind logical `InputEvent` values. Four rotary
+controls (`left_outer`, `left_inner`, `right_outer`, `right_inner`) and two
+press controls are already modeled and tested. No GPIO number appears in the UI
+or navigation logic; the GPIO input source is added after the delivered
+encoders have been identified and measured.
 
 ## Configuration and storage
 
@@ -53,8 +59,8 @@ not an installation dependency.
 6. The semantic text boot manifest is rendered when enabled.
 7. The semantic dashboard state is refreshed at the configured interval and
    exposed through `/api/status`.
-8. A future physical UI calls `claim_display()`, waits for the boot player to
-   close SPI/GPIO and keeps the ownership lock for its entire lifetime.
+8. The Whisplay UI calls `claim_display()`, waits for the boot player to close
+   SPI/GPIO and keeps the ownership lock for its entire lifetime.
 9. `SIGTERM` or `SIGINT` stops the loop and HTTP server cleanly.
 
 An unconfigured display consumes semantic frames without touching GPIO. An
@@ -81,7 +87,8 @@ allows the unprivileged process to bind local HTTP port 80. The generic command
 adapter uses an argument array and `shell=False`; it never interpolates input
 into a shell command.
 
-Hardware device access is not granted globally. The early boot unit runs a
-small native player with a closed device policy that permits only
-`/dev/spidev0.0` and `/dev/gpiochip0`. The application service retains its
-stricter private-device policy until the physical UI renderer exists.
+Hardware device access is not granted globally. Both services use a closed
+device policy that permits only `/dev/spidev0.0` and `/dev/gpiochip0`. The
+application runs as `openr4d10`, receives only the `gpio` and `spi`
+supplementary groups, and still has no access to I2C, audio devices, homes or
+unrelated hardware.

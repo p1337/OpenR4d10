@@ -1,11 +1,9 @@
-# Intentionally contains no active direct-GPIO implementation or PiSugar
-# protocol. The verified Whisplay header pinout is documented in
-# docs/HARDWARE.md.
-# Replace "unconfigured" only after checking the exact hardware documentation.
+# Whisplay uses the verified ST7789 profile documented in docs/HARDWARE.md.
+# PiSugar telemetry deliberately remains unconfigured until its API is verified.
 
 [display]
-backend = "unconfigured"
-# Generic choices: "file" or "command".
+backend = "whisplay"
+# Development alternatives: "file", "command" or "unconfigured".
 # output_path = "/run/openr4d10/display.json"
 # command = ["/absolute/path/to/whisplay-helper", "render"]
 # timeout_seconds = 2.0

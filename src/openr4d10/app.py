@@ -96,6 +96,11 @@ class OpenR4d10App:
         errors = [error for error in (receiver_error, power_error) if error]
         self._publish(dashboard_frame(self.config.title, receiver, power, errors))
 
+    def close(self) -> None:
+        close_display = getattr(self.display, "close", None)
+        if callable(close_display):
+            close_display()
+
     def run(self) -> None:
         self.install_signal_handlers()
         LOG.info("OpenR4d10 service starting")
@@ -123,4 +128,5 @@ class OpenR4d10App:
         finally:
             if self._web_server is not None:
                 self._web_server.stop()
+            self.close()
             LOG.info("OpenR4d10 service stopped")

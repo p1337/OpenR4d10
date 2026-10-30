@@ -19,6 +19,7 @@ function adapterLabel(value) {
     system: "Systemdaten",
     command: "Verbunden",
     file: "Dateiausgabe",
+    whisplay: "Whisplay LCD",
     unconfigured: "Noch offen",
     unknown: "Unbekannt",
   };

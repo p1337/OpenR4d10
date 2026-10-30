@@ -2,8 +2,9 @@
 
 ## Local checks
 
-Python 3.11 or newer is sufficient; the application has no runtime packages
-outside the standard library.
+Python 3.11 or newer is sufficient for the core. The physical renderer requires
+Pillow; the target installer uses Debian's `python3-pil`, `python3-libgpiod` and
+`python3-spidev` packages rather than downloading code with pip.
 
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests -v
@@ -29,7 +30,14 @@ PYTHONPATH=src python3 -m openr4d10 \
 ```
 
 The resulting JSON is the complete boundary between core UI and a future
-display helper.
+display helper. To render the actual 240 x 280 layout without hardware:
+
+```bash
+PYTHONPATH=src python3 -m openr4d10 \
+  --config config/openr4d10.toml \
+  --hardware-config config/hardware.toml \
+  preview-ui --output /tmp/openr4d10-ui.png
+```
 
 ## Web dashboard
 

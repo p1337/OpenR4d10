@@ -9,6 +9,14 @@ from openr4d10.cli import main
 
 
 class CliTests(unittest.TestCase):
+    def test_preview_ui_does_not_require_target_configuration(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            output = Path(raw) / "preview.png"
+            with redirect_stdout(io.StringIO()):
+                code = main(["preview-ui", "--output", str(output)])
+            self.assertEqual(code, 0)
+            self.assertTrue(output.is_file())
+
     def test_doctor_reports_placeholders_but_can_allow_development_mode(self) -> None:
         repository = Path(__file__).resolve().parents[1]
         manifest = repository / "assets" / "boot" / "text-sequence.toml"

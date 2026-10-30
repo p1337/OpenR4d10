@@ -105,6 +105,12 @@ first be identified:
 The planned underside wiring also has to be checked against the exact PiSugar
 model and the enclosure before soldering.
 
+As of 2026-10-30 the ordered dual-concentric encoders are still in transit from
+China to Waiblingen. Physical measurement, continuity testing and soldering are
+therefore not possible yet. UI development proceeds through the hardware-free
+input-event interface; the future GPIO implementation must plug into that
+interface without changing screen or navigation logic.
+
 ## Native boot display
 
 The normal installer compiles `boot/native/openr4d10_boot.c` on the target,
@@ -119,13 +125,27 @@ The service has access only to `/dev/spidev0.0` and `/dev/gpiochip0`. It does
 not configure audio, I2C, PiSugar or encoder GPIOs. See `boot/README.md` for the
 ownership handoff and exact validation status.
 
+## Physical application UI
+
+Release 0.4.0 adds the real physical renderer and selects
+`display.backend = "whisplay"` by default. It uses Debian 13's packaged
+`python3-pil`, `python3-libgpiod` and `python3-spidev` modules. The service waits
+for the early player to release the display lock, keeps that lock, requests
+only BCM4 reset, BCM27 data/command and BCM22 active-low backlight, and writes
+240 x 280 big-endian RGB565 frames through SPI0/CS0 at a conservative 32 MHz.
+
+The UI implements the documented four control fields, vertical `MENU`/`PLAY`
+click labels, WLAN/IP, date/time and battery status row, and the
+service-dependent media area. Logical encoder events are implemented and can be
+tested without hardware; no encoder GPIO assignment is active.
+
 ## Still deliberately unknown
 
 The installed Whisplay audio codec revision and PiSugar model/API have not yet
-been identified on the physical device. Keep the application
-`display.backend` and `power.backend` as `unconfigured` until the physical UI
-renderer and PiSugar integration are implemented and verified on this Debian
-13 target. This does not disable the separate boot player.
+been identified on the physical device. Keep `power.backend` as `unconfigured`
+until the PiSugar integration is implemented and verified. The Whisplay display
+backend is implemented but remains physically unverified until the updated
+installer has run and the real panel result has been reported.
 
 ## Generic adapter contract
 
@@ -185,10 +205,10 @@ field names beyond the optional `state` value.
 3. Verify the bus and device nodes on the target Pi.
 4. Confirm voltage and logic-level requirements before wiring.
 5. Implement the helper without root privileges where possible.
-6. Add only required groups/device permissions via a systemd drop-in. The
-   default unit intentionally sets `PrivateDevices=true` and grants only
-   `CAP_NET_BIND_SERVICE` for the web UI, so a verified hardware adapter must
-   document its narrow device-access override.
+6. Add only required groups/device permissions. The current unit uses
+   `DevicePolicy=closed` and permits only the verified SPI and GPIO character
+   devices; future audio, PiSugar or encoder access needs its own documented
+   review.
 7. Test boot, shutdown, helper timeout and disconnected-hardware behaviour.
 8. Update this document with the source and verified target revision.
 

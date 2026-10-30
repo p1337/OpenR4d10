@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import importlib.util
 import os
 from pathlib import Path
 import platform
@@ -71,6 +72,27 @@ def _command_check(component: str, command: tuple[str, ...]) -> Check:
     return Check("ERROR", f"{component} helper is not executable: {executable}")
 
 
+def _whisplay_checks() -> list[Check]:
+    checks: list[Check] = []
+    for module, package in (
+        ("PIL", "python3-pil"),
+        ("gpiod", "python3-libgpiod"),
+        ("spidev", "python3-spidev"),
+    ):
+        if importlib.util.find_spec(module) is not None:
+            checks.append(Check("OK", f"Whisplay Python module is available: {module}"))
+        else:
+            checks.append(Check("ERROR", f"Whisplay dependency is missing: {package}"))
+    for device in (Path("/dev/spidev0.0"), Path("/dev/gpiochip0")):
+        if device.exists():
+            checks.append(Check("OK", f"Whisplay device is available: {device}"))
+        else:
+            checks.append(
+                Check("WARN", f"Whisplay device is not available yet: {device}; reboot after installation")
+            )
+    return checks
+
+
 def run_checks(
     app: AppConfig,
     hardware: HardwareConfig,
@@ -111,6 +133,8 @@ def run_checks(
             )
         elif adapter.backend == "command":
             checks.append(_command_check(component, adapter.command))
+        elif component == "display" and adapter.backend == "whisplay":
+            checks.extend(_whisplay_checks())
         else:
             checks.append(Check("OK", f"{component} backend is {adapter.backend}"))
     return checks

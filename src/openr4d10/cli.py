@@ -10,6 +10,7 @@ import sys
 from .adapters import build_adapters
 from .app import OpenR4d10App
 from .config import ConfigError, load_app_config, load_hardware_config
+from .device_ui import DeviceUiState, render_device_ui
 from .doctor import exit_code, run_checks
 
 
@@ -30,6 +31,8 @@ def _parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("run", help="run the service loop")
     commands.add_parser("render-once", help="render one dashboard frame")
+    preview = commands.add_parser("preview-ui", help="write a 240x280 UI preview PNG")
+    preview.add_argument("--output", type=Path, required=True, help="PNG output path")
     doctor = commands.add_parser("doctor", help="check platform and configuration")
     doctor.add_argument(
         "--allow-unsupported-platform",
@@ -46,6 +49,12 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    if args.command == "preview-ui":
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        render_device_ui(DeviceUiState()).save(args.output, format="PNG")
+        print(args.output)
+        return 0
+
     try:
         app_config = load_app_config(args.config)
         hardware_config = load_hardware_config(args.hardware_config)
@@ -80,7 +89,10 @@ def main(argv: list[str] | None = None) -> int:
         hardware=hardware_config,
     )
     if args.command == "render-once":
-        application.render_once()
+        try:
+            application.render_once()
+        finally:
+            application.close()
         return 0
     application.run()
     return 0

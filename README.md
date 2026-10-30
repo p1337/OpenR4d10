@@ -1,6 +1,6 @@
 # OpenR4d10
 
-OpenR4d10 is a small, dependency-free Python service for a Raspberry Pi Zero 2 W
+OpenR4d10 is a small Python service for a Raspberry Pi Zero 2 W
 running Debian 13 (Trixie). It provides a safe foundation for a receiver UI,
 boot sequence, display output, status data and power telemetry without guessing
 the Whisplay pinout, display controller or PiSugar protocol.
@@ -16,6 +16,7 @@ the installer report exactly which adapters still need configuration.
 - hardened `systemd` autostart service
 - responsive local web dashboard on `http://<raspberry-pi-ip>/`
 - native Whisplay ST7789 boot animation installed and enabled automatically
+- native 240 x 280 physical UI with the agreed four-axis encoder layout
 - semantic UI frame model and configurable text boot sequence
 - safe `unconfigured`, JSON-file and external-command display adapters
 - built-in Linux system status and optional external-command status/power adapters
@@ -25,9 +26,7 @@ the installer report exactly which adapters still need configuration.
 
 Not included yet:
 
-- the final physical application-UI renderer and Whisplay audio adapter (the
-  native early boot display is included and uses the verified manufacturer
-  pinout documented in `docs/HARDWARE.md`)
+- the Whisplay audio adapter
 - PiSugar API details
 - credentials, WLAN settings, tokens or secrets
 
@@ -53,13 +52,14 @@ The bootstrap downloads a complete GitHub source archive, validates the archive
 before extraction, prints its SHA-256, and only then starts the local installer.
 The installer verifies the operating system, CPU architecture and Raspberry Pi
 model, installs files below `/opt/openr4d10`, preserves existing configuration,
-compiles the Whisplay boot player locally for the Pi, enables SPI, installs and
-enables both systemd services, and runs a final diagnostic. Neither script
-collects or writes credentials.
+compiles the Whisplay boot player locally for the Pi, installs the Debian
+Pillow/libgpiod/spidev packages, enables SPI, installs and enables both systemd
+services, and runs a final diagnostic. Neither script collects or writes
+credentials.
 
 Reboot after the first installation. The native Whisplay animation starts on
-the next boot and keeps its final animated second visible while the still
-unfinished physical application UI is starting. The web dashboard remains
+the next boot and keeps its final animated second visible until the physical
+application UI is ready and takes over the panel. The web dashboard remains
 available independently.
 
 After installation, open the Pi address directly in a browser, for example:
@@ -82,9 +82,8 @@ For an inspect-first installation, download `bootstrap.sh`, review it, and run
 it with `sudo bash bootstrap.sh`. Regardless of how the bootstrap is started,
 it downloads and validates the complete project archive before installation.
 
-The final physical application UI and PiSugar telemetry are still reported as
-configuration-required. This warning no longer means that the Whisplay boot
-display is absent: the native boot stage is installed separately and its log is
+PiSugar telemetry is still reported as configuration-required. The Whisplay
+display backend is installed and selected automatically. Its early-boot log is
 available with `journalctl -u openr4d10-boot -b --no-pager`.
 
 ## Configure hardware
@@ -95,7 +94,9 @@ The installer creates these files only if they do not already exist:
 - `/etc/openr4d10/hardware.toml`
 
 It also refreshes `.dist` copies on every install so local changes can be
-compared with the current defaults. Edit `hardware.toml`, then run:
+compared with the current defaults. An existing display placeholder is migrated
+to `backend = "whisplay"`; all other local settings are preserved. Edit
+`hardware.toml`, then run:
 
 ```bash
 sudo openr4d10 doctor
@@ -113,6 +114,7 @@ No shell is involved and the command must be an absolute path.
 ```bash
 sudo openr4d10 doctor
 openr4d10 render-once
+openr4d10 preview-ui --output /tmp/openr4d10-ui.png
 systemctl status openr4d10
 journalctl -u openr4d10 --since today
 journalctl -u openr4d10-boot -b --no-pager

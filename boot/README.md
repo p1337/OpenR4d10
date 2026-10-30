@@ -98,25 +98,17 @@ Whisplay audio driver. Those remain separate from the LCD boot path.
 
 ## Physical UI handoff
 
-The web prototype currently has no physical UI renderer. Integrate the supplied
-helper into that renderer when it exists:
+`WhisplayDisplay` now performs the handoff automatically on the first complete
+dashboard frame. It deliberately ignores the semantic text-boot frames so the
+approved native animation remains visible until the real UI is ready. The
+helper creates `/run/openr4d10-boot/release`, waits for the boot player to close
+SPI/GPIO and holds `display.lock` for the physical UI's lifetime.
 
-```python
-from openr4d10.boot_display import claim_display
-
-# Finish other UI preparation first. Do not call from web API startup.
-with claim_display():
-    # Initialize WhisplayBoard here and draw the actual first UI frame.
-    # Keep this context for the physical UI's entire lifetime.
-    run_physical_ui()
-```
-
-The helper creates `/run/openr4d10-boot/release`, waits for the boot player to
-close SPI/GPIO and holds `display.lock`. The UI process must belong to
-`openr4d10` and have its own required GPIO/SPI permissions. The helper is
-neither a renderer nor a substitute for the hardware driver. A vendor renderer
-may reset the panel during initialization; measure and address any visible
-handoff flash on the actual hardware.
+The application service belongs to `openr4d10`, receives the `gpio` and `spi`
+supplementary groups and has a closed device policy permitting only
+`/dev/gpiochip0` and `/dev/spidev0.0`. The renderer reuses the existing panel
+state when the boot marker matches, avoiding an unnecessary reset during normal
+handoff. Any visible transition still has to be measured on the real hardware.
 
 ## Verification and performance
 

@@ -183,7 +183,9 @@ def _adapter(
 def load_hardware_config(path: Path) -> HardwareConfig:
     data = _read_toml(path)
     return HardwareConfig(
-        display=_adapter(data, "display", {"unconfigured", "file", "command"}),
+        display=_adapter(
+            data, "display", {"unconfigured", "file", "command", "whisplay"}
+        ),
         power=_adapter(data, "power", {"unconfigured", "command"}),
         receiver=_adapter(data, "receiver", {"system", "command"}),
     )

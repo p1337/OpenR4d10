@@ -85,15 +85,19 @@ note "Installing required operating-system package"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends \
-    python3 ca-certificates gcc libc6-dev zlib1g-dev
+    python3 python3-pil python3-libgpiod python3-spidev fonts-dejavu-core \
+    ca-certificates gcc libc6-dev zlib1g-dev
 
-if ! getent group openr4d10 >/dev/null; then
-    groupadd --system openr4d10
-fi
+for system_group in openr4d10 gpio spi; do
+    if ! getent group "$system_group" >/dev/null; then
+        groupadd --system "$system_group"
+    fi
+done
 if ! id -u openr4d10 >/dev/null 2>&1; then
     useradd --system --gid openr4d10 --home-dir /var/lib/openr4d10 \
         --shell /usr/sbin/nologin openr4d10
 fi
+usermod --append --groups gpio,spi openr4d10
 
 version="$(tr -d '[:space:]' <"$SOURCE_ROOT/VERSION")"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]] \
@@ -106,6 +110,7 @@ for directory in src assets web; do
     install -d -m 0755 -o root -g root "$release_root/$directory"
     cp -a -- "$SOURCE_ROOT/$directory/." "$release_root/$directory/"
 done
+
 install -m 0644 -o root -g root "$SOURCE_ROOT/VERSION" "$release_root/VERSION"
 find "$release_root" -type d -exec chmod 0755 {} +
 find "$release_root" -type f -exec chmod 0644 {} +
@@ -126,6 +131,33 @@ for config_name in openr4d10.toml hardware.toml; do
         note "Preserving existing $live_config"
     fi
 done
+
+# Version 0.3 shipped the Whisplay boot player but kept the live application
+# display backend unconfigured. Migrate only that exact placeholder and leave
+# every other local hardware setting untouched. On a fresh installation the
+# new default already contains the Whisplay backend, so this is a no-op.
+python3 - "$CONFIG_ROOT/hardware.toml" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+section = ""
+changed = False
+for index, line in enumerate(lines):
+    stripped = line.strip()
+    if stripped.startswith("[") and stripped.endswith("]"):
+        section = stripped[1:-1]
+    elif section == "display" and stripped == 'backend = "unconfigured"':
+        newline = "\n" if line.endswith("\n") else ""
+        lines[index] = 'backend = "whisplay"' + newline
+        changed = True
+        break
+if changed:
+    path.write_text("".join(lines), encoding="utf-8")
+PY
+chown root:openr4d10 "$CONFIG_ROOT/hardware.toml"
+chmod 0640 "$CONFIG_ROOT/hardware.toml"
 
 install -m 0755 -o root -g root "$SOURCE_ROOT/bin/openr4d10" "$WRAPPER_FILE"
 install -m 0644 -o root -g root "$SOURCE_ROOT/systemd/openr4d10.service" "$SERVICE_FILE"
@@ -168,7 +200,7 @@ echo
 echo "OpenR4d10 $version is installed and enabled."
 if [[ $doctor_status -eq 2 ]]; then
     echo "APPLICATION HARDWARE CONFIGURATION REQUIRED: edit $CONFIG_ROOT/hardware.toml"
-    echo "The native Whisplay boot display is installed; the main physical UI and PiSugar telemetry remain unconfigured."
+    echo "The native Whisplay UI is installed; PiSugar telemetry remains unconfigured."
 fi
 echo "Status: systemctl status openr4d10"
 echo "Logs:   journalctl -u openr4d10 -f"

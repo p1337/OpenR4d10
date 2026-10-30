@@ -13,7 +13,9 @@ import tempfile
 from typing import Any, Protocol
 
 from .config import AdapterConfig, HardwareConfig
+from .device_ui import DeviceUiState, image_to_rgb565, render_device_ui
 from .models import Frame
+from .whisplay import WhisplayError, WhisplayPanel
 
 LOG = logging.getLogger(__name__)
 
@@ -107,6 +109,28 @@ class CommandDisplay:
         _run_json_command(self.config, frame.as_dict())
 
 
+class WhisplayDisplay:
+    """Render semantic frames as the agreed native 240 x 280 device UI."""
+
+    def __init__(self, panel: WhisplayPanel | None = None) -> None:
+        self.panel = panel or WhisplayPanel()
+        self.state = DeviceUiState()
+
+    def render(self, frame: Frame) -> None:
+        # Keep the approved native animation visible until the first real UI
+        # frame is ready instead of replacing it with the semantic text fallback.
+        if frame.screen == "boot":
+            return
+        self.state.update_from_frame(frame)
+        try:
+            self.panel.show(image_to_rgb565(render_device_ui(self.state)))
+        except (OSError, RuntimeError, WhisplayError) as exc:
+            raise AdapterError(f"Whisplay display failed: {exc}") from exc
+
+    def close(self) -> None:
+        self.panel.close()
+
+
 class UnconfiguredTelemetry:
     def __init__(self, component: str) -> None:
         self.component = component
@@ -116,6 +140,15 @@ class UnconfiguredTelemetry:
 
 
 class SystemTelemetry:
+    @staticmethod
+    def _local_ipv4() -> str | None:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+                probe.connect(("192.0.2.1", 9))
+                return str(probe.getsockname()[0])
+        except OSError:
+            return None
+
     def read(self) -> Mapping[str, Any]:
         uptime = None
         try:
@@ -129,6 +162,8 @@ class SystemTelemetry:
         return {
             "state": "online",
             "hostname": socket.gethostname(),
+            "wifi": "WLAN",
+            "ip_address": self._local_ipv4(),
             "uptime_seconds": uptime,
             "load_1m": load,
         }
@@ -153,6 +188,8 @@ def build_adapters(
         display: Display = FileDisplay(config.display.output_path)
     elif config.display.backend == "command":
         display = CommandDisplay(config.display)
+    elif config.display.backend == "whisplay":
+        display = WhisplayDisplay()
     else:
         display = UnconfiguredDisplay()
 
