@@ -1,0 +1,13 @@
+The ST7789 initialization command sequence and panel geometry in
+openr4d10_boot.c are based on the PiSugar Whisplay driver:
+https://github.com/PiSugar/Whisplay
+Commit: b2ccecab528caf939f0e3a900547cd094029f13e
+Source file: runtime/whisplay.py
+Upstream license: Apache License, Version 2.0 (LICENSE.PiSugar).
+
+Changes by OpenR4d10: implemented a native C SPI/GPIO backend, independent
+compressed RGB565 frame format, boot playback, first-image stage and UI
+ownership handoff. No upstream audio, microphone or button driver is included.
+
+The upstream portions retain their Apache-2.0 license. OpenR4d10's project
+license does not impose additional restrictions on the upstream originals.

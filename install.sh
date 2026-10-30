@@ -41,6 +41,10 @@ required=(
     assets/boot/text-sequence.toml
     web/index.html web/app.css web/app.js
     systemd/openr4d10.service bin/openr4d10
+    boot/install.sh boot/openr4d10-boot.service
+    boot/native/openr4d10_boot.c boot/native/LICENSE.PiSugar
+    boot/native/NOTICE.PiSugar boot/assets/boot.opb boot/assets/first.opb
+    boot/assets/manifest.json
 )
 for relative in "${required[@]}"; do
     [[ -f "$SOURCE_ROOT/$relative" ]] || die "Required project file missing: $relative"
@@ -80,7 +84,8 @@ fi
 note "Installing required operating-system package"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y --no-install-recommends python3 ca-certificates
+apt-get install -y --no-install-recommends \
+    python3 ca-certificates gcc libc6-dev zlib1g-dev
 
 if ! getent group openr4d10 >/dev/null; then
     groupadd --system openr4d10
@@ -125,6 +130,9 @@ done
 install -m 0755 -o root -g root "$SOURCE_ROOT/bin/openr4d10" "$WRAPPER_FILE"
 install -m 0644 -o root -g root "$SOURCE_ROOT/systemd/openr4d10.service" "$SERVICE_FILE"
 
+note "Installing the verified Whisplay ST7789 boot display"
+OPENR4D10_SKIP_APT=1 bash "$SOURCE_ROOT/boot/install.sh"
+
 note "Enabling systemd autostart"
 systemctl daemon-reload
 systemctl enable openr4d10.service
@@ -159,9 +167,11 @@ fi
 echo
 echo "OpenR4d10 $version is installed and enabled."
 if [[ $doctor_status -eq 2 ]]; then
-    echo "HARDWARE CONFIGURATION REQUIRED: edit $CONFIG_ROOT/hardware.toml"
-    echo "No unsupported Whisplay driver or PiSugar protocol was guessed."
+    echo "APPLICATION HARDWARE CONFIGURATION REQUIRED: edit $CONFIG_ROOT/hardware.toml"
+    echo "The native Whisplay boot display is installed; the main physical UI and PiSugar telemetry remain unconfigured."
 fi
 echo "Status: systemctl status openr4d10"
 echo "Logs:   journalctl -u openr4d10 -f"
 echo "Web UI: http://<raspberry-pi-ip>/"
+echo "Whisplay boot animation: enabled for the next reboot"
+echo "Whisplay logs: journalctl -u openr4d10-boot -b --no-pager"

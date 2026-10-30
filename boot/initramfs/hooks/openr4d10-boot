@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+case "${1:-}" in prereqs) exit 0;; esac
+. /usr/share/initramfs-tools/hook-functions
+copy_exec /usr/libexec/openr4d10-boot /usr/libexec/openr4d10-boot
+copy_file binary /usr/share/openr4d10/boot/first.opb /usr/share/openr4d10/boot/first.opb
+manual_add_modules spi_bcm2835
+manual_add_modules spidev

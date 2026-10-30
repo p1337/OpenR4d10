@@ -6,6 +6,22 @@
 - Debian GNU/Linux 13 (Trixie)
 - `aarch64`
 
+## Physical assembly reported on 2026-10-30
+
+- complete 2 x 20 header soldered at all 40 Pi contacts
+- Whisplay HAT fitted on the front
+- PiSugar 3 battery pack fitted on the rear
+- Raspberry Pi and `openr4d10.service` boot successfully
+- Whisplay RGB LED illuminates
+- LCD stayed black while the previous `display.backend = "unconfigured"`
+  installation intentionally made no SPI writes
+
+The LED observation confirms power and some connections, not the LCD SPI path.
+Release 0.3.0 therefore installs the already prepared native ST7789 boot player
+for the first real target-hardware test. Until Robert reports the result after
+reboot, colours, orientation, sustained frame rate and electrical stability
+remain target-unverified.
+
 ## Verified Whisplay HAT facts
 
 The official [PiSugar Whisplay documentation](https://docs.pisugar.com/docs/product-wiki/whisplay/overview)
@@ -89,12 +105,27 @@ first be identified:
 The planned underside wiring also has to be checked against the exact PiSugar
 model and the enclosure before soldering.
 
+## Native boot display
+
+The normal installer compiles `boot/native/openr4d10_boot.c` on the target,
+verifies every compressed animation frame before installation, enables SPI and
+enables `openr4d10-boot.service` for the next reboot. The implementation uses
+the manufacturer-verified profile: SPI0/CS0, BCM4 reset, BCM27 data/command,
+BCM22 active-low backlight, RGB565, MADCTL `0xC0` and vertical offset 20. It
+starts conservatively at 32 MHz rather than copying the vendor runtime's
+100 MHz request.
+
+The service has access only to `/dev/spidev0.0` and `/dev/gpiochip0`. It does
+not configure audio, I2C, PiSugar or encoder GPIOs. See `boot/README.md` for the
+ownership handoff and exact validation status.
+
 ## Still deliberately unknown
 
 The installed Whisplay audio codec revision and PiSugar model/API have not yet
-been identified on the physical device. Keep `display.backend` and
-`power.backend` as `unconfigured` until the official driver integration is
-implemented and verified on this Debian 13 target.
+been identified on the physical device. Keep the application
+`display.backend` and `power.backend` as `unconfigured` until the physical UI
+renderer and PiSugar integration are implemented and verified on this Debian
+13 target. This does not disable the separate boot player.
 
 ## Generic adapter contract
 

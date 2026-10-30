@@ -16,10 +16,11 @@ CLI -> configuration -> application loop -> semantic UI Frame
 ```
 
 A `Frame` describes intent (`screen`, `title`, `body`, fields and severity), not
-pixels. This is deliberate: the verified Whisplay controller and header pinout
-are documented in `docs/HARDWARE.md`, but the display adapter has not yet been
-implemented and verified on this Debian 13 target. A future Whisplay adapter is
-responsible for mapping a frame onto that hardware.
+pixels. The native early-boot player is a separate, deliberately narrow path:
+it initializes the verified Whisplay ST7789 panel and streams the checked-in
+240 x 280 RGB565 animation before the application is ready. The final physical
+application renderer is still responsible for mapping semantic frames onto the
+panel and then claiming display ownership from the boot player.
 
 ## Configuration and storage
 
@@ -42,14 +43,19 @@ not an installation dependency.
 
 ## Startup sequence
 
-1. `systemd` creates runtime and state directories as the `openr4d10` user.
-2. The CLI parses and validates both TOML files.
-3. Adapters are created from explicit backend names.
-4. The read-only web dashboard binds to the configured local address and port.
-5. The text boot manifest is rendered when enabled.
-6. The semantic dashboard state is refreshed at the configured interval and
+1. `openr4d10-boot.service` opens SPI0/CS0 plus only the verified LCD GPIO
+   lines and plays the native animation; its final second loops.
+2. `systemd` creates application runtime and state directories as the
+   `openr4d10` user.
+3. The CLI parses and validates both TOML files.
+4. Adapters are created from explicit backend names.
+5. The read-only web dashboard binds to the configured local address and port.
+6. The semantic text boot manifest is rendered when enabled.
+7. The semantic dashboard state is refreshed at the configured interval and
    exposed through `/api/status`.
-7. `SIGTERM` or `SIGINT` stops the loop and HTTP server cleanly.
+8. A future physical UI calls `claim_display()`, waits for the boot player to
+   close SPI/GPIO and keeps the ownership lock for its entire lifetime.
+9. `SIGTERM` or `SIGINT` stops the loop and HTTP server cleanly.
 
 An unconfigured display consumes semantic frames without touching GPIO. An
 unconfigured power adapter returns an explicit state that the UI surfaces as
@@ -75,5 +81,7 @@ allows the unprivileged process to bind local HTTP port 80. The generic command
 adapter uses an argument array and `shell=False`; it never interpolates input
 into a shell command.
 
-Hardware device and group permissions are intentionally not granted globally.
-They must be added narrowly after the real adapter and device nodes are known.
+Hardware device access is not granted globally. The early boot unit runs a
+small native player with a closed device policy that permits only
+`/dev/spidev0.0` and `/dev/gpiochip0`. The application service retains its
+stricter private-device policy until the physical UI renderer exists.

@@ -15,6 +15,7 @@ the installer report exactly which adapters still need configuration.
 - idempotent one-command online installer with no Git dependency
 - hardened `systemd` autostart service
 - responsive local web dashboard on `http://<raspberry-pi-ip>/`
+- native Whisplay ST7789 boot animation installed and enabled automatically
 - semantic UI frame model and configurable text boot sequence
 - safe `unconfigured`, JSON-file and external-command display adapters
 - built-in Linux system status and optional external-command status/power adapters
@@ -22,12 +23,12 @@ the installer report exactly which adapters still need configuration.
 - runtime data in `/run/openr4d10` and state in `/var/lib/openr4d10`
 - standard-library-only test suite and GitHub Actions CI
 
-Not included on purpose:
+Not included yet:
 
-- a working Whisplay display/audio adapter (the verified manufacturer pinout
-  and mechanical connection are documented in `docs/HARDWARE.md`)
+- the final physical application-UI renderer and Whisplay audio adapter (the
+  native early boot display is included and uses the verified manufacturer
+  pinout documented in `docs/HARDWARE.md`)
 - PiSugar API details
-- binary boot-animation assets
 - credentials, WLAN settings, tokens or secrets
 
 Those values must come from the exact hardware documentation. See
@@ -52,8 +53,14 @@ The bootstrap downloads a complete GitHub source archive, validates the archive
 before extraction, prints its SHA-256, and only then starts the local installer.
 The installer verifies the operating system, CPU architecture and Raspberry Pi
 model, installs files below `/opt/openr4d10`, preserves existing configuration,
-installs and enables `openr4d10.service`, and runs a final diagnostic. Neither
-script collects or writes credentials.
+compiles the Whisplay boot player locally for the Pi, enables SPI, installs and
+enables both systemd services, and runs a final diagnostic. Neither script
+collects or writes credentials.
+
+Reboot after the first installation. The native Whisplay animation starts on
+the next boot and keeps its final animated second visible while the still
+unfinished physical application UI is starting. The web dashboard remains
+available independently.
 
 After installation, open the Pi address directly in a browser, for example:
 
@@ -75,10 +82,10 @@ For an inspect-first installation, download `bootstrap.sh`, review it, and run
 it with `sudo bash bootstrap.sh`. Regardless of how the bootstrap is started,
 it downloads and validates the complete project archive before installation.
 
-If the final hardware adapter is not configured yet, installation still
-succeeds and the service runs headless. The final output clearly says
-`HARDWARE CONFIGURATION REQUIRED`. This is expected and safer than inventing
-pins or silently attempting GPIO access.
+The final physical application UI and PiSugar telemetry are still reported as
+configuration-required. This warning no longer means that the Whisplay boot
+display is absent: the native boot stage is installed separately and its log is
+available with `journalctl -u openr4d10-boot -b --no-pager`.
 
 ## Configure hardware
 
@@ -108,6 +115,7 @@ sudo openr4d10 doctor
 openr4d10 render-once
 systemctl status openr4d10
 journalctl -u openr4d10 --since today
+journalctl -u openr4d10-boot -b --no-pager
 curl http://127.0.0.1/healthz
 ```
 

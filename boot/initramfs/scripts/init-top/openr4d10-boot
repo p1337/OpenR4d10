@@ -1,0 +1,19 @@
+#!/bin/sh
+# Optional first still image before mounting the root filesystem.
+# A failure must never prevent the Raspberry Pi from continuing its boot.
+case "${1:-}" in prereqs) echo udev; exit 0;; esac
+modprobe spi_bcm2835 2>/dev/null || true
+modprobe spidev 2>/dev/null || true
+attempt=0
+while [ "$attempt" -lt 50 ]; do
+    if [ -c /dev/spidev0.0 ] && [ -c /dev/gpiochip0 ]; then
+        mkdir -p /run/openr4d10-boot
+        if ! /usr/libexec/openr4d10-boot --still /usr/share/openr4d10/boot/first.opb; then
+            echo 'OpenR4d10: early display unavailable; continuing normal boot.' >&2
+        fi
+        break
+    fi
+    attempt=$((attempt + 1))
+    sleep 0.02
+done
+exit 0

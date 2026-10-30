@@ -5,3 +5,6 @@
 *.jpeg binary
 *.gif binary
 *.webp binary
+*.mp4 binary
+*.opb binary
+*.rgb565 binary

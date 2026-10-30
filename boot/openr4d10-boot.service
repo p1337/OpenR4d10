@@ -1,0 +1,34 @@
+[Unit]
+Description=OpenR4d10 native Whisplay early boot animation
+DefaultDependencies=no
+After=local-fs.target systemd-udevd.service systemd-udev-trigger.service
+Before=basic.target shutdown.target
+Conflicts=shutdown.target
+ConditionPathExists=/usr/share/openr4d10/boot/boot.opb
+
+[Service]
+Type=simple
+User=root
+Group=openr4d10
+EnvironmentFile=-/etc/openr4d10/boot.env
+RuntimeDirectory=openr4d10-boot
+RuntimeDirectoryMode=0770
+RuntimeDirectoryPreserve=yes
+UMask=0007
+ExecStartPre=-/sbin/modprobe spi_bcm2835
+ExecStartPre=-/sbin/modprobe spidev
+ExecStart=/usr/libexec/openr4d10-boot --loop /usr/share/openr4d10/boot/boot.opb
+TimeoutStopSec=2
+Restart=no
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+DevicePolicy=closed
+DeviceAllow=/dev/spidev0.0 rw
+DeviceAllow=/dev/gpiochip0 rw
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=sysinit.target

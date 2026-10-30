@@ -9,6 +9,7 @@ outside the standard library.
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 bash -n bootstrap.sh
 bash -n install.sh
+bash -n boot/install.sh
 bash install.sh --check --allow-unsupported
 ```
 
@@ -53,6 +54,14 @@ systemctl cat openr4d10
 `doctor` exit status `2` means the checked-in placeholder hardware configuration
 is still active. It does not mean the installer failed. Exit status `1` means a
 file, helper, manifest or platform check failed.
+
+The native boot player has an additional hardware-independent integrity mode:
+
+```bash
+gcc -O2 -std=c11 -Wall -Wextra -Werror \
+  boot/native/openr4d10_boot.c -lz -o /tmp/openr4d10-boot-check
+/tmp/openr4d10-boot-check --verify boot/assets/boot.opb
+```
 
 ## Making lasting architecture changes
 
