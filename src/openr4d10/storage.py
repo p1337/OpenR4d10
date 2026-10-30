@@ -13,7 +13,7 @@ import threading
 from typing import Any
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 _SECRET_KEY = re.compile(
     r"(^|[._-])(password|passwd|token|secret|api[_-]?key|private[_-]?key)($|[._-])",
     re.IGNORECASE,
@@ -84,6 +84,11 @@ CREATE TABLE IF NOT EXISTS recordings (
 );
 """
 
+MIGRATION_2 = """
+UPDATE service_state SET enabled = 1, updated_at = CURRENT_TIMESTAMP
+WHERE service_id IN ('system', 'webradio', 'local_media', 'recorder', 'rss', 'webcam');
+"""
+
 
 def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
@@ -123,6 +128,15 @@ class StateStore:
                     (1, _now()),
                 )
                 self.connection.execute("PRAGMA user_version = 1")
+            current = 1
+        if current < 2:
+            with self.transaction():
+                self.connection.executescript(MIGRATION_2)
+                self.connection.execute(
+                    "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+                    (2, _now()),
+                )
+                self.connection.execute("PRAGMA user_version = 2")
 
     @contextmanager
     def transaction(self) -> Iterator[None]:
@@ -157,17 +171,40 @@ class StateStore:
             ).fetchone()
         return default if row is None else json.loads(row["value_json"])
 
-    def ensure_services(self, service_ids: tuple[str, ...]) -> None:
+    def ensure_services(
+        self, service_ids: tuple[str, ...], default_enabled: set[str] | None = None
+    ) -> None:
         now = _now()
+        enabled = default_enabled or set()
         with self.transaction():
             self.connection.executemany(
                 """
                 INSERT OR IGNORE INTO service_state(
                     service_id, enabled, config_state, updated_at
-                ) VALUES (?, 0, 'not_configured', ?)
+                ) VALUES (?, ?, 'not_configured', ?)
                 """,
-                ((service_id, now) for service_id in service_ids),
+                ((service_id, int(service_id in enabled), now) for service_id in service_ids),
             )
+
+    def set_service_enabled(self, service_id: str, enabled: bool) -> None:
+        if not service_id or not isinstance(enabled, bool):
+            raise ValueError("service_id and boolean enabled state are required")
+        with self.transaction():
+            cursor = self.connection.execute(
+                "UPDATE service_state SET enabled = ?, updated_at = ? WHERE service_id = ?",
+                (int(enabled), _now(), service_id),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError("unknown service")
+
+    def service_enabled(self, service_id: str) -> bool:
+        with self._lock:
+            row = self.connection.execute(
+                "SELECT enabled FROM service_state WHERE service_id = ?", (service_id,)
+            ).fetchone()
+        if row is None:
+            raise ValueError("unknown service")
+        return bool(row["enabled"])
 
     def service_states(self) -> dict[str, dict[str, Any]]:
         with self._lock:

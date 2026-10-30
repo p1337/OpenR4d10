@@ -64,6 +64,12 @@ in separate system services; the core connects only to a service-named Unix
 socket and exchanges bounded JSON. A successful status handshake is required
 before an external catalog entry becomes ready.
 
+Service activation is persistent. Core modules (`system`, web radio, local
+media, recorder, feeds and camera snapshots) start enabled; external modules
+start disabled. Disabled modules are not probed or reported as ready. Enabling
+an external module still requires its manifest and successful handshake, and
+disabling an active media module stops its current playback or recording.
+
 `MpvEngine` starts lazily and controls mpv through an inherited Unix socket
 using the documented JSON IPC. It disables user configuration and terminal
 input. `StreamRecorder` invokes ffmpeg through an argument array with

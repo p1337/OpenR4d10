@@ -38,6 +38,7 @@ function readinessLabel(value) {
     configuration_required: "Konfiguration nötig",
     missing_dependency: "Paket fehlt",
     adapter_error: "Adapter nicht erreichbar",
+    disabled: "Deaktiviert",
   };
   return labels[value] || value;
 }
@@ -71,6 +72,16 @@ function renderServices(catalog) {
           ? "Offizielle Anmeldung erforderlich"
           : "Lokaler Adapter";
     card.append(heading, description, detail);
+    if (service.service_id !== "system") {
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.textContent = service.enabled ? "Deaktivieren" : "Aktivieren";
+      toggle.addEventListener("click", () => sendControl("service_set_enabled", {
+        service_id: service.service_id,
+        enabled: !service.enabled,
+      }));
+      card.append(toggle);
+    }
     grid.append(card);
   }
   renderLibrary(catalog);
@@ -197,7 +208,17 @@ async function sendControl(action, extra = {}) {
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
-    output.textContent = `${payload.playback?.state || "stopped"} · ${payload.recording?.state || "stopped"}`;
+    if (typeof payload.enabled === "boolean") {
+      output.textContent = `Dienst ${payload.enabled ? "aktiviert" : "deaktiviert"}.`;
+    } else if (Number.isInteger(payload.scanned)) {
+      output.textContent = `${payload.scanned} Mediendateien eingelesen.`;
+    } else if (Number.isInteger(payload.station_id)) {
+      output.textContent = "Sender gespeichert.";
+    } else if (typeof payload.deleted === "boolean") {
+      output.textContent = payload.deleted ? "Sender gelöscht." : "Sender nicht gefunden.";
+    } else {
+      output.textContent = `${payload.playback?.state || "stopped"} · ${payload.recording?.state || "stopped"}`;
+    }
     await refresh();
   } catch (error) {
     output.textContent = `Fehler: ${error.message}`;

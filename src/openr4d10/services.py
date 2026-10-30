@@ -11,12 +11,15 @@ from urllib.parse import urlsplit
 from .content import CameraSnapshot, FeedReader
 from .media import MpvEngine, StreamRecorder, public_source_label, validate_media_source
 from .service_adapters import ServiceAdapterError, ServiceAdapterRegistry
-from .storage import StateStore
+from .storage import SCHEMA_VERSION, StateStore
 
 
 ExecutableLookup = Callable[[str], str | None]
 MEDIA_EXTENSIONS = {
     ".aac", ".flac", ".m4a", ".mka", ".mp3", ".mp4", ".ogg", ".opus", ".wav",
+}
+DEFAULT_ENABLED_SERVICES = {
+    "system", "webradio", "local_media", "recorder", "rss", "webcam",
 }
 
 
@@ -96,7 +99,10 @@ class ServiceCatalog:
             "cameras": {},
         }
         self.active_service = "system"
-        self.store.ensure_services(tuple(item.service_id for item in BUILTIN_SERVICES))
+        self.store.ensure_services(
+            tuple(item.service_id for item in BUILTIN_SERVICES),
+            DEFAULT_ENABLED_SERVICES,
+        )
 
     def snapshot(self) -> dict[str, object]:
         states = self.store.service_states()
@@ -111,7 +117,9 @@ class ServiceCatalog:
             adapter_state: dict[str, object] = {
                 "configured": self.adapters.configured(manifest.service_id)
             }
-            if missing:
+            if not state["enabled"]:
+                readiness = "disabled"
+            elif missing:
                 readiness = "missing_dependency"
             elif manifest.implementation in {"external", "official_api"}:
                 if not self.adapters.configured(manifest.service_id):
@@ -157,7 +165,7 @@ class ServiceCatalog:
             for item in self.store.media_items()
         ]
         return {
-            "schema_version": 1,
+            "schema_version": SCHEMA_VERSION,
             "total": len(services),
             "ready": sum(item["readiness"] == "ready" for item in services),
             "active_service": self.active_service,
@@ -173,6 +181,24 @@ class ServiceCatalog:
         action = request.get("action")
         if not isinstance(action, str):
             raise ValueError("control action is required")
+        if action == "service_set_enabled":
+            service_id = request.get("service_id")
+            enabled = request.get("enabled")
+            known = {item.service_id for item in BUILTIN_SERVICES}
+            if not isinstance(service_id, str) or service_id not in known:
+                raise ValueError("unknown service")
+            if not isinstance(enabled, bool):
+                raise ValueError("enabled must be true or false")
+            if service_id == "system" and not enabled:
+                raise ValueError("system service cannot be disabled")
+            if not enabled:
+                if self.active_service == service_id:
+                    self.player.stop()
+                    self.active_service = "system"
+                if service_id == "recorder":
+                    self.recorder.stop()
+            self.store.set_service_enabled(service_id, enabled)
+            return {"service_id": service_id, "enabled": enabled}
         if action == "play":
             service_id = request.get("service_id", "webradio")
             source = request.get("source")
@@ -183,6 +209,7 @@ class ServiceCatalog:
             }
             if not isinstance(service_id, str) or service_id not in allowed:
                 raise ValueError("unsupported playback service")
+            self._require_enabled(service_id)
             if not isinstance(source, str):
                 raise ValueError("play action requires a media source")
             self.player.load(source)
@@ -195,6 +222,7 @@ class ServiceCatalog:
         elif action == "volume":
             self.player.set_volume(request.get("value"))  # type: ignore[arg-type]
         elif action == "record_start":
+            self._require_enabled("recorder")
             source = request.get("source")
             if not isinstance(source, str):
                 raise ValueError("record_start requires a media source")
@@ -219,6 +247,7 @@ class ServiceCatalog:
                 raise ValueError("station_delete requires an integer station_id")
             return {"deleted": self.store.delete_station(station_id)}
         elif action == "station_play":
+            self._require_enabled("webradio")
             station_id = request.get("station_id")
             if isinstance(station_id, bool) or not isinstance(station_id, int):
                 raise ValueError("station_play requires an integer station_id")
@@ -228,8 +257,10 @@ class ServiceCatalog:
             self.player.load(str(station["stream_url"]))
             self.active_service = "webradio"
         elif action == "media_scan":
+            self._require_enabled("local_media")
             return {"scanned": self.scan_media()}
         elif action == "media_play":
+            self._require_enabled("local_media")
             media_id = request.get("media_id")
             if isinstance(media_id, bool) or not isinstance(media_id, int):
                 raise ValueError("media_play requires an integer media_id")
@@ -250,11 +281,13 @@ class ServiceCatalog:
             }
             if service_id not in external_ids:
                 raise ValueError("service does not use an external adapter")
+            self._require_enabled(service_id)
             result = self.adapters.call(
                 service_id, operation, request.get("parameters")
             )
             return {"service_id": service_id, "adapter": result}
         elif action == "feed_fetch":
+            self._require_enabled("rss")
             url = request.get("url")
             if not isinstance(url, str):
                 raise ValueError("feed_fetch requires a URL")
@@ -265,6 +298,7 @@ class ServiceCatalog:
             }
             return {"feed": feed}
         elif action == "camera_snapshot":
+            self._require_enabled("webcam")
             url = request.get("url")
             slot = request.get("slot", 1)
             if not isinstance(url, str):
@@ -283,6 +317,10 @@ class ServiceCatalog:
             "playback": self.player.state.as_dict(),
             "recording": self.recorder.state.as_dict(),
         }
+
+    def _require_enabled(self, service_id: str) -> None:
+        if not self.store.service_enabled(service_id):
+            raise ValueError(f"service is disabled: {service_id}")
 
     def scan_media(self) -> int:
         self.media_root.mkdir(parents=True, exist_ok=True, mode=0o750)

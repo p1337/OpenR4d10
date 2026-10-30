@@ -51,7 +51,7 @@ class ServiceCatalogTests(unittest.TestCase):
         self.assertTrue(expected.issubset(items))
         self.assertEqual(len(items), len(BUILTIN_SERVICES))
         self.assertEqual(items["webradio"]["readiness"], "ready")
-        self.assertEqual(items["brandmeister"]["readiness"], "configuration_required")
+        self.assertEqual(items["brandmeister"]["readiness"], "disabled")
         self.assertNotIn("credential", items["brandmeister"])
 
     def test_missing_process_dependency_is_visible(self) -> None:
@@ -83,6 +83,13 @@ class ServiceCatalogTests(unittest.TestCase):
                 Path(raw).resolve(), adapter_registry=Registry()
             )
             try:
+                catalog.control(
+                    {
+                        "action": "service_set_enabled",
+                        "service_id": "mumble",
+                        "enabled": True,
+                    }
+                )
                 items = {item["service_id"]: item for item in catalog.snapshot()["items"]}
                 result = catalog.control(
                     {
@@ -94,8 +101,41 @@ class ServiceCatalogTests(unittest.TestCase):
             finally:
                 catalog.close()
         self.assertEqual(items["mumble"]["readiness"], "ready")
-        self.assertEqual(items["discord"]["readiness"], "configuration_required")
+        self.assertEqual(items["discord"]["readiness"], "disabled")
         self.assertEqual(result["adapter"]["operation"], "list_channels")
+
+    def test_service_lifecycle_persists_and_system_cannot_be_disabled(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            catalog = ServiceCatalog(root)
+            try:
+                first = {item["service_id"]: item for item in catalog.snapshot()["items"]}
+                self.assertTrue(first["webradio"]["enabled"])
+                self.assertFalse(first["spotify"]["enabled"])
+                catalog.control(
+                    {
+                        "action": "service_set_enabled",
+                        "service_id": "spotify",
+                        "enabled": True,
+                    }
+                )
+                with self.assertRaisesRegex(ValueError, "cannot be disabled"):
+                    catalog.control(
+                        {
+                            "action": "service_set_enabled",
+                            "service_id": "system",
+                            "enabled": False,
+                        }
+                    )
+            finally:
+                catalog.close()
+            reopened = ServiceCatalog(root)
+            try:
+                state = {item["service_id"]: item for item in reopened.snapshot()["items"]}
+            finally:
+                reopened.close()
+        self.assertTrue(state["spotify"]["enabled"])
+        self.assertEqual(state["spotify"]["readiness"], "configuration_required")
 
     def test_media_control_updates_public_receiver_overlay(self) -> None:
         class State:

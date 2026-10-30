@@ -31,6 +31,7 @@ the installer report exactly which adapters still need configuration.
   media and recordings
 - central catalog covering all specified service modules with honest dependency,
   adapter and local-login readiness
+- persistent enable/disable lifecycle for native and external service modules
 - direct web-radio/local-media playback through private mpv JSON IPC and
   stream recording through shell-free ffmpeg/Opus
 - bounded RSS/Atom reader and two-slot camera snapshots with image validation

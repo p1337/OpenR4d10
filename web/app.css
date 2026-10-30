@@ -195,8 +195,12 @@ h2 { margin-bottom: 0; font-size: 1.15rem; letter-spacing: -0.02em; }
 .service-card-heading span { color: var(--cyan); font-size: .58rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
 .service-card[data-readiness="configuration_required"] .service-card-heading span { color: var(--amber); }
 .service-card[data-readiness="missing_dependency"] .service-card-heading span { color: var(--red); }
+.service-card[data-readiness="adapter_error"] .service-card-heading span { color: var(--red); }
+.service-card[data-readiness="disabled"] { opacity: .72; }
+.service-card[data-readiness="disabled"] .service-card-heading span { color: #7d9290; }
 .service-card p { min-height: 2.8em; margin: 11px 0 8px; color: var(--muted); font-size: .72rem; line-height: 1.4; }
 .service-card small { color: #627675; font-size: .63rem; }
+.service-card > button { width: 100%; margin-top: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); background: rgba(255, 255, 255, .025); cursor: pointer; }
 
 footer { justify-content: space-between; gap: 20px; padding: 32px 4px 0; color: #627675; font-size: .68rem; }
 

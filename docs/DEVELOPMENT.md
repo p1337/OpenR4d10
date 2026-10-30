@@ -59,8 +59,9 @@ browser origins and never accepts or stores credentials. It supports explicit
 playback, pause, stop, volume and stream-recording actions plus bounded feed and
 camera retrieval, saved station management and local media rescans. Saved
 station URLs containing query strings are rejected; temporary direct playback
-is not persisted. Port, bind address and static directory live in `[web]` in
-`openr4d10.toml`.
+is not persisted. `service_set_enabled` persists module activation; `system`
+cannot be disabled and external modules still require their own adapter. Port,
+bind address and static directory live in `[web]` in `openr4d10.toml`.
 
 External account-based modules are never loaded into the web process. Their
 non-secret manifests live in `/etc/openr4d10/services.d`; see

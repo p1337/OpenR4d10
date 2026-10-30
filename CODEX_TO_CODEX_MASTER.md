@@ -758,6 +758,21 @@ werden, wenn die tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-30 – Dauerhafter Dienst-Lebenszyklus
+
+- Dienstmodule erhalten einen dauerhaften Aktiv-/Inaktiv-Zustand in der
+  versionierten Datenbank und eine Bedienung in der Weboberfläche. `System`,
+  Webradio, lokale Medien, Recorder, Feeds und Webcam sind als vorhandene
+  Kernmodule standardmäßig aktiv; konto- und adapterabhängige Module bleiben
+  standardmäßig inaktiv.
+- Ein deaktivierter Dienst wird weder als bereit ausgegeben noch über seinen
+  externen Socket angesprochen. Aktivieren allein genügt bei externen Modulen
+  weiterhin nicht: Manifest, erreichbarer Adapter und Status-Handshake bleiben
+  zwingend.
+- Das Systemmodul kann nicht deaktiviert werden. Das Deaktivieren einer aktuell
+  laufenden Medienquelle beendet deren Wiedergabe beziehungsweise Aufnahme,
+  bevor der Zustand gespeichert wird.
+
 ### 2026-10-30 – Isolierter Vertrag für externe Dienstadapter
 
 - Externe Dienste mit eigenen Konten oder Tokens werden nicht als Bibliothek im
@@ -794,8 +809,8 @@ werden, wenn die tatsächlich verwendete Hardwareversion verifiziert ist.
 - Nach diesem Bibliotheksblock bestanden 34 lokale Tests; vier zusätzliche
   Linux-/C-spezifische Prüfungen liefen erst in GitHub Actions beziehungsweise
   auf Linux. Mit dem anschließend implementierten Dienstadaptervertrag umfasst
-  die Suite 38 lokale Tests, davon fünf auf Windows übersprungene Linux-/C-/
-  Unix-Socket-Prüfungen.
+  die Suite zunächst 38 und nach dem Dienst-Lebenszyklus 39 lokale Tests,
+  davon fünf auf Windows übersprungene Linux-/C-/Unix-Socket-Prüfungen.
 
 ### 2026-10-30 – Dienstkatalog, Datenbank und sichere Medienprozesse
 
