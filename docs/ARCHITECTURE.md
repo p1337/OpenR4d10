@@ -40,6 +40,12 @@ encoders have been identified and measured.
 - non-secret SQLite state: `/var/lib/openr4d10/openr4d10.sqlite3`
 - service logs: system journal, unit `openr4d10.service`
 
+Portable core backups contain a SQLite online-backup snapshot plus a public
+manifest and SHA-256. Restore accepts exactly those two archive members,
+validates integrity and schema compatibility, requires the runtime directory to
+be absent (service stopped), and requires explicit replacement of an existing
+database. Credentials and bulk media are outside this format.
+
 The installer never overwrites live configuration. It refreshes only the
 `.dist` files. `StateStore` applies explicit SQLite migrations and stores only
 non-secret state: settings, service readiness, stations, channels, media and

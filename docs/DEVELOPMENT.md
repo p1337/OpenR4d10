@@ -44,6 +44,11 @@ the configured state directory. Tests must always point this at a temporary
 absolute directory. Never add tokens, passwords or keys to this database; its
 setting API rejects secret-like keys by design.
 
+Test the portable metadata backup against a temporary state directory. Restore
+must be tested only while the service is stopped and requires `--replace` when
+the database already exists. The archive intentionally excludes configuration
+secrets, WLAN data, media and recordings.
+
 ## Web dashboard
 
 The installed service listens on port 80 by default. It serves only the tracked

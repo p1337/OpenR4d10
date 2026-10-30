@@ -758,6 +758,20 @@ werden, wenn die tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-30 – Portables, secret-freies Kernbackup
+
+- Der Core erhält ein versioniertes Backup-Paket mit einer über die SQLite-
+  Backup-API konsistent erzeugten Datenbankkopie, öffentlichem Manifest,
+  Prüfsumme und nicht geheimem Dienstplan. Medien-, Aufnahme-, WLAN-, Konto-,
+  Token-, Passwort-, Schlüssel- und Secret-Dateien sind nicht enthalten.
+- Eine Wiederherstellung validiert Archivstruktur, Größenlimits, SHA-256,
+  SQLite-Integrität und unterstützte Schemaversion. Sie verweigert den Vorgang,
+  solange der Systemdienst läuft, und überschreibt eine vorhandene Datenbank
+  nur nach ausdrücklichem `--replace`.
+- Backup und Restore verwenden atomare Zieldateien und erlauben keine
+  frei wählbaren Archivpfade oder Pfadtraversierung. Externe Zielmodule wie
+  USB, SFTP und WebDAV bleiben separate, standardmäßig deaktivierte Adapter.
+
 ### 2026-10-30 – Dauerhafter Dienst-Lebenszyklus
 
 - Dienstmodule erhalten einen dauerhaften Aktiv-/Inaktiv-Zustand in der
@@ -809,7 +823,8 @@ werden, wenn die tatsächlich verwendete Hardwareversion verifiziert ist.
 - Nach diesem Bibliotheksblock bestanden 34 lokale Tests; vier zusätzliche
   Linux-/C-spezifische Prüfungen liefen erst in GitHub Actions beziehungsweise
   auf Linux. Mit dem anschließend implementierten Dienstadaptervertrag umfasst
-  die Suite zunächst 38 und nach dem Dienst-Lebenszyklus 39 lokale Tests,
+  die Suite zunächst 38, nach dem Dienst-Lebenszyklus 39 und nach Backup/
+  Restore 41 lokale Tests,
   davon fünf auf Windows übersprungene Linux-/C-/Unix-Socket-Prüfungen.
 
 ### 2026-10-30 – Dienstkatalog, Datenbank und sichere Medienprozesse

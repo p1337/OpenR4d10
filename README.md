@@ -32,6 +32,7 @@ the installer report exactly which adapters still need configuration.
 - central catalog covering all specified service modules with honest dependency,
   adapter and local-login readiness
 - persistent enable/disable lifecycle for native and external service modules
+- checksummed, secret-free SQLite backup and guarded offline restore
 - direct web-radio/local-media playback through private mpv JSON IPC and
   stream recording through shell-free ffmpeg/Opus
 - bounded RSS/Atom reader and two-slot camera snapshots with image validation
@@ -151,7 +152,20 @@ systemctl status openr4d10
 journalctl -u openr4d10 --since today
 journalctl -u openr4d10-boot -b --no-pager
 curl http://127.0.0.1/healthz
+sudo openr4d10 backup --output /var/lib/openr4d10/backups/manual.openr4d10.zip
 ```
+
+A restore is deliberately offline and explicit:
+
+```bash
+sudo systemctl stop openr4d10
+sudo openr4d10 restore --input /path/to/backup.openr4d10.zip --replace
+sudo systemctl start openr4d10
+```
+
+The core backup contains the consistent non-secret SQLite state and service
+activation plan. It does not contain credentials, WLAN data, SSH keys, media or
+recordings.
 
 For development:
 

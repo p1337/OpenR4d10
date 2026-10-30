@@ -9,6 +9,7 @@ import sys
 
 from .adapters import build_adapters
 from .app import OpenR4d10App
+from .backup import BackupError, create_backup, restore_backup
 from .config import ConfigError, load_app_config, load_hardware_config
 from .device_ui import DeviceUiState, render_device_ui
 from .doctor import exit_code, run_checks
@@ -32,6 +33,11 @@ def _parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("run", help="run the service loop")
     commands.add_parser("render-once", help="render one dashboard frame")
+    backup = commands.add_parser("backup", help="create a secret-free state backup")
+    backup.add_argument("--output", type=Path, required=True, help="absolute backup archive path")
+    restore = commands.add_parser("restore", help="restore a validated state backup")
+    restore.add_argument("--input", type=Path, required=True, help="absolute backup archive path")
+    restore.add_argument("--replace", action="store_true", help="explicitly replace an existing state database")
     preview = commands.add_parser("preview-ui", help="write a 240x280 UI preview PNG")
     preview.add_argument("--output", type=Path, required=True, help="PNG output path")
     doctor = commands.add_parser("doctor", help="check platform and configuration")
@@ -67,6 +73,29 @@ def main(argv: list[str] | None = None) -> int:
         level=getattr(logging, app_config.log_level),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+
+    database_path = app_config.state_directory / "openr4d10.sqlite3"
+    if args.command == "backup":
+        try:
+            manifest = create_backup(database_path, args.output)
+        except (BackupError, ValueError) as exc:
+            print(f"[ERROR] {exc}", file=sys.stderr)
+            return 1
+        print(f"Backup created: {args.output} ({manifest['database_sha256']})")
+        return 0
+    if args.command == "restore":
+        try:
+            manifest = restore_backup(
+                args.input,
+                database_path,
+                app_config.runtime_directory,
+                replace=args.replace,
+            )
+        except (BackupError, ValueError) as exc:
+            print(f"[ERROR] {exc}", file=sys.stderr)
+            return 1
+        print(f"Backup restored: schema {manifest['schema_version']}")
+        return 0
 
     if args.command == "doctor":
         checks = run_checks(
