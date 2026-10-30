@@ -122,7 +122,11 @@ sources and their review references are recorded in `PRESETS.md`.
 For a fresh machine, `bootstrap.sh` downloads a GitHub-generated source archive
 over HTTPS into a private temporary directory. It checks paths and archive
 integrity before extraction, then invokes the same local `install.sh`. Git is
-not an installation dependency.
+not an installation dependency. The reviewed official Whisplay sound-card
+source is pinned and vendored with its Apache-2.0 license, so audio installation
+also requires neither Git nor a second source download. The installer builds it
+in a private temporary directory for the running kernel, installs the unified
+WM8960/ES8389 module and overlay, and leaves activation to the required reboot.
 
 ## Startup sequence
 
@@ -178,5 +182,6 @@ device policy permits only `/dev/spidev0.0` and `/dev/gpiochip0`. The
 application runs as `openr4d10`, receives only the `gpio`, `spi` and standard
 `audio` supplementary groups. Its closed policy permits the same LCD devices
 plus the standard `char-alsa` device class for media playback/recording; it
-still has no access to I2C, homes or unrelated hardware. This generic ALSA
-boundary does not select or configure a Whisplay codec revision.
+still has no direct access to I2C, homes or unrelated hardware. Codec control
+and detection stay inside the kernel/ALSA driver installed by the privileged
+installer; the application itself never selects or guesses a codec revision.

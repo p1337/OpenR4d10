@@ -144,9 +144,9 @@ the same input-event path and repaints the physical LCD immediately.
 
 The application media boundary uses generic ALSA through Debian's mpv and
 ffmpeg packages. Its systemd unit allows the standard `char-alsa` device class
-and the `audio` group, but it does not guess or install a WM8960/ES8389 codec
-overlay. Until the exact Whisplay audio revision is identified and its ALSA
-device appears, playback controls may report an audio-device error.
+and the `audio` group. Release 0.10.5 adds the official unified PiSugar
+Whisplay driver, which detects WM8960 or ES8389 rather than requiring the
+physical revision to be guessed.
 
 On the real freshly installed Pi on 2026-10-30, `/proc/asound/cards` and
 `aplay -l` expose only `vc4-hdmi`; no Whisplay speaker device is present yet.
@@ -155,14 +155,38 @@ live and Deutschlandfunk endpoints as MP3 streams. A playback timeout on this
 stack must therefore not be described as a WLAN or station-source failure;
 the missing Whisplay ALSA integration remains the open hardware boundary.
 
+A later live check with OpenR4d10 0.10.4 confirms that SWR3 is in `playing`
+state and the private mpv process is running, while ALSA still exposes only
+`vc4-hdmi`. There is no `/dev/i2c-*`, no `whisplaysound` card and no active
+Whisplay sound overlay. The physical HAT also exposes no readable HAT EEPROM
+node on this boot, so automatic EEPROM overlay loading cannot be assumed.
+
+The current official PiSugar Whisplay repository provides one unified
+`whisplay-soundcard` driver for both WM8960 and ES8389 variants. OpenR4d10 pins
+the unmodified sound-card source to manufacturer commit
+`736975188ebbe146d319e450aad19c218a310611`; its complete upstream archive has
+SHA-256
+`1fac1045fb763de52eed5aa23704d7752ff5e024c9ce64692cf9832261cfb88a`.
+Source, Apache-2.0 license and provenance are retained below
+`vendor/pisugar-whisplay`.
+
+The main installer enables I2C and I2S, builds the module for the running
+kernel, installs the device-tree overlay, makes ALSA card `whisplaysound` the
+default and enables the manufacturer's warm-up service. A reboot is mandatory.
+Before reboot, `doctor` reports the installed-but-inactive state; afterwards it
+requires the card to appear in `/proc/asound/cards`. Actual speaker operation
+still needs a real listening test and is not claimed merely from the card name.
+
 ## Still deliberately unknown
 
 The installed Whisplay audio codec revision and PiSugar model/API have not yet
-been identified on the physical device. The PiSugar's physical presence and
-battery-powered operation are confirmed; `power.backend` remains
-`unconfigured` only because battery percentage and other telemetry are not yet
-integrated. The Whisplay display backend is implemented and physically verified
-on the real stack.
+been identified on the physical device. The unified official audio driver makes
+manual codec identification unnecessary for installation, but its detection
+result and speaker output remain to be verified after reboot. The PiSugar's
+physical presence and battery-powered operation are confirmed;
+`power.backend` remains `unconfigured` only because battery percentage and
+other telemetry are not yet integrated. The Whisplay display backend is
+implemented and physically verified on the real stack.
 
 ## Generic adapter contract
 

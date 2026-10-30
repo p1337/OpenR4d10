@@ -11,6 +11,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 bash -n bootstrap.sh
 bash -n install.sh
 bash -n boot/install.sh
+bash -n vendor/pisugar-whisplay/audio/scripts/install.sh
 bash install.sh --check --allow-unsupported
 ```
 
@@ -102,6 +103,21 @@ systemctl cat openr4d10
 `doctor` exit status `2` means the checked-in placeholder hardware configuration
 is still active. It does not mean the installer failed. Exit status `1` means a
 file, helper, manifest or platform check failed.
+
+For Whisplay audio, `doctor` has three explicit states: missing driver,
+installed overlay awaiting reboot, and active ALSA card `whisplaysound`. After
+installing 0.10.5, reboot before judging playback, then verify:
+
+```bash
+aplay -l | grep -i whisplay
+amixer -c whisplaysound cget name='speaker'
+sudo openr4d10 doctor
+```
+
+The vendored source provenance and upstream archive checksum live in
+`vendor/pisugar-whisplay/UPSTREAM.md`. Updates must replace that reviewed
+unmodified subset and retain its own Apache-2.0 `LICENSE`; do not edit vendor
+files to implement OpenR4d10 behavior.
 
 Immediately after an in-session installation, `openr4d10-boot.service` has not
 run yet. `openr4d10.service` must nevertheless create the shared

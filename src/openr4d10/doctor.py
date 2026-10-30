@@ -72,6 +72,35 @@ def _command_check(component: str, command: tuple[str, ...]) -> Check:
     return Check("ERROR", f"{component} helper is not executable: {executable}")
 
 
+def _whisplay_audio_checks(
+    cards_path: Path = Path("/proc/asound/cards"),
+    overlay_paths: tuple[Path, ...] = (
+        Path("/boot/firmware/overlays/whisplay-soundcard.dtbo"),
+        Path("/boot/overlays/whisplay-soundcard.dtbo"),
+    ),
+) -> list[Check]:
+    try:
+        cards = cards_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        cards = ""
+
+    if "whisplaysound" in cards.lower():
+        return [Check("OK", "Whisplay ALSA card is available: whisplaysound")]
+    if any(path.is_file() for path in overlay_paths):
+        return [
+            Check(
+                "WARN",
+                "Whisplay audio driver is installed but its ALSA card is not active; reboot and re-check",
+            )
+        ]
+    return [
+        Check(
+            "WARN",
+            "Whisplay audio driver is not installed; re-run the OpenR4d10 installer",
+        )
+    ]
+
+
 def _whisplay_checks() -> list[Check]:
     checks: list[Check] = []
     for module, package in (
@@ -90,6 +119,7 @@ def _whisplay_checks() -> list[Check]:
             checks.append(
                 Check("WARN", f"Whisplay device is not available yet: {device}; reboot after installation")
             )
+    checks.extend(_whisplay_audio_checks())
     return checks
 
 

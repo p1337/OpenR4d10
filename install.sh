@@ -45,6 +45,13 @@ required=(
     boot/native/openr4d10_boot.c boot/native/LICENSE.PiSugar
     boot/native/NOTICE.PiSugar boot/assets/boot.opb boot/assets/first.opb
     boot/assets/manifest.json
+    vendor/pisugar-whisplay/LICENSE vendor/pisugar-whisplay/UPSTREAM.md
+    vendor/pisugar-whisplay/audio/scripts/install.sh
+    vendor/pisugar-whisplay/audio/configs/asound.conf
+    vendor/pisugar-whisplay/audio/src/Makefile
+    vendor/pisugar-whisplay/audio/src/whisplay-core.c
+    vendor/pisugar-whisplay/audio/src/es8389.c
+    vendor/pisugar-whisplay/audio/src/dts/whisplay-soundcard.dts
 )
 for relative in "${required[@]}"; do
     [[ -f "$SOURCE_ROOT/$relative" ]] || die "Required project file missing: $relative"
@@ -86,7 +93,9 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends \
     python3 python3-pil python3-libgpiod python3-spidev fonts-dejavu-core \
-    mpv ffmpeg ca-certificates gcc libc6-dev zlib1g-dev
+    mpv ffmpeg ca-certificates gcc make kmod libc6-dev zlib1g-dev \
+    raspberrypi-kernel-headers device-tree-compiler alsa-utils \
+    libasound2-plugins sox
 
 for system_group in openr4d10 gpio spi audio; do
     if ! getent group "$system_group" >/dev/null; then
@@ -106,7 +115,7 @@ release_root="$INSTALL_ROOT/releases/$version"
 
 note "Installing OpenR4d10 $version"
 install -d -m 0755 -o root -g root "$release_root"
-for directory in src assets web; do
+for directory in src assets web vendor; do
     install -d -m 0755 -o root -g root "$release_root/$directory"
     cp -a -- "$SOURCE_ROOT/$directory/." "$release_root/$directory/"
 done
@@ -166,6 +175,19 @@ install -m 0644 -o root -g root "$SOURCE_ROOT/systemd/openr4d10.service" "$SERVI
 note "Installing the verified Whisplay ST7789 boot display"
 OPENR4D10_SKIP_APT=1 bash "$SOURCE_ROOT/boot/install.sh"
 
+note "Installing the official unified Whisplay sound-card driver"
+# Close any old mpv instance before the vendor installer replaces the default
+# ALSA configuration. The service is started again below even though the new
+# kernel module and overlay deliberately wait for a controlled reboot.
+systemctl stop openr4d10.service >/dev/null 2>&1 || true
+driver_build_root="$(mktemp -d)"
+trap 'rm -rf -- "$driver_build_root"' EXIT
+cp -a -- "$SOURCE_ROOT/vendor/pisugar-whisplay/audio/." "$driver_build_root/"
+WHISPLAY_PLATFORM=raspberry_pi \
+    bash "$driver_build_root/scripts/install.sh"
+rm -rf -- "$driver_build_root"
+trap - EXIT
+
 note "Enabling systemd autostart"
 systemctl daemon-reload
 systemctl enable openr4d10.service
@@ -208,3 +230,6 @@ echo "Logs:   journalctl -u openr4d10 -f"
 echo "Web UI: http://<raspberry-pi-ip>/"
 echo "Whisplay boot animation: enabled for the next reboot"
 echo "Whisplay logs: journalctl -u openr4d10-boot -b --no-pager"
+echo "Whisplay audio: official unified WM8960/ES8389 driver installed"
+echo "REBOOT REQUIRED: sudo reboot"
+echo "After reboot: aplay -l | grep -i whisplay"

@@ -778,6 +778,45 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-30 – Offiziellen Whisplay-Audiotreiber in den Hauptinstaller aufnehmen
+
+- Robert beauftragt ausdrücklich, die fehlende interne Audioausgabe jetzt in
+  den vorhandenen Ein-Befehl-Installer einzubauen. Es entsteht kein zweiter
+  Installationsweg.
+- Verwendet wird ausschließlich der offizielle vereinheitlichte PiSugar-
+  `whisplay-soundcard`-Treiber für WM8960 und ES8389, gepinnt auf Hersteller-
+  Commit `736975188ebbe146d319e450aad19c218a310611`. Der Installer darf keine
+  Codec-Revision raten.
+- Der geprüfte Herstellerquellcode wird mit unveränderter Apache-2.0-Lizenz,
+  Herkunft und Prüfsumme im Repository mitgeführt. Dadurch bleiben
+  `bootstrap.sh` und `install.sh` Git-frei und benötigen während der
+  Installation keinen zweiten Fremddownload.
+- Der Hauptinstaller installiert die Kernel-Bauwerkzeuge, aktiviert I²C und
+  I²S, baut das Modul für den laufenden Kernel, installiert Overlay und ALSA-
+  Konfiguration und meldet den zwingend erforderlichen Neustart klar. Er darf
+  den Pi nicht ungefragt neu starten.
+- `doctor` muss unterscheiden zwischen fehlendem Treiber, installiertem aber
+  noch nicht durch Neustart aktiviertem Treiber und einer vorhandenen ALSA-
+  Karte `whisplaysound`. Reale Lautsprecherfunktion ist erst nach Neustart und
+  Hörtest bestätigt.
+
+### 2026-10-30 – Laufender SWR3-Stream ohne Whisplay-Audiogerät bestätigt
+
+- Auf dem realen Pi mit OpenR4d10 0.10.4 meldet der Webradio-Core SWR3 als
+  `playing`; der zugehörige `mpv`-Prozess läuft ohne gemeldeten Streamfehler.
+  Fehlender Ton ist deshalb kein Lautstärke-, WLAN- oder Senderproblem.
+- ALSA stellt ausschließlich `vc4-hdmi` bereit. Es gibt weder eine
+  `whisplaysound`-Karte noch `/dev/i2c-*`; in der Bootkonfiguration sind nur
+  SPI und der generische Audio-/HDMI-Pfad aktiv. Der interne Lautsprecher kann
+  ohne Whisplay-I2C/I2S-Treiber kein Signal erhalten.
+- Das offizielle PiSugar-Whisplay-Projekt stellt inzwischen einen einheitlichen
+  Soundkartentreiber für WM8960 und ES8389 bereit. Auf diesem HAT ist kein
+  auslesbarer HAT-EEPROM-Knoten vorhanden, weshalb der offizielle manuelle
+  `whisplay-soundcard`-Overlaypfad benötigt wird. Eine Integration muss gegen
+  eine geprüfte Herstellerrevision gepinnt werden, Bootdateien nachvollziehbar
+  ändern und anschließend einen Neustart plus reale ALSA-/Lautsprecherprüfung
+  verlangen.
+
 ### 2026-10-30 – PiSugar-Stromversorgung real bestätigt
 
 - Robert bestätigt den laufenden Pi im Akkubetrieb über den montierten

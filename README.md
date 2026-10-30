@@ -45,9 +45,9 @@ the installer report exactly which adapters still need configuration.
 
 Hardware-specific integration still pending:
 
-- the Whisplay audio adapter
 - PiSugar API details
-- physical Whisplay audio codec setup and encoder GPIO input
+- physical verification of Whisplay audio after the required reboot
+- encoder GPIO input
 - credentials, WLAN settings, tokens or secrets
 
 Those values must come from the exact hardware documentation. See
@@ -74,15 +74,20 @@ starts the local installer, which requests root access when required.
 The installer verifies the operating system, CPU architecture and Raspberry Pi
 model, installs files below `/opt/openr4d10`, preserves existing configuration,
 compiles the Whisplay boot player locally for the Pi, installs the Debian
-Pillow/libgpiod/spidev/mpv/ffmpeg packages, enables SPI, installs and enables
-both systemd services, and runs a final diagnostic. Neither script collects or
-writes credentials.
+Pillow/libgpiod/spidev/mpv/ffmpeg packages, enables SPI, builds the pinned
+official unified Whisplay sound-card driver for the running kernel, enables
+I²C/I²S, installs its overlay and ALSA configuration, installs and enables
+the systemd services, and runs a final diagnostic. The official driver supports
+both WM8960 and ES8389 without guessing the fitted revision. Neither script
+collects or writes credentials.
 
-Reboot after the first installation. The native Whisplay animation starts on
-the next boot, keeps the moving skull visible 1.5 seconds longer and then keeps
-its reviewed final-logo loop visible until the physical
-application UI is ready and takes over the panel. The web dashboard remains
-available independently.
+Reboot after installation; the sound-card kernel module and overlay cannot
+become active before that reboot. The native Whisplay animation starts on the
+next boot, keeps the moving skull visible 1.5 seconds longer and then keeps its
+reviewed final-logo loop visible until the physical application UI is ready and
+takes over the panel. The web dashboard remains available independently. After
+reboot, `openr4d10 doctor` must report `whisplaysound` before internal speaker
+output is treated as available.
 
 After installation, open the Pi address directly in a browser, for example:
 
@@ -108,7 +113,9 @@ claiming audio transmission.
 The service section accepts an explicit `http` or `https` audio URL for local
 playback and recording. It rejects credentials embedded in URLs and does not
 persist URL query strings in public status. Actual sound requires an ALSA
-device; the Whisplay codec driver is still hardware-revision-dependent.
+device. Local sound uses the official Whisplay ALSA card `whisplaysound`; the
+installer builds the unified driver for either supported codec revision and
+the real speaker is verified after reboot.
 RSS/Atom URLs and camera snapshot URLs can be loaded in the same local panel.
 Feed downloads are size-limited; camera responses are decoded, dimension-
 checked, resized and re-encoded before the browser can retrieve them.
@@ -136,10 +143,11 @@ For an inspect-first installation, download `bootstrap.sh`, review it, and run
 it with `sudo bash bootstrap.sh`. Regardless of how the bootstrap is started,
 it downloads and validates the complete project archive before installation.
 
-PiSugar telemetry and hardware audio are still reported as
-configuration-required. The Whisplay
-display backend is installed and selected automatically. Its early-boot log is
-available with `journalctl -u openr4d10-boot -b --no-pager`.
+PiSugar telemetry remains configuration-required. The Whisplay display backend
+and unified audio driver are installed automatically. Until the next reboot,
+the diagnostic deliberately reports the audio driver as installed but not yet
+active. The early-boot display log is available with
+`journalctl -u openr4d10-boot -b --no-pager`.
 
 ## Configure hardware
 

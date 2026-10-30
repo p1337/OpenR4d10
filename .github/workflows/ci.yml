@@ -28,6 +28,7 @@ jobs:
           bash -n bootstrap.sh install.sh boot/install.sh
           boot/initramfs/hooks/openr4d10-boot
           boot/initramfs/scripts/init-top/openr4d10-boot
+          vendor/pisugar-whisplay/audio/scripts/install.sh
       - name: Read-only installer check
         run: bash install.sh --check --allow-unsupported
       - name: Git-free bootstrap smoke test
