@@ -10,10 +10,12 @@ from pathlib import Path
 import socket
 import subprocess
 import tempfile
+import threading
 from typing import Any, Protocol
 
 from .config import AdapterConfig, HardwareConfig
 from .device_ui import DeviceUiState, image_to_rgb565, render_device_ui
+from .input_events import InputEvent
 from .models import Frame
 from .whisplay import WhisplayError, WhisplayPanel
 
@@ -115,20 +117,37 @@ class WhisplayDisplay:
     def __init__(self, panel: WhisplayPanel | None = None) -> None:
         self.panel = panel or WhisplayPanel()
         self.state = DeviceUiState()
+        self._lock = threading.Lock()
+
+    def _show_state(self) -> None:
+        try:
+            self.panel.show(image_to_rgb565(render_device_ui(self.state)))
+        except (OSError, RuntimeError, WhisplayError) as exc:
+            raise AdapterError(f"Whisplay display failed: {exc}") from exc
 
     def render(self, frame: Frame) -> None:
         # Keep the approved native animation visible until the first real UI
         # frame is ready instead of replacing it with the semantic text fallback.
         if frame.screen == "boot":
             return
-        self.state.update_from_frame(frame)
-        try:
-            self.panel.show(image_to_rgb565(render_device_ui(self.state)))
-        except (OSError, RuntimeError, WhisplayError) as exc:
-            raise AdapterError(f"Whisplay display failed: {exc}") from exc
+        with self._lock:
+            self.state.update_from_frame(frame)
+            self._show_state()
+
+    def apply_input(self, event: InputEvent) -> dict[str, object]:
+        """Apply the same logical event used by the future GPIO adapter."""
+        with self._lock:
+            self.state.apply(event)
+            self._show_state()
+            return self.state.public_state()
+
+    def snapshot(self) -> dict[str, object]:
+        with self._lock:
+            return self.state.public_state()
 
     def close(self) -> None:
-        self.panel.close()
+        with self._lock:
+            self.panel.close()
 
 
 class UnconfiguredTelemetry:

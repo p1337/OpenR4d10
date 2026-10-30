@@ -28,6 +28,13 @@ press controls are already modeled and tested. No GPIO number appears in the UI
 or navigation logic; the GPIO input source is added after the delivered
 encoders have been identified and measured.
 
+The local web dashboard can submit those same bounded `InputEvent` values to
+the configured Whisplay adapter. The adapter serializes browser input and the
+normal render loop with one display lock, updates its existing `DeviceUiState`
+and repaints the physical panel immediately. This is the temporary hardware-
+free input source and remains useful for remote operation after GPIO input is
+added; it is not a second navigation model.
+
 ## Configuration and storage
 
 - repository defaults: `config/*.toml`

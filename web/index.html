@@ -108,6 +108,64 @@
       </article>
     </section>
 
+    <section class="panel device-control-panel" aria-labelledby="device-control-title">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">VIRTUELLE ENCODER</p>
+          <h2 id="device-control-title">Gerät ohne Hardware bedienen</h2>
+        </div>
+        <span class="version">direkt aufs LCD</span>
+      </div>
+      <p class="services-note">Diese Tasten senden dieselben logischen Ereignisse wie die späteren Doppelencoder.</p>
+      <div class="encoder-grid">
+        <article class="encoder-control">
+          <span>Links außen</span>
+          <strong>Lautstärke <output id="device-volume">–</output></strong>
+          <div class="encoder-buttons">
+            <button type="button" data-device-control="left_outer" data-steps="-1" aria-label="Lautstärke verringern">−</button>
+            <button type="button" data-device-control="left_outer" data-steps="1" aria-label="Lautstärke erhöhen">+</button>
+          </div>
+        </article>
+        <article class="encoder-control">
+          <span>Links innen</span>
+          <strong>Squelch <output id="device-squelch">–</output></strong>
+          <div class="encoder-buttons">
+            <button type="button" data-device-control="left_inner" data-steps="-1" aria-label="Squelch verringern">−</button>
+            <button type="button" data-device-control="left_inner" data-steps="1" aria-label="Squelch erhöhen">+</button>
+          </div>
+        </article>
+        <article class="encoder-control">
+          <span>Rechts außen</span>
+          <strong>Kanal <output id="device-channel">–</output></strong>
+          <div class="encoder-buttons">
+            <button type="button" data-device-control="right_outer" data-steps="-1" aria-label="Vorheriger Kanal">−</button>
+            <button type="button" data-device-control="right_outer" data-steps="1" aria-label="Nächster Kanal">+</button>
+          </div>
+        </article>
+        <article class="encoder-control">
+          <span>Rechts innen</span>
+          <strong>Dienst <output id="device-service">–</output></strong>
+          <div class="encoder-buttons">
+            <button type="button" data-device-control="right_inner" data-steps="-1" aria-label="Vorheriger Dienst">−</button>
+            <button type="button" data-device-control="right_inner" data-steps="1" aria-label="Nächster Dienst">+</button>
+          </div>
+        </article>
+      </div>
+      <div class="press-grid">
+        <div>
+          <span>Linker Drucktaster</span>
+          <button type="button" data-device-control="left_press">Menü</button>
+          <button type="button" data-device-control="left_press" data-held="2">Dienst-Einstellungen</button>
+        </div>
+        <div>
+          <span>Rechter Drucktaster</span>
+          <button type="button" data-device-control="right_press">Play / Pause</button>
+          <button type="button" data-device-control="right_press" data-held="2">Quick-Menü</button>
+        </div>
+      </div>
+      <output class="device-control-result" id="device-control-result" aria-live="polite">Bereit.</output>
+    </section>
+
     <section class="panel services-panel" aria-labelledby="services-title">
       <div class="panel-heading">
         <div>

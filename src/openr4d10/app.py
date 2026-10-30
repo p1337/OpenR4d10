@@ -11,6 +11,7 @@ from . import __version__
 from .adapters import AdapterError, Display, Telemetry
 from .boot import load_boot_sequence
 from .config import AppConfig, ConfigError, HardwareConfig
+from .input_events import Control, InputEvent
 from .models import Frame
 from .services import ServiceCatalog
 from .ui import dashboard_frame
@@ -70,9 +71,63 @@ class OpenR4d10App:
             "frame": frame,
             "adapters": adapters,
         }
+        display_snapshot = getattr(self.display, "snapshot", None)
+        if callable(display_snapshot):
+            snapshot["device_ui"] = display_snapshot()
         if self.services is not None:
             snapshot["services"] = self.services.snapshot()
         return snapshot
+
+    def control(self, request: dict[str, object]) -> dict[str, object]:
+        """Route bounded local browser controls to existing application boundaries."""
+        if request.get("action") != "device_input":
+            if self.services is None:
+                raise RuntimeError("service control is unavailable")
+            return self.services.control(request)
+
+        raw_control = request.get("control")
+        try:
+            control = Control(raw_control)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("unknown device control") from exc
+
+        rotary = control in {
+            Control.LEFT_OUTER,
+            Control.LEFT_INNER,
+            Control.RIGHT_OUTER,
+            Control.RIGHT_INNER,
+        }
+        raw_steps = request.get("steps", 0)
+        raw_held = request.get("held_seconds", 0.0)
+        if isinstance(raw_steps, bool) or not isinstance(raw_steps, int):
+            raise ValueError("steps must be an integer")
+        if isinstance(raw_held, bool) or not isinstance(raw_held, (int, float)):
+            raise ValueError("held_seconds must be a number")
+        held_seconds = float(raw_held)
+        if rotary:
+            if raw_steps == 0 or abs(raw_steps) > 10:
+                raise ValueError("rotary steps must be between -10 and 10, excluding zero")
+            if held_seconds != 0:
+                raise ValueError("rotary input cannot contain a hold duration")
+        else:
+            if raw_steps != 0:
+                raise ValueError("press input cannot contain rotary steps")
+            if not 0 <= held_seconds <= 5:
+                raise ValueError("held_seconds must be between 0 and 5")
+
+        handler = getattr(self.display, "apply_input", None)
+        if not callable(handler):
+            raise RuntimeError("the configured display does not accept device input")
+        event = InputEvent(control, steps=raw_steps, held_seconds=held_seconds)
+        device_state = handler(event)
+        return {
+            "accepted": {
+                "control": event.control.value,
+                "steps": event.steps,
+                "held_seconds": event.held_seconds,
+            },
+            "device_ui": device_state,
+        }
 
     def show_boot(self) -> None:
         if not self.config.boot_enabled:
@@ -122,7 +177,7 @@ class OpenR4d10App:
                     self.config.web.port,
                     self.config.web.static_directory,
                     self.status_snapshot,
-                    self.services.control if self.services is not None else None,
+                    self.control,
                     self.services.content_asset if self.services is not None else None,
                 )
                 self._web_server.start()

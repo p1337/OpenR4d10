@@ -120,6 +120,16 @@ class WhisplayDisplayTests(unittest.TestCase):
         display.close()
         self.assertTrue(panel.closed)
 
+    def test_virtual_input_uses_the_native_display_state(self) -> None:
+        panel = FakePanel()
+        display = WhisplayDisplay(panel=panel)  # type: ignore[arg-type]
+        display.render(Frame(screen="dashboard", title="OpenR4d10"))
+        state = display.apply_input(InputEvent(Control.LEFT_OUTER, steps=4))
+        self.assertEqual(state["volume"], 40)
+        self.assertEqual(display.snapshot()["volume"], 40)
+        self.assertEqual(len(panel.frames), 2)
+        display.close()
+
 
 if __name__ == "__main__":
     unittest.main()

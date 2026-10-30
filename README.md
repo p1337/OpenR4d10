@@ -23,6 +23,7 @@ the installer report exactly which adapters still need configuration.
 - safe display handoff both at boot and during an in-session installation
 - real-device-confirmed Whisplay SPI transport, colour order and orientation
 - native 240 x 280 physical UI with the agreed four-axis encoder layout
+- browser controls for all four virtual encoder axes and both press actions
 - semantic UI frame model and configurable text boot sequence
 - safe `unconfigured`, JSON-file and external-command display adapters
 - built-in Linux system status and optional external-command status/power adapters
@@ -92,6 +93,12 @@ http://192.168.1.64/
 The dashboard shows live service, system and adapter status. Until verified
 Whisplay and PiSugar adapters are configured, it labels those components as
 open instead of displaying invented measurements.
+
+Until the physical encoders are delivered, the **Virtuelle Encoder** panel in
+the same dashboard controls the real Whisplay immediately. Its volume, squelch,
+channel and service buttons plus short/long press actions use the same logical
+input events as the future GPIO adapter; no provisional pin assignment is
+required.
 
 The service section accepts an explicit `http` or `https` audio URL for local
 playback and recording. It rejects credentials embedded in URLs and does not

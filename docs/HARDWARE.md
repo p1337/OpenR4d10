@@ -136,7 +136,9 @@ only BCM4 reset, BCM27 data/command and BCM22 active-low backlight, and writes
 The UI implements the documented four control fields, vertical `MENU`/`PLAY`
 click labels, WLAN/IP, date/time and battery status row, and the
 service-dependent media area. Logical encoder events are implemented and can be
-tested without hardware; no encoder GPIO assignment is active.
+tested without hardware; no encoder GPIO assignment is active. The local web
+dashboard exposes all four rotations and both short/long press actions through
+the same input-event path and repaints the physical LCD immediately.
 
 The application media boundary uses generic ALSA through Debian's mpv and
 ffmpeg packages. Its systemd unit allows the standard `char-alsa` device class

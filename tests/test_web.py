@@ -9,6 +9,21 @@ from openr4d10.web import WebServer
 
 
 class WebTests(unittest.TestCase):
+    def test_checked_in_dashboard_exposes_virtual_encoder_controls(self) -> None:
+        web_root = Path(__file__).resolve().parents[1] / "web"
+        html = web_root.joinpath("index.html").read_text(encoding="utf-8")
+        script = web_root.joinpath("app.js").read_text(encoding="utf-8")
+        for control in (
+            "left_outer",
+            "left_inner",
+            "right_outer",
+            "right_inner",
+            "left_press",
+            "right_press",
+        ):
+            self.assertIn(f'data-device-control="{control}"', html)
+        self.assertIn('action: "device_input"', script)
+
     def test_dashboard_and_status_endpoint(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             static = Path(raw)

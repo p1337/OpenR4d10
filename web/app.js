@@ -253,7 +253,16 @@ function render(data) {
   setAdapter("display-adapter", adapters.display);
   setAdapter("power-adapter", adapters.power);
   setText("footer-status", `Letzte Aktualisierung: ${new Date().toLocaleTimeString("de-DE")}`);
+  renderDeviceState(data.device_ui);
   renderServices(data.services || {});
+}
+
+function renderDeviceState(state) {
+  if (!state) return;
+  setText("device-volume", Number.isInteger(state.volume) ? `${state.volume}%` : null);
+  setText("device-squelch", state.squelch);
+  setText("device-channel", Number.isInteger(state.channel) ? String(state.channel).padStart(3, "0") : null);
+  setText("device-service", state.service);
 }
 
 function renderOffline() {
@@ -300,6 +309,37 @@ async function sendControl(action, extra = {}) {
   } catch (error) {
     output.textContent = `Fehler: ${error.message}`;
   }
+}
+
+async function sendDeviceInput(button) {
+  const output = byId("device-control-result");
+  const request = {
+    action: "device_input",
+    control: button.dataset.deviceControl,
+  };
+  if (button.dataset.steps) request.steps = Number(button.dataset.steps);
+  if (button.dataset.held) request.held_seconds = Number(button.dataset.held);
+  button.disabled = true;
+  try {
+    const response = await fetch("/api/control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    renderDeviceState(payload.device_ui);
+    const state = payload.device_ui || {};
+    output.textContent = `${state.service || "Gerät"} · ${state.title || "Eingabe übernommen"}`;
+  } catch (error) {
+    output.textContent = `Fehler: ${error.message}`;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+for (const button of document.querySelectorAll("[data-device-control]")) {
+  button.addEventListener("click", () => sendDeviceInput(button));
 }
 
 byId("media-control").addEventListener("submit", (event) => {

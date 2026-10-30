@@ -45,6 +45,21 @@ class DeviceUiState:
     def service(self) -> str:
         return SERVICES[self.service_index % len(SERVICES)]
 
+    def public_state(self) -> dict[str, object]:
+        """Return the bounded, non-secret state exposed to virtual controls."""
+        return {
+            "volume": self.volume,
+            "squelch": self.squelch,
+            "channel": self.channel,
+            "service": self.service,
+            "left_action": self.left_action,
+            "right_action": self.right_action,
+            "playing": self.playing,
+            "menu_open": self.menu_open,
+            "title": self.title,
+            "subtitle": self.subtitle,
+        }
+
     def apply(self, event: InputEvent) -> None:
         if event.control == Control.LEFT_OUTER:
             self.volume = max(0, min(100, self.volume + event.steps))

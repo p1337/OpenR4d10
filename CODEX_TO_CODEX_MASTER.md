@@ -760,6 +760,21 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-30 – Reale UI bestätigt; virtuelle Encoderbedienung
+
+- Nach Installation von 0.10.1 bestätigt Robert die native 240-x-280-UI auf
+  dem realen Whisplay als sichtbar und optisch gelungen. Seit der korrigierten
+  Displayübergabe treten keine neuen Displayadapterfehler auf.
+- Da die bestellten Doppelencoder noch nicht geliefert sind, muss die bereits
+  vorhandene hardwareunabhängige Eingabeschnittstelle jetzt auch über die
+  lokale Weboberfläche bedienbar sein. Die Webbedienung verwendet dieselben
+  vier logischen Drehachsen und zwei Druckereignisse wie der spätere
+  GPIO-Adapter; sie ist keine parallele Navigationsimplementierung.
+- Browserereignisse werden streng auf bekannte Controls, kleine ganzzahlige
+  Drehschritte und begrenzte Haltedauer validiert. Sie aktualisieren die echte
+  physische Anzeige unmittelbar, ohne GPIO-Nummern oder Encoderverdrahtung
+  vorwegzunehmen.
+
 ### 2026-10-30 – Displayübergabe bei Installation im laufenden System
 
 - Auf dem frisch installierten realen Pi wurde beobachtet, dass der
