@@ -6,13 +6,17 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 import shutil
 from typing import Callable
+from urllib.parse import urlsplit
 
 from .content import CameraSnapshot, FeedReader
-from .media import MpvEngine, StreamRecorder
+from .media import MpvEngine, StreamRecorder, public_source_label, validate_media_source
 from .storage import StateStore
 
 
 ExecutableLookup = Callable[[str], str | None]
+MEDIA_EXTENSIONS = {
+    ".aac", ".flac", ".m4a", ".mka", ".mp3", ".mp4", ".ogg", ".opus", ".wav",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,11 +70,11 @@ class ServiceCatalog:
     ) -> None:
         self.store = StateStore(state_directory / "openr4d10.sqlite3")
         self.executable_lookup = executable_lookup
-        media_root = state_directory / "media"
-        self.player = player or MpvEngine(media_roots=(media_root,))
+        self.media_root = state_directory / "media"
+        self.player = player or MpvEngine(media_roots=(self.media_root,))
         self.recorder = recorder or StreamRecorder(
             state_directory / "recordings",
-            media_roots=(media_root,),
+            media_roots=(self.media_root,),
         )
         self.feed_reader = feed_reader or FeedReader()
         self.camera = camera or CameraSnapshot(state_directory / "cache")
@@ -104,6 +108,23 @@ class ServiceCatalog:
             item["missing_executables"] = missing
             item["readiness"] = readiness
             services.append(item)
+        stations = [
+            {
+                "id": item["id"],
+                "name": item["name"],
+                "source": public_source_label(str(item["stream_url"])),
+                "favorite": bool(item["favorite"]),
+            }
+            for item in self.store.stations()
+        ]
+        media = [
+            {
+                "id": item["id"],
+                "title": item["title"],
+                "size_bytes": item["size_bytes"],
+            }
+            for item in self.store.media_items()
+        ]
         return {
             "schema_version": 1,
             "total": len(services),
@@ -112,6 +133,8 @@ class ServiceCatalog:
             "playback": self.player.state.as_dict(),
             "recording": self.recorder.state.as_dict(),
             "content": self.content_state,
+            "stations": stations,
+            "media": media,
             "items": services,
         }
 
@@ -147,6 +170,43 @@ class ServiceCatalog:
             self.recorder.start(source)
         elif action == "record_stop":
             self.recorder.stop()
+        elif action == "station_add":
+            name = request.get("name")
+            source = request.get("source")
+            if not isinstance(name, str) or not isinstance(source, str):
+                raise ValueError("station_add requires name and source")
+            approved = validate_media_source(source, (self.media_root,))
+            if urlsplit(approved).query:
+                raise ValueError(
+                    "saved station URLs cannot contain a query; use direct playback for temporary URLs"
+                )
+            station_id = self.store.add_station("webradio", name, approved)
+            return {"station_id": station_id}
+        elif action == "station_delete":
+            station_id = request.get("station_id")
+            if isinstance(station_id, bool) or not isinstance(station_id, int):
+                raise ValueError("station_delete requires an integer station_id")
+            return {"deleted": self.store.delete_station(station_id)}
+        elif action == "station_play":
+            station_id = request.get("station_id")
+            if isinstance(station_id, bool) or not isinstance(station_id, int):
+                raise ValueError("station_play requires an integer station_id")
+            station = self.store.station(station_id)
+            if station is None:
+                raise ValueError("station was not found")
+            self.player.load(str(station["stream_url"]))
+            self.active_service = "webradio"
+        elif action == "media_scan":
+            return {"scanned": self.scan_media()}
+        elif action == "media_play":
+            media_id = request.get("media_id")
+            if isinstance(media_id, bool) or not isinstance(media_id, int):
+                raise ValueError("media_play requires an integer media_id")
+            media = self.store.media_item(media_id)
+            if media is None:
+                raise ValueError("media item was not found")
+            self.player.load(str(media["path"]))
+            self.active_service = "local_media"
         elif action == "feed_fetch":
             url = request.get("url")
             if not isinstance(url, str):
@@ -176,6 +236,31 @@ class ServiceCatalog:
             "playback": self.player.state.as_dict(),
             "recording": self.recorder.state.as_dict(),
         }
+
+    def scan_media(self) -> int:
+        self.media_root.mkdir(parents=True, exist_ok=True, mode=0o750)
+        root = self.media_root.resolve()
+        count = 0
+        present: set[str] = set()
+        for path in self.media_root.rglob("*"):
+            if count >= 2000:
+                break
+            try:
+                resolved = path.resolve(strict=True)
+                if (
+                    not resolved.is_file()
+                    or not resolved.is_relative_to(root)
+                    or resolved.suffix.lower() not in MEDIA_EXTENSIONS
+                ):
+                    continue
+                size = resolved.stat().st_size
+            except OSError:
+                continue
+            self.store.upsert_media("local_media", resolved, size)
+            present.add(str(resolved))
+            count += 1
+        self.store.remove_missing_media("local_media", present)
+        return count
 
     def content_asset(self, path: str) -> tuple[str, bytes] | None:
         if path not in {"camera-1.jpg", "camera-2.jpg"}:

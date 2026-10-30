@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import re
 import sqlite3
+import threading
 from typing import Any
 
 
@@ -97,6 +98,7 @@ class StateStore:
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
         self.connection = sqlite3.connect(path, timeout=5, check_same_thread=False)
+        self._lock = threading.RLock()
         self.connection.row_factory = sqlite3.Row
         try:
             path.chmod(0o600)
@@ -124,13 +126,14 @@ class StateStore:
 
     @contextmanager
     def transaction(self) -> Iterator[None]:
-        try:
-            yield
-        except Exception:
-            self.connection.rollback()
-            raise
-        else:
-            self.connection.commit()
+        with self._lock:
+            try:
+                yield
+            except Exception:
+                self.connection.rollback()
+                raise
+            else:
+                self.connection.commit()
 
     def set_setting(self, key: str, value: Any) -> None:
         if not key or _SECRET_KEY.search(key):
@@ -148,9 +151,10 @@ class StateStore:
             )
 
     def get_setting(self, key: str, default: Any = None) -> Any:
-        row = self.connection.execute(
-            "SELECT value_json FROM settings WHERE key = ?", (key,)
-        ).fetchone()
+        with self._lock:
+            row = self.connection.execute(
+                "SELECT value_json FROM settings WHERE key = ?", (key,)
+            ).fetchone()
         return default if row is None else json.loads(row["value_json"])
 
     def ensure_services(self, service_ids: tuple[str, ...]) -> None:
@@ -166,21 +170,115 @@ class StateStore:
             )
 
     def service_states(self) -> dict[str, dict[str, Any]]:
-        rows = self.connection.execute(
-            """
-            SELECT service_id, enabled, config_state, last_error, updated_at
-            FROM service_state ORDER BY service_id
-            """
-        )
-        return {
-            str(row["service_id"]): {
-                "enabled": bool(row["enabled"]),
-                "config_state": str(row["config_state"]),
-                "last_error": row["last_error"],
-                "updated_at": str(row["updated_at"]),
+        with self._lock:
+            rows = self.connection.execute(
+                """
+                SELECT service_id, enabled, config_state, last_error, updated_at
+                FROM service_state ORDER BY service_id
+                """
+            ).fetchall()
+            return {
+                str(row["service_id"]): {
+                    "enabled": bool(row["enabled"]),
+                    "config_state": str(row["config_state"]),
+                    "last_error": row["last_error"],
+                    "updated_at": str(row["updated_at"]),
+                }
+                for row in rows
             }
-            for row in rows
-        }
+
+    def add_station(self, service_id: str, name: str, stream_url: str) -> int:
+        if not service_id or not name.strip() or len(name) > 160:
+            raise ValueError("station service and name are required")
+        with self.transaction():
+            cursor = self.connection.execute(
+                """
+                INSERT INTO stations(service_id, name, stream_url, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (service_id, name.strip(), stream_url, _now()),
+            )
+            return int(cursor.lastrowid)
+
+    def delete_station(self, station_id: int) -> bool:
+        with self.transaction():
+            cursor = self.connection.execute(
+                "DELETE FROM stations WHERE id = ?", (station_id,)
+            )
+            return cursor.rowcount == 1
+
+    def station(self, station_id: int) -> dict[str, Any] | None:
+        with self._lock:
+            row = self.connection.execute(
+                "SELECT id, service_id, name, stream_url, favorite, position FROM stations WHERE id = ?",
+                (station_id,),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def stations(self, service_id: str = "webradio") -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self.connection.execute(
+                """
+                SELECT id, service_id, name, stream_url, favorite, position
+                FROM stations WHERE service_id = ?
+                ORDER BY favorite DESC, position, name COLLATE NOCASE LIMIT 500
+                """,
+                (service_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def upsert_media(self, service_id: str, path: Path, size_bytes: int) -> None:
+        with self.transaction():
+            self.connection.execute(
+                """
+                INSERT INTO media(service_id, path, title, size_bytes, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(path) DO UPDATE SET
+                    service_id = excluded.service_id,
+                    title = excluded.title,
+                    size_bytes = excluded.size_bytes
+                """,
+                (service_id, str(path), path.stem[:240], size_bytes, _now()),
+            )
+
+    def media_items(self, service_id: str = "local_media") -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self.connection.execute(
+                """
+                SELECT id, service_id, path, title, duration_seconds, size_bytes
+                FROM media WHERE service_id = ?
+                ORDER BY title COLLATE NOCASE LIMIT 2000
+                """,
+                (service_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def media_item(self, media_id: int) -> dict[str, Any] | None:
+        with self._lock:
+            row = self.connection.execute(
+                """
+                SELECT id, service_id, path, title, duration_seconds, size_bytes
+                FROM media WHERE id = ?
+                """,
+                (media_id,),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def remove_missing_media(self, service_id: str, present_paths: set[str]) -> int:
+        """Remove stale library rows without constructing a dynamic SQL query."""
+        removed = 0
+        with self.transaction():
+            rows = self.connection.execute(
+                "SELECT id, path FROM media WHERE service_id = ?", (service_id,)
+            ).fetchall()
+            for row in rows:
+                if str(row["path"]) not in present_paths:
+                    cursor = self.connection.execute(
+                        "DELETE FROM media WHERE id = ?", (row["id"],)
+                    )
+                    removed += cursor.rowcount
+        return removed
 
     def close(self) -> None:
-        self.connection.close()
+        with self._lock:
+            self.connection.close()

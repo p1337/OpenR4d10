@@ -66,6 +66,14 @@ Network URLs are limited to HTTP(S), reject embedded credentials and are
 redacted before appearing in status. Local media must resolve below the
 approved media directory.
 
+The web dashboard persists named radio stations without query strings and can
+rescan the private media directory for a bounded set of supported extensions.
+The scanner resolves every candidate, rejects paths outside the media root and
+removes stale database rows. Status output exposes stable IDs, display names
+and sizes, never local filesystem paths or raw stored stream URLs. SQLite
+access is serialized because the application loop and threaded HTTP server
+share one `StateStore` connection.
+
 `BoundedFetcher` supplies the native feed and camera modules. It accepts only
 HTTP(S) URLs without embedded credentials and enforces response-type, size and
 timeout limits. The feed reader parses at most 50 RSS/Atom entries and converts

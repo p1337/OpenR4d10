@@ -1,5 +1,9 @@
 # OpenR4d10
 
+The versioned project truth and complete accumulated product requirements live
+in [`CODEX_TO_CODEX_MASTER.md`](CODEX_TO_CODEX_MASTER.md). It must be read
+before changing architecture, hardware assumptions or product scope.
+
 OpenR4d10 is a small Python service for a Raspberry Pi Zero 2 W
 running Debian 13 (Trixie). It provides a safe foundation for a receiver UI,
 boot sequence, display output, status data and power telemetry without guessing
@@ -31,6 +35,7 @@ the installer report exactly which adapters still need configuration.
   stream recording through shell-free ffmpeg/Opus
 - bounded RSS/Atom reader and two-slot camera snapshots with image validation
   and safe JPEG re-encoding
+- persistent web-radio favorites and bounded local-media library scanning
 - standard-library-only test suite and GitHub Actions CI
 
 Hardware-specific integration still pending:
@@ -91,6 +96,11 @@ device; the Whisplay codec driver is still hardware-revision-dependent.
 RSS/Atom URLs and camera snapshot URLs can be loaded in the same local panel.
 Feed downloads are size-limited; camera responses are decoded, dimension-
 checked, resized and re-encoded before the browser can retrieve them.
+Saved radio stations can be managed in the same dashboard. Station URLs with a
+query are intentionally refused for persistent storage, while direct temporary
+playback remains possible. Local files copied below
+`/var/lib/openr4d10/media` appear after selecting **Neu einlesen**; their full
+paths never appear in the public status response.
 
 If the repository files are already present, the local command remains:
 

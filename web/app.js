@@ -72,6 +72,58 @@ function renderServices(catalog) {
     card.append(heading, description, detail);
     grid.append(card);
   }
+  renderLibrary(catalog);
+}
+
+function libraryButton(label, action, extra) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = label;
+  button.addEventListener("click", () => sendControl(action, extra));
+  return button;
+}
+
+function renderLibrary(catalog) {
+  const stations = Array.isArray(catalog?.stations) ? catalog.stations : [];
+  const stationList = byId("station-list");
+  stationList.replaceChildren();
+  for (const station of stations) {
+    const row = document.createElement("li");
+    const label = document.createElement("span");
+    label.textContent = `${station.name} · ${station.source}`;
+    const actions = document.createElement("span");
+    actions.className = "library-actions";
+    actions.append(
+      libraryButton("Play", "station_play", { station_id: station.id }),
+      libraryButton("Löschen", "station_delete", { station_id: station.id }),
+    );
+    row.append(label, actions);
+    stationList.append(row);
+  }
+  if (!stations.length) {
+    const row = document.createElement("li");
+    row.textContent = "Noch keine Sender gespeichert.";
+    stationList.append(row);
+  }
+
+  const media = Array.isArray(catalog?.media) ? catalog.media : [];
+  const mediaList = byId("media-list");
+  mediaList.replaceChildren();
+  for (const item of media) {
+    const row = document.createElement("li");
+    const label = document.createElement("span");
+    const size = Number.isFinite(item.size_bytes)
+      ? `${(item.size_bytes / 1024 / 1024).toFixed(1)} MB`
+      : "Größe unbekannt";
+    label.textContent = `${item.title} · ${size}`;
+    row.append(label, libraryButton("Play", "media_play", { media_id: item.id }));
+    mediaList.append(row);
+  }
+  if (!media.length) {
+    const row = document.createElement("li");
+    row.textContent = "Noch keine lokalen Audiodateien eingelesen.";
+    mediaList.append(row);
+  }
 }
 
 function render(data) {
@@ -155,6 +207,17 @@ byId("media-control").addEventListener("submit", (event) => {
   event.preventDefault();
   sendControl("play", { source: byId("media-source").value, service_id: "webradio" });
 });
+
+byId("station-control").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await sendControl("station_add", {
+    name: byId("station-name").value,
+    source: byId("station-url").value,
+  });
+  event.currentTarget.reset();
+});
+
+byId("media-scan").addEventListener("click", () => sendControl("media_scan"));
 
 for (const button of document.querySelectorAll("[data-action]")) {
   button.addEventListener("click", () => {

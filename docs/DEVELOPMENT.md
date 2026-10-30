@@ -57,7 +57,9 @@ files in `web/` plus the following endpoints:
 The control endpoint accepts only JSON up to 4096 bytes, rejects mismatched
 browser origins and never accepts or stores credentials. It supports explicit
 playback, pause, stop, volume and stream-recording actions plus bounded feed and
-camera retrieval. Port, bind address and static directory live in `[web]` in
+camera retrieval, saved station management and local media rescans. Saved
+station URLs containing query strings are rejected; temporary direct playback
+is not persisted. Port, bind address and static directory live in `[web]` in
 `openr4d10.toml`.
 
 ## Installed diagnostics

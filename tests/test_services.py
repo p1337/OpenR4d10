@@ -134,3 +134,84 @@ class ServiceCatalogTests(unittest.TestCase):
         self.assertEqual(overlay["service"], "RADIO")
         self.assertEqual(overlay["station"], "https://radio.example/live")
         self.assertTrue(overlay["playing"])
+
+    def test_station_library_is_persistent_and_never_exposes_query_values(self) -> None:
+        class State:
+            def __init__(self, **values):
+                self.values = values
+                for key, value in values.items():
+                    setattr(self, key, value)
+
+            def as_dict(self):
+                return dict(self.values)
+
+        class Player:
+            def __init__(self):
+                self.state = State(state="stopped", source=None, paused=False)
+                self.loaded = None
+
+            def load(self, source):
+                self.loaded = source
+                self.state = State(state="playing", source=source, paused=False)
+
+            def close(self):
+                pass
+
+        class Recorder:
+            def __init__(self):
+                self.state = State(state="stopped")
+
+            def close(self):
+                pass
+
+        with tempfile.TemporaryDirectory() as raw:
+            player = Player()
+            catalog = ServiceCatalog(
+                Path(raw).resolve(), player=player, recorder=Recorder()
+            )
+            try:
+                result = catalog.control(
+                    {
+                        "action": "station_add",
+                        "name": "Open Radio",
+                        "source": "https://radio.example/live",
+                    }
+                )
+                catalog.control(
+                    {"action": "station_play", "station_id": result["station_id"]}
+                )
+                snapshot = catalog.snapshot()
+                with self.assertRaisesRegex(ValueError, "cannot contain a query"):
+                    catalog.control(
+                        {
+                            "action": "station_add",
+                            "name": "Secret",
+                            "source": "https://radio.example/live?token=never-store",
+                        }
+                    )
+            finally:
+                catalog.close()
+        self.assertEqual(player.loaded, "https://radio.example/live")
+        self.assertEqual(snapshot["stations"][0]["name"], "Open Radio")
+        self.assertNotIn("stream_url", snapshot["stations"][0])
+
+    def test_media_scan_indexes_only_approved_files_and_removes_stale_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            catalog = ServiceCatalog(root)
+            media_root = root / "media"
+            media_root.mkdir()
+            audio = media_root / "song.mp3"
+            ignored = media_root / "notes.txt"
+            audio.write_bytes(b"audio")
+            ignored.write_text("not media", encoding="utf-8")
+            try:
+                self.assertEqual(catalog.scan_media(), 1)
+                snapshot = catalog.snapshot()
+                self.assertEqual(snapshot["media"][0]["title"], "song")
+                self.assertNotIn("path", snapshot["media"][0])
+                audio.unlink()
+                self.assertEqual(catalog.scan_media(), 0)
+                self.assertEqual(catalog.snapshot()["media"], [])
+            finally:
+                catalog.close()

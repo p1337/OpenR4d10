@@ -177,6 +177,12 @@ h2 { margin-bottom: 0; font-size: 1.15rem; letter-spacing: -0.02em; }
 .media-actions button { color: var(--muted); border-color: var(--line); background: rgba(255, 255, 255, .025); }
 .media-control output { display: block; margin-top: 11px; color: var(--muted); font-size: .7rem; }
 .content-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.library-controls { margin-top: 20px; }
+.library-heading { align-items: center; display: flex; justify-content: space-between; gap: 12px; }
+.library-list { display: grid; gap: 8px; list-style: none; margin: 12px 0 0; padding: 0; }
+.library-list li { align-items: center; background: rgba(255, 255, 255, .035); border-radius: 9px; display: flex; gap: 12px; justify-content: space-between; min-width: 0; padding: 10px 11px; }
+.library-list li > span:first-child { overflow-wrap: anywhere; }
+.library-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .content-control { padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: rgba(5, 12, 14, .58); }
 .content-control label { display: block; margin-bottom: 8px; color: var(--muted); font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .content-control button { padding: 10px 13px; border: 1px solid var(--line); border-radius: 9px; color: var(--text); background: rgba(255, 255, 255, .025); cursor: pointer; }
