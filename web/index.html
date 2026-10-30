@@ -117,6 +117,11 @@
         <span class="version">direkt aufs LCD</span>
       </div>
       <p class="services-note">Diese Tasten senden dieselben logischen Ereignisse wie die späteren Doppelencoder.</p>
+      <p class="keyboard-help" aria-label="Tastaturbelegung">
+        <kbd>W</kbd><kbd>S</kbd> Lautstärke · <kbd>A</kbd><kbd>D</kbd> Squelch ·
+        <kbd>↑</kbd><kbd>↓</kbd> Kanal · <kbd>←</kbd><kbd>→</kbd> Dienst ·
+        <kbd>Leertaste</kbd> linker Klick · <kbd>Enter</kbd> rechter Klick
+      </p>
       <div class="encoder-grid">
         <article class="encoder-control">
           <span>Links außen</span>
@@ -162,6 +167,10 @@
           <button type="button" data-device-control="right_press">Play / Pause</button>
           <button type="button" data-device-control="right_press" data-held="2">Quick-Menü</button>
         </div>
+      </div>
+      <div class="ptt-control">
+        <button type="button" id="ptt-button" aria-pressed="false"><kbd>Q</kbd> halten · PTT</button>
+        <span id="device-ptt">Bereit – kein PTT-Dienstadapter konfiguriert</span>
       </div>
       <output class="device-control-result" id="device-control-result" aria-live="polite">Bereit.</output>
     </section>

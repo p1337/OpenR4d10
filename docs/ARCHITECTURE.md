@@ -24,16 +24,20 @@ its first complete dashboard frame and claims display ownership.
 
 Encoder hardware is isolated behind logical `InputEvent` values. Four rotary
 controls (`left_outer`, `left_inner`, `right_outer`, `right_inner`) and two
-press controls are already modeled and tested. No GPIO number appears in the UI
-or navigation logic; the GPIO input source is added after the delivered
-encoders have been identified and measured.
+press controls are already modeled and tested. A seventh held `ptt` control has
+an explicit boolean state so release cannot be confused with a second click.
+It is only an input indication until an authorized PTT service adapter consumes
+it. No GPIO number appears in the UI or navigation logic; the GPIO input source
+is added after the delivered encoders have been identified and measured.
 
 The local web dashboard can submit those same bounded `InputEvent` values to
 the configured Whisplay adapter. The adapter serializes browser input and the
 normal render loop with one display lock, updates its existing `DeviceUiState`
 and repaints the physical panel immediately. This is the temporary hardware-
 free input source and remains useful for remote operation after GPIO input is
-added; it is not a second navigation model.
+added; it is not a second navigation model. Browser keyboard bindings translate
+WASD, arrow keys, Space, Enter and held Q into this same contract and are
+disabled while the user edits a form field.
 
 ## Configuration and storage
 

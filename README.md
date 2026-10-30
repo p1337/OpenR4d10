@@ -98,7 +98,12 @@ Until the physical encoders are delivered, the **Virtuelle Encoder** panel in
 the same dashboard controls the real Whisplay immediately. Its volume, squelch,
 channel and service buttons plus short/long press actions use the same logical
 input events as the future GPIO adapter; no provisional pin assignment is
-required.
+required. Keyboard control is available outside form fields: `W`/`S` control
+volume, `A`/`D` control squelch, the up/down arrows control the channel, the
+left/right arrows control the service, Space is the left click and Enter is the
+right click. Holding `Q` exposes the logical PTT input; until a verified PTT
+service adapter is configured it deliberately shows input state without
+claiming audio transmission.
 
 The service section accepts an explicit `http` or `https` audio URL for local
 playback and recording. It rejects credentials embedded in URLs and does not

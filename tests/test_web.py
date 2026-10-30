@@ -23,8 +23,36 @@ class WebTests(unittest.TestCase):
         ):
             self.assertIn(f'data-device-control="{control}"', html)
         self.assertIn('action: "device_input"', script)
+        for key_code in (
+            "KeyW",
+            "KeyS",
+            "KeyA",
+            "KeyD",
+            "ArrowUp",
+            "ArrowDown",
+            "ArrowLeft",
+            "ArrowRight",
+            "Space",
+            "Enter",
+            "KeyQ",
+        ):
+            self.assertIn(key_code, script)
+        self.assertIn('control: "ptt", active', script)
+        self.assertIn("isEditableTarget", script)
+        self.assertIn('KeyW: { control: "left_outer", steps: 1 }', script)
+        self.assertIn('KeyA: { control: "left_inner", steps: -1 }', script)
+        self.assertIn('ArrowUp: { control: "right_outer", steps: 1 }', script)
+        self.assertIn('ArrowLeft: { control: "right_inner", steps: -1 }', script)
+        self.assertIn('Space: { control: "left_press" }', script)
+        self.assertIn('Enter: { control: "right_press" }', script)
+        self.assertIn('window.addEventListener("blur"', script)
+        self.assertIn('document.addEventListener("visibilitychange"', script)
+        self.assertIn('id="ptt-button"', html)
         self.assertIn("System und Display online. Energieanzeige noch offen.", script)
         self.assertIn("Nur die verifizierte PiSugar-Telemetrie fehlt noch.", script)
+        self.assertIn("PiSugar vorhanden", script)
+        self.assertIn("Akkubetrieb bestätigt · Messwerte noch offen", script)
+        self.assertNotIn("PiSugar-Adapter fehlt", script)
 
     def test_dashboard_and_status_endpoint(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

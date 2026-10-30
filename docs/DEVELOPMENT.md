@@ -70,11 +70,14 @@ cannot be disabled and external modules still require their own adapter. Port,
 bind address and static directory live in `[web]` in `openr4d10.toml`.
 
 The `device_input` action is the hardware-free input source for the native
-display. It accepts only the six checked-in logical control names, rotary steps
-from -10 through 10 excluding zero, and press hold durations from 0 through 5
-seconds. The application passes the resulting `InputEvent` directly to the
-Whisplay adapter; the normal render loop and browser inputs share its display
-lock. No GPIO number is accepted by this endpoint.
+display. It accepts only the checked-in logical control names, rotary steps
+from -10 through 10 excluding zero, press hold durations from 0 through 5
+seconds, and an explicit boolean `active` state for `ptt`. The application
+passes the resulting `InputEvent` directly to the Whisplay adapter; the normal
+render loop and browser inputs share its display lock. No GPIO number is
+accepted by this endpoint. Browser PTT must release on key-up, focus loss and
+tab hiding. It remains an input indication, not an audio claim, until a real
+authorized service adapter consumes it.
 
 Curated controls are `preset_play`, `preset_save` and `feed_fetch_preset`.
 They accept only a checked-in preset ID and never a client-supplied internal

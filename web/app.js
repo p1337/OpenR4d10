@@ -248,8 +248,13 @@ function render(data) {
 
   setText("receiver-state", receiver.state === "online" ? "Online" : adapterLabel(adapters.receiver));
   setText("receiver-detail", receiver.hostname ? `Quelle: ${receiver.hostname}` : "Statusquelle aktiv");
-  setText("power-state", power.state === "unconfigured" ? "Nicht konfiguriert" : power.state);
-  setText("power-detail", adapters.power === "unconfigured" ? "PiSugar-Adapter fehlt" : "Energieadapter aktiv");
+  setText("power-state", power.state === "unconfigured" ? "PiSugar vorhanden" : power.state);
+  setText(
+    "power-detail",
+    adapters.power === "unconfigured"
+      ? "Akkubetrieb bestätigt · Messwerte noch offen"
+      : "PiSugar-Telemetrie verbunden"
+  );
   setText("display-state", adapters.display === "unconfigured" ? "Headless" : "Verbunden");
   setText("display-detail", adapters.display === "unconfigured" ? "Whisplay-Adapter fehlt" : `Backend: ${adapters.display}`);
   setText("uptime", formatUptime(receiver.uptime_seconds));
@@ -272,6 +277,14 @@ function renderDeviceState(state) {
   setText("device-squelch", state.squelch);
   setText("device-channel", Number.isInteger(state.channel) ? String(state.channel).padStart(3, "0") : null);
   setText("device-service", state.service);
+  const pttButton = byId("ptt-button");
+  pttButton.setAttribute("aria-pressed", state.ptt_active ? "true" : "false");
+  setText(
+    "device-ptt",
+    state.ptt_active
+      ? "PTT-Eingabe aktiv – kein Audioadapter verbunden"
+      : "Bereit – kein PTT-Dienstadapter konfiguriert"
+  );
 }
 
 function renderOffline() {
@@ -320,36 +333,104 @@ async function sendControl(action, extra = {}) {
   }
 }
 
-async function sendDeviceInput(button) {
+async function postDeviceInput(request, button = null) {
   const output = byId("device-control-result");
-  const request = {
-    action: "device_input",
-    control: button.dataset.deviceControl,
-  };
-  if (button.dataset.steps) request.steps = Number(button.dataset.steps);
-  if (button.dataset.held) request.held_seconds = Number(button.dataset.held);
-  button.disabled = true;
+  if (button) button.disabled = true;
   try {
     const response = await fetch("/api/control", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
+      body: JSON.stringify({ action: "device_input", ...request }),
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
     renderDeviceState(payload.device_ui);
     const state = payload.device_ui || {};
-    output.textContent = `${state.service || "Gerät"} · ${state.title || "Eingabe übernommen"}`;
+    output.textContent = request.control === "ptt"
+      ? (state.ptt_active ? "PTT-Eingabe aktiv · kein PTT-Audioadapter verbunden" : "PTT-Eingabe beendet")
+      : `${state.service || "Gerät"} · ${state.title || "Eingabe übernommen"}`;
   } catch (error) {
     output.textContent = `Fehler: ${error.message}`;
   } finally {
-    button.disabled = false;
+    if (button) button.disabled = false;
   }
+}
+
+function sendDeviceInput(button) {
+  const request = { control: button.dataset.deviceControl };
+  if (button.dataset.steps) request.steps = Number(button.dataset.steps);
+  if (button.dataset.held) request.held_seconds = Number(button.dataset.held);
+  return postDeviceInput(request, button);
 }
 
 for (const button of document.querySelectorAll("[data-device-control]")) {
   button.addEventListener("click", () => sendDeviceInput(button));
 }
+
+const keyboardDeviceInputs = {
+  KeyW: { control: "left_outer", steps: 1 },
+  KeyS: { control: "left_outer", steps: -1 },
+  KeyA: { control: "left_inner", steps: -1 },
+  KeyD: { control: "left_inner", steps: 1 },
+  ArrowUp: { control: "right_outer", steps: 1 },
+  ArrowDown: { control: "right_outer", steps: -1 },
+  ArrowLeft: { control: "right_inner", steps: -1 },
+  ArrowRight: { control: "right_inner", steps: 1 },
+  Space: { control: "left_press" },
+  Enter: { control: "right_press" },
+};
+
+function isEditableTarget(target) {
+  return target instanceof HTMLElement && (
+    target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)
+  );
+}
+
+let pttKeyActive = false;
+let pttQueue = Promise.resolve();
+
+function setPttInput(active) {
+  if (pttKeyActive === active) return;
+  pttKeyActive = active;
+  byId("ptt-button").setAttribute("aria-pressed", active ? "true" : "false");
+  pttQueue = pttQueue
+    .catch(() => undefined)
+    .then(() => postDeviceInput({ control: "ptt", active }));
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.altKey || event.ctrlKey || event.metaKey || isEditableTarget(event.target)) return;
+  if (event.code === "KeyQ") {
+    event.preventDefault();
+    if (!event.repeat) setPttInput(true);
+    return;
+  }
+  const request = keyboardDeviceInputs[event.code];
+  if (!request) return;
+  event.preventDefault();
+  if (event.repeat && !Object.hasOwn(request, "steps")) return;
+  postDeviceInput(request);
+});
+
+document.addEventListener("keyup", (event) => {
+  if (event.code !== "KeyQ") return;
+  event.preventDefault();
+  setPttInput(false);
+});
+
+const pttButton = byId("ptt-button");
+pttButton.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  pttButton.setPointerCapture?.(event.pointerId);
+  setPttInput(true);
+});
+for (const eventName of ["pointerup", "pointercancel", "lostpointercapture"]) {
+  pttButton.addEventListener(eventName, () => setPttInput(false));
+}
+window.addEventListener("blur", () => setPttInput(false));
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) setPttInput(false);
+});
 
 byId("media-control").addEventListener("submit", (event) => {
   event.preventDefault();

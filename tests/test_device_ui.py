@@ -53,11 +53,15 @@ class DeviceUiTests(unittest.TestCase):
         state.apply(InputEvent(Control.RIGHT_OUTER, steps=5))
         state.apply(InputEvent(Control.RIGHT_INNER, steps=1))
         state.apply(InputEvent(Control.RIGHT_PRESS))
+        state.apply(InputEvent(Control.PTT, active=True))
         self.assertEqual(state.volume, 53)
         self.assertEqual(state.squelch, 2)
         self.assertEqual(state.channel, 15)
         self.assertEqual(state.service, "RADIO")
         self.assertTrue(state.playing)
+        self.assertTrue(state.ptt_active)
+        state.apply(InputEvent(Control.PTT, active=False))
+        self.assertFalse(state.ptt_active)
 
     def test_receiver_service_selects_matching_header_mode(self) -> None:
         state = DeviceUiState()
@@ -77,6 +81,10 @@ class DeviceUiTests(unittest.TestCase):
             InputEvent(Control.LEFT_OUTER)
         with self.assertRaises(ValueError):
             InputEvent(Control.LEFT_PRESS, steps=1)
+        with self.assertRaises(ValueError):
+            InputEvent(Control.PTT)
+        with self.assertRaises(ValueError):
+            InputEvent(Control.RIGHT_PRESS, active=True)
 
 
 class FakePanel:

@@ -38,6 +38,7 @@ class DeviceUiState:
     playing: bool = False
     recording: bool = False
     menu_open: bool = False
+    ptt_active: bool = False
     accent: tuple[int, int, int] = DEFAULT_ACCENT
     timestamp: datetime = field(default_factory=datetime.now)
 
@@ -56,6 +57,7 @@ class DeviceUiState:
             "right_action": self.right_action,
             "playing": self.playing,
             "menu_open": self.menu_open,
+            "ptt_active": self.ptt_active,
             "title": self.title,
             "subtitle": self.subtitle,
         }
@@ -85,6 +87,10 @@ class DeviceUiState:
             else:
                 self.playing = not self.playing
                 self.right_action = "PAUSE" if self.playing else "PLAY"
+        elif event.control == Control.PTT:
+            self.ptt_active = bool(event.active)
+            self.title = "PTT input active" if self.ptt_active else "PTT released"
+            self.subtitle = "No PTT service adapter configured"
 
     def update_from_frame(self, frame: Frame) -> None:
         fields = frame.fields
@@ -262,7 +268,7 @@ def render_device_ui(state: DeviceUiState) -> Image.Image:
     if state.recording:
         draw.ellipse((207, 178, 216, 187), fill=(255, 78, 78))
 
-    footer = "PLAYING" if state.playing else "READY"
+    footer = "PTT INPUT" if state.ptt_active else ("PLAYING" if state.playing else "READY")
     if state.recording:
         footer = "RECORDING"
     draw.line((14, 247, 226, 247), fill=(28, 40, 44), width=1)

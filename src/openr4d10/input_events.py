@@ -13,6 +13,7 @@ class Control(str, Enum):
     RIGHT_INNER = "right_inner"
     LEFT_PRESS = "left_press"
     RIGHT_PRESS = "right_press"
+    PTT = "ptt"
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,6 +23,7 @@ class InputEvent:
     control: Control
     steps: int = 0
     held_seconds: float = 0.0
+    active: bool | None = None
 
     def __post_init__(self) -> None:
         rotary = self.control in {
@@ -36,3 +38,12 @@ class InputEvent:
             raise ValueError("press input cannot contain rotary steps")
         if self.held_seconds < 0:
             raise ValueError("held_seconds cannot be negative")
+        if rotary and self.held_seconds != 0:
+            raise ValueError("rotary input cannot contain a hold duration")
+        if self.control == Control.PTT:
+            if not isinstance(self.active, bool):
+                raise ValueError("PTT input requires an active state")
+            if self.held_seconds != 0:
+                raise ValueError("PTT input cannot contain a hold duration")
+        elif self.active is not None:
+            raise ValueError("only PTT input accepts an active state")

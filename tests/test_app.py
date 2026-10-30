@@ -44,6 +44,12 @@ class AppTests(unittest.TestCase):
             )
             self.assertEqual(result["device_ui"]["volume"], 37)
             self.assertEqual(display.events[0].control, Control.LEFT_OUTER)
+            ptt = app.control(
+                {"action": "device_input", "control": "ptt", "active": True}
+            )
+            self.assertTrue(ptt["accepted"]["active"])
+            self.assertEqual(display.events[1].control, Control.PTT)
+            self.assertTrue(display.events[1].active)
             for request in (
                 {"action": "device_input", "control": "missing", "steps": 1},
                 {"action": "device_input", "control": "left_outer", "steps": 0},
@@ -58,6 +64,13 @@ class AppTests(unittest.TestCase):
                     "action": "device_input",
                     "control": "right_press",
                     "held_seconds": 6,
+                },
+                {"action": "device_input", "control": "ptt"},
+                {"action": "device_input", "control": "ptt", "active": 1},
+                {
+                    "action": "device_input",
+                    "control": "left_press",
+                    "active": True,
                 },
             ):
                 with self.subTest(request=request), self.assertRaises(ValueError):

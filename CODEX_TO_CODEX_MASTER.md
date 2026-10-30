@@ -84,6 +84,8 @@ Realer Aufbau am 2026-10-30:
   40 Kontakten verlötet,
 - das Whisplay HAT ist auf der Vorderseite aufgesteckt,
 - das PiSugar-3-Akkupack ist auf der Rückseite montiert,
+- der PiSugar versorgt den Pi nach realer Nutzerbestätigung erfolgreich im
+  Akkubetrieb; offen ist nur die Softwareanbindung seiner Messwerte,
 - der Raspberry Pi startet und der OpenR4d10-Dienst läuft,
 - die RGB-LED des Whisplay leuchtet; das LCD blieb mit dem bisherigen
   absichtlich unkonfigurierten/headless Display-Backend schwarz.
@@ -221,6 +223,22 @@ Die zwei Encoder-Drucktaster sind verbindlich so belegt:
 |---|---|---|
 | links | Hauptmenü | Einstellungen des aktiven Dienstes |
 | rechts | Play/Pause; bei BrandMeister Kanal/Talkgroup aktivieren oder deaktivieren | Quick-Menü inklusive Aufnahme |
+
+Bis die Encoder verfügbar sind, bildet die Weboberfläche dieselben logischen
+Eingaben zusätzlich auf eine PC-Tastatur ab:
+
+- `W`/`S`: linker äußerer Encoder (Lautstärke höher/niedriger),
+- `A`/`D`: linker innerer Encoder (Squelch niedriger/höher),
+- Pfeil hoch/runter: rechter äußerer Encoder (Kanal vor/zurück),
+- Pfeil links/rechts: rechter innerer Encoder (Dienst zurück/vor),
+- Leertaste: linker Drucktaster,
+- Enter: rechter Drucktaster,
+- `Q` halten: PTT aktiv; Loslassen beendet PTT.
+
+Die Tastatursteuerung ist in Text- und Auswahlfeldern inaktiv, damit Eingaben
+nicht versehentlich Gerätesteuerungen oder PTT auslösen. PTT bleibt bis zur
+Einrichtung eines berechtigten PTT-Dienstadapters ein sichtbares logisches
+Eingabesignal und darf keine funktionierende Audioübertragung vortäuschen.
 
 Die Druckfunktionen werden im oberen Displaybereich vertikal angezeigt:
 
@@ -759,6 +777,28 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-30 – PiSugar-Stromversorgung real bestätigt
+
+- Robert bestätigt den laufenden Pi im Akkubetrieb über den montierten
+  PiSugar. Die bisherige Webformulierung „PiSugar-Adapter fehlt“ war deshalb
+  sachlich falsch: Hardware und Stromversorgung sind vorhanden.
+- Nicht eingerichtet ist ausschließlich der Software-/Telemetrieadapter für
+  Ladestand und weitere PiSugar-Messwerte. Die Weboberfläche muss genau diese
+  Grenze benennen und darf weder fehlende Hardware noch bereits messbare
+  Batteriedaten behaupten.
+
+### 2026-10-30 – Browser-Tastatursteuerung und sichere PTT-Taste
+
+- Die virtuelle Encoderbedienung erhält die verbindliche Tastaturbelegung
+  `WASD`, Pfeiltasten, Leertaste, Enter und `Q` für PTT. Alle Tasten verwenden
+  die bestehende logische Eingabeschnittstelle und keine parallele Navigation.
+- `Q` ist ein gehaltenes Signal: `keydown` aktiviert PTT, `keyup`, Fokusverlust
+  oder ausgeblendeter Tab deaktiviert es. Damit darf PTT nicht durch einen
+  verlorenen Tastaturzustand eingeschaltet bleiben.
+- Tastaturkürzel greifen nicht in Formularfeldern oder editierbaren Elementen.
+  Solange kein echter berechtigter PTT-Dienstadapter bereitsteht, zeigt die UI
+  nur den Eingabestatus und behauptet keine Mikrofon- oder Audioübertragung.
 
 ### 2026-10-30 – Adapterstatus und reale Audiogrenze präzisiert
 

@@ -11,6 +11,8 @@
 - complete 2 x 20 header soldered at all 40 Pi contacts
 - Whisplay HAT fitted on the front
 - PiSugar 3 battery pack fitted on the rear
+- the PiSugar supplies the running Pi successfully from its battery; only its
+  software telemetry integration remains open
 - Raspberry Pi and `openr4d10.service` boot successfully
 - Whisplay RGB LED illuminates
 - the original native boot animation has since been recorded visibly on the
@@ -156,10 +158,11 @@ the missing Whisplay ALSA integration remains the open hardware boundary.
 ## Still deliberately unknown
 
 The installed Whisplay audio codec revision and PiSugar model/API have not yet
-been identified on the physical device. Keep `power.backend` as `unconfigured`
-until the PiSugar integration is implemented and verified. The Whisplay display
-backend is implemented but remains physically unverified until the updated
-installer has run and the real panel result has been reported.
+been identified on the physical device. The PiSugar's physical presence and
+battery-powered operation are confirmed; `power.backend` remains
+`unconfigured` only because battery percentage and other telemetry are not yet
+integrated. The Whisplay display backend is implemented and physically verified
+on the real stack.
 
 ## Generic adapter contract
 

@@ -99,6 +99,7 @@ class OpenR4d10App:
         }
         raw_steps = request.get("steps", 0)
         raw_held = request.get("held_seconds", 0.0)
+        raw_active = request.get("active")
         if isinstance(raw_steps, bool) or not isinstance(raw_steps, int):
             raise ValueError("steps must be an integer")
         if isinstance(raw_held, bool) or not isinstance(raw_held, (int, float)):
@@ -109,22 +110,37 @@ class OpenR4d10App:
                 raise ValueError("rotary steps must be between -10 and 10, excluding zero")
             if held_seconds != 0:
                 raise ValueError("rotary input cannot contain a hold duration")
+            if raw_active is not None:
+                raise ValueError("rotary input cannot contain an active state")
+        elif control == Control.PTT:
+            if raw_steps != 0 or held_seconds != 0:
+                raise ValueError("PTT input accepts only an active state")
+            if not isinstance(raw_active, bool):
+                raise ValueError("PTT active state must be a boolean")
         else:
             if raw_steps != 0:
                 raise ValueError("press input cannot contain rotary steps")
             if not 0 <= held_seconds <= 5:
                 raise ValueError("held_seconds must be between 0 and 5")
+            if raw_active is not None:
+                raise ValueError("press input cannot contain an active state")
 
         handler = getattr(self.display, "apply_input", None)
         if not callable(handler):
             raise RuntimeError("the configured display does not accept device input")
-        event = InputEvent(control, steps=raw_steps, held_seconds=held_seconds)
+        event = InputEvent(
+            control,
+            steps=raw_steps,
+            held_seconds=held_seconds,
+            active=raw_active if control == Control.PTT else None,
+        )
         device_state = handler(event)
         return {
             "accepted": {
                 "control": event.control.value,
                 "steps": event.steps,
                 "held_seconds": event.held_seconds,
+                "active": event.active,
             },
             "device_ui": device_state,
         }
