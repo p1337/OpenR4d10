@@ -30,10 +30,10 @@ robustes Handheld im Stil eines hochwertigen professionellen Funkgeräts.
 Der endgültige öffentliche Projekt- und Produktname lautet exakt
 **OpenR4d10**. Die Standardschreibweise ist `OpenR4d10`; auf Logo und Gehäuse
 darf `OPENR4D10` stehen. Gesprochen wird der Name „Open Radio“. Der geplante
-Repository-Pfad lautet `p1337/openr4d10`. `OpenHandheld` ist ausschließlich ein
-historischer Arbeitsname und darf nicht mehr als sichtbare Marke verwendet
-werden. Der interne Linux-Daemon, Paketbezeichner und vorhandene Systempfade
-dürfen zur technischen Kompatibilität weiterhin `openplayer` heißen.
+Repository-Pfad lautet `p1337/OpenR4d10`. `OpenHandheld` und `openplayer` sind
+ausschließlich historische Arbeitsnamen und dürfen nicht mehr als sichtbare
+Marke, Daemonname oder neuer Systempfad verwendet werden. Der aktuelle Dienst,
+Python-Namespace und die installierten Pfade heißen einheitlich `openr4d10`.
 
 Primärer Zweck:
 
@@ -423,7 +423,7 @@ definierten Berechtigungen, Ressourcenlimits und getrennten Datenverzeichnissen.
 - Ein Modul erhält einen eigenen unprivilegierten Benutzer beziehungsweise
   eine isolierte Laufzeit, ein eigenes Datenverzeichnis und nur deklarierte
   Ressourcen.
-- `/home`, `/root`, `/etc/openplayer`, der zentrale Secret-Speicher, SSH-Keys,
+- `/home`, `/root`, `/etc/openr4d10`, der zentrale Secret-Speicher, SSH-Keys,
   WLAN-Profile und die Datenverzeichnisse anderer Module sind unsichtbar.
 - Das Root-Dateisystem ist für Module schreibgeschützt; schreibbar sind nur
   das private Modulverzeichnis und ein begrenztes temporäres Verzeichnis.
@@ -646,7 +646,7 @@ Oberfläche keine steuerlich absetzbare „gemeinnützige Spende“ versprechen.
 
 Empfohlener Kern:
 
-- Raspberry Pi OS Lite,
+- Debian 13 Trixie für `aarch64` auf Raspberry Pi Zero 2 W,
 - Python-Core-Service,
 - FastAPI für REST, WebSocket und Weboberfläche,
 - SQLite mit versionierten Migrationen,
@@ -748,13 +748,15 @@ Verbindliche Schutzregeln:
 Geplanter Installationsaufruf nach Veröffentlichung des Repositories:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/p1337/openplayer/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/p1337/OpenR4d10/main/bootstrap.sh | sudo bash
 ```
 
-Der Installer muss wiederholbar, abbrechbar und auf Raspberry Pi OS Bookworm
-prüfbar sein. Er installiert Systempakete, Anwendung, Python-Umgebung,
-Systemdienst und lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert
-werden, wenn die tatsächlich verwendete Hardwareversion verifiziert ist.
+Der Installer ist wiederholbar und für Debian 13 Trixie auf dem Raspberry Pi
+Zero 2 W ausgelegt. `bootstrap.sh` lädt das vollständige öffentliche Archiv
+ohne Git-Abhängigkeit und übergibt an den einzigen lokalen Installer
+`install.sh`. Dieser installiert Systempakete, Anwendung, Systemdienst und
+lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
+tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
@@ -932,7 +934,7 @@ werden, wenn die tatsächlich verwendete Hardwareversion verifiziert ist.
   softwareseitig geprüft; mangels angeschlossenem Pi/Whisplay sind sie nicht als
   hardwaregetestet oder bereits auf Roberts Pi installiert auszugeben.
 - Umsetzung liegt in `boot/`, UI-Übergabe in
-  `src/openplayer/boot_display.py`. Erzeugt: 73 Frames mit 24 fps, 240 × 280,
+  `src/openr4d10/boot_display.py`. Erzeugt: 73 Frames mit 24 fps, 240 × 280,
   RGB565, 1.593.280 Byte Animationspaket; frühes Einzelbild 12.550 Byte.
   Das Originalvideo ist unverändert geblieben. Die letzten 24 Originalframes
   dienen als wartende Schleife; deren sichtbare Naht ist noch zu prüfen.
@@ -1186,7 +1188,9 @@ werden, wenn die tatsächlich verwendete Hardwareversion verifiziert ist.
 ### 2026-10-30 – Name und Logo-Grundform
 
 - Öffentliche Marke auf `OpenR4d10`, Logoform `OPENR4D10` und Aussprache
-  „Open Radio“ festgelegt; `openplayer` bleibt interner Technikname.
+  „Open Radio“ festgelegt; der damals noch vorgesehene interne Technikname
+  `openplayer` wurde später zugunsten des einheitlichen Namens `openr4d10`
+  aufgegeben.
 - Logo als freundlicher weißer 45-Grad-Schädel ohne Unterkiefer mit exakt fünf
   farbigen Flammen auf Schwarz definiert.
 
