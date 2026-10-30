@@ -86,9 +86,9 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends \
     python3 python3-pil python3-libgpiod python3-spidev fonts-dejavu-core \
-    ca-certificates gcc libc6-dev zlib1g-dev
+    mpv ffmpeg ca-certificates gcc libc6-dev zlib1g-dev
 
-for system_group in openr4d10 gpio spi; do
+for system_group in openr4d10 gpio spi audio; do
     if ! getent group "$system_group" >/dev/null; then
         groupadd --system "$system_group"
     fi
@@ -97,7 +97,7 @@ if ! id -u openr4d10 >/dev/null 2>&1; then
     useradd --system --gid openr4d10 --home-dir /var/lib/openr4d10 \
         --shell /usr/sbin/nologin openr4d10
 fi
-usermod --append --groups gpio,spi openr4d10
+usermod --append --groups gpio,spi,audio openr4d10
 
 version="$(tr -d '[:space:]' <"$SOURCE_ROOT/VERSION")"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]] \

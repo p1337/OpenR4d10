@@ -27,6 +27,8 @@ the installer report exactly which adapters still need configuration.
   media and recordings
 - central catalog covering all specified service modules with honest dependency,
   adapter and local-login readiness
+- direct web-radio/local-media playback through private mpv JSON IPC and
+  stream recording through shell-free ffmpeg/Opus
 - standard-library-only test suite and GitHub Actions CI
 
 Hardware-specific integration still pending:
@@ -60,9 +62,9 @@ starts the local installer, which requests root access when required.
 The installer verifies the operating system, CPU architecture and Raspberry Pi
 model, installs files below `/opt/openr4d10`, preserves existing configuration,
 compiles the Whisplay boot player locally for the Pi, installs the Debian
-Pillow/libgpiod/spidev packages, enables SPI, installs and enables both systemd
-services, and runs a final diagnostic. Neither script collects or writes
-credentials.
+Pillow/libgpiod/spidev/mpv/ffmpeg packages, enables SPI, installs and enables
+both systemd services, and runs a final diagnostic. Neither script collects or
+writes credentials.
 
 Reboot after the first installation. The native Whisplay animation starts on
 the next boot, keeps the moving skull visible 1.5 seconds longer and then keeps
@@ -79,6 +81,11 @@ http://192.168.1.64/
 The dashboard shows live service, system and adapter status. Until verified
 Whisplay and PiSugar adapters are configured, it labels those components as
 open instead of displaying invented measurements.
+
+The service section accepts an explicit `http` or `https` audio URL for local
+playback and recording. It rejects credentials embedded in URLs and does not
+persist URL query strings in public status. Actual sound requires an ALSA
+device; the Whisplay codec driver is still hardware-revision-dependent.
 
 If the repository files are already present, the local command remains:
 

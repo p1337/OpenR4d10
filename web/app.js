@@ -134,5 +134,35 @@ async function refresh() {
   }
 }
 
+async function sendControl(action, extra = {}) {
+  const output = byId("control-result");
+  try {
+    const response = await fetch("/api/control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...extra }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    output.textContent = `${payload.playback?.state || "stopped"} · ${payload.recording?.state || "stopped"}`;
+    await refresh();
+  } catch (error) {
+    output.textContent = `Fehler: ${error.message}`;
+  }
+}
+
+byId("media-control").addEventListener("submit", (event) => {
+  event.preventDefault();
+  sendControl("play", { source: byId("media-source").value, service_id: "webradio" });
+});
+
+for (const button of document.querySelectorAll("[data-action]")) {
+  button.addEventListener("click", () => {
+    const action = button.dataset.action;
+    const extra = action === "record_start" ? { source: byId("media-source").value } : {};
+    sendControl(action, extra);
+  });
+}
+
 refresh();
 window.setInterval(refresh, 2000);

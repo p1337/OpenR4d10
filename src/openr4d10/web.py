@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 LOG = logging.getLogger(__name__)
 
 StatusProvider = Callable[[], dict[str, Any]]
+ControlProvider = Callable[[dict[str, object]], dict[str, object]]
 
 STATIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
@@ -26,6 +27,7 @@ STATIC_FILES = {
 class _DashboardHandler(BaseHTTPRequestHandler):
     static_directory: Path
     status_provider: StatusProvider
+    control_provider: ControlProvider | None = None
     server_version = "OpenR4d10/0.2"
     sys_version = ""
 
@@ -69,6 +71,38 @@ class _DashboardHandler(BaseHTTPRequestHandler):
             return
         self._send(200, content_type, payload)
 
+    def _serve_control(self) -> None:
+        if self.control_provider is None:
+            self._send(503, "application/json; charset=utf-8", b'{"error":"control unavailable"}')
+            return
+        content_type = self.headers.get_content_type()
+        if content_type != "application/json":
+            self._send(415, "application/json; charset=utf-8", b'{"error":"application/json required"}')
+            return
+        origin = self.headers.get("Origin")
+        host = self.headers.get("Host")
+        if origin and (not host or origin not in {f"http://{host}", f"https://{host}"}):
+            self._send(403, "application/json; charset=utf-8", b'{"error":"origin rejected"}')
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = -1
+        if not 1 <= length <= 4096:
+            self._send(400, "application/json; charset=utf-8", b'{"error":"invalid request size"}')
+            return
+        try:
+            request = json.loads(self.rfile.read(length))
+            if not isinstance(request, dict):
+                raise ValueError("JSON object required")
+            response = self.control_provider(request)
+        except (ValueError, RuntimeError, OSError, json.JSONDecodeError) as exc:
+            payload = json.dumps({"error": str(exc)}, ensure_ascii=False).encode("utf-8")
+            self._send(400, "application/json; charset=utf-8", payload)
+            return
+        payload = json.dumps(response, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        self._send(200, "application/json; charset=utf-8", payload)
+
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
         path = urlsplit(self.path).path
         if path == "/api/status":
@@ -81,6 +115,12 @@ class _DashboardHandler(BaseHTTPRequestHandler):
     def do_HEAD(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
         self.do_GET()
 
+    def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
+        if urlsplit(self.path).path == "/api/control":
+            self._serve_control()
+        else:
+            self._send(404, "text/plain; charset=utf-8", b"Not found\n")
+
     def log_message(self, format_string: str, *args: object) -> None:
         LOG.debug("Web request: " + format_string, *args)
 
@@ -92,6 +132,7 @@ class WebServer:
         port: int,
         static_directory: Path,
         status_provider: StatusProvider,
+        control_provider: ControlProvider | None = None,
     ) -> None:
         handler = type(
             "DashboardHandler",
@@ -99,6 +140,7 @@ class WebServer:
             {
                 "static_directory": static_directory,
                 "status_provider": staticmethod(status_provider),
+                "control_provider": staticmethod(control_provider) if control_provider else None,
             },
         )
         self._server = ThreadingHTTPServer((host, port), handler)

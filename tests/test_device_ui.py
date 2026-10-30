@@ -58,6 +58,18 @@ class DeviceUiTests(unittest.TestCase):
         self.assertEqual(state.channel, 15)
         self.assertEqual(state.service, "RADIO")
         self.assertTrue(state.playing)
+
+    def test_receiver_service_selects_matching_header_mode(self) -> None:
+        state = DeviceUiState()
+        state.update_from_frame(
+            Frame(
+                screen="dashboard",
+                title="Radio",
+                fields={"receiver": {"service": "RADIO", "playing": True}},
+            )
+        )
+        self.assertEqual(state.service, "RADIO")
+        self.assertTrue(state.playing)
         self.assertEqual(state.right_action, "PAUSE")
 
     def test_invalid_input_shapes_are_rejected(self) -> None:

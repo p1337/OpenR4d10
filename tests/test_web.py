@@ -3,6 +3,7 @@ import json
 import tempfile
 import unittest
 from urllib.request import urlopen
+from urllib.request import Request
 
 from openr4d10.web import WebServer
 
@@ -21,6 +22,7 @@ class WebTests(unittest.TestCase):
                 0,
                 static,
                 lambda: {"service": "online", "version": "test"},
+                lambda request: {"accepted": request["action"]},
             )
             server.start()
             try:
@@ -34,6 +36,18 @@ class WebTests(unittest.TestCase):
                 ) as response:
                     payload = json.loads(response.read())
                     self.assertEqual(payload["service"], "online")
+                request = Request(
+                    f"http://{host}:{port}/api/control",
+                    data=b'{"action":"pause"}',
+                    headers={
+                        "Content-Type": "application/json",
+                        "Origin": f"http://{host}:{port}",
+                    },
+                    method="POST",
+                )
+                with urlopen(request, timeout=2) as response:
+                    payload = json.loads(response.read())
+                    self.assertEqual(payload["accepted"], "pause")
             finally:
                 server.stop()
 

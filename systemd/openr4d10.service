@@ -10,7 +10,7 @@ After=openr4d10-boot.service
 Type=simple
 User=openr4d10
 Group=openr4d10
-SupplementaryGroups=gpio spi
+SupplementaryGroups=gpio spi audio
 ExecStart=/usr/local/bin/openr4d10 --config /etc/openr4d10/openr4d10.toml --hardware-config /etc/openr4d10/hardware.toml run
 Restart=on-failure
 RestartSec=3s
@@ -20,14 +20,15 @@ StateDirectory=openr4d10
 StateDirectoryMode=0750
 UMask=0027
 
-# The verified Whisplay renderer receives only its SPI controller and GPIO chip.
-# Audio, I2C, PiSugar and unrelated devices remain blocked.
+# The renderer receives its SPI/GPIO devices; media receives generic ALSA only.
+# I2C, PiSugar and unrelated devices remain blocked.
 NoNewPrivileges=true
 PrivateTmp=true
 PrivateDevices=false
 DevicePolicy=closed
 DeviceAllow=/dev/spidev0.0 rw
 DeviceAllow=/dev/gpiochip0 rw
+DeviceAllow=char-alsa rw
 ProtectSystem=strict
 ProtectHome=true
 ProtectKernelTunables=true

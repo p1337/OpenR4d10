@@ -47,13 +47,16 @@ setting API rejects secret-like keys by design.
 ## Web dashboard
 
 The installed service listens on port 80 by default. It serves only the tracked
-files in `web/` plus two read-only endpoints:
+files in `web/` plus the following endpoints:
 
 - `/api/status` — current semantic frame and adapter state as JSON
 - `/healthz` — simple service health response
+- `POST /api/control` — bounded same-origin JSON media controls
 
-No credentials or configuration writes are exposed over HTTP. Port, bind
-address and static directory live in `[web]` in `openr4d10.toml`.
+The control endpoint accepts only JSON up to 4096 bytes, rejects mismatched
+browser origins and never accepts or stores credentials. It supports explicit
+playback, pause, stop, volume and stream-recording actions. Port, bind address
+and static directory live in `[web]` in `openr4d10.toml`.
 
 ## Installed diagnostics
 

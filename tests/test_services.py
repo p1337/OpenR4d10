@@ -66,3 +66,71 @@ class ServiceCatalogTests(unittest.TestCase):
                 catalog.close()
         self.assertEqual(items["recorder"]["readiness"], "missing_dependency")
         self.assertEqual(items["recorder"]["missing_executables"], ["ffmpeg"])
+
+    def test_media_control_updates_public_receiver_overlay(self) -> None:
+        class State:
+            def __init__(self, **values):
+                self.values = values
+                for key, value in values.items():
+                    setattr(self, key, value)
+
+            def as_dict(self):
+                return dict(self.values)
+
+        class Player:
+            def __init__(self):
+                self.state = State(state="stopped", source=None, paused=False)
+
+            def load(self, source):
+                self.state = State(
+                    state="playing", source="https://radio.example/live",
+                    paused=False,
+                )
+
+            def toggle_pause(self):
+                self.state.paused = True
+                self.state.values["paused"] = True
+
+            def set_volume(self, value):
+                pass
+
+            def stop(self):
+                self.state = State(state="stopped", source=None, paused=False)
+
+            def close(self):
+                pass
+
+        class Recorder:
+            def __init__(self):
+                self.state = State(state="stopped")
+
+            def start(self, source):
+                self.state = State(state="recording")
+
+            def stop(self):
+                self.state = State(state="stopped")
+
+            def close(self):
+                pass
+
+        with tempfile.TemporaryDirectory() as raw:
+            catalog = ServiceCatalog(
+                Path(raw).resolve(),
+                executable_lookup=lambda name: f"/usr/bin/{name}",
+                player=Player(),
+                recorder=Recorder(),
+            )
+            try:
+                catalog.control(
+                    {
+                        "action": "play",
+                        "service_id": "webradio",
+                        "source": "https://radio.example/live?private=value",
+                    }
+                )
+                overlay = catalog.receiver_overlay()
+            finally:
+                catalog.close()
+        self.assertEqual(overlay["service"], "RADIO")
+        self.assertEqual(overlay["station"], "https://radio.example/live")
+        self.assertTrue(overlay["playing"])

@@ -138,6 +138,12 @@ click labels, WLAN/IP, date/time and battery status row, and the
 service-dependent media area. Logical encoder events are implemented and can be
 tested without hardware; no encoder GPIO assignment is active.
 
+The application media boundary uses generic ALSA through Debian's mpv and
+ffmpeg packages. Its systemd unit allows the standard `char-alsa` device class
+and the `audio` group, but it does not guess or install a WM8960/ES8389 codec
+overlay. Until the exact Whisplay audio revision is identified and its ALSA
+device appears, playback controls may report an audio-device error.
+
 ## Still deliberately unknown
 
 The installed Whisplay audio codec revision and PiSugar model/API have not yet

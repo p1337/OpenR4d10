@@ -95,7 +95,11 @@ class DeviceUiState:
         self.wifi_label = str(receiver.get("wifi") or "WLAN")[:12]
         self.ip_address = str(receiver.get("ip_address") or "--")[:15]
         self.playing = bool(receiver.get("playing", self.playing))
+        self.right_action = "PAUSE" if self.playing else "PLAY"
         self.recording = bool(receiver.get("recording", False))
+        service = str(receiver.get("service") or "").upper()
+        if service in SERVICES:
+            self.service_index = SERVICES.index(service)
 
         battery = power.get("battery_percent")
         if isinstance(battery, (int, float)) and not isinstance(battery, bool):

@@ -117,6 +117,20 @@
         <span class="version" id="service-count">–</span>
       </div>
       <p class="services-note">Zugangsdaten werden niemals aus dem Repository geladen oder in der Statusdatenbank gespeichert.</p>
+      <form class="media-control" id="media-control">
+        <label for="media-source">Direkte Audioquelle</label>
+        <div class="media-source-row">
+          <input id="media-source" name="source" type="url" inputmode="url" placeholder="https://…" autocomplete="off" required>
+          <button type="submit">Abspielen</button>
+        </div>
+        <div class="media-actions" aria-label="Wiedergabesteuerung">
+          <button type="button" data-action="pause">Play / Pause</button>
+          <button type="button" data-action="stop">Stopp</button>
+          <button type="button" data-action="record_start">Aufnahme starten</button>
+          <button type="button" data-action="record_stop">Aufnahme stoppen</button>
+        </div>
+        <output id="control-result" aria-live="polite">Keine Quelle aktiv.</output>
+      </form>
       <div class="service-grid" id="service-grid" aria-live="polite"></div>
     </section>
 

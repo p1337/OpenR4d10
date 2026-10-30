@@ -98,6 +98,8 @@ class OpenR4d10App:
 
     def render_once(self) -> None:
         receiver, receiver_error = self._safe_read(self.receiver, "receiver")
+        if self.services is not None:
+            receiver.update(self.services.receiver_overlay())
         power, power_error = self._safe_read(self.power, "power")
         errors = [error for error in (receiver_error, power_error) if error]
         self._publish(dashboard_frame(self.config.title, receiver, power, errors))
@@ -120,6 +122,7 @@ class OpenR4d10App:
                     self.config.web.port,
                     self.config.web.static_directory,
                     self.status_snapshot,
+                    self.services.control if self.services is not None else None,
                 )
                 self._web_server.start()
                 LOG.info(

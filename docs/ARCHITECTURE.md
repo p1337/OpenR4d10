@@ -58,6 +58,14 @@ requirements and whether an individual local login is required. Status output
 never contains a credential value and does not describe an external adapter as
 ready merely because its menu entry exists.
 
+`MpvEngine` starts lazily and controls mpv through an inherited Unix socket
+using the documented JSON IPC. It disables user configuration and terminal
+input. `StreamRecorder` invokes ffmpeg through an argument array with
+`shell=False` semantics and writes 64-kbit/s Opus below the state directory.
+Network URLs are limited to HTTP(S), reject embedded credentials and are
+redacted before appearing in status. Local media must resolve below the
+approved media directory.
+
 For a fresh machine, `bootstrap.sh` downloads a GitHub-generated source archive
 over HTTPS into a private temporary directory. It checks paths and archive
 integrity before extraction, then invokes the same local `install.sh`. Git is
@@ -105,8 +113,10 @@ allows the unprivileged process to bind local HTTP port 80. The generic command
 adapter uses an argument array and `shell=False`; it never interpolates input
 into a shell command.
 
-Hardware device access is not granted globally. Both services use a closed
-device policy that permits only `/dev/spidev0.0` and `/dev/gpiochip0`. The
-application runs as `openr4d10`, receives only the `gpio` and `spi`
-supplementary groups, and still has no access to I2C, audio devices, homes or
-unrelated hardware.
+Hardware device access is not granted globally. The early boot service's closed
+device policy permits only `/dev/spidev0.0` and `/dev/gpiochip0`. The
+application runs as `openr4d10`, receives only the `gpio`, `spi` and standard
+`audio` supplementary groups. Its closed policy permits the same LCD devices
+plus the standard `char-alsa` device class for media playback/recording; it
+still has no access to I2C, homes or unrelated hardware. This generic ALSA
+boundary does not select or configure a Whisplay codec revision.

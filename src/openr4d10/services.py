@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 from typing import Callable
 
+from .media import MpvEngine, StreamRecorder
 from .storage import StateStore
 
 
@@ -57,9 +58,18 @@ class ServiceCatalog:
         state_directory: Path,
         *,
         executable_lookup: ExecutableLookup = shutil.which,
+        player: MpvEngine | None = None,
+        recorder: StreamRecorder | None = None,
     ) -> None:
         self.store = StateStore(state_directory / "openr4d10.sqlite3")
         self.executable_lookup = executable_lookup
+        media_root = state_directory / "media"
+        self.player = player or MpvEngine(media_roots=(media_root,))
+        self.recorder = recorder or StreamRecorder(
+            state_directory / "recordings",
+            media_roots=(media_root,),
+        )
+        self.active_service = "system"
         self.store.ensure_services(tuple(item.service_id for item in BUILTIN_SERVICES))
 
     def snapshot(self) -> dict[str, object]:
@@ -89,8 +99,70 @@ class ServiceCatalog:
             "schema_version": 1,
             "total": len(services),
             "ready": sum(item["readiness"] == "ready" for item in services),
+            "active_service": self.active_service,
+            "playback": self.player.state.as_dict(),
+            "recording": self.recorder.state.as_dict(),
             "items": services,
         }
 
+    def control(self, request: dict[str, object]) -> dict[str, object]:
+        action = request.get("action")
+        if not isinstance(action, str):
+            raise ValueError("control action is required")
+        if action == "play":
+            service_id = request.get("service_id", "webradio")
+            source = request.get("source")
+            allowed = {
+                "webradio", "local_media", "brandmeister", "remote_sdr",
+                "youtube_audio", "spotify", "ard_mediathek", "zdf_mediathek",
+                "international_media",
+            }
+            if not isinstance(service_id, str) or service_id not in allowed:
+                raise ValueError("unsupported playback service")
+            if not isinstance(source, str):
+                raise ValueError("play action requires a media source")
+            self.player.load(source)
+            self.active_service = service_id
+        elif action == "pause":
+            self.player.toggle_pause()
+        elif action == "stop":
+            self.player.stop()
+            self.active_service = "system"
+        elif action == "volume":
+            self.player.set_volume(request.get("value"))  # type: ignore[arg-type]
+        elif action == "record_start":
+            source = request.get("source")
+            if not isinstance(source, str):
+                raise ValueError("record_start requires a media source")
+            self.recorder.start(source)
+        elif action == "record_stop":
+            self.recorder.stop()
+        else:
+            raise ValueError("unsupported control action")
+        return {
+            "active_service": self.active_service,
+            "playback": self.player.state.as_dict(),
+            "recording": self.recorder.state.as_dict(),
+        }
+
+    def receiver_overlay(self) -> dict[str, object]:
+        playback = self.player.state
+        if playback.state not in {"playing", "paused"}:
+            return {}
+        service_label = {
+            "local_media": "PLAYER",
+            "recorder": "REC",
+        }.get(self.active_service, "RADIO")
+        return {
+            "service": service_label,
+            "station": playback.source or self.active_service,
+            "title": playback.source or self.active_service,
+            "subtitle": "Paused" if playback.paused else "Audio stream active",
+            "playing": not playback.paused,
+            "recording": self.recorder.state.state == "recording",
+        }
+
     def close(self) -> None:
+        self.recorder.close()
+        self.player.close()
         self.store.close()
