@@ -33,6 +33,28 @@ class StateStoreTests(unittest.TestCase):
 
 
 class ServiceCatalogTests(unittest.TestCase):
+    def test_display_brightness_is_persistent_and_bounded(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            state_root = Path(raw).resolve()
+            catalog = ServiceCatalog(state_root)
+            try:
+                self.assertEqual(catalog.display_brightness(), 100)
+                self.assertEqual(catalog.set_display_brightness(35), 35)
+                self.assertEqual(
+                    catalog.snapshot()["settings"]["display_brightness_percent"],
+                    35,
+                )
+                for invalid in (-1, 101, True, 50.0):
+                    with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                        catalog.set_display_brightness(invalid)  # type: ignore[arg-type]
+            finally:
+                catalog.close()
+            reopened = ServiceCatalog(state_root)
+            try:
+                self.assertEqual(reopened.display_brightness(), 35)
+            finally:
+                reopened.close()
+
     def test_curated_presets_are_public_without_remote_content_urls(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             catalog = ServiceCatalog(Path(raw).resolve())

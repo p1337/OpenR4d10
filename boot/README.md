@@ -123,6 +123,12 @@ lets the UI initialize the panel directly when installation or a manual restart
 happens in a boot where the native player never ran. It does not start a second
 player and does not change the normal boot-time lock/release protocol.
 
+The native player deliberately has no SQLite dependency and uses its fixed
+boot backlight state. The persistent 0–100% application brightness is restored
+only when `WhisplayDisplay` takes over BCM22 with the same display-owner lock.
+Do not add a second boot setting or another GPIO process to bridge this short
+startup interval.
+
 ## Verification and performance
 
 Host checks:
@@ -174,6 +180,8 @@ an unavailable LCD should not itself block normal boot.
 - [PiSugar hardware overview and physical pins](https://docs.pisugar.com/docs/product-wiki/whisplay/overview).
 - [PiSugar Whisplay driver](https://github.com/PiSugar/Whisplay), inspected at
   commit `b2ccecab528caf939f0e3a900547cd094029f13e`.
+- [PiSugar Whisplay 0–100% software-PWM backlight implementation](https://github.com/PiSugar/Whisplay/blob/bb4cdcc5371838009804940559e828d6a7a7ba04/runtime/whisplay.py),
+  inspected at commit `bb4cdcc5371838009804940559e828d6a7a7ba04`.
 - [Raspberry Pi boot configuration](https://www.raspberrypi.com/documentation/computers/config_txt.html).
 - [Linux GPIO character interface](https://www.kernel.org/doc/html/latest/userspace-api/gpio/chardev.html).
 - [Linux spidev interface](https://www.kernel.org/doc/html/latest/spi/spidev.html).

@@ -90,6 +90,14 @@ recording metadata. Secret-like setting keys are rejected. No credential store
 exists in the application; future credentials require a separate protected
 mechanism.
 
+Display brightness is the non-secret integer setting
+`display.brightness_percent` with an accepted range of 0 through 100. The
+`ServiceCatalog` remains its single persistence owner. At application
+construction the saved value is passed to the configured display adapter; a
+web change is first accepted by the existing `WhisplayDisplay` owner and then
+committed to SQLite. A failed database write attempts to restore the previous
+hardware value. No parallel settings file, daemon or GPIO owner exists.
+
 ## Service catalog
 
 `ServiceCatalog` is the single inventory for device and web UI. It currently
@@ -194,13 +202,15 @@ other non-secret state.
 4. Adapters are created from explicit backend names.
 5. The service catalog migrates the non-secret state database and evaluates
    local dependencies.
-6. The read-only web dashboard binds to the configured local address and port.
-7. The semantic text boot manifest is rendered when enabled.
-8. The semantic dashboard state is refreshed at the configured interval and
+6. The persisted display brightness is loaded into the display adapter without
+   opening a second hardware path.
+7. The local web dashboard binds to the configured local address and port.
+8. The semantic text boot manifest is rendered when enabled.
+9. The semantic dashboard state is refreshed at the configured interval and
    exposed through `/api/status`.
-9. The Whisplay UI calls `claim_display()`, waits for the boot player to close
+10. The Whisplay UI calls `claim_display()`, waits for the boot player to close
    SPI/GPIO and keeps the ownership lock for its entire lifetime.
-10. `SIGTERM` or `SIGINT` stops the loop, database and HTTP server cleanly.
+11. `SIGTERM` or `SIGINT` stops the loop, database and HTTP server cleanly.
 
 Both display services declare the shared `/run/openr4d10-boot` runtime. This is
 also required when the installer starts the application in an already running

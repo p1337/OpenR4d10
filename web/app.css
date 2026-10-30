@@ -173,7 +173,16 @@ h2 { margin-bottom: 0; font-size: 1.15rem; letter-spacing: -0.02em; }
 .adapter-list strong[data-state="open"] { color: var(--amber); }
 
 .services-panel { margin-top: 14px; }
+.settings-panel { margin-top: 14px; }
 .device-control-panel { margin-top: 14px; }
+.display-brightness-setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 20px; align-items: center; margin-top: 22px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(5, 12, 14, .58); }
+.display-brightness-setting label strong, .display-brightness-setting label span { display: block; }
+.display-brightness-setting label strong { margin-bottom: 5px; font-size: .86rem; }
+.display-brightness-setting label span, #display-brightness-status { color: var(--muted); font-size: .7rem; line-height: 1.45; }
+#display-brightness-value { min-width: 54px; color: var(--cyan); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .9rem; font-weight: 750; text-align: right; }
+#display-brightness { grid-column: 1 / -1; width: 100%; accent-color: var(--cyan); cursor: pointer; }
+#display-brightness:disabled { cursor: wait; opacity: .55; }
+#display-brightness-status { grid-column: 1 / -1; }
 .encoder-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 20px; }
 .encoder-control { padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: rgba(5, 12, 14, .58); }
 .encoder-control > span, .press-grid span { display: block; margin-bottom: 8px; color: var(--muted); font-size: .64rem; letter-spacing: .08em; text-transform: uppercase; }

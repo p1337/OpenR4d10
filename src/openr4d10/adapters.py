@@ -125,6 +125,7 @@ class WhisplayDisplay:
         self.panel = panel or WhisplayPanel()
         self.state = DeviceUiState()
         self.artwork_cache_root = artwork_cache_root
+        self.brightness_percent = 100
         self._lock = threading.Lock()
 
     def _show_state(self) -> None:
@@ -159,11 +160,24 @@ class WhisplayDisplay:
         with self._lock:
             self.state.apply(event)
             self._show_state()
-            return self.state.public_state()
+            return self._public_state()
+
+    def set_brightness(self, brightness_percent: int) -> None:
+        with self._lock:
+            try:
+                self.panel.set_brightness(brightness_percent)
+            except (OSError, RuntimeError, ValueError, WhisplayError) as exc:
+                raise AdapterError(f"Whisplay brightness failed: {exc}") from exc
+            self.brightness_percent = brightness_percent
+
+    def _public_state(self) -> dict[str, object]:
+        state = self.state.public_state()
+        state["brightness_percent"] = self.brightness_percent
+        return state
 
     def snapshot(self) -> dict[str, object]:
         with self._lock:
-            return self.state.public_state()
+            return self._public_state()
 
     def close(self) -> None:
         with self._lock:

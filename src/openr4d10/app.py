@@ -49,6 +49,10 @@ class OpenR4d10App:
             screen="startup", title=config.title, body="Dienst wird gestartet"
         ).as_dict()
         self._web_server: WebServer | None = None
+        brightness_reader = getattr(self.services, "display_brightness", None)
+        brightness_setter = getattr(self.display, "set_brightness", None)
+        if callable(brightness_reader) and callable(brightness_setter):
+            brightness_setter(brightness_reader())
 
     def request_stop(self, signum: int | None = None, _frame: object = None) -> None:
         if signum is not None:
@@ -90,6 +94,38 @@ class OpenR4d10App:
         """Route bounded local browser controls to existing application boundaries."""
         if request.get("action") == "system_update":
             return self.updates.request(request)
+        if request.get("action") == "display_brightness":
+            if self.services is None:
+                raise RuntimeError("settings control is unavailable")
+            brightness = request.get("brightness_percent")
+            if (
+                isinstance(brightness, bool)
+                or not isinstance(brightness, int)
+                or not 0 <= brightness <= 100
+            ):
+                raise ValueError("display brightness must be an integer from 0 to 100")
+            display_setter = getattr(self.display, "set_brightness", None)
+            persist = getattr(self.services, "set_display_brightness", None)
+            current = getattr(self.services, "display_brightness", None)
+            if not callable(display_setter):
+                raise RuntimeError("the configured display does not support brightness")
+            if not callable(persist) or not callable(current):
+                raise RuntimeError("persistent settings are unavailable")
+            previous = current()
+            display_setter(brightness)
+            try:
+                persist(brightness)
+            except Exception:
+                display_setter(previous)
+                raise
+            return {
+                "settings": {"display_brightness_percent": brightness},
+                "device_ui": (
+                    self.display.snapshot()
+                    if callable(getattr(self.display, "snapshot", None))
+                    else {}
+                ),
+            }
         if request.get("action") != "device_input":
             if self.services is None:
                 raise RuntimeError("service control is unavailable")

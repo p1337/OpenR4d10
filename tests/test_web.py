@@ -61,6 +61,11 @@ class WebTests(unittest.TestCase):
         self.assertIn('action: "system_update", confirmed: true', script)
         self.assertIn("window.confirm", script)
         self.assertIn("renderUpdate", script)
+        self.assertIn('id="display-brightness"', html)
+        self.assertIn('type="range" min="0" max="100"', html)
+        self.assertIn('action: "display_brightness"', script)
+        self.assertIn("display_brightness_percent", script)
+        self.assertIn("dauerhaft gespeichert", script)
 
     def test_dashboard_and_status_endpoint(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

@@ -116,6 +116,25 @@
       </article>
     </section>
 
+    <section class="panel settings-panel" aria-labelledby="settings-title">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">EINSTELLUNGEN</p>
+          <h2 id="settings-title">Display</h2>
+        </div>
+        <span class="version">persistent</span>
+      </div>
+      <div class="display-brightness-setting">
+        <label for="display-brightness">
+          <strong>Displayhelligkeit</strong>
+          <span>Wird sofort am Whisplay angewendet und dauerhaft gespeichert.</span>
+        </label>
+        <output id="display-brightness-value" for="display-brightness">100%</output>
+        <input id="display-brightness" type="range" min="0" max="100" step="5" value="100">
+        <output id="display-brightness-status" aria-live="polite">Gespeicherte Einstellung wird geladen.</output>
+      </div>
+    </section>
+
     <section class="panel device-control-panel" aria-labelledby="device-control-title">
       <div class="panel-heading">
         <div>

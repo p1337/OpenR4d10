@@ -284,42 +284,50 @@ Der Funktionskopf muss optisch eindeutig vom Medienbereich getrennt bleiben.
 
 Die Geräteeinstellungen enthalten genau diese Hauptbereiche:
 
-1. **Akzentfarbe**
+1. **Display**
+   - Displayhelligkeit von 0 bis 100 Prozent,
+   - Änderungen werden sofort auf dem realen Whisplay sichtbar,
+   - der Wert wird als nicht geheime UI-Einstellung dauerhaft in SQLite
+     gespeichert und nach Dienst- oder Geräteneustart wieder angewendet,
+   - die Raspberry-Pi-Zero-2-W-Umsetzung verwendet den vom Hersteller
+     vorgesehenen Software-PWM-Pfad auf dem bereits verifizierten aktiven-low
+     Backlight BCM22; kein neuer Pin und kein paralleler Hardwareadapter.
+2. **Akzentfarbe**
    - normaler Menüeintrag wie alle anderen,
    - öffnet beim Anwählen eine eigene Farbauswahl,
    - Farbton, Sättigung, Helligkeit und Preset werden mit den vier Drehachsen
      bedient,
    - Live-Vorschau der Akzentfarbe.
-2. **WLAN**
+3. **WLAN**
    - vollständige Standalone-Einrichtung am Gerät,
    - Netzsuche, SSID, Kennwort, DHCP/feste IP, gespeicherte Netze und Priorität.
-3. **Dienstmodule**
+4. **Dienstmodule**
    - installierte Dienste konfigurieren, aktivieren, deaktivieren, aktualisieren
      und deinstallieren.
-4. **Dienst-Store**
+5. **Dienst-Store**
    - eigener Hauptmenüpunkt,
    - lädt einen signierten beziehungsweise prüfsummengesicherten Katalog aus
      dem öffentlichen Git-Repository,
    - zeigt verfügbare, installierte und aktualisierbare Dienste,
    - installiert nur nach sichtbarer Berechtigungsanzeige und Bestätigung.
-5. **Bluetooth**
+6. **Bluetooth**
    - Bluetooth ein/aus,
    - Audiogeräte,
    - Bluetooth-HID-Tastaturen.
-6. **Eingabe und Sprache**
+7. **Eingabe und Sprache**
    - PTT-Verhalten,
    - deutsches Diktat,
    - Sprachbefehle,
    - Vorlesefunktion.
-7. **Sprache**
+8. **Sprache**
    - Standardsprache ist Englisch,
    - Schnellwahl oben: English, Deutsch, Polski, Français, Español,
    - darunter vollständige, alphabetisch nach Eigenbezeichnung sortierte
      Sprachliste; die fünf Schnellwahlsprachen erscheinen dort ebenfalls,
    - nicht wörtlich, sondern funktions- und kontextgerecht übersetzen.
-8. **System**
+9. **System**
    - Updates, Diagnose, Protokolle, Neustart, Sicherung und Wiederherstellung.
-9. **Informationen & Support**
+10. **Informationen & Support**
    - muss der letzte Hauptmenüpunkt bleiben,
    - Entwickler, Projekt, Version, Lizenzen und Quellcode,
    - freiwillige Unterstützung über konfigurierbaren PayPal-/Spendenlink,
@@ -511,6 +519,7 @@ Lokale Hauptdatenbank: SQLite mit Migrationen.
 In der Datenbank liegen:
 
 - System- und UI-Einstellungen,
+- Displayhelligkeit in Prozent,
 - Akzentfarbe und Presets,
 - WLAN-Profile,
 - Bluetooth-Geräteinformationen soweit zulässig,
@@ -805,6 +814,26 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-30 – Persistente Whisplay-Displayhelligkeit
+
+- Robert verlangt eine Displayhelligkeit in den Einstellungen, deren Wert
+  dauerhaft gespeichert wird. Die lokale Weboberfläche erhält deshalb einen
+  klar beschrifteten Regler von 0 bis 100 Prozent mit sofortiger Anwendung.
+- Die Einstellung wird unter einem nicht geheimen Schlüssel in der vorhandenen
+  SQLite-Datenbank gespeichert, im normalen Kernbackup mitgesichert und beim
+  Start vor dem ersten Anwendungsbild wieder an den Displayadapter übergeben.
+- Die offizielle aktuelle PiSugar-Whisplay-Laufzeit bestätigt auf Raspberry Pi
+  Zero 2 W Software-PWM für den Backlight-Ausgang: `set_backlight(0..100)`
+  verwendet 1000 Hz und invertiert den Tastgrad für den aktiven-low Anschluss
+  auf dem bereits belegten BCM22; geprüft wurde Hersteller-Commit
+  `bb4cdcc5371838009804940559e828d6a7a7ba04`. OpenR4d10 übernimmt diese bestehende
+  Herstellerlogik in den eigenen exklusiven `WhisplayPanel`-Besitzer; es wird
+  weder `whisplay-daemon` parallel gestartet noch ein neuer GPIO erfunden.
+- Der native frühe Bootplayer besitzt keine SQLite-Abhängigkeit und läuft vor
+  dem Anwendungskern. Der gespeicherte Wert gilt daher ab Übernahme durch die
+  physische OpenR4d10-UI; eine separate zweite Boot-Konfiguration wird nicht
+  eingeführt.
 
 ### 2026-10-30 – Dauerhafte, sortierbare Radios und Pflichtbackup vor Updates
 

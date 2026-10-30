@@ -24,6 +24,8 @@ MEDIA_EXTENSIONS = {
 DEFAULT_ENABLED_SERVICES = {
     "system", "webradio", "local_media", "recorder", "rss", "webcam",
 }
+DISPLAY_BRIGHTNESS_KEY = "display.brightness_percent"
+DEFAULT_DISPLAY_BRIGHTNESS = 100
 
 LOG = logging.getLogger(__name__)
 
@@ -120,6 +122,26 @@ class ServiceCatalog:
             marker="radio.defaults_seeded_v1",
         )
 
+    def display_brightness(self) -> int:
+        value = self.store.get_setting(
+            DISPLAY_BRIGHTNESS_KEY,
+            DEFAULT_DISPLAY_BRIGHTNESS,
+        )
+        if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 100:
+            LOG.warning("Ignoring invalid persisted display brightness: %r", value)
+            return DEFAULT_DISPLAY_BRIGHTNESS
+        return value
+
+    def set_display_brightness(self, brightness_percent: int) -> int:
+        if (
+            isinstance(brightness_percent, bool)
+            or not isinstance(brightness_percent, int)
+            or not 0 <= brightness_percent <= 100
+        ):
+            raise ValueError("display brightness must be an integer from 0 to 100")
+        self.store.set_setting(DISPLAY_BRIGHTNESS_KEY, brightness_percent)
+        return brightness_percent
+
     def snapshot(self) -> dict[str, object]:
         states = self.store.service_states()
         services: list[dict[str, object]] = []
@@ -193,6 +215,9 @@ class ServiceCatalog:
         ]
         return {
             "schema_version": SCHEMA_VERSION,
+            "settings": {
+                "display_brightness_percent": self.display_brightness(),
+            },
             "total": len(services),
             "ready": sum(item["readiness"] == "ready" for item in services),
             "active_service": self.active_service,

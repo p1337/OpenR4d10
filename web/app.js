@@ -284,6 +284,15 @@ function render(data) {
   renderUpdate(data.update || {});
   renderDeviceState(data.device_ui);
   renderServices(data.services || {});
+  renderSettings(data.services?.settings || {});
+}
+
+function renderSettings(settings) {
+  const brightness = settings.display_brightness_percent;
+  if (!Number.isInteger(brightness) || brightness < 0 || brightness > 100) return;
+  const input = byId("display-brightness");
+  if (document.activeElement !== input) input.value = String(brightness);
+  setText("display-brightness-value", `${input.value}%`);
 }
 
 function renderUpdate(update) {
@@ -365,6 +374,38 @@ async function sendControl(action, extra = {}) {
     output.textContent = `Fehler: ${error.message}`;
   }
 }
+
+const displayBrightness = byId("display-brightness");
+displayBrightness.addEventListener("input", () => {
+  setText("display-brightness-value", `${displayBrightness.value}%`);
+});
+displayBrightness.addEventListener("change", async () => {
+  const status = byId("display-brightness-status");
+  const brightness = Number(displayBrightness.value);
+  displayBrightness.disabled = true;
+  status.textContent = "Helligkeit wird gespeichert …";
+  try {
+    const response = await fetch("/api/control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "display_brightness",
+        brightness_percent: brightness,
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    const saved = payload.settings?.display_brightness_percent;
+    displayBrightness.value = String(saved);
+    setText("display-brightness-value", `${saved}%`);
+    status.textContent = `Displayhelligkeit ${saved}% dauerhaft gespeichert.`;
+  } catch (error) {
+    status.textContent = `Fehler: ${error.message}`;
+    await refresh();
+  } finally {
+    displayBrightness.disabled = false;
+  }
+});
 
 byId("system-update").addEventListener("click", async () => {
   if (!window.confirm("Aktuelle OpenR4d10-Version installieren? Das Gerät startet danach automatisch neu.")) return;

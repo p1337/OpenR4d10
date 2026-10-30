@@ -70,6 +70,16 @@ is not persisted. `service_set_enabled` persists module activation; `system`
 cannot be disabled and external modules still require their own adapter. Port,
 bind address and static directory live in `[web]` in `openr4d10.toml`.
 
+`display_brightness` accepts exactly one integer `brightness_percent` from 0
+through 100. The application applies it through the configured display adapter
+and then persists it under `display.brightness_percent` in the existing SQLite
+state. Status exposes the value only as
+`services.settings.display_brightness_percent`. Tests must cover the default,
+both bounds, invalid booleans/non-integers, restart persistence and delivery to
+the Whisplay adapter. Do not add a second configuration file or a direct web
+GPIO path. The early native boot player intentionally has no SQLite dependency;
+brightness restoration begins at application display handoff.
+
 The `device_input` action is the hardware-free input source for the native
 display. It accepts only the checked-in logical control names, rotary steps
 from -10 through 10 excluding zero, press hold durations from 0 through 5

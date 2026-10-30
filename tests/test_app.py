@@ -10,6 +10,70 @@ from openr4d10.input_events import Control
 
 
 class AppTests(unittest.TestCase):
+    def test_display_brightness_restores_and_persists_through_app_control(self) -> None:
+        class BrightnessDisplay:
+            def __init__(self) -> None:
+                self.values = []
+
+            def render(self, _frame) -> None:
+                pass
+
+            def set_brightness(self, value):
+                self.values.append(value)
+
+            def snapshot(self):
+                return {"brightness_percent": self.values[-1]}
+
+        class Services:
+            active_service = "system"
+
+            def __init__(self) -> None:
+                self.value = 65
+
+            def display_brightness(self):
+                return self.value
+
+            def set_display_brightness(self, value):
+                self.value = value
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            display = BrightnessDisplay()
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=display,
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,  # type: ignore[arg-type]
+            )
+            self.assertEqual(display.values, [65])
+            result = app.control(
+                {"action": "display_brightness", "brightness_percent": 35}
+            )
+            self.assertEqual(display.values, [65, 35])
+            self.assertEqual(services.value, 35)
+            self.assertEqual(
+                result["settings"]["display_brightness_percent"],
+                35,
+            )
+            for invalid in (-1, 101, True, 35.0):
+                with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                    app.control(
+                        {
+                            "action": "display_brightness",
+                            "brightness_percent": invalid,
+                        }
+                    )
+
     def test_confirmed_system_update_uses_the_fixed_runtime_request(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)

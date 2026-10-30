@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager
 from pathlib import Path
+import threading
 import time
 from typing import Any
 
@@ -24,6 +25,55 @@ PANEL_ID = "ST7789-240x280-C0-y20\n"
 
 class WhisplayError(RuntimeError):
     pass
+
+
+class _SoftPwm:
+    """Small software PWM matching the official Whisplay Zero 2 W runtime."""
+
+    def __init__(
+        self,
+        set_high: Any,
+        duty_percent: int,
+        frequency_hz: int = 1_000,
+    ) -> None:
+        self._set_high = set_high
+        self._period = 1.0 / frequency_hz
+        self._duty_percent = duty_percent
+        self._lock = threading.Lock()
+        self._stop = threading.Event()
+        self._thread = threading.Thread(
+            target=self._run,
+            name="openr4d10-backlight-pwm",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def set_duty_cycle(self, duty_percent: int) -> None:
+        with self._lock:
+            self._duty_percent = duty_percent
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            with self._lock:
+                duty = self._duty_percent
+            if duty <= 0:
+                self._set_high(False)
+                self._stop.wait(self._period)
+                continue
+            if duty >= 100:
+                self._set_high(True)
+                self._stop.wait(self._period)
+                continue
+            high_seconds = self._period * duty / 100
+            self._set_high(True)
+            if self._stop.wait(high_seconds):
+                break
+            self._set_high(False)
+            self._stop.wait(self._period - high_seconds)
+
+    def close(self) -> None:
+        self._stop.set()
+        self._thread.join(timeout=0.1)
 
 
 class WhisplayPanel:
@@ -45,6 +95,8 @@ class WhisplayPanel:
         self._spi: Any = None
         self._value_active: Any = None
         self._value_inactive: Any = None
+        self._brightness_percent = 100
+        self._backlight_pwm: _SoftPwm | None = None
 
     def open(self) -> None:
         if self._spi is not None:
@@ -129,6 +181,33 @@ class WhisplayPanel:
             self._value_active if high else self._value_inactive,
         )
 
+    def set_brightness(self, brightness_percent: int) -> None:
+        if (
+            isinstance(brightness_percent, bool)
+            or not isinstance(brightness_percent, int)
+            or not 0 <= brightness_percent <= 100
+        ):
+            raise ValueError("display brightness must be an integer from 0 to 100")
+        self._brightness_percent = brightness_percent
+        if self._backlight is not None:
+            self._apply_brightness()
+
+    def _apply_brightness(self) -> None:
+        duty_percent = 100 - self._brightness_percent
+        if self._backlight_pwm is None:
+            self._backlight_pwm = _SoftPwm(
+                lambda high: self._set(
+                    self._backlight,
+                    self.BACKLIGHT_BCM,
+                    high,
+                ),
+                duty_percent,
+            )
+        else:
+            # The Whisplay backlight is active-low, so the vendor PWM duty is
+            # the inverse of the user-visible brightness percentage.
+            self._backlight_pwm.set_duty_cycle(duty_percent)
+
     def _write(self, data: bytes) -> None:
         if hasattr(self._spi, "writebytes2"):
             self._spi.writebytes2(data)
@@ -179,9 +258,21 @@ class WhisplayPanel:
         self._command(0x2C)
         self._set(self._dc, self.DC_BCM, True)
         self._write(rgb565)
-        self._set(self._backlight, self.BACKLIGHT_BCM, False)
+        self._apply_brightness()
 
     def close(self) -> None:
+        if self._backlight_pwm is not None:
+            self._backlight_pwm.close()
+            self._backlight_pwm = None
+        if self._backlight is not None:
+            try:
+                self._set(
+                    self._backlight,
+                    self.BACKLIGHT_BCM,
+                    self._brightness_percent == 0,
+                )
+            except Exception:
+                pass
         for request_name in ("_backlight", "_dc", "_reset"):
             request = getattr(self, request_name)
             if request is not None:

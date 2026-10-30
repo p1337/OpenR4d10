@@ -23,6 +23,7 @@ the installer report exactly which adapters still need configuration.
 - native Whisplay ST7789 boot animation installed and enabled automatically
 - safe display handoff both at boot and during an in-session installation
 - real-device-confirmed Whisplay SPI transport, colour order and orientation
+- persistent 0–100% Whisplay brightness control in the web settings
 - native 240 x 280 physical UI with the agreed four-axis encoder layout
 - browser controls for all four virtual encoder axes and both press actions
 - semantic UI frame model and configurable text boot sequence
@@ -118,6 +119,13 @@ backup below `/var/lib/openr4d10/backups`; a backup failure aborts the update.
 The dashboard shows live service, system and adapter status. Until verified
 Whisplay and PiSugar adapters are configured, it labels those components as
 open instead of displaying invented measurements.
+
+The **Einstellungen → Display** panel changes the physical Whisplay backlight
+immediately from 0 through 100 percent. The value is stored in the existing
+non-secret SQLite state, included in the normal pre-update backup and restored
+automatically when the application starts. The early native boot animation
+runs before that database is available; the saved value takes effect when the
+normal OpenR4d10 device UI takes over the panel.
 
 Until the physical encoders are delivered, the **Virtuelle Encoder** panel in
 the same dashboard controls the real Whisplay immediately. Its volume, squelch,

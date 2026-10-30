@@ -1,5 +1,6 @@
 from datetime import datetime
 import unittest
+from unittest.mock import patch
 
 from PIL import Image
 
@@ -13,6 +14,7 @@ from openr4d10.device_ui import (
 )
 from openr4d10.input_events import Control, InputEvent
 from openr4d10.models import Frame
+from openr4d10.whisplay import WhisplayPanel
 
 
 class DeviceUiTests(unittest.TestCase):
@@ -117,16 +119,37 @@ class DeviceUiTests(unittest.TestCase):
 class FakePanel:
     def __init__(self) -> None:
         self.frames: list[bytes] = []
+        self.brightness: list[int] = []
         self.closed = False
 
     def show(self, frame: bytes) -> None:
         self.frames.append(frame)
+
+    def set_brightness(self, brightness_percent: int) -> None:
+        self.brightness.append(brightness_percent)
 
     def close(self) -> None:
         self.closed = True
 
 
 class WhisplayDisplayTests(unittest.TestCase):
+    def test_brightness_is_bounded_without_opening_hardware(self) -> None:
+        panel = WhisplayPanel()
+        panel.set_brightness(0)
+        panel.set_brightness(100)
+        for invalid in (-1, 101, True, 50.0):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                panel.set_brightness(invalid)  # type: ignore[arg-type]
+
+    def test_brightness_uses_active_low_vendor_pwm_mapping(self) -> None:
+        panel = WhisplayPanel()
+        panel._backlight = object()  # Simulate the already requested GPIO line.
+        with patch("openr4d10.whisplay._SoftPwm") as pwm:
+            panel.set_brightness(35)
+            self.assertEqual(pwm.call_args.args[1], 65)
+            panel.set_brightness(80)
+            pwm.return_value.set_duty_cycle.assert_called_once_with(20)
+
     def test_boot_animation_is_not_replaced_by_text_fallback(self) -> None:
         panel = FakePanel()
         display = WhisplayDisplay(panel=panel)  # type: ignore[arg-type]
@@ -164,6 +187,13 @@ class WhisplayDisplayTests(unittest.TestCase):
         self.assertEqual(display.snapshot()["volume"], 76)
         self.assertEqual(len(panel.frames), 2)
         display.close()
+
+    def test_display_brightness_reaches_panel_and_public_state(self) -> None:
+        panel = FakePanel()
+        display = WhisplayDisplay(panel=panel)  # type: ignore[arg-type]
+        display.set_brightness(35)
+        self.assertEqual(panel.brightness, [35])
+        self.assertEqual(display.snapshot()["brightness_percent"], 35)
 
 
 if __name__ == "__main__":

@@ -142,6 +142,19 @@ tested without hardware; no encoder GPIO assignment is active. The local web
 dashboard exposes all four rotations and both short/long press actions through
 the same input-event path and repaints the physical LCD immediately.
 
+The official PiSugar Whisplay
+[`runtime/whisplay.py`](https://github.com/PiSugar/Whisplay/blob/bb4cdcc5371838009804940559e828d6a7a7ba04/runtime/whisplay.py)
+for Raspberry Pi Zero 2 W implements `set_backlight(0..100)` as 1000 Hz
+software PWM on the same physical pin 15 / BCM22 output. Because the backlight
+is active-low, its GPIO duty is
+`100 - brightness`. OpenR4d10 uses that verified method inside the existing
+exclusive `WhisplayPanel` owner; it does not start `whisplay-daemon`, claim a
+second GPIO or invent another control interface. The web display setting is
+stored in SQLite and applied before the first application frame. The native C
+boot player precedes SQLite startup and therefore retains its fixed boot
+brightness until the application takes ownership. Actual perceived brightness
+at intermediate values still requires a short visual check on the real stack.
+
 The application media boundary uses generic ALSA through Debian's mpv and
 ffmpeg packages. Its systemd unit allows the standard `char-alsa` device class
 and the `audio` group. Release 0.10.5 adds the official unified PiSugar
