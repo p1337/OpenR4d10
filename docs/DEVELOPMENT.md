@@ -105,8 +105,10 @@ is still active. It does not mean the installer failed. Exit status `1` means a
 file, helper, manifest or platform check failed.
 
 For Whisplay audio, `doctor` has three explicit states: missing driver,
-installed overlay awaiting reboot, and active ALSA card `whisplaysound`. After
-installing 0.10.6, reboot before judging playback, then verify:
+installed overlay awaiting reboot, and active ALSA card `whisplaysound`. The
+normal 0.10.7 installer reboots automatically after all checks succeed. Use
+`--no-reboot` only for an intentional maintenance run; reboot before judging
+playback, then verify:
 
 ```bash
 aplay -l | grep -i whisplay
@@ -118,6 +120,11 @@ The vendored source provenance and upstream archive checksum live in
 `vendor/pisugar-whisplay/UPSTREAM.md`. Updates must replace that reviewed
 unmodified subset and retain its own Apache-2.0 `LICENSE`; do not edit vendor
 files to implement OpenR4d10 behavior.
+
+`--check` always exits before privileged changes and never reboots. A normal
+successful installation requests `systemctl reboot --no-block` only after the
+service healthcheck and final diagnostics. Any earlier package, build, service
+or healthcheck failure exits without rebooting.
 
 Immediately after an in-session installation, `openr4d10-boot.service` has not
 run yet. `openr4d10.service` must nevertheless create the shared

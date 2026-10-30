@@ -8,9 +8,10 @@ readonly WRAPPER_FILE=/usr/local/bin/openr4d10
 
 CHECK_ONLY=false
 ALLOW_UNSUPPORTED=false
+AUTO_REBOOT=true
 
 usage() {
-    echo "Usage: sudo ./install.sh [--check] [--allow-unsupported]"
+    echo "Usage: sudo ./install.sh [--check] [--allow-unsupported] [--no-reboot]"
 }
 
 die() {
@@ -26,6 +27,7 @@ for argument in "$@"; do
     case "$argument" in
         --check) CHECK_ONLY=true ;;
         --allow-unsupported) ALLOW_UNSUPPORTED=true ;;
+        --no-reboot) AUTO_REBOOT=false ;;
         -h|--help) usage; exit 0 ;;
         *) usage >&2; die "Unknown argument: $argument" ;;
     esac
@@ -238,5 +240,14 @@ echo "Web UI: http://<raspberry-pi-ip>/"
 echo "Whisplay boot animation: enabled for the next reboot"
 echo "Whisplay logs: journalctl -u openr4d10-boot -b --no-pager"
 echo "Whisplay audio: official unified WM8960/ES8389 driver installed"
-echo "REBOOT REQUIRED: sudo reboot"
 echo "After reboot: aplay -l | grep -i whisplay"
+if [[ "$AUTO_REBOOT" == true ]]; then
+    echo "Installation succeeded. Rebooting automatically in 5 seconds."
+    echo "The SSH connection will close; reconnect after about one minute."
+    sync
+    sleep 5
+    systemctl reboot --no-block
+else
+    echo "Automatic reboot disabled by --no-reboot."
+    echo "REBOOT REQUIRED: sudo reboot"
+fi

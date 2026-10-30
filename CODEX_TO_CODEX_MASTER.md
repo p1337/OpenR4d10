@@ -778,6 +778,23 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-30 – Ein-Befehl-Installation startet nach Erfolg selbst neu
+
+- Robert verlangt, dass der Ein-Befehl-Installer den für neue Kernelmodule und
+  Overlays notwendigen Neustart selbst ausführt. Diese neue ausdrückliche
+  Anweisung ersetzt die frühere Regel, den Pi nicht automatisch neu zu starten.
+- Nach vollständig erfolgreicher Installation, Web-Healthcheck und Diagnose
+  kündigt `install.sh` den Neustart sichtbar an, synchronisiert ausstehende
+  Schreibvorgänge und fordert den systemd-Neustart an. Bei jedem vorherigen
+  Fehler darf kein Neustart ausgelöst werden.
+- Für bewusste Wartungsarbeiten bleibt `--no-reboot` als ausdrückliche
+  Ausnahme erhalten. `--check` ist weiterhin strikt nur lesend und startet
+  niemals neu. `bootstrap.sh` reicht beide Optionen an den einzigen lokalen
+  Installer weiter.
+- Der reale Neustart nach 0.10.6 bestätigt ALSA-Karte `whisplaysound`, Codec
+  WM8960 und den Lautsprecherregler auf 80. Offen bleibt ein realer Hörtest;
+  die PiSugar-Warnung betrifft weiterhin ausschließlich Telemetrie.
+
 ### 2026-10-30 – Trixie-Kernel-Headerpaket am realen Pi korrigiert
 
 - Der erste Lauf von 0.10.5 wurde vor der Treiberinstallation von APT mit
@@ -807,8 +824,9 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Installation keinen zweiten Fremddownload.
 - Der Hauptinstaller installiert die Kernel-Bauwerkzeuge, aktiviert I²C und
   I²S, baut das Modul für den laufenden Kernel, installiert Overlay und ALSA-
-  Konfiguration und meldet den zwingend erforderlichen Neustart klar. Er darf
-  den Pi nicht ungefragt neu starten.
+  Konfiguration und meldet den zwingend erforderlichen Neustart klar. Die
+  spätere ausdrückliche Entscheidung zum automatischen Neustart hat gegenüber
+  der damaligen manuellen Neustartgrenze Vorrang.
 - `doctor` muss unterscheiden zwischen fehlendem Treiber, installiertem aber
   noch nicht durch Neustart aktiviertem Treiber und einer vorhandenen ALSA-
   Karte `whisplaysound`. Reale Lautsprecherfunktion ist erst nach Neustart und

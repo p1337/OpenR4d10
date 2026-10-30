@@ -46,7 +46,7 @@ the installer report exactly which adapters still need configuration.
 Hardware-specific integration still pending:
 
 - PiSugar API details
-- physical verification of Whisplay audio after the required reboot
+- acoustic verification of actual Whisplay speaker output
 - encoder GPIO input
 - credentials, WLAN settings, tokens or secrets
 
@@ -82,13 +82,22 @@ both WM8960 and ES8389 without guessing the fitted revision. The installer
 requests the exact `linux-headers-$(uname -r)` package and validates its kernel
 build tools before compilation. Neither script collects or writes credentials.
 
-Reboot after installation; the sound-card kernel module and overlay cannot
-become active before that reboot. The native Whisplay animation starts on the
-next boot, keeps the moving skull visible 1.5 seconds longer and then keeps its
-reviewed final-logo loop visible until the physical application UI is ready and
-takes over the panel. The web dashboard remains available independently. After
-reboot, `openr4d10 doctor` must report `whisplaysound` before internal speaker
-output is treated as available.
+After every successful normal installation the installer announces and starts
+the required reboot automatically; the SSH connection therefore closes. The
+sound-card kernel module and overlay cannot become active before that reboot.
+The native Whisplay animation starts on the next boot, keeps the moving skull
+visible 1.5 seconds longer and then keeps its reviewed final-logo loop visible
+until the physical application UI is ready and takes over the panel. The web
+dashboard remains available independently. After reboot, `openr4d10 doctor`
+must report `whisplaysound` before internal speaker output is treated as
+available.
+
+For an intentional maintenance run without an automatic reboot, pass the
+explicit opt-out through the bootstrap:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/p1337/OpenR4d10/main/bootstrap.sh | sudo bash -s -- --no-reboot
+```
 
 After installation, open the Pi address directly in a browser, for example:
 
@@ -145,9 +154,9 @@ it with `sudo bash bootstrap.sh`. Regardless of how the bootstrap is started,
 it downloads and validates the complete project archive before installation.
 
 PiSugar telemetry remains configuration-required. The Whisplay display backend
-and unified audio driver are installed automatically. Until the next reboot,
-the diagnostic deliberately reports the audio driver as installed but not yet
-active. The early-boot display log is available with
+and unified audio driver are installed automatically. With `--no-reboot`, the
+diagnostic deliberately reports the audio driver as installed but not yet
+active until the administrator reboots manually. The early-boot display log is available with
 `journalctl -u openr4d10-boot -b --no-pager`.
 
 ## Configure hardware

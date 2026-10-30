@@ -12,6 +12,9 @@ class InstallerContractTests(unittest.TestCase):
         self.assertIn('"linux-headers-$kernel_release"', installer)
         self.assertIn("scripts/basic/fixdep", installer)
         self.assertNotIn("raspberrypi-kernel-headers", installer)
+        self.assertIn("AUTO_REBOOT=true", installer)
+        self.assertIn("--no-reboot", installer)
+        self.assertIn("systemctl reboot --no-block", installer)
         self.assertIn("REBOOT REQUIRED: sudo reboot", installer)
         self.assertNotIn("git clone", installer)
 

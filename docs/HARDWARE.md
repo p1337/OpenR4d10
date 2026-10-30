@@ -173,12 +173,21 @@ Source, Apache-2.0 license and provenance are retained below
 The main installer enables I2C and I2S, builds the module for the running
 kernel, installs the device-tree overlay, makes ALSA card `whisplaysound` the
 default and enables the manufacturer's warm-up service. A reboot is mandatory.
+The normal installer performs that reboot automatically after every preceding
+step and diagnostic succeeds; `--no-reboot` is the explicit maintenance opt-out.
 On Raspberry Pi OS Debian 13 it installs the exact
 `linux-headers-$(uname -r)` package; the obsolete package name
 `raspberrypi-kernel-headers` is not available on the verified target.
 Before reboot, `doctor` reports the installed-but-inactive state; afterwards it
 requires the card to appear in `/proc/asound/cards`. Actual speaker operation
 still needs a real listening test and is not claimed merely from the card name.
+
+The real target has now completed that reboot with OpenR4d10 0.10.6. ALSA
+reports card `whisplaysound`, device `Whisplay HiFi wm8960-hifi-0`; the unified
+driver therefore detected this physical HAT as WM8960. Mixer control `speaker`
+exists with range 0 through 100 and was initialized to 80. These checks confirm
+driver, overlay and mixer activation, but not yet audible output from the
+speaker; the listening test remains separate.
 
 ## Still deliberately unknown
 
