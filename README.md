@@ -19,6 +19,7 @@ the installer report exactly which adapters still need configuration.
 - idempotent one-command online installer with no Git dependency
 - hardened `systemd` autostart service
 - responsive local web dashboard on `http://<raspberry-pi-ip>/`
+- explicitly confirmed system updates directly from the web dashboard
 - native Whisplay ST7789 boot animation installed and enabled automatically
 - safe display handoff both at boot and during an in-session installation
 - real-device-confirmed Whisplay SPI transport, colour order and orientation
@@ -104,6 +105,13 @@ After installation, open the Pi address directly in a browser, for example:
 ```text
 http://192.168.1.64/
 ```
+
+The **Systemupdate** control in the running-service panel can install later
+releases without SSH. It requires an explicit browser confirmation, shows
+queued/running/failure/reboot status and uses a fixed root-owned systemd helper.
+The web service itself receives no sudo or arbitrary command capability. A
+successful web update follows the same bootstrap/installer checks and automatic
+reboot as the one-command installation.
 
 The dashboard shows live service, system and adapter status. Until verified
 Whisplay and PiSugar adapters are configured, it labels those components as

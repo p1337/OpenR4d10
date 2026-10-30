@@ -14,6 +14,7 @@ from .config import AppConfig, ConfigError, HardwareConfig
 from .input_events import Control, InputEvent
 from .models import Frame
 from .services import ServiceCatalog
+from .updates import UpdateController
 from .ui import dashboard_frame
 from .web import WebServer
 
@@ -29,6 +30,7 @@ class OpenR4d10App:
         receiver: Telemetry,
         hardware: HardwareConfig | None = None,
         services: ServiceCatalog | None = None,
+        updates: UpdateController | None = None,
     ) -> None:
         self.config = config
         self.display = display
@@ -36,6 +38,10 @@ class OpenR4d10App:
         self.receiver = receiver
         self.hardware = hardware
         self.services = services
+        self.updates = updates or UpdateController(
+            config.runtime_directory,
+            config.state_directory,
+        )
         self.stop_event = threading.Event()
         self._device_input_lock = threading.Lock()
         self._status_lock = threading.Lock()
@@ -71,6 +77,7 @@ class OpenR4d10App:
             "version": __version__,
             "frame": frame,
             "adapters": adapters,
+            "update": self.updates.status(),
         }
         display_snapshot = getattr(self.display, "snapshot", None)
         if callable(display_snapshot):
@@ -81,6 +88,8 @@ class OpenR4d10App:
 
     def control(self, request: dict[str, object]) -> dict[str, object]:
         """Route bounded local browser controls to existing application boundaries."""
+        if request.get("action") == "system_update":
+            return self.updates.request(request)
         if request.get("action") != "device_input":
             if self.services is None:
                 raise RuntimeError("service control is unavailable")

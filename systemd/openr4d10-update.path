@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch for an explicitly confirmed OpenR4d10 web update request
+Documentation=https://github.com/p1337/OpenR4d10
+
+[Path]
+PathExists=/run/openr4d10/update.request
+Unit=openr4d10-update.service
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,16 @@
+[Unit]
+Description=Install a fixed-source OpenR4d10 system update
+Documentation=https://github.com/p1337/OpenR4d10
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/local/sbin/openr4d10-update
+TimeoutStartSec=30min
+UMask=0027
+PrivateTmp=true
+ProtectHome=true
+NoNewPrivileges=false

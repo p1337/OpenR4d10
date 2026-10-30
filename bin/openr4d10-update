@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly REQUEST_FILE=/run/openr4d10/update.request
+readonly STATUS_FILE=/var/lib/openr4d10/update-status.json
+readonly BOOTSTRAP_URL=https://raw.githubusercontent.com/p1337/OpenR4d10/main/bootstrap.sh
+readonly LOCK_FILE=/run/lock/openr4d10-update.lock
+
+[[ $# -eq 0 ]] || { echo "This helper accepts no arguments" >&2; exit 2; }
+
+write_status() {
+    local state="$1"
+    local message="$2"
+    local version="${3:-}"
+    local boot_id=""
+    local temporary
+    boot_id="$(tr -d '[:space:]' </proc/sys/kernel/random/boot_id 2>/dev/null || true)"
+    temporary="$(mktemp /var/lib/openr4d10/.update-status.XXXXXXXX)"
+    python3 - "$temporary" "$state" "$message" "$version" "$boot_id" <<'PY'
+from datetime import UTC, datetime
+import json
+from pathlib import Path
+import sys
+
+target, state, message, version, boot_id = sys.argv[1:]
+payload = {
+    "state": state,
+    "message": message,
+    "updated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+}
+if version:
+    payload["version"] = version
+if boot_id:
+    payload["boot_id"] = boot_id
+Path(target).write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+PY
+    chown root:openr4d10 "$temporary"
+    chmod 0640 "$temporary"
+    mv -f -- "$temporary" "$STATUS_FILE"
+}
+
+update_failed() {
+    local status=$?
+    rm -f -- "$REQUEST_FILE"
+    write_status failed "Update fehlgeschlagen. Details: journalctl -u openr4d10-update" || true
+    systemctl start openr4d10.service >/dev/null 2>&1 || true
+    exit "$status"
+}
+
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    write_status running "Ein Update läuft bereits."
+    exit 0
+fi
+
+trap update_failed ERR
+if [[ ! -f "$REQUEST_FILE" || -L "$REQUEST_FILE" ]] \
+    || [[ "$(cat -- "$REQUEST_FILE" 2>/dev/null || true)" != update ]]; then
+    rm -f -- "$REQUEST_FILE"
+    trap - ERR
+    write_status failed "Ungültige Updateanforderung."
+    exit 1
+fi
+rm -f -- "$REQUEST_FILE"
+
+write_status running "Update wird sicher heruntergeladen und installiert."
+temporary_root="$(mktemp -d -t openr4d10-web-update.XXXXXXXX)"
+trap 'rm -rf -- "$temporary_root"' EXIT
+bootstrap="$temporary_root/bootstrap.sh"
+curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
+    --output "$bootstrap" "$BOOTSTRAP_URL"
+[[ -s "$bootstrap" ]]
+bash -n "$bootstrap"
+bash "$bootstrap"
+
+version="$(tr -d '[:space:]' </opt/openr4d10/current/VERSION)"
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]]
+trap - ERR
+write_status rebooting "Update $version installiert. Das Gerät startet neu." "$version"

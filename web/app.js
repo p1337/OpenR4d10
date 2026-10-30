@@ -267,8 +267,25 @@ function render(data) {
   setAdapter("display-adapter", adapters.display);
   setAdapter("power-adapter", adapters.power);
   setText("footer-status", `Letzte Aktualisierung: ${new Date().toLocaleTimeString("de-DE")}`);
+  renderUpdate(data.update || {});
   renderDeviceState(data.device_ui);
   renderServices(data.services || {});
+}
+
+function renderUpdate(update) {
+  const state = update.state || "idle";
+  const busy = ["queued", "running", "rebooting"].includes(state);
+  const button = byId("system-update");
+  button.disabled = busy;
+  button.textContent = state === "queued"
+    ? "Update wartet …"
+    : state === "running"
+      ? "Update läuft …"
+      : state === "rebooting"
+        ? "Neustart läuft …"
+        : "Update installieren";
+  const suffix = update.version ? ` · Version ${update.version}` : "";
+  setText("update-status", `${update.message || "Kein Update läuft."}${suffix}`);
 }
 
 function renderDeviceState(state) {
@@ -332,6 +349,27 @@ async function sendControl(action, extra = {}) {
     output.textContent = `Fehler: ${error.message}`;
   }
 }
+
+byId("system-update").addEventListener("click", async () => {
+  if (!window.confirm("Aktuelle OpenR4d10-Version installieren? Das Gerät startet danach automatisch neu.")) return;
+  const button = byId("system-update");
+  const output = byId("update-status");
+  button.disabled = true;
+  output.textContent = "Update wird angefordert …";
+  try {
+    const response = await fetch("/api/control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "system_update", confirmed: true }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    renderUpdate(payload.update || {});
+  } catch (error) {
+    output.textContent = `Updatefehler: ${error.message}`;
+    button.disabled = false;
+  }
+});
 
 async function postDeviceInput(request, button = null) {
   const output = byId("device-control-result");

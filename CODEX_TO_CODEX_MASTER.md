@@ -567,6 +567,18 @@ Die Weboberfläche ist eine responsive PWA und zeigt:
 - ausschließlich hier den Datenbankeditor,
 - WLAN-Ersteinrichtung im Hotspotmodus.
 
+Systemupdates müssen direkt aus der lokalen Weboberfläche ausdrücklich
+bestätigt und gestartet werden können; eine SSH-Konsole darf dafür nicht
+erforderlich sein. Der unprivilegierte Webdienst erhält dabei weder `sudo`
+noch allgemeine Root- oder Shellrechte. Er darf ausschließlich eine feste
+Updateanforderung an einen separat installierten, root-eigenen systemd-Helfer
+übergeben. Dieser verwendet nur die fest eingetragene öffentliche
+Projektquelle, übernimmt keine URL und kein Kommando aus dem Browser, schreibt
+einen begrenzten Status und nutzt weiterhin den einzigen vorhandenen
+`bootstrap.sh`-/`install.sh`-Installationsweg. Die Oberfläche muss Start,
+laufende Installation, Fehler und den anschließenden automatischen Neustart
+verständlich anzeigen und Mehrfachstarts verhindern.
+
 Bei verbundenem Browser kann der Benutzer die Ausgabe zwischen Gerät,
 Webbrowser und Bluetooth wählen. Das Gerät kann gleichzeitig lokal spielen,
 aufzeichnen und an berechtigte Browser streamen, soweit die Leistung reicht.
@@ -777,6 +789,23 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-30 – Systemupdate direkt aus der Weboberfläche
+
+- Robert verlangt, ein OpenR4d10-Update ohne SSH-Konsole direkt in der lokalen
+  Webmaske anstoßen zu können. Dafür wird ein ausdrücklich zu bestätigender
+  System-Update-Bereich mit sichtbarem Status ergänzt.
+- Der bestehende unprivilegierte Webdienst darf dadurch keine allgemeinen
+  Administratorrechte bekommen. Er erstellt nur eine feste, inhaltlose
+  Anforderungsdatei im eigenen Runtime-Verzeichnis. Ein root-eigener
+  systemd-Path und ein fest installiertes Updateprogramm reagieren darauf und
+  rufen ausschließlich den vorhandenen Git-freien Bootstrap von
+  `p1337/OpenR4d10` auf; Browserdaten dürfen weder URL noch Argumente oder
+  Shellbefehle bestimmen.
+- Updateprogramm und Weboberfläche verwenden eine kleine, nicht geheime
+  Statusdatei für `idle`, `queued`, `running`, `failed` und `rebooting`.
+  Doppelte Anforderungen werden abgewiesen. Bei Erfolg gelten weiterhin alle
+  Installerprüfungen und der bereits festgelegte automatische Neustart.
 
 ### 2026-10-30 – Encoderwerte müssen reale Medienfunktionen steuern
 

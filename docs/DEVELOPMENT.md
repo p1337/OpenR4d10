@@ -91,6 +91,15 @@ display counter. Radio frames expose the preset ID, channel and display name,
 but no remote artwork URL, stream URL or local cache path. The physical
 renderer may read only `radio-<preset-id>.jpg` below the configured cache root.
 
+`system_update` requires the exact boolean field `confirmed: true`. It creates
+the fixed runtime request only; it accepts no URL, branch, version, command or
+arguments. Test the application boundary with temporary runtime/state
+directories and test the installed privilege boundary by asserting root
+ownership/modes, the exact systemd path, the helper's fixed HTTPS source and
+absence of `sudo`/shell interpolation in the web process. Update progress is
+reported in `/api/status` under `update` and the browser disables its button
+for `queued`, `running` and `rebooting` states.
+
 Curated controls are `preset_play`, `preset_save` and `feed_fetch_preset`.
 They accept only a checked-in preset ID and never a client-supplied internal
 stream or feed URL. Update presets and their evidence together in

@@ -55,6 +55,10 @@ class WebTests(unittest.TestCase):
         self.assertIn("PiSugar vorhanden", script)
         self.assertIn("Akkubetrieb bestätigt · Messwerte noch offen", script)
         self.assertNotIn("PiSugar-Adapter fehlt", script)
+        self.assertIn('id="system-update"', html)
+        self.assertIn('action: "system_update", confirmed: true', script)
+        self.assertIn("window.confirm", script)
+        self.assertIn("renderUpdate", script)
 
     def test_dashboard_and_status_endpoint(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

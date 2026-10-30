@@ -152,6 +152,27 @@ also requires neither Git nor a second source download. The installer builds it
 in a private temporary directory for the running kernel, installs the unified
 WM8960/ES8389 module and overlay, and leaves activation to the required reboot.
 
+## Privileged web-requested updates
+
+The HTTP process never runs an installer, invokes a shell or receives sudo
+permission. An explicitly confirmed `system_update` control atomically creates
+only `/run/openr4d10/update.request`. A root-owned
+`openr4d10-update.path` unit watches that exact file and starts the fixed
+`/usr/local/sbin/openr4d10-update` helper. The helper accepts no browser
+arguments or URL, serializes runs with a private lock, downloads only the
+checked-in public `bootstrap.sh` URL over HTTPS and therefore rejoins the sole
+existing bootstrap/install path.
+
+The helper publishes bounded, non-secret JSON at
+`/var/lib/openr4d10/update-status.json`; the application exposes it with normal
+status data. Requests are rejected while state is `queued` or `running`.
+Installer failure preserves the normal configuration rules, records a generic
+failure pointing to the root helper's journal and attempts to start the current
+release so the dashboard can report the failure.
+Success records `rebooting`; the installer performs the already-defined
+automatic reboot. No arbitrary command, repository, branch or installer option
+crosses the web/root boundary.
+
 ## Startup sequence
 
 1. `openr4d10-boot.service` opens SPI0/CS0 plus only the verified LCD GPIO

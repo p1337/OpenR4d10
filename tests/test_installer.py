@@ -17,6 +17,33 @@ class InstallerContractTests(unittest.TestCase):
         self.assertIn("systemctl reboot --no-block", installer)
         self.assertIn("REBOOT REQUIRED: sudo reboot", installer)
         self.assertNotIn("git clone", installer)
+        self.assertIn("bin/openr4d10-update", installer)
+        self.assertIn("systemd/openr4d10-update.path", installer)
+        self.assertIn("systemctl enable --now openr4d10-update.path", installer)
+
+    def test_web_updater_has_a_fixed_privilege_boundary(self) -> None:
+        repository = Path(__file__).resolve().parents[1]
+        helper = (repository / "bin" / "openr4d10-update").read_text(
+            encoding="utf-8"
+        )
+        path_unit = (repository / "systemd" / "openr4d10-update.path").read_text(
+            encoding="utf-8"
+        )
+        service = (
+            repository / "systemd" / "openr4d10-update.service"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "https://raw.githubusercontent.com/p1337/OpenR4d10/main/bootstrap.sh",
+            helper,
+        )
+        self.assertIn("bash \"$bootstrap\"", helper)
+        self.assertIn("[[ $# -eq 0 ]]", helper)
+        self.assertNotIn("$@", helper)
+        self.assertNotIn("sudo", helper)
+        self.assertIn("PathExists=/run/openr4d10/update.request", path_unit)
+        self.assertIn("User=root", service)
+        self.assertIn("ExecStart=/usr/local/sbin/openr4d10-update", service)
 
     def test_pinned_vendor_provenance_is_present(self) -> None:
         repository = Path(__file__).resolve().parents[1]

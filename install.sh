@@ -5,6 +5,9 @@ readonly INSTALL_ROOT=/opt/openr4d10
 readonly CONFIG_ROOT=/etc/openr4d10
 readonly SERVICE_FILE=/etc/systemd/system/openr4d10.service
 readonly WRAPPER_FILE=/usr/local/bin/openr4d10
+readonly UPDATE_SERVICE_FILE=/etc/systemd/system/openr4d10-update.service
+readonly UPDATE_PATH_FILE=/etc/systemd/system/openr4d10-update.path
+readonly UPDATE_HELPER_FILE=/usr/local/sbin/openr4d10-update
 
 CHECK_ONLY=false
 ALLOW_UNSUPPORTED=false
@@ -42,7 +45,8 @@ required=(
     config/openr4d10.toml config/hardware.toml
     assets/boot/text-sequence.toml
     web/index.html web/app.css web/app.js
-    systemd/openr4d10.service bin/openr4d10
+    systemd/openr4d10.service systemd/openr4d10-update.service
+    systemd/openr4d10-update.path bin/openr4d10 bin/openr4d10-update
     boot/install.sh boot/openr4d10-boot.service
     boot/native/openr4d10_boot.c boot/native/LICENSE.PiSugar
     boot/native/NOTICE.PiSugar boot/assets/boot.opb boot/assets/first.opb
@@ -180,6 +184,9 @@ chmod 0640 "$CONFIG_ROOT/hardware.toml"
 
 install -m 0755 -o root -g root "$SOURCE_ROOT/bin/openr4d10" "$WRAPPER_FILE"
 install -m 0644 -o root -g root "$SOURCE_ROOT/systemd/openr4d10.service" "$SERVICE_FILE"
+install -m 0755 -o root -g root "$SOURCE_ROOT/bin/openr4d10-update" "$UPDATE_HELPER_FILE"
+install -m 0644 -o root -g root "$SOURCE_ROOT/systemd/openr4d10-update.service" "$UPDATE_SERVICE_FILE"
+install -m 0644 -o root -g root "$SOURCE_ROOT/systemd/openr4d10-update.path" "$UPDATE_PATH_FILE"
 
 note "Installing the verified Whisplay ST7789 boot display"
 OPENR4D10_SKIP_APT=1 bash "$SOURCE_ROOT/boot/install.sh"
@@ -200,6 +207,7 @@ trap - EXIT
 note "Enabling systemd autostart"
 systemctl daemon-reload
 systemctl enable openr4d10.service
+systemctl enable --now openr4d10-update.path
 systemctl restart openr4d10.service
 
 note "Checking local web dashboard"
@@ -237,6 +245,7 @@ fi
 echo "Status: systemctl status openr4d10"
 echo "Logs:   journalctl -u openr4d10 -f"
 echo "Web UI: http://<raspberry-pi-ip>/"
+echo "Web updates: enabled through the confirmed Systemupdate control"
 echo "Whisplay boot animation: enabled for the next reboot"
 echo "Whisplay logs: journalctl -u openr4d10-boot -b --no-pager"
 echo "Whisplay audio: official unified WM8960/ES8389 driver installed"
