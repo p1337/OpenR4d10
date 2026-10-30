@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 from typing import Callable
 
+from .content import CameraSnapshot, FeedReader
 from .media import MpvEngine, StreamRecorder
 from .storage import StateStore
 
@@ -60,6 +61,8 @@ class ServiceCatalog:
         executable_lookup: ExecutableLookup = shutil.which,
         player: MpvEngine | None = None,
         recorder: StreamRecorder | None = None,
+        feed_reader: FeedReader | None = None,
+        camera: CameraSnapshot | None = None,
     ) -> None:
         self.store = StateStore(state_directory / "openr4d10.sqlite3")
         self.executable_lookup = executable_lookup
@@ -69,6 +72,12 @@ class ServiceCatalog:
             state_directory / "recordings",
             media_roots=(media_root,),
         )
+        self.feed_reader = feed_reader or FeedReader()
+        self.camera = camera or CameraSnapshot(state_directory / "cache")
+        self.content_state: dict[str, object] = {
+            "feed": None,
+            "cameras": {},
+        }
         self.active_service = "system"
         self.store.ensure_services(tuple(item.service_id for item in BUILTIN_SERVICES))
 
@@ -102,6 +111,7 @@ class ServiceCatalog:
             "active_service": self.active_service,
             "playback": self.player.state.as_dict(),
             "recording": self.recorder.state.as_dict(),
+            "content": self.content_state,
             "items": services,
         }
 
@@ -137,6 +147,28 @@ class ServiceCatalog:
             self.recorder.start(source)
         elif action == "record_stop":
             self.recorder.stop()
+        elif action == "feed_fetch":
+            url = request.get("url")
+            if not isinstance(url, str):
+                raise ValueError("feed_fetch requires a URL")
+            feed = self.feed_reader.fetch(url)
+            self.content_state["feed"] = {
+                "title": feed["title"],
+                "item_count": feed["item_count"],
+            }
+            return {"feed": feed}
+        elif action == "camera_snapshot":
+            url = request.get("url")
+            slot = request.get("slot", 1)
+            if not isinstance(url, str):
+                raise ValueError("camera_snapshot requires a URL")
+            if isinstance(slot, bool) or not isinstance(slot, int):
+                raise ValueError("camera slot must be an integer")
+            camera = self.camera.fetch(url, slot)
+            cameras = self.content_state["cameras"]
+            assert isinstance(cameras, dict)
+            cameras[str(slot)] = camera
+            return {"camera": camera}
         else:
             raise ValueError("unsupported control action")
         return {
@@ -144,6 +176,15 @@ class ServiceCatalog:
             "playback": self.player.state.as_dict(),
             "recording": self.recorder.state.as_dict(),
         }
+
+    def content_asset(self, path: str) -> tuple[str, bytes] | None:
+        if path not in {"camera-1.jpg", "camera-2.jpg"}:
+            return None
+        target = self.camera.cache_root / path
+        try:
+            return "image/jpeg", target.read_bytes()
+        except OSError:
+            return None
 
     def receiver_overlay(self) -> dict[str, object]:
         playback = self.player.state

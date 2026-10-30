@@ -52,11 +52,13 @@ files in `web/` plus the following endpoints:
 - `/api/status` — current semantic frame and adapter state as JSON
 - `/healthz` — simple service health response
 - `POST /api/control` — bounded same-origin JSON media controls
+- `/api/camera/1` and `/api/camera/2` — locally re-encoded camera snapshots
 
 The control endpoint accepts only JSON up to 4096 bytes, rejects mismatched
 browser origins and never accepts or stores credentials. It supports explicit
-playback, pause, stop, volume and stream-recording actions. Port, bind address
-and static directory live in `[web]` in `openr4d10.toml`.
+playback, pause, stop, volume and stream-recording actions plus bounded feed and
+camera retrieval. Port, bind address and static directory live in `[web]` in
+`openr4d10.toml`.
 
 ## Installed diagnostics
 

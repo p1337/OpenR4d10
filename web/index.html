@@ -131,6 +131,24 @@
         </div>
         <output id="control-result" aria-live="polite">Keine Quelle aktiv.</output>
       </form>
+      <div class="content-controls">
+        <form class="content-control" id="feed-control">
+          <label for="feed-url">RSS/Atom-Feed</label>
+          <div class="media-source-row">
+            <input id="feed-url" type="url" placeholder="https://…/feed.xml" autocomplete="off" required>
+            <button type="submit">Feed laden</button>
+          </div>
+          <ol id="feed-results" class="feed-results"></ol>
+        </form>
+        <form class="content-control" id="camera-control">
+          <label for="camera-url">Kamera-Standbild</label>
+          <div class="media-source-row">
+            <input id="camera-url" type="url" placeholder="https://…/snapshot.jpg" autocomplete="off" required>
+            <button type="submit">Bild laden</button>
+          </div>
+          <img id="camera-preview" class="camera-preview" alt="Kamerabild" hidden>
+        </form>
+      </div>
       <div class="service-grid" id="service-grid" aria-live="polite"></div>
     </section>
 

@@ -15,6 +15,7 @@ LOG = logging.getLogger(__name__)
 
 StatusProvider = Callable[[], dict[str, Any]]
 ControlProvider = Callable[[dict[str, object]], dict[str, object]]
+ContentProvider = Callable[[str], tuple[str, bytes] | None]
 
 STATIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
@@ -28,6 +29,7 @@ class _DashboardHandler(BaseHTTPRequestHandler):
     static_directory: Path
     status_provider: StatusProvider
     control_provider: ControlProvider | None = None
+    content_provider: ContentProvider | None = None
     server_version = "OpenR4d10/0.2"
     sys_version = ""
 
@@ -103,10 +105,20 @@ class _DashboardHandler(BaseHTTPRequestHandler):
         payload = json.dumps(response, ensure_ascii=False, sort_keys=True).encode("utf-8")
         self._send(200, "application/json; charset=utf-8", payload)
 
+    def _serve_content(self, name: str) -> None:
+        item = self.content_provider(name) if self.content_provider is not None else None
+        if item is None:
+            self._send(404, "text/plain; charset=utf-8", b"Not found\n")
+            return
+        content_type, payload = item
+        self._send(200, content_type, payload)
+
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
         path = urlsplit(self.path).path
         if path == "/api/status":
             self._serve_status()
+        elif path in {"/api/camera/1", "/api/camera/2"}:
+            self._serve_content(f"camera-{path[-1]}.jpg")
         elif path == "/healthz":
             self._send(200, "text/plain; charset=utf-8", b"ok\n")
         else:
@@ -133,6 +145,7 @@ class WebServer:
         static_directory: Path,
         status_provider: StatusProvider,
         control_provider: ControlProvider | None = None,
+        content_provider: ContentProvider | None = None,
     ) -> None:
         handler = type(
             "DashboardHandler",
@@ -141,6 +154,7 @@ class WebServer:
                 "static_directory": static_directory,
                 "status_provider": staticmethod(status_provider),
                 "control_provider": staticmethod(control_provider) if control_provider else None,
+                "content_provider": staticmethod(content_provider) if content_provider else None,
             },
         )
         self._server = ThreadingHTTPServer((host, port), handler)

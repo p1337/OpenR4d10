@@ -29,6 +29,8 @@ the installer report exactly which adapters still need configuration.
   adapter and local-login readiness
 - direct web-radio/local-media playback through private mpv JSON IPC and
   stream recording through shell-free ffmpeg/Opus
+- bounded RSS/Atom reader and two-slot camera snapshots with image validation
+  and safe JPEG re-encoding
 - standard-library-only test suite and GitHub Actions CI
 
 Hardware-specific integration still pending:
@@ -86,6 +88,9 @@ The service section accepts an explicit `http` or `https` audio URL for local
 playback and recording. It rejects credentials embedded in URLs and does not
 persist URL query strings in public status. Actual sound requires an ALSA
 device; the Whisplay codec driver is still hardware-revision-dependent.
+RSS/Atom URLs and camera snapshot URLs can be loaded in the same local panel.
+Feed downloads are size-limited; camera responses are decoded, dimension-
+checked, resized and re-encoded before the browser can retrieve them.
 
 If the repository files are already present, the local command remains:
 

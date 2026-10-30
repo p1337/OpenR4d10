@@ -164,5 +164,49 @@ for (const button of document.querySelectorAll("[data-action]")) {
   });
 }
 
+byId("feed-control").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const output = byId("feed-results");
+  output.replaceChildren();
+  try {
+    const response = await fetch("/api/control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "feed_fetch", url: byId("feed-url").value }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    for (const item of payload.feed.items.slice(0, 10)) {
+      const row = document.createElement("li");
+      row.textContent = item.title || item.summary || "Ohne Titel";
+      output.append(row);
+    }
+  } catch (error) {
+    const row = document.createElement("li");
+    row.textContent = `Fehler: ${error.message}`;
+    output.append(row);
+  }
+});
+
+byId("camera-control").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const image = byId("camera-preview");
+  try {
+    const response = await fetch("/api/control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "camera_snapshot", url: byId("camera-url").value, slot: 1 }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    image.src = `/api/camera/1?t=${Date.now()}`;
+    image.hidden = false;
+    image.alt = `Kamerabild ${payload.camera.width} × ${payload.camera.height}`;
+  } catch (error) {
+    image.hidden = true;
+    byId("control-result").textContent = `Kamerafehler: ${error.message}`;
+  }
+});
+
 refresh();
 window.setInterval(refresh, 2000);

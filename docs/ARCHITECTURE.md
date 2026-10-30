@@ -66,6 +66,13 @@ Network URLs are limited to HTTP(S), reject embedded credentials and are
 redacted before appearing in status. Local media must resolve below the
 approved media directory.
 
+`BoundedFetcher` supplies the native feed and camera modules. It accepts only
+HTTP(S) URLs without embedded credentials and enforces response-type, size and
+timeout limits. The feed reader parses at most 50 RSS/Atom entries and converts
+markup to bounded text. Camera slots accept at most 5 MiB, reject excessive
+pixel dimensions and always decode, resize and atomically re-encode JPEG rather
+than serving untrusted remote bytes.
+
 For a fresh machine, `bootstrap.sh` downloads a GitHub-generated source archive
 over HTTPS into a private temporary directory. It checks paths and archive
 integrity before extraction, then invokes the same local `install.sh`. Git is
