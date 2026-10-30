@@ -131,6 +131,13 @@ not an installation dependency.
    SPI/GPIO and keeps the ownership lock for its entire lifetime.
 10. `SIGTERM` or `SIGINT` stops the loop, database and HTTP server cleanly.
 
+Both display services declare the shared `/run/openr4d10-boot` runtime. This is
+also required when the installer starts the application in an already running
+system where the early-boot player did not run. In that case the application
+creates and locks the handoff file itself and initializes the panel directly;
+on a normal reboot the native player creates the same runtime first and the
+release handshake remains unchanged.
+
 An unconfigured display consumes semantic frames without touching GPIO. An
 unconfigured power adapter returns an explicit state that the UI surfaces as
 `Hardware configuration required`.

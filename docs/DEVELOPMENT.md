@@ -93,6 +93,13 @@ systemctl cat openr4d10
 is still active. It does not mean the installer failed. Exit status `1` means a
 file, helper, manifest or platform check failed.
 
+Immediately after an in-session installation, `openr4d10-boot.service` has not
+run yet. `openr4d10.service` must nevertheless create the shared
+`/run/openr4d10-boot` directory through `RuntimeDirectory=` so the physical UI
+can claim the display directly. Repeated `Boot display runtime is absent`
+messages indicate a stale application unit; reinstall the current release and
+verify the unit's two runtime-directory names before rebooting.
+
 The native boot player has an additional hardware-independent integrity mode:
 
 ```bash

@@ -20,6 +20,7 @@ the installer report exactly which adapters still need configuration.
 - hardened `systemd` autostart service
 - responsive local web dashboard on `http://<raspberry-pi-ip>/`
 - native Whisplay ST7789 boot animation installed and enabled automatically
+- safe display handoff both at boot and during an in-session installation
 - real-device-confirmed Whisplay SPI transport, colour order and orientation
 - native 240 x 280 physical UI with the agreed four-axis encoder layout
 - semantic UI frame model and configurable text boot sequence

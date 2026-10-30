@@ -118,6 +118,11 @@ supplementary groups and has a closed device policy permitting only
 state when the boot marker matches, avoiding an unnecessary reset during normal
 handoff. Any visible transition still has to be measured on the real hardware.
 
+The application unit also owns the shared runtime-directory declaration. This
+lets the UI initialize the panel directly when installation or a manual restart
+happens in a boot where the native player never ran. It does not start a second
+player and does not change the normal boot-time lock/release protocol.
+
 ## Verification and performance
 
 Host checks:

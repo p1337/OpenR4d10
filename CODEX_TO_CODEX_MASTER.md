@@ -760,6 +760,21 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-30 – Displayübergabe bei Installation im laufenden System
+
+- Auf dem frisch installierten realen Pi wurde beobachtet, dass der
+  Anwendungsdienst sofort startet, der frühe Bootplayer in diesem bereits
+  laufenden Boot aber erwartungsgemäß noch nicht ausgeführt wurde. Dadurch
+  fehlte `/run/openr4d10-boot` und die Geräte-UI meldete wiederholt
+  `Boot display runtime is absent`, während Weboberfläche, WLAN und SSH stabil
+  blieben.
+- Der Anwendungsdienst deklariert nun denselben erhaltenen Laufzeitordner wie
+  der Bootplayer. Bei einer laufenden Installation kann die UI den gemeinsamen
+  Lock direkt übernehmen und das Panel initialisieren; beim normalen Neustart
+  bleibt die vorhandene Release-/Lock-Übergabe vom Bootplayer unverändert.
+- Ein Regressionstest prüft die systemd-Vertragswerte für gemeinsamen
+  Laufzeitordner, Schreibrechte und Erhalt über Dienstneustarts.
+
 ### 2026-10-30 – Kuratierte Radio- und Feed-Grundausstattung
 
 - Die lokale Weboberfläche erhält eine sofort nutzbare, kuratierte Auswahl

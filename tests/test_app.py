@@ -9,6 +9,19 @@ from openr4d10.config import AppConfig
 
 
 class AppTests(unittest.TestCase):
+    def test_application_unit_provides_display_handoff_runtime(self) -> None:
+        unit = (
+            Path(__file__).resolve().parents[1]
+            / "systemd"
+            / "openr4d10.service"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "RuntimeDirectory=openr4d10 openr4d10-boot",
+            unit,
+        )
+        self.assertIn("RuntimeDirectoryMode=0770", unit)
+        self.assertIn("RuntimeDirectoryPreserve=yes", unit)
+
     def test_render_once_surfaces_unconfigured_power(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
