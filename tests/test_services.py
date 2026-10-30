@@ -67,6 +67,36 @@ class ServiceCatalogTests(unittest.TestCase):
         self.assertEqual(items["recorder"]["readiness"], "missing_dependency")
         self.assertEqual(items["recorder"]["missing_executables"], ["ffmpeg"])
 
+    def test_external_service_is_ready_only_after_adapter_handshake(self) -> None:
+        class Registry:
+            def configured(self, service_id):
+                return service_id == "mumble"
+
+            def status(self, service_id):
+                return {"ok": True, "ready": True, "status": "connected"}
+
+            def call(self, service_id, operation, parameters=None):
+                return {"ok": True, "operation": operation}
+
+        with tempfile.TemporaryDirectory() as raw:
+            catalog = ServiceCatalog(
+                Path(raw).resolve(), adapter_registry=Registry()
+            )
+            try:
+                items = {item["service_id"]: item for item in catalog.snapshot()["items"]}
+                result = catalog.control(
+                    {
+                        "action": "adapter_call",
+                        "service_id": "mumble",
+                        "operation": "list_channels",
+                    }
+                )
+            finally:
+                catalog.close()
+        self.assertEqual(items["mumble"]["readiness"], "ready")
+        self.assertEqual(items["discord"]["readiness"], "configuration_required")
+        self.assertEqual(result["adapter"]["operation"], "list_channels")
+
     def test_media_control_updates_public_receiver_overlay(self) -> None:
         class State:
             def __init__(self, **values):

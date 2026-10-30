@@ -37,6 +37,7 @@ function readinessLabel(value) {
     ready: "Bereit",
     configuration_required: "Konfiguration nötig",
     missing_dependency: "Paket fehlt",
+    adapter_error: "Adapter nicht erreichbar",
   };
   return labels[value] || value;
 }

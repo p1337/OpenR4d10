@@ -10,6 +10,7 @@ boot_enabled = true
 [paths]
 runtime_directory = "/run/openr4d10"
 state_directory = "/var/lib/openr4d10"
+service_adapter_directory = "/etc/openr4d10/services.d"
 
 [web]
 enabled = true

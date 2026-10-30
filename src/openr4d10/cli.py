@@ -83,7 +83,10 @@ def main(argv: list[str] | None = None) -> int:
 
     display, power, receiver = build_adapters(hardware_config)
     services = (
-        ServiceCatalog(app_config.state_directory)
+        ServiceCatalog(
+            app_config.state_directory,
+            adapter_directory=app_config.service_adapter_directory,
+        )
         if args.command == "run"
         else None
     )

@@ -58,6 +58,12 @@ requirements and whether an individual local login is required. Status output
 never contains a credential value and does not describe an external adapter as
 ready merely because its menu entry exists.
 
+Account-bearing integrations use the protocol in
+[`SERVICE_ADAPTERS.md`](SERVICE_ADAPTERS.md). Their code and credentials stay
+in separate system services; the core connects only to a service-named Unix
+socket and exchanges bounded JSON. A successful status handshake is required
+before an external catalog entry becomes ready.
+
 `MpvEngine` starts lazily and controls mpv through an inherited Unix socket
 using the documented JSON IPC. It disables user configuration and terminal
 input. `StreamRecorder` invokes ffmpeg through an argument array with

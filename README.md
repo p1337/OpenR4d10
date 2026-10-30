@@ -162,4 +162,6 @@ PYTHONPATH=src python3 -m openr4d10 --config config/openr4d10.toml \
 
 More detail is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
 [`docs/HARDWARE.md`](docs/HARDWARE.md) and
-[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
+[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md). The isolated protocol for
+account-bearing modules is documented in
+[`docs/SERVICE_ADAPTERS.md`](docs/SERVICE_ADAPTERS.md).

@@ -120,6 +120,7 @@ ln -sfn -- "$release_root" "$INSTALL_ROOT/current.next"
 mv -Tf -- "$INSTALL_ROOT/current.next" "$INSTALL_ROOT/current"
 
 install -d -m 0750 -o root -g openr4d10 "$CONFIG_ROOT"
+install -d -m 0750 -o root -g openr4d10 "$CONFIG_ROOT/services.d"
 for config_name in openr4d10.toml hardware.toml; do
     source_config="$SOURCE_ROOT/config/$config_name"
     dist_config="$CONFIG_ROOT/$config_name.dist"

@@ -62,6 +62,11 @@ station URLs containing query strings are rejected; temporary direct playback
 is not persisted. Port, bind address and static directory live in `[web]` in
 `openr4d10.toml`.
 
+External account-based modules are never loaded into the web process. Their
+non-secret manifests live in `/etc/openr4d10/services.d`; see
+[`SERVICE_ADAPTERS.md`](SERVICE_ADAPTERS.md) for the Unix-socket protocol and
+per-service credential isolation requirements.
+
 ## Installed diagnostics
 
 ```bash

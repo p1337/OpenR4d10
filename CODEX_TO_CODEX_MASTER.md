@@ -758,6 +758,22 @@ werden, wenn die tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-30 – Isolierter Vertrag für externe Dienstadapter
+
+- Externe Dienste mit eigenen Konten oder Tokens werden nicht als Bibliothek im
+  privilegierten Hauptprozess geladen. Jeder Dienst läuft zukünftig als
+  eigener, lokal installierter Prozess mit eigener Unix-Socket-Schnittstelle
+  und kann dadurch einen eigenen Systembenutzer sowie ausschließlich seine
+  eigenen geschützten Zugangsdaten erhalten.
+- Der OpenR4d10-Kern kennt nur versionierte, nicht geheime TOML-Manifeste in
+  `/etc/openr4d10/services.d` und ein begrenztes JSON-Protokoll über lokale
+  Unix-Sockets. Weder Shell-Aufruf noch Adaptercode, Token oder Passwort werden
+  in den Kern beziehungsweise seine SQLite-Datenbank übernommen.
+- Ein vorhandener Menüeintrag allein macht einen externen Dienst nicht bereit:
+  erst Manifest, erreichbarer Socket und erfolgreicher Status-Handshake dürfen
+  den Zustand `ready` ergeben. Fehlende oder fehlerhafte Adapter bleiben
+  sichtbar und ehrlich als zu konfigurieren beziehungsweise fehlerhaft markiert.
+
 ### 2026-10-30 – Projektwissen versioniert; Sender- und Medienbibliothek
 
 - Die zentrale Masteranweisung lag versehentlich nur in einem durch
@@ -775,8 +791,11 @@ werden, wenn die tatsächlich verwendete Hardwareversion verifiziert ist.
 - Öffentliche Statusdaten enthalten bei Sendern keine vollständigen
   Datenbankwerte und bei lokalen Medien keine Dateipfade. Gleichzeitige
   Zugriffe des Webservers und der Hauptschleife auf SQLite werden serialisiert.
-- 34 lokale Tests bestehen; vier zusätzliche Linux-/C-spezifische Prüfungen
-  werden weiterhin erst in GitHub Actions beziehungsweise auf Linux ausgeführt.
+- Nach diesem Bibliotheksblock bestanden 34 lokale Tests; vier zusätzliche
+  Linux-/C-spezifische Prüfungen liefen erst in GitHub Actions beziehungsweise
+  auf Linux. Mit dem anschließend implementierten Dienstadaptervertrag umfasst
+  die Suite 38 lokale Tests, davon fünf auf Windows übersprungene Linux-/C-/
+  Unix-Socket-Prüfungen.
 
 ### 2026-10-30 – Dienstkatalog, Datenbank und sichere Medienprozesse
 

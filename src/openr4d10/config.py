@@ -12,6 +12,11 @@ class ConfigError(ValueError):
     pass
 
 
+def _is_absolute_target_path(path: Path) -> bool:
+    """Accept native host paths plus Linux target paths during Windows tests."""
+    return path.is_absolute() or str(path).startswith(("/", "\\"))
+
+
 @dataclass(frozen=True, slots=True)
 class WebConfig:
     enabled: bool = True
@@ -29,6 +34,7 @@ class AppConfig:
     boot_enabled: bool
     runtime_directory: Path
     state_directory: Path
+    service_adapter_directory: Path = Path("/etc/openr4d10/services.d")
     web: WebConfig = field(default_factory=WebConfig)
 
 
@@ -99,13 +105,20 @@ def load_app_config(path: Path) -> AppConfig:
 
     runtime = paths.get("runtime_directory", "/run/openr4d10")
     state = paths.get("state_directory", "/var/lib/openr4d10")
-    if not isinstance(runtime, str) or not isinstance(state, str):
+    service_adapters = paths.get(
+        "service_adapter_directory", "/etc/openr4d10/services.d"
+    )
+    if not all(isinstance(value, str) for value in (runtime, state, service_adapters)):
         raise ConfigError("configured directories must be path strings")
     manifest_path = Path(manifest)
     runtime_path = Path(runtime)
     state_path = Path(state)
-    if not all(path.is_absolute() for path in (manifest_path, runtime_path, state_path)):
-        raise ConfigError("boot manifest, runtime and state paths must be absolute")
+    service_adapter_path = Path(service_adapters)
+    if not all(
+        _is_absolute_target_path(path)
+        for path in (manifest_path, runtime_path, state_path, service_adapter_path)
+    ):
+        raise ConfigError("boot manifest, runtime, state and adapter paths must be absolute")
 
     web_enabled = web.get("enabled", True)
     web_host = web.get("host", "0.0.0.0")
@@ -130,6 +143,7 @@ def load_app_config(path: Path) -> AppConfig:
         boot_enabled=boot_enabled,
         runtime_directory=runtime_path,
         state_directory=state_path,
+        service_adapter_directory=service_adapter_path,
         web=WebConfig(
             enabled=web_enabled,
             host=web_host.strip(),

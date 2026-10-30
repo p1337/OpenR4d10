@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 
 from .content import CameraSnapshot, FeedReader
 from .media import MpvEngine, StreamRecorder, public_source_label, validate_media_source
+from .service_adapters import ServiceAdapterError, ServiceAdapterRegistry
 from .storage import StateStore
 
 
@@ -67,6 +68,8 @@ class ServiceCatalog:
         recorder: StreamRecorder | None = None,
         feed_reader: FeedReader | None = None,
         camera: CameraSnapshot | None = None,
+        adapter_directory: Path | None = None,
+        adapter_registry: ServiceAdapterRegistry | None = None,
     ) -> None:
         self.store = StateStore(state_directory / "openr4d10.sqlite3")
         self.executable_lookup = executable_lookup
@@ -78,6 +81,16 @@ class ServiceCatalog:
         )
         self.feed_reader = feed_reader or FeedReader()
         self.camera = camera or CameraSnapshot(state_directory / "cache")
+        external_ids = {
+            item.service_id
+            for item in BUILTIN_SERVICES
+            if item.implementation in {"external", "official_api"}
+        }
+        self.adapters = adapter_registry or (
+            ServiceAdapterRegistry.from_directory(adapter_directory, external_ids)
+            if adapter_directory is not None
+            else ServiceAdapterRegistry()
+        )
         self.content_state: dict[str, object] = {
             "feed": None,
             "cameras": {},
@@ -95,10 +108,26 @@ class ServiceCatalog:
                 for executable in manifest.required_executables
                 if self.executable_lookup(executable) is None
             ]
+            adapter_state: dict[str, object] = {
+                "configured": self.adapters.configured(manifest.service_id)
+            }
             if missing:
                 readiness = "missing_dependency"
             elif manifest.implementation in {"external", "official_api"}:
-                readiness = "configuration_required"
+                if not self.adapters.configured(manifest.service_id):
+                    readiness = "configuration_required"
+                else:
+                    try:
+                        adapter_status = self.adapters.status(manifest.service_id)
+                        adapter_state["status"] = adapter_status.get("status", "ready")
+                        readiness = (
+                            "ready" if adapter_status.get("ready") is True
+                            else "configuration_required"
+                        )
+                    except ServiceAdapterError as exc:
+                        adapter_state["status"] = "error"
+                        adapter_state["error"] = str(exc)
+                        readiness = "adapter_error"
             elif manifest.requires_credentials and state["config_state"] != "ready":
                 readiness = "configuration_required"
             else:
@@ -107,6 +136,8 @@ class ServiceCatalog:
             item.update(state)
             item["missing_executables"] = missing
             item["readiness"] = readiness
+            if manifest.implementation in {"external", "official_api"}:
+                item["adapter"] = adapter_state
             services.append(item)
         stations = [
             {
@@ -207,6 +238,22 @@ class ServiceCatalog:
                 raise ValueError("media item was not found")
             self.player.load(str(media["path"]))
             self.active_service = "local_media"
+        elif action == "adapter_call":
+            service_id = request.get("service_id")
+            operation = request.get("operation")
+            if not isinstance(service_id, str) or not isinstance(operation, str):
+                raise ValueError("adapter_call requires service_id and operation")
+            external_ids = {
+                item.service_id
+                for item in BUILTIN_SERVICES
+                if item.implementation in {"external", "official_api"}
+            }
+            if service_id not in external_ids:
+                raise ValueError("service does not use an external adapter")
+            result = self.adapters.call(
+                service_id, operation, request.get("parameters")
+            )
+            return {"service_id": service_id, "adapter": result}
         elif action == "feed_fetch":
             url = request.get("url")
             if not isinstance(url, str):
