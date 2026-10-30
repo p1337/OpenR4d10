@@ -146,6 +146,13 @@ and the `audio` group, but it does not guess or install a WM8960/ES8389 codec
 overlay. Until the exact Whisplay audio revision is identified and its ALSA
 device appears, playback controls may report an audio-device error.
 
+On the real freshly installed Pi on 2026-10-30, `/proc/asound/cards` and
+`aplay -l` expose only `vc4-hdmi`; no Whisplay speaker device is present yet.
+Independent `ffprobe` checks successfully identify the curated SWR3, sunshine
+live and Deutschlandfunk endpoints as MP3 streams. A playback timeout on this
+stack must therefore not be described as a WLAN or station-source failure;
+the missing Whisplay ALSA integration remains the open hardware boundary.
+
 ## Still deliberately unknown
 
 The installed Whisplay audio codec revision and PiSugar model/API have not yet

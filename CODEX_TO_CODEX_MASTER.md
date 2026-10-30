@@ -760,6 +760,22 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-30 – Adapterstatus und reale Audiogrenze präzisiert
+
+- Die reale Webansicht von 0.10.1 zeigte das Whisplay korrekt als verbunden,
+  verwendete in der allgemeinen Statusüberschrift bei allein fehlender
+  PiSugar-Telemetrie aber noch den pauschalen Text, Display und Energie seien
+  offen. Die Zusammenfassung muss die tatsächlich offenen Adapter einzeln
+  benennen und darf einen funktionierenden Displayadapter nicht relativieren.
+- Ein Wiedergabeversuch lieferte `timed out`. Vom Pi aus wurden die geprüften
+  SWR3-, sunshine-live- und Deutschlandfunk-Streams mit `ffprobe` erfolgreich
+  als MP3 erreicht; WLAN und Streamquellen sind damit nicht die Ursache.
+- Auf dem realen System ist derzeit ausschließlich `vc4-hdmi` als ALSA-
+  Wiedergabegerät vorhanden. Der Whisplay-Lautsprecher ist noch nicht als
+  Audiogerät eingebunden. Bis dessen exakte Codec-/Overlay-Konfiguration
+  verifiziert ist, darf keine funktionierende interne Audioausgabe behauptet
+  und kein Treiber geraten werden.
+
 ### 2026-10-30 – Reale UI bestätigt; virtuelle Encoderbedienung
 
 - Nach Installation von 0.10.1 bestätigt Robert die native 240-x-280-UI auf

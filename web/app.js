@@ -222,17 +222,26 @@ function render(data) {
   const power = fields.power || {};
   const adapters = data.adapters || {};
   const severity = frame.severity || "info";
-  const hardwareOpen = [adapters.display, adapters.power].includes("unconfigured");
+  const displayOpen = adapters.display === "unconfigured";
+  const powerOpen = adapters.power === "unconfigured";
+
+  let heroTitle = "OpenR4d10 ist bereit.";
+  let heroCopy = "Alle konfigurierten Dienste liefern aktuelle Daten.";
+  if (displayOpen && powerOpen) {
+    heroTitle = "System online. Display und Energie noch offen.";
+    heroCopy = "Die Weboberfläche läuft. Display und Energieversorgung warten auf verifizierte Hardwareadapter.";
+  } else if (displayOpen) {
+    heroTitle = "System online. Display noch offen.";
+    heroCopy = "Die Weboberfläche und Energieabfrage laufen; der Displayadapter ist noch nicht konfiguriert.";
+  } else if (powerOpen) {
+    heroTitle = "System und Display online. Energieanzeige noch offen.";
+    heroCopy = "Das Whisplay ist verbunden. Nur die verifizierte PiSugar-Telemetrie fehlt noch.";
+  }
 
   byId("connection").dataset.state = "online";
   setText("connection-label", "Dienst verbunden");
-  setText("hero-title", hardwareOpen ? "System online. Hardware noch offen." : "OpenR4d10 ist bereit.");
-  setText(
-    "hero-copy",
-    hardwareOpen
-      ? "Die Weboberfläche läuft. Display und Energieversorgung warten noch auf verifizierte Hardwareadapter."
-      : "Alle konfigurierten Dienste liefern aktuelle Daten."
-  );
+  setText("hero-title", heroTitle);
+  setText("hero-copy", heroCopy);
   setText("hostname", receiver.hostname, "OpenR4d10");
   setText("updated", frame.timestamp ? new Date(frame.timestamp).toLocaleString("de-DE") : "gerade eben");
   setText("version", `v${data.version || "–"}`);

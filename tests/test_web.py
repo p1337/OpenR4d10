@@ -23,6 +23,8 @@ class WebTests(unittest.TestCase):
         ):
             self.assertIn(f'data-device-control="{control}"', html)
         self.assertIn('action: "device_input"', script)
+        self.assertIn("System und Display online. Energieanzeige noch offen.", script)
+        self.assertIn("Nur die verifizierte PiSugar-Telemetrie fehlt noch.", script)
 
     def test_dashboard_and_status_endpoint(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
