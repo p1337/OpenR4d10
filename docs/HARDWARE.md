@@ -6,16 +6,61 @@
 - Debian GNU/Linux 13 (Trixie)
 - `aarch64`
 
-## Deliberately unknown
+## Verified Whisplay HAT facts
 
-This repository currently has no trustworthy source for the exact Whisplay
-board revision, display controller, resolution, colour format, SPI bus/chip
-select, GPIO assignments, backlight control, input buttons or PiSugar model/API.
-None of these values may be inferred from a product name alone.
+The official [PiSugar Whisplay documentation](https://docs.pisugar.com/docs/product-wiki/whisplay/overview)
+and [manufacturer product page](https://www.pisugar.com/products/whisplay-hat-for-pi-zero-2w-audio-display)
+document the following:
 
-Until those facts are documented, keep `display.backend` and `power.backend` as
-`unconfigured`. This is a supported diagnostic mode, not an implementation gap
-hidden by fake values.
+- interface: full Raspberry Pi 40-pin GPIO header
+- supply voltage: 5 V; logic voltage: 3.3 V
+- display: 1.69 inch, 240 x 280 RGB, ST7789, 4-wire SPI
+- audio codec revision: WM8960 or ES8389
+- physical orientation: Whisplay button side faces the Pi USB-port side
+
+The [Raspberry Pi Zero 2 W documentation](https://www.raspberrypi.com/documentation/computers/zero.html)
+specifies one complete `2 x 20`, 2.54 mm male GPIO header soldered into all 40
+through-holes for boards without a factory header. Do not
+solder only the signal pins listed below: the complete header provides correct
+alignment, mechanical support, ground/power contacts and the HAT connection.
+The Whisplay plugs onto that header; it is not soldered directly to the Pi.
+
+### Manufacturer pin assignment (physical pin numbers)
+
+| Function | Physical pin(s) | Function | Physical pin(s) |
+| --- | --- | --- | --- |
+| 5 V | 2, 4 | Button | 11 |
+| I2C data | 3 | LED 1 | 22 |
+| I2C clock | 5 | LED 2 | 18 |
+| SPI reset | 7 | LED 3 | 16 |
+| SPI data/command | 13 | LCD control | 15 |
+| SPI MOSI | 19 | SPI clock | 23 |
+| SPI chip select | 24 | I2S word select | 35 |
+| I2S data in | 38 | I2S data out | 40 |
+
+The official driver additionally describes the audio bus as using I2S header
+pins `12/35/38/40`. Ground is taken from the standard header ground contacts.
+
+### Safe assembly
+
+1. Shut the Pi down and disconnect USB power and any battery/UPS.
+2. Fit the complete straight 2 x 20 male header; keep it square to the PCB.
+3. Solder all 40 joints on the Pi. Do not solder with the Whisplay attached.
+4. Inspect for bridges, especially around 5 V, 3.3 V and adjacent ground pins.
+5. With power still disconnected, seat the Whisplay fully and without a
+   one-row/one-column offset; button side points toward the Pi USB ports.
+6. Hold the Whisplay PCB edges, not the glass, while seating it.
+
+If the Whisplay board itself has no fitted female socket, stop and identify the
+exact board/revision from clear photos before soldering; that is a different
+assembly case.
+
+## Still deliberately unknown
+
+The installed Whisplay audio codec revision and PiSugar model/API have not yet
+been identified on the physical device. Keep `display.backend` and
+`power.backend` as `unconfigured` until the official driver integration is
+implemented and verified on this Debian 13 target.
 
 ## Generic adapter contract
 
@@ -76,8 +121,9 @@ field names beyond the optional `state` value.
 4. Confirm voltage and logic-level requirements before wiring.
 5. Implement the helper without root privileges where possible.
 6. Add only required groups/device permissions via a systemd drop-in. The
-   default unit intentionally sets `PrivateDevices=true` and an empty capability
-   set, so a verified hardware adapter must document its narrow override.
+   default unit intentionally sets `PrivateDevices=true` and grants only
+   `CAP_NET_BIND_SERVICE` for the web UI, so a verified hardware adapter must
+   document its narrow device-access override.
 7. Test boot, shutdown, helper timeout and disconnected-hardware behaviour.
 8. Update this document with the source and verified target revision.
 
