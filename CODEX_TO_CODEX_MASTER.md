@@ -760,6 +760,33 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-30 – Kuratierte Radio- und Feed-Grundausstattung
+
+- Die lokale Weboberfläche erhält eine sofort nutzbare, kuratierte Auswahl
+  verifizierter Webradios. Gewünscht sind insbesondere SWR3, sunshine live,
+  Deutschlandfunk, RMF FM, Radio ZET und ein geeigneter BBC-Nachrichten-/
+  Radiodienst; weitere seriöse Sender dürfen ergänzt werden.
+- Zusätzlich werden mehrere seriöse RSS-/Atom-Nachrichtenquellen als Presets
+  angeboten. Stream- und Feed-Adressen müssen vor Aufnahme gegen offizielle
+  beziehungsweise eindeutig zuständige Quellen geprüft werden und bleiben als
+  aktualisierbare Daten getrennt von Wiedergabe- und Parserlogik.
+- Senderbilder dürfen nicht ungeprüft als fremder Webinhalt in die Oberfläche
+  eingebettet werden. Zulässig sind begrenzt geladene, dekodierte und lokal neu
+  erzeugte Bilder mit dokumentierter Quelle oder sichere lokale Ersatzkacheln.
+  Ausfall eines Bildes darf Wiedergabe und Senderauswahl nicht blockieren.
+- Umgesetzt sind sechs Radios (SWR3, sunshine live, Deutschlandfunk, RMF FM,
+  Radio ZET und BBC World Service) sowie vier Nachrichtenfeeds (tagesschau,
+  Deutschlandfunk Nachrichten, RMF24 und BBC News World). Die Auswahl kann
+  direkt abgespielt beziehungsweise geladen und ein Radiosender idempotent in
+  die Favoriten übernommen werden.
+- Der öffentliche Status enthält weder die internen Stream- und Feed-Adressen
+  noch die entfernten Bildadressen. Senderbilder werden auf maximal 2 MiB und
+  20 Megapixel begrenzt, dekodiert, auf höchstens 256 × 256 verkleinert und als
+  lokales JPEG neu erzeugt; bei Fehlern bleibt eine Initialenkachel sichtbar.
+- Quellen, Adressen, Prüfreferenzen und Aktualisierungsregeln sind dauerhaft in
+  `docs/PRESETS.md` dokumentiert. Nach Umsetzung umfasst die lokale Suite 45
+  Tests, davon fünf plattformbedingt unter Windows übersprungen.
+
 ### 2026-10-30 – Portables, secret-freies Kernbackup
 
 - Der Core erhält ein versioniertes Backup-Paket mit einer über die SQLite-

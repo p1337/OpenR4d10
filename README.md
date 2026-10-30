@@ -38,6 +38,7 @@ the installer report exactly which adapters still need configuration.
 - bounded RSS/Atom reader and two-slot camera snapshots with image validation
   and safe JPEG re-encoding
 - persistent web-radio favorites and bounded local-media library scanning
+- curated one-click radio and news-feed presets with locally re-encoded artwork
 - standard-library-only test suite and GitHub Actions CI
 
 Hardware-specific integration still pending:
@@ -103,6 +104,14 @@ query are intentionally refused for persistent storage, while direct temporary
 playback remains possible. Local files copied below
 `/var/lib/openr4d10/media` appear after selecting **Neu einlesen**; their full
 paths never appear in the public status response.
+
+The built-in selection currently includes SWR3, sunshine live,
+Deutschlandfunk, RMF FM, Radio ZET and BBC World Service. News presets include
+tagesschau, Deutschlandfunk Nachrichten, RMF24 and BBC News World. The source
+addresses and their review references are documented in
+[`docs/PRESETS.md`](docs/PRESETS.md). Station artwork is fetched only from the
+reviewed list, size-limited, decoded and locally re-encoded as JPEG. If a logo
+is unavailable, the dashboard keeps working and displays a text tile instead.
 
 If the repository files are already present, the local command remains:
 

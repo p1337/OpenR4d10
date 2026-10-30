@@ -99,6 +99,15 @@ markup to bounded text. Camera slots accept at most 5 MiB, reject excessive
 pixel dimensions and always decode, resize and atomically re-encode JPEG rather
 than serving untrusted remote bytes.
 
+Curated radio and news entries are immutable data in `presets.py`, separate
+from playback and parser logic. Public status includes display metadata and a
+local artwork route, but omits the underlying stream, feed and remote artwork
+addresses. Selecting a radio resolves the reviewed stream only inside the
+core. Preset artwork uses the same bounded-download boundary as camera images,
+is decoded and re-encoded to a maximum 256 x 256 JPEG in the private cache, and
+falls back to a browser-generated initials tile when retrieval fails. Current
+sources and their review references are recorded in `PRESETS.md`.
+
 For a fresh machine, `bootstrap.sh` downloads a GitHub-generated source archive
 over HTTPS into a private temporary directory. It checks paths and archive
 integrity before extraction, then invokes the same local `install.sh`. Git is

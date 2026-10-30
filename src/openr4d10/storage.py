@@ -228,6 +228,12 @@ class StateStore:
         if not service_id or not name.strip() or len(name) > 160:
             raise ValueError("station service and name are required")
         with self.transaction():
+            existing = self.connection.execute(
+                "SELECT id FROM stations WHERE service_id = ? AND stream_url = ? LIMIT 1",
+                (service_id, stream_url),
+            ).fetchone()
+            if existing is not None:
+                return int(existing["id"])
             cursor = self.connection.execute(
                 """
                 INSERT INTO stations(service_id, name, stream_url, created_at)

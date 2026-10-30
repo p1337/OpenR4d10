@@ -7,6 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import logging
 from pathlib import Path
+import re
 import threading
 from typing import Any
 from urllib.parse import urlsplit
@@ -30,7 +31,7 @@ class _DashboardHandler(BaseHTTPRequestHandler):
     status_provider: StatusProvider
     control_provider: ControlProvider | None = None
     content_provider: ContentProvider | None = None
-    server_version = "OpenR4d10/0.2"
+    server_version = "OpenR4d10"
     sys_version = ""
 
     def _headers(self, status: int, content_type: str, length: int) -> None:
@@ -119,6 +120,8 @@ class _DashboardHandler(BaseHTTPRequestHandler):
             self._serve_status()
         elif path in {"/api/camera/1", "/api/camera/2"}:
             self._serve_content(f"camera-{path[-1]}.jpg")
+        elif re.fullmatch(r"/api/radio-art/[a-z][a-z0-9_]{1,63}", path):
+            self._serve_content(f"radio-art/{path.rsplit('/', 1)[-1]}")
         elif path == "/healthz":
             self._send(200, "text/plain; charset=utf-8", b"ok\n")
         else:

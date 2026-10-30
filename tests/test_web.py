@@ -23,7 +23,9 @@ class WebTests(unittest.TestCase):
                 static,
                 lambda: {"service": "online", "version": "test"},
                 lambda request: {"accepted": request["action"]},
-                lambda name: ("image/jpeg", b"camera") if name == "camera-1.jpg" else None,
+                lambda name: ("image/jpeg", name.encode("ascii"))
+                if name in {"camera-1.jpg", "radio-art/swr3"}
+                else None,
             )
             server.start()
             try:
@@ -51,7 +53,10 @@ class WebTests(unittest.TestCase):
                     self.assertEqual(payload["accepted"], "pause")
                 with urlopen(f"http://{host}:{port}/api/camera/1", timeout=2) as response:
                     self.assertEqual(response.headers["Content-Type"], "image/jpeg")
-                    self.assertEqual(response.read(), b"camera")
+                    self.assertEqual(response.read(), b"camera-1.jpg")
+                with urlopen(f"http://{host}:{port}/api/radio-art/swr3", timeout=2) as response:
+                    self.assertEqual(response.headers["Content-Type"], "image/jpeg")
+                    self.assertEqual(response.read(), b"radio-art/swr3")
             finally:
                 server.stop()
 

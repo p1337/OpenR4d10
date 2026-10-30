@@ -9,6 +9,7 @@ from io import BytesIO
 import os
 from pathlib import Path
 import re
+import threading
 from typing import Any, Callable
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
@@ -51,7 +52,7 @@ class BoundedFetcher:
         request = Request(
             approved,
             headers={
-                "User-Agent": "OpenR4d10/0.6 (+https://github.com/p1337/OpenR4d10)",
+                "User-Agent": "OpenR4d10 (+https://github.com/p1337/OpenR4d10)",
                 "Accept": ", ".join(accepted_types),
             },
         )
@@ -199,3 +200,47 @@ class CameraSnapshot:
             "source_type": content_type,
             "updated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         }
+
+
+class PresetArtwork:
+    """Fetch only curated preset artwork and re-encode it into a local JPEG."""
+
+    def __init__(self, cache_root: Path, fetcher: BoundedFetcher | None = None) -> None:
+        if not cache_root.is_absolute():
+            raise ValueError("artwork cache path must be absolute")
+        self.cache_root = cache_root
+        self.fetcher = fetcher or BoundedFetcher()
+        self._locks: dict[str, threading.Lock] = {}
+        self._locks_guard = threading.Lock()
+
+    def _preset_lock(self, preset_id: str) -> threading.Lock:
+        with self._locks_guard:
+            return self._locks.setdefault(preset_id, threading.Lock())
+
+    def ensure(self, preset_id: str, url: str) -> Path:
+        if not re.fullmatch(r"[a-z][a-z0-9_]{1,63}", preset_id):
+            raise ValueError("invalid radio preset id")
+        output = self.cache_root / f"radio-{preset_id}.jpg"
+        with self._preset_lock(preset_id):
+            if output.is_file():
+                return output
+            payload, _content_type = self.fetcher.fetch(
+                url, max_bytes=2 * 1024 * 1024, accepted_types=("image/*",)
+            )
+            try:
+                with Image.open(BytesIO(payload)) as source:
+                    if source.width * source.height > 20_000_000:
+                        raise ContentError("station artwork dimensions exceed the safety limit")
+                    source.verify()
+                with Image.open(BytesIO(payload)) as source:
+                    image = ImageOps.exif_transpose(source).convert("RGB")
+                    image.thumbnail((256, 256), Image.Resampling.LANCZOS)
+            except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
+                raise ContentError(f"invalid station artwork: {exc}") from exc
+            self.cache_root.mkdir(parents=True, exist_ok=True, mode=0o750)
+            encoded = BytesIO()
+            image.save(encoded, format="JPEG", quality=88, optimize=True)
+            temporary = output.with_suffix(".jpg.tmp")
+            temporary.write_bytes(encoded.getvalue())
+            os.replace(temporary, output)
+            return output

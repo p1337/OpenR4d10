@@ -4,8 +4,10 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from urllib.parse import urlsplit
 
 from openr4d10.services import BUILTIN_SERVICES, ServiceCatalog
+from openr4d10.presets import FEED_BY_ID, RADIO_BY_ID
 from openr4d10.storage import SCHEMA_VERSION, StateStore
 
 
@@ -30,6 +32,97 @@ class StateStoreTests(unittest.TestCase):
 
 
 class ServiceCatalogTests(unittest.TestCase):
+    def test_curated_presets_are_public_without_remote_content_urls(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            catalog = ServiceCatalog(Path(raw).resolve())
+            try:
+                presets = catalog.snapshot()["presets"]
+            finally:
+                catalog.close()
+        station_ids = {item["preset_id"] for item in presets["stations"]}
+        self.assertEqual(station_ids, set(RADIO_BY_ID))
+        self.assertTrue({"swr3", "sunshine_live", "deutschlandfunk", "rmf_fm", "radio_zet", "bbc_world"}.issubset(station_ids))
+        for item in presets["stations"]:
+            self.assertNotIn("stream_url", item)
+            self.assertNotIn("artwork_url", item)
+            self.assertTrue(item["artwork"].startswith("/api/radio-art/"))
+        for item in presets["feeds"]:
+            self.assertNotIn("feed_url", item)
+        for item in RADIO_BY_ID.values():
+            parsed = urlsplit(item.stream_url)
+            self.assertEqual(parsed.scheme, "https")
+            self.assertIsNone(parsed.username)
+            self.assertFalse(parsed.query)
+        for item in FEED_BY_ID.values():
+            parsed = urlsplit(item.feed_url)
+            self.assertEqual(parsed.scheme, "https")
+            self.assertIsNone(parsed.username)
+
+    def test_radio_preset_plays_and_saves_idempotently(self) -> None:
+        class State:
+            state = "stopped"
+            source = None
+            paused = False
+
+            def as_dict(self):
+                return {"state": self.state, "source": self.source, "paused": self.paused}
+
+        class Player:
+            def __init__(self):
+                self.state = State()
+                self.loaded = None
+
+            def load(self, source):
+                self.loaded = source
+
+            def close(self):
+                pass
+
+        class Recorder:
+            def __init__(self):
+                self.state = State()
+
+            def close(self):
+                pass
+
+        with tempfile.TemporaryDirectory() as raw:
+            player = Player()
+            catalog = ServiceCatalog(
+                Path(raw).resolve(), player=player, recorder=Recorder()
+            )
+            try:
+                catalog.control({"action": "preset_play", "preset_id": "swr3"})
+                first = catalog.control({"action": "preset_save", "preset_id": "swr3"})
+                second = catalog.control({"action": "preset_save", "preset_id": "swr3"})
+                stations = catalog.snapshot()["stations"]
+            finally:
+                catalog.close()
+        self.assertEqual(player.loaded, RADIO_BY_ID["swr3"].stream_url)
+        self.assertEqual(first["station_id"], second["station_id"])
+        self.assertEqual(len(stations), 1)
+
+    def test_feed_preset_uses_curated_address_and_returns_credit(self) -> None:
+        class Reader:
+            def __init__(self):
+                self.loaded = None
+
+            def fetch(self, url):
+                self.loaded = url
+                return {"title": "World", "item_count": 1, "items": []}
+
+        reader = Reader()
+        with tempfile.TemporaryDirectory() as raw:
+            catalog = ServiceCatalog(Path(raw).resolve(), feed_reader=reader)
+            try:
+                result = catalog.control(
+                    {"action": "feed_fetch_preset", "preset_id": "bbc_world"}
+                )
+            finally:
+                catalog.close()
+        self.assertEqual(reader.loaded, FEED_BY_ID["bbc_world"].feed_url)
+        self.assertEqual(result["credit"], "Source: BBC News")
+        self.assertNotIn("feed_url", result)
+
     def test_catalog_covers_documented_services_without_claiming_credentials(self) -> None:
         available = {"mpv": "/usr/bin/mpv", "ffmpeg": "/usr/bin/ffmpeg"}
         with tempfile.TemporaryDirectory() as raw:

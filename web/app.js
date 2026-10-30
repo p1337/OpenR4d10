@@ -1,4 +1,5 @@
 const byId = (id) => document.getElementById(id);
+let presetSignature = "";
 
 function setText(id, value, fallback = "–") {
   byId(id).textContent = value === null || value === undefined || value === "" ? fallback : String(value);
@@ -84,7 +85,83 @@ function renderServices(catalog) {
     }
     grid.append(card);
   }
+  renderPresets(catalog);
   renderLibrary(catalog);
+}
+
+function initials(value) {
+  return String(value || "Radio")
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0))
+    .join("")
+    .toUpperCase();
+}
+
+function renderPresets(catalog) {
+  const presets = catalog?.presets || {};
+  const stations = Array.isArray(presets.stations) ? presets.stations : [];
+  const feeds = Array.isArray(presets.feeds) ? presets.feeds : [];
+  const signature = JSON.stringify([stations, feeds]);
+  if (signature === presetSignature) return;
+  presetSignature = signature;
+  const grid = byId("radio-preset-grid");
+  grid.replaceChildren();
+  for (const station of stations) {
+    const card = document.createElement("article");
+    card.className = "radio-preset-card";
+
+    const artwork = document.createElement("div");
+    artwork.className = "radio-artwork";
+    artwork.dataset.initials = initials(station.name);
+    const image = document.createElement("img");
+    image.src = station.artwork;
+    image.alt = `${station.name} Senderbild`;
+    image.loading = "lazy";
+    image.addEventListener("load", () => artwork.classList.add("has-image"));
+    image.addEventListener("error", () => image.remove());
+    artwork.append(image);
+
+    const copy = document.createElement("div");
+    copy.className = "radio-preset-copy";
+    const name = document.createElement("strong");
+    name.textContent = station.name;
+    const detail = document.createElement("span");
+    detail.textContent = `${station.country} · ${station.genre}`;
+    copy.append(name, detail);
+
+    const actions = document.createElement("div");
+    actions.className = "radio-preset-actions";
+    actions.append(
+      libraryButton("Play", "preset_play", { preset_id: station.preset_id }),
+      libraryButton("Speichern", "preset_save", { preset_id: station.preset_id }),
+    );
+    card.append(artwork, copy, actions);
+    grid.append(card);
+  }
+  if (!stations.length) {
+    const empty = document.createElement("p");
+    empty.className = "services-note";
+    empty.textContent = "Die Senderliste wird geladen.";
+    grid.append(empty);
+  }
+
+  const feedSelect = byId("feed-preset");
+  const selected = feedSelect.value;
+  feedSelect.replaceChildren(new Option("Nachrichtenquelle auswählen …", ""));
+  for (const feed of feeds) {
+    feedSelect.add(new Option(`${feed.name} (${feed.language})`, feed.preset_id));
+  }
+  if (feeds.some((feed) => feed.preset_id === selected)) feedSelect.value = selected;
+}
+
+function safeExternalUrl(value) {
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : null;
+  } catch (_error) {
+    return null;
+  }
 }
 
 function libraryButton(label, action, extra) {
@@ -249,21 +326,42 @@ for (const button of document.querySelectorAll("[data-action]")) {
   });
 }
 
-byId("feed-control").addEventListener("submit", async (event) => {
-  event.preventDefault();
+async function loadFeed(request) {
   const output = byId("feed-results");
+  const credit = byId("feed-credit");
   output.replaceChildren();
+  credit.hidden = true;
+  credit.replaceChildren();
   try {
     const response = await fetch("/api/control", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "feed_fetch", url: byId("feed-url").value }),
+      body: JSON.stringify(request),
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    if (payload.credit) {
+      const link = document.createElement("a");
+      link.href = safeExternalUrl(payload.homepage) || "#";
+      link.textContent = payload.credit;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      credit.append(link);
+      credit.hidden = false;
+    }
     for (const item of payload.feed.items.slice(0, 10)) {
       const row = document.createElement("li");
-      row.textContent = item.title || item.summary || "Ohne Titel";
+      const itemUrl = safeExternalUrl(item.link);
+      if (itemUrl) {
+        const link = document.createElement("a");
+        link.href = itemUrl;
+        link.textContent = item.title || item.summary || "Ohne Titel";
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        row.append(link);
+      } else {
+        row.textContent = item.title || item.summary || "Ohne Titel";
+      }
       output.append(row);
     }
   } catch (error) {
@@ -271,6 +369,20 @@ byId("feed-control").addEventListener("submit", async (event) => {
     row.textContent = `Fehler: ${error.message}`;
     output.append(row);
   }
+}
+
+byId("feed-control").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await loadFeed({ action: "feed_fetch", url: byId("feed-url").value });
+});
+
+byId("feed-preset-load").addEventListener("click", () => {
+  const presetId = byId("feed-preset").value;
+  if (!presetId) {
+    byId("control-result").textContent = "Bitte zuerst eine Nachrichtenquelle auswählen.";
+    return;
+  }
+  loadFeed({ action: "feed_fetch_preset", preset_id: presetId });
 });
 
 byId("camera-control").addEventListener("submit", async (event) => {

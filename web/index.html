@@ -117,6 +117,16 @@
         <span class="version" id="service-count">–</span>
       </div>
       <p class="services-note">Zugangsdaten werden niemals aus dem Repository geladen oder in der Statusdatenbank gespeichert.</p>
+      <section class="preset-section" aria-labelledby="radio-presets-title">
+        <div class="library-heading">
+          <div>
+            <p class="eyebrow">SENDERAUSWAHL</p>
+            <h3 id="radio-presets-title">Webradio direkt starten</h3>
+          </div>
+          <span class="version">ohne Anmeldung</span>
+        </div>
+        <div class="radio-preset-grid" id="radio-preset-grid"></div>
+      </section>
       <form class="media-control" id="media-control">
         <label for="media-source">Direkte Audioquelle</label>
         <div class="media-source-row">
@@ -153,10 +163,18 @@
       <div class="content-controls">
         <form class="content-control" id="feed-control">
           <label for="feed-url">RSS/Atom-Feed</label>
+          <div class="feed-preset-row">
+            <select id="feed-preset" aria-label="Nachrichtenquelle auswählen">
+              <option value="">Nachrichtenquelle auswählen …</option>
+            </select>
+            <button type="button" id="feed-preset-load">Auswahl laden</button>
+          </div>
+          <p class="services-note">Oder eine eigene, öffentliche Feed-Adresse eingeben:</p>
           <div class="media-source-row">
             <input id="feed-url" type="url" placeholder="https://…/feed.xml" autocomplete="off" required>
             <button type="submit">Feed laden</button>
           </div>
+          <p id="feed-credit" class="feed-credit" hidden></p>
           <ol id="feed-results" class="feed-results"></ol>
         </form>
         <form class="content-control" id="camera-control">

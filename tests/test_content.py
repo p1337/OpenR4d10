@@ -13,6 +13,7 @@ from openr4d10.content import (
     CameraSnapshot,
     ContentError,
     FeedReader,
+    PresetArtwork,
     validate_content_url,
 )
 
@@ -77,3 +78,25 @@ class ContentTests(unittest.TestCase):
                 self.assertEqual(image.format, "JPEG")
                 self.assertLessEqual(image.width, 640)
                 self.assertLessEqual(image.height, 480)
+
+    def test_preset_artwork_is_bounded_reencoded_and_cached(self) -> None:
+        raw = BytesIO()
+        Image.new("RGBA", (500, 300), (20, 120, 180, 180)).save(raw, format="PNG")
+        calls = []
+
+        def opener(*args, **kwargs):
+            calls.append((args, kwargs))
+            return FakeResponse(raw.getvalue(), "image/png")
+
+        fetcher = BoundedFetcher(opener)
+        with tempfile.TemporaryDirectory() as directory:
+            cache = Path(directory).resolve()
+            artwork = PresetArtwork(cache, fetcher)
+            first = artwork.ensure("test_radio", "https://radio.example/logo.png")
+            second = artwork.ensure("test_radio", "https://radio.example/logo.png")
+            self.assertEqual(first, second)
+            self.assertEqual(len(calls), 1)
+            with Image.open(first) as image:
+                self.assertEqual(image.format, "JPEG")
+                self.assertLessEqual(image.width, 256)
+                self.assertLessEqual(image.height, 256)

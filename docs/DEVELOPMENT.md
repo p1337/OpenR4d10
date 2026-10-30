@@ -58,6 +58,7 @@ files in `web/` plus the following endpoints:
 - `/healthz` — simple service health response
 - `POST /api/control` — bounded same-origin JSON media controls
 - `/api/camera/1` and `/api/camera/2` — locally re-encoded camera snapshots
+- `/api/radio-art/<preset-id>` — bounded, locally re-encoded preset artwork
 
 The control endpoint accepts only JSON up to 4096 bytes, rejects mismatched
 browser origins and never accepts or stores credentials. It supports explicit
@@ -67,6 +68,12 @@ station URLs containing query strings are rejected; temporary direct playback
 is not persisted. `service_set_enabled` persists module activation; `system`
 cannot be disabled and external modules still require their own adapter. Port,
 bind address and static directory live in `[web]` in `openr4d10.toml`.
+
+Curated controls are `preset_play`, `preset_save` and `feed_fetch_preset`.
+They accept only a checked-in preset ID and never a client-supplied internal
+stream or feed URL. Update presets and their evidence together in
+[`PRESETS.md`](PRESETS.md), then test the current addresses without adding
+cookies, tokens or signed URLs.
 
 External account-based modules are never loaded into the web process. Their
 non-secret manifests live in `/etc/openr4d10/services.d`; see

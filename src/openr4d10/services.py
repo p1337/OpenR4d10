@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import logging
 from pathlib import Path
 import shutil
 from typing import Callable
 from urllib.parse import urlsplit
 
-from .content import CameraSnapshot, FeedReader
+from .content import CameraSnapshot, ContentError, FeedReader, PresetArtwork
 from .media import MpvEngine, StreamRecorder, public_source_label, validate_media_source
+from .presets import FEED_BY_ID, FEED_PRESETS, RADIO_BY_ID, RADIO_PRESETS
 from .service_adapters import ServiceAdapterError, ServiceAdapterRegistry
 from .storage import SCHEMA_VERSION, StateStore
 
@@ -21,6 +23,8 @@ MEDIA_EXTENSIONS = {
 DEFAULT_ENABLED_SERVICES = {
     "system", "webradio", "local_media", "recorder", "rss", "webcam",
 }
+
+LOG = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +88,7 @@ class ServiceCatalog:
         )
         self.feed_reader = feed_reader or FeedReader()
         self.camera = camera or CameraSnapshot(state_directory / "cache")
+        self.artwork = PresetArtwork(state_directory / "cache")
         external_ids = {
             item.service_id
             for item in BUILTIN_SERVICES
@@ -172,6 +177,10 @@ class ServiceCatalog:
             "playback": self.player.state.as_dict(),
             "recording": self.recorder.state.as_dict(),
             "content": self.content_state,
+            "presets": {
+                "stations": [item.public() for item in RADIO_PRESETS],
+                "feeds": [item.public() for item in FEED_PRESETS],
+            },
             "stations": stations,
             "media": media,
             "items": services,
@@ -256,6 +265,24 @@ class ServiceCatalog:
                 raise ValueError("station was not found")
             self.player.load(str(station["stream_url"]))
             self.active_service = "webradio"
+        elif action == "preset_play":
+            self._require_enabled("webradio")
+            preset_id = request.get("preset_id")
+            if not isinstance(preset_id, str) or preset_id not in RADIO_BY_ID:
+                raise ValueError("unknown radio preset")
+            preset = RADIO_BY_ID[preset_id]
+            self.player.load(preset.stream_url)
+            self.active_service = "webradio"
+        elif action == "preset_save":
+            self._require_enabled("webradio")
+            preset_id = request.get("preset_id")
+            if not isinstance(preset_id, str) or preset_id not in RADIO_BY_ID:
+                raise ValueError("unknown radio preset")
+            preset = RADIO_BY_ID[preset_id]
+            station_id = self.store.add_station(
+                "webradio", preset.name, preset.stream_url
+            )
+            return {"station_id": station_id, "preset_id": preset_id}
         elif action == "media_scan":
             self._require_enabled("local_media")
             return {"scanned": self.scan_media()}
@@ -297,6 +324,24 @@ class ServiceCatalog:
                 "item_count": feed["item_count"],
             }
             return {"feed": feed}
+        elif action == "feed_fetch_preset":
+            self._require_enabled("rss")
+            preset_id = request.get("preset_id")
+            if not isinstance(preset_id, str) or preset_id not in FEED_BY_ID:
+                raise ValueError("unknown feed preset")
+            preset = FEED_BY_ID[preset_id]
+            feed = self.feed_reader.fetch(preset.feed_url)
+            self.content_state["feed"] = {
+                "title": feed["title"],
+                "item_count": feed["item_count"],
+                "preset_id": preset_id,
+            }
+            return {
+                "feed": feed,
+                "preset_id": preset_id,
+                "credit": preset.credit,
+                "homepage": preset.homepage,
+            }
         elif action == "camera_snapshot":
             self._require_enabled("webcam")
             url = request.get("url")
@@ -348,9 +393,20 @@ class ServiceCatalog:
         return count
 
     def content_asset(self, path: str) -> tuple[str, bytes] | None:
-        if path not in {"camera-1.jpg", "camera-2.jpg"}:
+        if path in {"camera-1.jpg", "camera-2.jpg"}:
+            target = self.camera.cache_root / path
+        elif path.startswith("radio-art/"):
+            preset_id = path.removeprefix("radio-art/")
+            preset = RADIO_BY_ID.get(preset_id)
+            if preset is None:
+                return None
+            try:
+                target = self.artwork.ensure(preset_id, preset.artwork_url)
+            except (ContentError, OSError, ValueError) as exc:
+                LOG.warning("Station artwork unavailable for %s: %s", preset_id, exc)
+                return None
+        else:
             return None
-        target = self.camera.cache_root / path
         try:
             return "image/jpeg", target.read_bytes()
         except OSError:
