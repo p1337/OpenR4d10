@@ -12,7 +12,7 @@ the installer report exactly which adapters still need configuration.
 ## Current status
 
 - Raspberry Pi Zero 2 W / Debian 13 / `aarch64` platform checks
-- idempotent one-command installer from a reviewed checkout
+- idempotent one-command online installer with no Git dependency
 - hardened `systemd` autostart service
 - semantic UI frame model and configurable text boot sequence
 - safe `unconfigured`, JSON-file and external-command display adapters
@@ -33,25 +33,30 @@ Those values must come from the exact hardware documentation. See
 
 ## Install
 
-Review the checkout, then run exactly one command from its root:
+On a fresh Debian installation, use this one command. It installs only the
+download prerequisite, fetches the bootstrap completely into a temporary file,
+and runs it only after the download succeeded. Git is not needed.
+
+```bash
+sudo bash -c 'set -Eeuo pipefail; export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y --no-install-recommends ca-certificates curl; d=$(mktemp -d); trap "rm -rf -- \"$d\"" EXIT; curl --proto "=https" --tlsv1.2 -fsSLo "$d/bootstrap.sh" https://raw.githubusercontent.com/p1337/OpenR4d10/main/bootstrap.sh; bash "$d/bootstrap.sh"'
+```
+
+The bootstrap downloads a complete GitHub source archive, validates the archive
+before extraction, prints its SHA-256, and only then starts the local installer.
+The installer verifies the operating system, CPU architecture and Raspberry Pi
+model, installs files below `/opt/openr4d10`, preserves existing configuration,
+installs and enables `openr4d10.service`, and runs a final diagnostic. Neither
+script collects or writes credentials.
+
+If the repository files are already present, the local command remains:
 
 ```bash
 sudo ./install.sh
 ```
 
-The installer verifies the operating system, CPU architecture and Raspberry Pi
-model, installs files below `/opt/openr4d10`, preserves existing configuration,
-installs and enables `openr4d10.service`, and runs a final diagnostic. It does
-not collect or write credentials.
-
-For a fresh Pi, one shell line can clone and run the reviewed installer:
-
-```bash
-git clone --depth 1 https://github.com/p1337/OpenR4d10.git && cd OpenR4d10 && sudo ./install.sh
-```
-
-The project deliberately does not recommend `curl | sudo bash`: cloning first
-makes the code reviewable and avoids executing a partially downloaded script.
+The documented online command deliberately does not use `curl | sudo bash`:
+the bootstrap must download completely before Bash starts it, and it likewise
+downloads and validates the complete project archive before installation.
 
 If the final hardware adapter is not configured yet, installation still
 succeeds and the service runs headless. The final output clearly says

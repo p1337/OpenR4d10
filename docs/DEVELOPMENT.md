@@ -7,12 +7,14 @@ outside the standard library.
 
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests -v
+bash -n bootstrap.sh
 bash -n install.sh
 bash install.sh --check --allow-unsupported
 ```
 
 The last command is read-only. It validates the source tree and tests without
-creating users, installing packages or changing systemd.
+creating users, installing packages or changing systemd. `bootstrap.sh` is the
+Git-free online entry point; `install.sh` remains the sole system installer.
 
 ## Test one rendered frame
 

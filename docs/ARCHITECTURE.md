@@ -33,6 +33,11 @@ adapter is responsible for mapping a frame onto verified hardware.
 The installer never overwrites live configuration. It refreshes only the
 `.dist` files. No credential store exists in the application.
 
+For a fresh machine, `bootstrap.sh` downloads a GitHub-generated source archive
+over HTTPS into a private temporary directory. It checks paths and archive
+integrity before extraction, then invokes the same local `install.sh`. Git is
+not an installation dependency.
+
 ## Startup sequence
 
 1. `systemd` creates runtime and state directories as the `openr4d10` user.

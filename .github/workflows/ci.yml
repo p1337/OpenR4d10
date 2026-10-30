@@ -22,6 +22,8 @@ jobs:
       - name: Python tests
         run: PYTHONPATH=src python -m unittest discover -s tests -v
       - name: Installer syntax
-        run: bash -n install.sh
+        run: bash -n bootstrap.sh install.sh
       - name: Read-only installer check
         run: bash install.sh --check --allow-unsupported
+      - name: Git-free bootstrap smoke test
+        run: bash bootstrap.sh --check --allow-unsupported
