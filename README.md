@@ -14,6 +14,7 @@ the installer report exactly which adapters still need configuration.
 - Raspberry Pi Zero 2 W / Debian 13 / `aarch64` platform checks
 - idempotent one-command online installer with no Git dependency
 - hardened `systemd` autostart service
+- responsive local web dashboard on `http://<raspberry-pi-ip>/`
 - semantic UI frame model and configurable text boot sequence
 - safe `unconfigured`, JSON-file and external-command display adapters
 - built-in Linux system status and optional external-command status/power adapters
@@ -52,6 +53,16 @@ The installer verifies the operating system, CPU architecture and Raspberry Pi
 model, installs files below `/opt/openr4d10`, preserves existing configuration,
 installs and enables `openr4d10.service`, and runs a final diagnostic. Neither
 script collects or writes credentials.
+
+After installation, open the Pi address directly in a browser, for example:
+
+```text
+http://192.168.1.64/
+```
+
+The dashboard shows live service, system and adapter status. Until verified
+Whisplay and PiSugar adapters are configured, it labels those components as
+open instead of displaying invented measurements.
 
 If the repository files are already present, the local command remains:
 
@@ -96,6 +107,7 @@ sudo openr4d10 doctor
 openr4d10 render-once
 systemctl status openr4d10
 journalctl -u openr4d10 --since today
+curl http://127.0.0.1/healthz
 ```
 
 For development:

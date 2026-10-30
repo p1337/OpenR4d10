@@ -39,6 +39,7 @@ required=(
     src/openr4d10/__main__.py
     config/openr4d10.toml config/hardware.toml
     assets/boot/text-sequence.toml
+    web/index.html web/app.css web/app.js
     systemd/openr4d10.service bin/openr4d10
 )
 for relative in "${required[@]}"; do
@@ -96,7 +97,7 @@ release_root="$INSTALL_ROOT/releases/$version"
 
 note "Installing OpenR4d10 $version"
 install -d -m 0755 -o root -g root "$release_root"
-for directory in src assets; do
+for directory in src assets web; do
     install -d -m 0755 -o root -g root "$release_root/$directory"
     cp -a -- "$SOURCE_ROOT/$directory/." "$release_root/$directory/"
 done
@@ -126,7 +127,22 @@ install -m 0644 -o root -g root "$SOURCE_ROOT/systemd/openr4d10.service" "$SERVI
 
 note "Enabling systemd autostart"
 systemctl daemon-reload
-systemctl enable --now openr4d10.service
+systemctl enable openr4d10.service
+systemctl restart openr4d10.service
+
+note "Checking local web dashboard"
+web_ready=false
+for _attempt in {1..10}; do
+    if python3 -c 'from urllib.request import urlopen; response = urlopen("http://127.0.0.1/healthz", timeout=1); raise SystemExit(0 if response.read() == b"ok\n" else 1)' >/dev/null 2>&1; then
+        web_ready=true
+        break
+    fi
+    sleep 0.5
+done
+if [[ "$web_ready" != true ]]; then
+    systemctl status openr4d10.service --no-pager >&2 || true
+    die "Web dashboard did not become ready on port 80. Check: journalctl -u openr4d10"
+fi
 
 note "Running final diagnostics"
 set +e
@@ -148,3 +164,4 @@ if [[ $doctor_status -eq 2 ]]; then
 fi
 echo "Status: systemctl status openr4d10"
 echo "Logs:   journalctl -u openr4d10 -f"
+echo "Web UI: http://<raspberry-pi-ip>/"

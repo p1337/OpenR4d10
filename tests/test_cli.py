@@ -28,6 +28,8 @@ class CliTests(unittest.TestCase):
                         "[paths]",
                         f"runtime_directory = {json.dumps(str(root))}",
                         f"state_directory = {json.dumps(str(root))}",
+                        "[web]",
+                        "enabled = false",
                     )
                 ),
                 encoding="utf-8",

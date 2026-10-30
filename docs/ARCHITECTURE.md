@@ -9,9 +9,10 @@ Linux/systemd
     |
     v
 CLI -> configuration -> application loop -> semantic UI Frame
-                                      |             |
-                                      |             +-> display adapter
-                                      +-> receiver/power telemetry adapters
+              |                       |             |
+              |                       |             +-> display adapter
+              |                       +-> receiver/power telemetry adapters
+              +-> local HTTP dashboard (port 80)
 ```
 
 A `Frame` describes intent (`screen`, `title`, `body`, fields and severity), not
@@ -43,9 +44,11 @@ not an installation dependency.
 1. `systemd` creates runtime and state directories as the `openr4d10` user.
 2. The CLI parses and validates both TOML files.
 3. Adapters are created from explicit backend names.
-4. The text boot manifest is rendered when enabled.
-5. The dashboard is refreshed at the configured interval.
-6. `SIGTERM` or `SIGINT` stops the loop cleanly.
+4. The read-only web dashboard binds to the configured local address and port.
+5. The text boot manifest is rendered when enabled.
+6. The semantic dashboard state is refreshed at the configured interval and
+   exposed through `/api/status`.
+7. `SIGTERM` or `SIGINT` stops the loop and HTTP server cleanly.
 
 An unconfigured display consumes semantic frames without touching GPIO. An
 unconfigured power adapter returns an explicit state that the UI surfaces as
@@ -66,8 +69,10 @@ Exit codes are `0` ready, `1` invalid/error, and `2` hardware action required.
 
 The service runs as a dedicated unprivileged user with a read-only system view,
 private temporary directory, no new privileges and writable access only to its
-runtime and state directories. The generic command adapter uses an argument
-array and `shell=False`; it never interpolates input into a shell command.
+runtime and state directories. It receives only `CAP_NET_BIND_SERVICE`, which
+allows the unprivileged process to bind local HTTP port 80. The generic command
+adapter uses an argument array and `shell=False`; it never interpolates input
+into a shell command.
 
 Hardware device and group permissions are intentionally not granted globally.
 They must be added narrowly after the real adapter and device nodes are known.

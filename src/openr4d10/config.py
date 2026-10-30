@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 import tomllib
@@ -10,6 +10,14 @@ import tomllib
 
 class ConfigError(ValueError):
     pass
+
+
+@dataclass(frozen=True, slots=True)
+class WebConfig:
+    enabled: bool = True
+    host: str = "0.0.0.0"
+    port: int = 80
+    static_directory: Path = Path("/opt/openr4d10/current/web")
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +29,7 @@ class AppConfig:
     boot_enabled: bool
     runtime_directory: Path
     state_directory: Path
+    web: WebConfig = field(default_factory=WebConfig)
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +81,7 @@ def load_app_config(path: Path) -> AppConfig:
     application = _table(data, "application")
     ui = _table(data, "ui")
     paths = _table(data, "paths")
+    web = _table(data, "web")
 
     log_level = str(application.get("log_level", "INFO")).upper()
     if log_level not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
@@ -97,6 +107,19 @@ def load_app_config(path: Path) -> AppConfig:
     if not all(path.is_absolute() for path in (manifest_path, runtime_path, state_path)):
         raise ConfigError("boot manifest, runtime and state paths must be absolute")
 
+    web_enabled = web.get("enabled", True)
+    web_host = web.get("host", "0.0.0.0")
+    web_port = web.get("port", 80)
+    web_static = web.get("static_directory", "/opt/openr4d10/current/web")
+    if not isinstance(web_enabled, bool):
+        raise ConfigError("web.enabled must be true or false")
+    if not isinstance(web_host, str) or not web_host.strip():
+        raise ConfigError("web.host must be a non-empty string")
+    if isinstance(web_port, bool) or not isinstance(web_port, int) or not 1 <= web_port <= 65535:
+        raise ConfigError("web.port must be an integer between 1 and 65535")
+    if not isinstance(web_static, str) or (web_enabled and not Path(web_static).is_absolute()):
+        raise ConfigError("web.static_directory must be an absolute path")
+
     return AppConfig(
         log_level=log_level,
         refresh_interval_seconds=_positive_number(
@@ -107,6 +130,12 @@ def load_app_config(path: Path) -> AppConfig:
         boot_enabled=boot_enabled,
         runtime_directory=runtime_path,
         state_directory=state_path,
+        web=WebConfig(
+            enabled=web_enabled,
+            host=web_host.strip(),
+            port=web_port,
+            static_directory=Path(web_static),
+        ),
     )
 
 

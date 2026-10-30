@@ -86,6 +86,17 @@ def run_checks(
     except ValueError as exc:
         checks.append(Check("ERROR", str(exc)))
 
+    if app.web.enabled:
+        index_file = app.web.static_directory / "index.html"
+        if index_file.is_file():
+            checks.append(
+                Check("OK", f"Web dashboard is enabled on port {app.web.port}")
+            )
+        else:
+            checks.append(Check("ERROR", f"Web dashboard asset missing: {index_file}"))
+    else:
+        checks.append(Check("WARN", "Web dashboard is disabled"))
+
     for component, adapter in (
         ("display", hardware.display),
         ("power", hardware.power),

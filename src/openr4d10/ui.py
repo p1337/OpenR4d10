@@ -20,13 +20,13 @@ def dashboard_frame(
         "power": dict(power),
         "adapter_errors": errors,
     }
-    body = "Hardware configuration required"
+    body = "Hardwarekonfiguration erforderlich"
     severity = "warning"
     if power.get("state") != "unconfigured" and not errors:
-        body = "Receiver ready"
+        body = "Empfänger bereit"
         severity = "info"
     if errors:
-        body = "Adapter error"
+        body = "Adapterfehler"
         severity = "error"
     return Frame(
         screen="dashboard",

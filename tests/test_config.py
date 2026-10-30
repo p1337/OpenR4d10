@@ -29,11 +29,18 @@ boot_enabled = false
 [paths]
 runtime_directory = {json.dumps(str(root / "run"))}
 state_directory = {json.dumps(str(root / "state"))}
+[web]
+enabled = true
+host = "127.0.0.1"
+port = 8080
+static_directory = {json.dumps(str(root / "web"))}
 """,
             )
             config = load_app_config(path)
             self.assertEqual(config.log_level, "DEBUG")
             self.assertEqual(config.title, "Test")
+            self.assertEqual(config.web.port, 8080)
+            self.assertEqual(config.web.host, "127.0.0.1")
 
     def test_command_requires_absolute_executable(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

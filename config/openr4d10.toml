@@ -10,3 +10,9 @@ boot_enabled = true
 [paths]
 runtime_directory = "/run/openr4d10"
 state_directory = "/var/lib/openr4d10"
+
+[web]
+enabled = true
+host = "0.0.0.0"
+port = 80
+static_directory = "/opt/openr4d10/current/web"

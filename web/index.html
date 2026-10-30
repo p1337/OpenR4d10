@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#071011">
+  <title>OpenR4d10</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"></div>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="OpenR4d10 Startseite">
+        <span class="brand-mark" aria-hidden="true">O</span>
+        <span>
+          <strong>OpenR4d10</strong>
+          <small>Receiver Control</small>
+        </span>
+      </a>
+      <div class="connection" id="connection" data-state="loading">
+        <span class="pulse" aria-hidden="true"></span>
+        <span id="connection-label">Verbindung wird geprüft</span>
+      </div>
+    </header>
+
+    <section class="hero" aria-labelledby="hero-title">
+      <div>
+        <p class="eyebrow">SYSTEMSTATUS</p>
+        <h1 id="hero-title">OpenR4d10 startet …</h1>
+        <p class="hero-copy" id="hero-copy">Die aktuellen Gerätedaten werden geladen.</p>
+      </div>
+      <div class="hero-meta">
+        <span id="hostname">OpenR4d10</span>
+        <time id="updated">–</time>
+      </div>
+    </section>
+
+    <section class="metrics" aria-label="Systemübersicht">
+      <article class="metric-card feature-card">
+        <div class="card-heading">
+          <span class="card-icon radio-icon" aria-hidden="true"></span>
+          <span class="tag">EMPFÄNGER</span>
+        </div>
+        <strong class="metric-main" id="receiver-state">Wird geladen</strong>
+        <span class="metric-detail" id="receiver-detail">Statusquelle wird geprüft</span>
+      </article>
+
+      <article class="metric-card">
+        <div class="card-heading">
+          <span class="card-icon power-icon" aria-hidden="true"></span>
+          <span class="tag">ENERGIE</span>
+        </div>
+        <strong class="metric-main" id="power-state">–</strong>
+        <span class="metric-detail" id="power-detail">PiSugar-Adapter</span>
+      </article>
+
+      <article class="metric-card">
+        <div class="card-heading">
+          <span class="card-icon display-icon" aria-hidden="true"></span>
+          <span class="tag">DISPLAY</span>
+        </div>
+        <strong class="metric-main" id="display-state">–</strong>
+        <span class="metric-detail" id="display-detail">Whisplay-Adapter</span>
+      </article>
+
+      <article class="metric-card">
+        <div class="card-heading">
+          <span class="card-icon load-icon" aria-hidden="true"></span>
+          <span class="tag">SYSTEM</span>
+        </div>
+        <strong class="metric-main" id="uptime">–</strong>
+        <span class="metric-detail">Load 1 min: <span id="load">–</span></span>
+      </article>
+    </section>
+
+    <section class="lower-grid">
+      <article class="panel status-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">LAUFENDER DIENST</p>
+            <h2>Aktueller Zustand</h2>
+          </div>
+          <span class="version" id="version">v–</span>
+        </div>
+        <div class="status-line">
+          <span class="status-orb" id="status-orb" data-severity="info"></span>
+          <div>
+            <strong id="screen-title">Dienst wird gestartet</strong>
+            <p id="screen-body">Bitte einen Moment warten.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel adapter-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">HARDWARE</p>
+            <h2>Adapterbereitschaft</h2>
+          </div>
+        </div>
+        <ul class="adapter-list">
+          <li><span>Empfängerquelle</span><strong id="receiver-adapter">–</strong></li>
+          <li><span>Displaytreiber</span><strong id="display-adapter">–</strong></li>
+          <li><span>Stromversorgung</span><strong id="power-adapter">–</strong></li>
+        </ul>
+      </article>
+    </section>
+
+    <footer>
+      <span>OpenR4d10 · lokale Geräteoberfläche</span>
+      <span id="footer-status">Warte auf Status …</span>
+    </footer>
+  </main>
+</body>
+</html>

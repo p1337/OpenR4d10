@@ -30,6 +30,17 @@ PYTHONPATH=src python3 -m openr4d10 \
 The resulting JSON is the complete boundary between core UI and a future
 display helper.
 
+## Web dashboard
+
+The installed service listens on port 80 by default. It serves only the tracked
+files in `web/` plus two read-only endpoints:
+
+- `/api/status` — current semantic frame and adapter state as JSON
+- `/healthz` — simple service health response
+
+No credentials or configuration writes are exposed over HTTP. Port, bind
+address and static directory live in `[web]` in `openr4d10.toml`.
+
 ## Installed diagnostics
 
 ```bash

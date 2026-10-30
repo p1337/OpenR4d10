@@ -73,7 +73,11 @@ def main(argv: list[str] | None = None) -> int:
 
     display, power, receiver = build_adapters(hardware_config)
     application = OpenR4d10App(
-        app_config, display=display, power=power, receiver=receiver
+        app_config,
+        display=display,
+        power=power,
+        receiver=receiver,
+        hardware=hardware_config,
     )
     if args.command == "render-once":
         application.render_once()
