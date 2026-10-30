@@ -1,4 +1,6 @@
-# Intentionally contains no Whisplay pins, controller names or PiSugar protocol.
+# Intentionally contains no active direct-GPIO implementation or PiSugar
+# protocol. The verified Whisplay header pinout is documented in
+# docs/HARDWARE.md.
 # Replace "unconfigured" only after checking the exact hardware documentation.
 
 [display]

@@ -24,7 +24,8 @@ the installer report exactly which adapters still need configuration.
 
 Not included on purpose:
 
-- Whisplay GPIO/SPI pins, dimensions, controller name or Python driver
+- a working Whisplay display/audio adapter (the verified manufacturer pinout
+  and mechanical connection are documented in `docs/HARDWARE.md`)
 - PiSugar API details
 - binary boot-animation assets
 - credentials, WLAN settings, tokens or secrets

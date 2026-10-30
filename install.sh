@@ -160,7 +160,7 @@ echo
 echo "OpenR4d10 $version is installed and enabled."
 if [[ $doctor_status -eq 2 ]]; then
     echo "HARDWARE CONFIGURATION REQUIRED: edit $CONFIG_ROOT/hardware.toml"
-    echo "No Whisplay pins, display driver or PiSugar protocol was guessed."
+    echo "No unsupported Whisplay driver or PiSugar protocol was guessed."
 fi
 echo "Status: systemctl status openr4d10"
 echo "Logs:   journalctl -u openr4d10 -f"

@@ -16,9 +16,10 @@ CLI -> configuration -> application loop -> semantic UI Frame
 ```
 
 A `Frame` describes intent (`screen`, `title`, `body`, fields and severity), not
-pixels. This is deliberate: display dimensions, colour format, orientation,
-controller and pins are not documented in this repository. A future Whisplay
-adapter is responsible for mapping a frame onto verified hardware.
+pixels. This is deliberate: the verified Whisplay controller and header pinout
+are documented in `docs/HARDWARE.md`, but the display adapter has not yet been
+implemented and verified on this Debian 13 target. A future Whisplay adapter is
+responsible for mapping a frame onto that hardware.
 
 ## Configuration and storage
 

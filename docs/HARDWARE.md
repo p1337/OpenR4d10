@@ -55,6 +55,40 @@ If the Whisplay board itself has no fitted female socket, stop and identify the
 exact board/revision from clear photos before soldering; that is a different
 assembly case.
 
+### Physical access for additional controls
+
+The Whisplay's female 2 x 20 socket covers the Pi's complete male header. A pin
+can therefore be electrically unused by Whisplay while still being physically
+inaccessible from above. Soldering only selected header pins does not solve
+this and would make the HAT mechanically unreliable.
+
+Bare mechanical rotary encoders are not SPI devices. A conventional encoder
+with a push switch needs three GPIO inputs (`A`, `B`, and `SW`) plus a shared
+ground. Its bare contacts may be wired directly; it does not need its own PCB.
+Use 3.3 V GPIO pull-ups and never feed 5 V into a GPIO.
+
+Without an additional breakout PCB, the only direct wiring option is to solder
+thin insulated wires to the corresponding GPIO and ground solder pads on the
+underside of the Pi after fitting the full header. Add strain relief and route
+the wires so they cannot be pinched or short against the Whisplay or enclosure.
+Do not do this if a PiSugar board, battery, case, or other hardware covers those
+pads; use a suitable 40-pin header splitter/breakout instead.
+
+Do not attach encoder contacts to the Whisplay's LCD SPI signals. Sharing an SPI
+bus is relevant only for an actual SPI peripheral with its own chip-select and
+does not provide inputs for a bare encoder.
+
+No final encoder GPIO assignment is committed yet. The exact encoder type must
+first be identified:
+
+- two conventional rotary encoders with push switches require six GPIO inputs
+  in total;
+- two dual-concentric encoders with push switches commonly require ten GPIO
+  inputs in total and may need a GPIO expander or small controller.
+
+The planned underside wiring also has to be checked against the exact PiSugar
+model and the enclosure before soldering.
+
 ## Still deliberately unknown
 
 The installed Whisplay audio codec revision and PiSugar model/API have not yet
