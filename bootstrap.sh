@@ -12,11 +12,6 @@ note() {
     echo "==> $*"
 }
 
-if [[ $EUID -ne 0 ]]; then
-    command -v sudo >/dev/null 2>&1 || die "Run this bootstrap as root"
-    exec sudo -- bash "${BASH_SOURCE[0]}" "$@"
-fi
-
 for command_name in mktemp tar sha256sum; do
     command -v "$command_name" >/dev/null 2>&1 \
         || die "Required base-system command is missing: $command_name"

@@ -48,8 +48,9 @@ If the image has `wget` instead of `curl`, the equivalent command is:
 wget -qO- https://raw.githubusercontent.com/p1337/OpenR4d10/main/bootstrap.sh | sudo bash
 ```
 
-The bootstrap downloads a complete GitHub source archive, validates the archive
-before extraction, prints its SHA-256, and only then starts the local installer.
+The bootstrap downloads a complete GitHub source archive without root access,
+validates the archive before extraction, prints its SHA-256, and only then
+starts the local installer, which requests root access when required.
 The installer verifies the operating system, CPU architecture and Raspberry Pi
 model, installs files below `/opt/openr4d10`, preserves existing configuration,
 compiles the Whisplay boot player locally for the Pi, installs the Debian

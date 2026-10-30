@@ -33,4 +33,4 @@ jobs:
       - name: Git-free bootstrap smoke test
         run: bash bootstrap.sh --check --allow-unsupported
       - name: Exact online one-liner smoke test
-        run: curl -fsSL https://raw.githubusercontent.com/p1337/OpenR4d10/main/bootstrap.sh | sudo bash -s -- --check --allow-unsupported
+        run: curl -fsSL https://raw.githubusercontent.com/p1337/OpenR4d10/main/bootstrap.sh | sudo env "PATH=$PATH" bash -s -- --check --allow-unsupported
