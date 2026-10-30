@@ -3,8 +3,10 @@
 Read [../CODEX_TO_CODEX_MASTER.md](../CODEX_TO_CODEX_MASTER.md) first.
 
 Prepared for Raspberry Pi Zero 2 W and the PiSugar Whisplay ST7789 panel.
-**This implementation has passed development-host checks. It has not been
-installed or measured on the physical Pi/Whisplay.**
+The original transport has now been recorded on the physical Pi/Whisplay:
+initialisation, SPI image transfer, colour order and orientation work. The
+revised longer skull timing and new loop boundary still require a second
+real-device check.
 
 The approved source is
 `assets/boot/OpenR4d10_APPROVED_ORIGINAL.mp4` in the project root, SHA256
@@ -42,10 +44,10 @@ redesign, not firmware for the present HAT. Neither alternative is implemented.
 
 | File | Purpose | Size / timing |
 | --- | --- | --- |
-| `assets/boot.opb` | Actual native boot animation | 1,589,895 bytes; 240 × 280; 24 fps; 73 frames |
+| `assets/boot.opb` | Actual native boot animation | 2,090,107 bytes; 240 × 280; 24 fps; 109 frames |
 | `assets/first.opb` | Tiny first-frame pack for initramfs | 12,551 bytes |
 | `assets/first.rgb565` | Uncompressed first frame | 134,400 bytes |
-| `assets/preview_240x280.mp4` | Browser/phone preview only | 235,268 bytes; 3.042 s |
+| `assets/preview_240x280.mp4` | Browser/phone preview only | 240,638 bytes; 4.542 s |
 | `assets/manifest.json` | Source hash, timing and validation status | JSON |
 
 The square source is fitted without stretching or cutting the wordmark. Its
@@ -58,10 +60,16 @@ the panel's big-endian wire order; per-frame zlib compression is lossless after
 the necessary 24-bit-to-16-bit conversion. At boot the player expands only one
 134.4 KB pixel frame at a time. It does not decode MP4/H.264.
 
-The last 24 original frames repeat in forward order. The loop join must still
-be reviewed on hardware; it is not a newly generated seamless extension. If a
-new longer version is approved, rebuild from that separately named source and
-retain the original unchanged.
+The first 19 source frames are slowed by factor three with two interpolated
+motion frames between each original pair. This keeps fire and camera motion
+alive and adds exactly 36 frames (1.5 seconds) to the skull phase. All original
+frames remain present and the approved source file and hash stay unchanged.
+
+The waiting loop starts at approved source frame 54, corresponding to generated
+frame 90, and contains 19 forward frames. Among loop candidates with at least
+18 frames this measured closer to the last frame than the previous source frame
+49. The new join must still be reviewed on hardware; no claim of mathematical
+seamlessness is made from a single development-host metric.
 
 ## Installation on the target Pi
 
@@ -127,10 +135,11 @@ compressed records and CRC mismatches cause failure before hardware access.
 
 SPI starts conservatively at 32 MHz; 24 full frames/s require 25.8048 Mbit/s of
 pixel payload before overhead. The vendor driver requests 100 MHz, but this is
-not a guarantee for every assembled unit. After installation, measure the
-journal's first-frame kernel-monotonic timestamp and dropped-frame counter,
-check colours/orientation, warm restart, cold start, loop join and UI handoff.
-Do not claim a frame rate or boot latency until measured on the actual Pi.
+not a guarantee for every assembled unit. The 2026-10-30 device recording
+confirmed visible output, colour order and orientation. After installing the
+revised assets, recheck the longer skull phase, new loop join, warm restart,
+cold start, dropped-frame counter and UI handoff. Do not claim a sustained
+frame rate or boot latency until measured from the target journal.
 
 ## Disable / recovery
 

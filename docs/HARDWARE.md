@@ -13,14 +13,13 @@
 - PiSugar 3 battery pack fitted on the rear
 - Raspberry Pi and `openr4d10.service` boot successfully
 - Whisplay RGB LED illuminates
-- LCD stayed black while the previous `display.backend = "unconfigured"`
-  installation intentionally made no SPI writes
+- the original native boot animation has since been recorded visibly on the
+  LCD with correct colour order and orientation
 
-The LED observation confirms power and some connections, not the LCD SPI path.
-Release 0.3.0 therefore installs the already prepared native ST7789 boot player
-for the first real target-hardware test. Until Robert reports the result after
-reboot, colours, orientation, sustained frame rate and electrical stability
-remain target-unverified.
+The earlier LED observation alone did not confirm the LCD SPI path. The later
+device recording now confirms initialisation, SPI image transfer, colour order
+and orientation. Sustained frame rate, boot latency, revised animation seam,
+audio coexistence and long-term electrical stability remain target-unverified.
 
 ## Verified Whisplay HAT facts
 
@@ -127,7 +126,7 @@ ownership handoff and exact validation status.
 
 ## Physical application UI
 
-Release 0.4.0 adds the real physical renderer and selects
+Release 0.4 adds the real physical renderer and selects
 `display.backend = "whisplay"` by default. It uses Debian 13's packaged
 `python3-pil`, `python3-libgpiod` and `python3-spidev` modules. The service waits
 for the early player to release the display lock, keeps that lock, requests

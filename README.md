@@ -16,6 +16,7 @@ the installer report exactly which adapters still need configuration.
 - hardened `systemd` autostart service
 - responsive local web dashboard on `http://<raspberry-pi-ip>/`
 - native Whisplay ST7789 boot animation installed and enabled automatically
+- real-device-confirmed Whisplay SPI transport, colour order and orientation
 - native 240 x 280 physical UI with the agreed four-axis encoder layout
 - semantic UI frame model and configurable text boot sequence
 - safe `unconfigured`, JSON-file and external-command display adapters
@@ -59,7 +60,8 @@ services, and runs a final diagnostic. Neither script collects or writes
 credentials.
 
 Reboot after the first installation. The native Whisplay animation starts on
-the next boot and keeps its final animated second visible until the physical
+the next boot, keeps the moving skull visible 1.5 seconds longer and then keeps
+its reviewed final-logo loop visible until the physical
 application UI is ready and takes over the panel. The web dashboard remains
 available independently.
 

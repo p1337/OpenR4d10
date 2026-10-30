@@ -36,7 +36,12 @@ class BootManifestTests(unittest.TestCase):
         )
         self.assertEqual(manifest["width"], 240)
         self.assertEqual(manifest["height"], 280)
-        self.assertEqual(manifest["frame_count"], 73)
+        self.assertEqual(manifest["source_frame_count"], 73)
+        self.assertEqual(manifest["frame_count"], 109)
+        self.assertEqual(manifest["skull_extension_frames"], 36)
+        self.assertEqual(manifest["loop_source_start_frame"], 54)
+        self.assertEqual(manifest["loop_start_frame"], 90)
+        self.assertGreaterEqual(manifest["loop_frame_count"], 18)
 
 
 @unittest.skipUnless(shutil.which("gcc"), "C compiler not installed")
@@ -76,7 +81,7 @@ class NativeBootIntegrityTests(unittest.TestCase):
         )
 
     def test_real_native_assets_decode_without_gpio(self) -> None:
-        for name, count in (("boot.opb", 73), ("first.opb", 1)):
+        for name, count in (("boot.opb", 109), ("first.opb", 1)):
             result = self.verify(ROOT / "boot/assets" / name)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(

@@ -1,9 +1,12 @@
 # Validation — 2026-10-30
 
-Development host only. No attached Pi Zero 2 W or Whisplay was used.
+The native files were validated on the development host. A 2026-10-30 device
+recording additionally confirms that the original native player produces the
+correct visible image, colours and orientation on the assembled Pi Zero 2 W /
+Whisplay / PiSugar 3 stack.
 
 - Native player: static GCC build, `-O2 -std=c11 -Wall -Wextra -Werror` passed.
-- All 73 animation frames and the separate first frame decompressed and passed
+- All 109 generated animation frames and the separate first frame decompressed and passed
   CRC validation through the actual C reader, without GPIO/SPI access.
 - Truncated, trailing, wrong-dimension, damaged-compression and CRC-damaged
   files rejected in verification mode.
@@ -21,8 +24,8 @@ Development host only. No attached Pi Zero 2 W or Whisplay was used.
   compare exactly before RGB565 conversion; no skull or letter was cut off.
   Original blue fire reaches physical row 279 in all 24 end-loop frames.
 
-Still required on actual target: kernel/device-node compatibility, colour
-order and orientation, GPIO retention between boot stages, cold power-to-image
-latency, achieved frame rate, loop seam, audio coexistence and physical UI
+Still required on the actual target: revised 1.5-second skull extension, new
+source-frame-54 loop seam, GPIO retention between boot stages, cold
+power-to-image latency, achieved frame rate, audio coexistence and physical UI
 handoff. The optional initramfs image and Raspberry Pi OS firmware-copy hooks
 have not been tested on the target. Web API readiness is not display readiness.
