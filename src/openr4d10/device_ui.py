@@ -38,6 +38,8 @@ FONT_BOLD = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
 DISPLAY_TEXT = {
     "en": {
         "controls": ("VOL", "SQL", "CH", "SRV"),
+        "dmr_controls": ("VOL", "JMP", "TG", "SRV"),
+        "dmr_toggle": "MARK",
         "menu": "MENU",
         "play": "PLAY",
         "pause": "PAUSE",
@@ -79,6 +81,8 @@ DISPLAY_TEXT = {
     },
     "de": {
         "controls": ("LAU", "SQL", "KAN", "DST"),
+        "dmr_controls": ("LAU", "SPR", "TG", "DST"),
+        "dmr_toggle": "WAHL",
         "menu": "MENÜ",
         "play": "PLAY",
         "pause": "PAUSE",
@@ -120,6 +124,8 @@ DISPLAY_TEXT = {
     },
     "pl": {
         "controls": ("GŁO", "SQL", "KAN", "USŁ"),
+        "dmr_controls": ("GŁO", "SKK", "TG", "USŁ"),
+        "dmr_toggle": "WYB",
         "menu": "MENU",
         "play": "GRAJ",
         "pause": "PAUZA",
@@ -161,6 +167,8 @@ DISPLAY_TEXT = {
     },
     "fr": {
         "controls": ("VOL", "SQL", "CAN", "SRV"),
+        "dmr_controls": ("VOL", "SAU", "TG", "SRV"),
+        "dmr_toggle": "COCH",
         "menu": "MENU",
         "play": "LIRE",
         "pause": "PAUSE",
@@ -202,6 +210,8 @@ DISPLAY_TEXT = {
     },
     "es": {
         "controls": ("VOL", "SQL", "CAN", "SRV"),
+        "dmr_controls": ("VOL", "SAL", "TG", "SRV"),
+        "dmr_toggle": "MARC",
         "menu": "MENÚ",
         "play": "PLAY",
         "pause": "PAUSA",
@@ -268,6 +278,7 @@ class DeviceUiState:
     volume: int = 30
     squelch: int = 5
     channel: int = 1
+    channel_label: str | None = None
     service_index: int = 0
     left_action: str = "MENU"
     right_action: str = "PLAY"
@@ -308,6 +319,7 @@ class DeviceUiState:
             "volume": self.volume,
             "squelch": self.squelch,
             "channel": self.channel,
+            "channel_label": self.channel_label,
             "service": self.service,
             "left_action": self.left_action,
             "right_action": self.right_action,
@@ -468,6 +480,10 @@ class DeviceUiState:
         channel = receiver.get("channel")
         if isinstance(channel, int) and not isinstance(channel, bool):
             self.channel = max(1, min(999, channel))
+        channel_label = receiver.get("channel_label")
+        self.channel_label = (
+            str(channel_label)[:7] if channel_label is not None else None
+        )
         service = str(receiver.get("service") or "").upper()
         if service in SERVICES:
             self.service_index = SERVICES.index(service)
@@ -942,11 +958,13 @@ def render_device_ui(
     draw = ImageDraw.Draw(image)
     accent = state.accent
     text = _display_text(state.language)
-    controls = text["controls"]
+    controls = text["dmr_controls"] if state.service == "DMR" else text["controls"]
     assert isinstance(controls, tuple)
     left_action = str(text["menu"])
     if state.menu_open:
         right_action = "OK"
+    elif state.service == "DMR":
+        right_action = str(text["dmr_toggle"])
     elif state.service in {"RADIO", "AMBIENT", "DMR", "PLAYER"}:
         right_action = str(text["pause"] if state.playing else text["play"])
     else:
@@ -972,7 +990,7 @@ def render_device_ui(
         19,
         20,
         str(controls[1]),
-        str(state.squelch),
+        "25" if state.service == "DMR" else str(state.squelch),
         accent,
         label_offset_x=3,
     )
@@ -981,7 +999,7 @@ def render_device_ui(
         122,
         1,
         str(controls[2]),
-        f"{state.channel:03d}",
+        state.channel_label if state.service == "DMR" and state.channel_label else f"{state.channel:03d}",
         accent,
         mirrored=True,
     )

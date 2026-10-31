@@ -84,7 +84,6 @@ the installer report exactly which adapters still need configuration.
 
 Hardware-specific integration still pending:
 
-- acoustic verification of actual Whisplay speaker output
 - encoder GPIO input
 - credentials, WLAN settings, tokens or secrets
 
@@ -263,6 +262,15 @@ the complete player and shows the localized heading plus the ten documented
 settings areas as a scrollable list. Up/down on the right outer control moves
 the selection, Enter opens it and PTT returns one menu level unless a ready
 service explicitly owns PTT. The default interface accent is `#FDB813`.
+
+BrandMeister replaces the otherwise meaningless Squelch assignment in its
+device view. The right outer axis browses the complete official talkgroup
+catalog one entry at a time, while the left inner axis jumps 25 entries per
+detent. A short right press adds and enables the selected talkgroup in the
+persistent quick list or disables it when already enabled. The localized
+header shows these real assignments (`JMP`/`TG` in English) instead of the
+normal `SQL`/`CH` labels. On 2026-10-31 a real subscribed HoseLine call was
+heard through the fitted Whisplay speaker, confirming the native ALSA path.
 
 The service section accepts an explicit `http` or `https` audio URL for local
 playback and recording. It rejects credentials embedded in URLs and does not

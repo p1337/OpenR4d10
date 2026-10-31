@@ -31,9 +31,17 @@ BrandMeister endpoint `https://api.brandmeister.network/v2/talkgroup`, bounded
 to 256 KiB, validated and cached for one day. It doesn't use a SelfCare API key
 and doesn't manage repeaters, hotspots or static account subscriptions.
 
-On the physical device, channel rotation selects a saved talkgroup and the
-right short press activates or deactivates it. Up to five checked talkgroups
-are subscribed at once. The active call takes display priority and shows its
-destination, source ID, available alias and a conservative country flag cue.
-No transmit or PTT message exists in this adapter. Native speaker operation is
-claimed only after a real Pi receive and audio test.
+On the physical device, the right outer channel axis browses the complete
+official catalog one entry at a time. Because Squelch has no meaning for this
+IP-based DMR receiver, the left inner axis jumps 25 catalog entries per detent.
+The right short press adds and enables the selected talkgroup in the persistent
+quick list or disables an already saved entry. The header changes with the
+service and shows the real DMR assignments instead of `SQL` and a generic
+channel label. Up to five checked talkgroups are subscribed at once. The active
+call takes display priority and shows its destination, source ID, available
+alias and a conservative country flag cue. No transmit or PTT message exists
+in this adapter.
+
+On 2026-10-31 the user heard a real subscribed HoseLine call through the fitted
+Whisplay speaker. This confirms the complete native WebSocket, MessagePack,
+G.711 µ-law, PCM and `whisplaysound` ALSA path on the target hardware.

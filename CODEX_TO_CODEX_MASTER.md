@@ -1140,6 +1140,20 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Der öffentliche Katalog benötigt keinen Benutzer-API-Schlüssel; persönliche
   Hotspot- oder SelfCare-Konfiguration bleibt ausdrücklich außerhalb dieses
   Receive-only-Pfads.
+- BrandMeister muss auch ohne Browser vollständig am Gerät konfigurierbar sein.
+  In der DMR-Ansicht blättert die rechte äußere Achse einzeln durch den
+  offiziellen Talkgroup-Katalog; die linke innere, dort nicht als Squelch
+  benötigte Achse springt pro Rastung 25 Katalogeinträge vor oder zurück. Ein
+  kurzer rechter Druck aktiviert beziehungsweise deaktiviert die ausgewählte
+  Talkgroup in der persistenten Quickliste. Linke äußere Achse bleibt
+  Lautstärke, rechte innere Achse bleibt Dienstwahl. Der Funktionskopf muss
+  dienstabhängig stets die wirkliche Belegung aller vier Achsen anzeigen; in
+  BrandMeister sind deshalb eine lokalisierte Sprungfunktion und `TG` statt
+  eines sachlich falschen `SQL`/Kanal-Schemas sichtbar.
+- Am 2026-10-31 bestätigt Robert während eines realen abonnierten HoseLine-Rufs
+  hörbaren Ton aus dem montierten Whisplay-Lautsprecher. Damit ist der native
+  WebSocket-/MessagePack-/G.711-µ-law-/PCM-/ALSA-Pfad bis zur realen Hardware
+  erstmals akustisch bestätigt; Browseraudio bleibt nur der optionale Zusatz.
 
 ### 2026-10-31 – Einheitliche Web-Pfeilrichtung und direkt geladene Ambient-Bilder
 
@@ -2619,3 +2633,18 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 - Eine einmalige Migration ändert ausschließlich die noch unveränderte alte
   eingebaute Caféquelle. Gelöschte Szenen werden nicht wiederhergestellt und
   benutzerdefinierte Quellen werden nicht überschrieben.
+
+### 2026-10-31 – Native BrandMeister-Audio bestätigt und geräteinterne TG-Wahl
+
+- Ein realer abonnierten HoseLine-Ruf war hörbar über den montierten
+  Whisplay-Lautsprecher. Der native Empfangspfad ist damit bis zur Zielhardware
+  bestätigt; Browseraudio bleibt eine optionale zweite Ausgabe.
+- Die DMR-Ansicht verwendet den lokal gecachten vollständigen offiziellen
+  Talkgroup-Katalog auch ohne Webbrowser. Rechts außen blättert pro Rastung
+  genau eine Talkgroup, links innen springt pro Rastung 25 Einträge und ein
+  kurzer rechter Druck übernimmt die markierte Talkgroup in die persistente
+  Quickliste beziehungsweise schaltet sie dort ab.
+- Der physische Funktionskopf zeigt in DMR lokalisierte tatsächliche
+  Achsenfunktionen (`SPR`/`TG` auf Deutsch) sowie den Sprungwert `25` und die
+  wirkliche Talkgroup-Nummer. Das fachlich falsche `SQL`/`KAN` erscheint in
+  dieser Ansicht nicht mehr.

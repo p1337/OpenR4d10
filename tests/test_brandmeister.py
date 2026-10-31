@@ -103,6 +103,10 @@ class BrandmeisterCatalogTests(unittest.TestCase):
                 [91, 262],
             )
             self.assertEqual(payload["talkgroups"][1]["country_code"], "DE")
+            self.assertEqual(
+                [item["name"] for item in catalog.entries()],
+                ["World-wide", "Germany"],
+            )
             self.assertTrue(cache.is_file())
 
 

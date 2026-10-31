@@ -572,6 +572,64 @@ class AppTests(unittest.TestCase):
         self.assertEqual(opened["weather_channel_id"], 2)
         self.assertEqual(stepped["weather_channel_id"], 2)
 
+    def test_dmr_axes_browse_one_or_twenty_five_and_enter_toggles(self) -> None:
+        class InputDisplay:
+            def render(self, _frame) -> None:
+                pass
+
+            def snapshot(self):
+                return {"service": "DMR", "menu_open": False}
+
+            def apply_input(self, _event):
+                return self.snapshot()
+
+        class Services:
+            active_service = "brandmeister"
+
+            def __init__(self):
+                self.requests = []
+
+            def control(self, request):
+                self.requests.append(request)
+                return {"talkgroup": 262, "enabled": True}
+
+            def receiver_overlay(self, _view_service=None):
+                return {
+                    "service": "DMR", "station": "TG 262", "channel": 25,
+                    "channel_label": "262",
+                }
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=InputDisplay(),
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,
+            )
+            app.control({"action": "device_input", "control": "right_outer", "steps": 1})
+            app.control({"action": "device_input", "control": "left_inner", "steps": -1})
+            app.control({"action": "device_input", "control": "right_press"})
+
+        self.assertEqual(
+            services.requests,
+            [
+                {"action": "brandmeister_step", "steps": 1},
+                {"action": "brandmeister_step", "steps": -25},
+                {"action": "brandmeister_toggle_selected"},
+            ],
+        )
+
     def test_service_navigation_survives_refresh_while_radio_keeps_playing(self) -> None:
         class InputDisplay:
             def __init__(self) -> None:

@@ -279,6 +279,15 @@ class OpenR4d10App:
             )
         elif (
             self.services is not None
+            and event.control == Control.LEFT_INNER
+            and not menu_open
+            and selected_service == "DMR"
+        ):
+            media_result = self.services.control(
+                {"action": "brandmeister_step", "steps": event.steps * 25}
+            )
+        elif (
+            self.services is not None
             and event.control == Control.RIGHT_OUTER
             and not menu_open
             and selected_service == "RADIO"

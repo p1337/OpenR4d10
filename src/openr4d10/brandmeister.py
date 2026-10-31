@@ -445,6 +445,35 @@ class BrandmeisterTalkgroupCatalog:
                     return cached
                 raise OSError("BrandMeister talkgroup catalog is unavailable") from exc
 
+    def entries(self) -> list[dict[str, object]]:
+        """Return the validated catalog rows used by web and device controls."""
+
+        decoded = json.loads(self.payload())
+        rows = decoded.get("talkgroups") if isinstance(decoded, dict) else None
+        if not isinstance(rows, list):
+            raise OSError("BrandMeister talkgroup catalog is unavailable")
+        entries: list[dict[str, object]] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            talkgroup = row.get("talkgroup")
+            name = row.get("name")
+            if (
+                isinstance(talkgroup, int)
+                and not isinstance(talkgroup, bool)
+                and 90 < talkgroup <= 9_999_999
+                and isinstance(name, str)
+                and name
+            ):
+                entries.append(
+                    {
+                        "talkgroup": talkgroup,
+                        "name": name[:160],
+                        "country_code": country_code(talkgroup),
+                    }
+                )
+        return entries
+
     def _cached(self, *, fresh_only: bool) -> bytes | None:
         try:
             stat = self.cache_file.stat()

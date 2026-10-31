@@ -205,6 +205,9 @@ class ServiceCatalog:
         self.selected_ambient_scene_id: int | None = None
         self.active_ambient_scene_id: int | None = None
         self.selected_brandmeister_channel_id: int | None = None
+        self.selected_brandmeister_talkgroup: int | None = None
+        self._brandmeister_catalog_entries_cache: list[dict[str, object]] = []
+        self._brandmeister_catalog_guard = threading.Lock()
         self.store.ensure_services(
             tuple(item.service_id for item in BUILTIN_SERVICES),
             DEFAULT_ENABLED_SERVICES,
@@ -303,6 +306,10 @@ class ServiceCatalog:
         brandmeister_channels = self.store.channels("brandmeister")
         if brandmeister_channels:
             self.selected_brandmeister_channel_id = int(brandmeister_channels[0]["id"])
+            metadata = brandmeister_channels[0].get("metadata")
+            talkgroup = metadata.get("talkgroup") if isinstance(metadata, dict) else None
+            if isinstance(talkgroup, int) and not isinstance(talkgroup, bool):
+                self.selected_brandmeister_talkgroup = talkgroup
         if self.radio_buffer is not None:
             self.radio_buffer.set_continuous(
                 self.store.get_setting(RADIO_CONTINUOUS_KEY, False) is True
@@ -331,6 +338,57 @@ class ServiceCatalog:
             "openr4d10-ambient-offline-cache",
             self._cache_builtin_ambient_audio,
         )
+
+    def prefetch_brandmeister_catalog(self) -> None:
+        """Warm the official catalog without delaying device rendering."""
+
+        self._start_worker(
+            "openr4d10-brandmeister-catalog",
+            self._load_brandmeister_catalog,
+        )
+
+    def _load_brandmeister_catalog(self) -> None:
+        try:
+            entries = self.brandmeister_catalog.entries()
+        except OSError as exc:
+            LOG.warning("BrandMeister talkgroup catalog unavailable: %s", exc)
+            return
+        with self._brandmeister_catalog_guard:
+            self._brandmeister_catalog_entries_cache = entries
+
+    def _brandmeister_catalog_entries(self, *, allow_network: bool) -> list[dict[str, object]]:
+        with self._brandmeister_catalog_guard:
+            cached = list(self._brandmeister_catalog_entries_cache)
+        if cached or not allow_network:
+            return cached
+        self._load_brandmeister_catalog()
+        with self._brandmeister_catalog_guard:
+            return list(self._brandmeister_catalog_entries_cache)
+
+    def _saved_brandmeister_channel_for_talkgroup(
+        self, talkgroup: int | None
+    ) -> dict[str, object] | None:
+        if talkgroup is None:
+            return None
+        for channel in self.store.channels("brandmeister"):
+            metadata = channel.get("metadata")
+            if isinstance(metadata, dict) and metadata.get("talkgroup") == talkgroup:
+                return channel
+        return None
+
+    def _selected_brandmeister_entry(self) -> dict[str, object] | None:
+        talkgroup = self.selected_brandmeister_talkgroup
+        for entry in self._brandmeister_catalog_entries(allow_network=False):
+            if entry.get("talkgroup") == talkgroup:
+                return entry
+        channel = self._saved_brandmeister_channel_for_talkgroup(talkgroup)
+        if channel is None:
+            return None
+        return {
+            "talkgroup": talkgroup,
+            "name": str(channel["name"]),
+            "country_code": country_code(talkgroup) if talkgroup is not None else None,
+        }
 
     def _enabled_brandmeister_talkgroups(self) -> list[int]:
         enabled: list[int] = []
@@ -874,7 +932,7 @@ class ServiceCatalog:
                     "country_code": country_code(talkgroup),
                     "position": channel - 1,
                     "channel": channel,
-                    "selected": int(item["id"]) == self.selected_brandmeister_channel_id,
+                    "selected": talkgroup == self.selected_brandmeister_talkgroup,
                 }
             )
         return {
@@ -926,6 +984,7 @@ class ServiceCatalog:
             "brandmeister": {
                 **self.brandmeister.snapshot(),
                 "selected_channel_id": self.selected_brandmeister_channel_id,
+                "selected_talkgroup": self.selected_brandmeister_talkgroup,
                 "channels": brandmeister_channels,
                 "limits": {"saved": 30, "enabled": 5},
             },
@@ -1233,24 +1292,65 @@ class ServiceCatalog:
         elif action == "brandmeister_step":
             self._require_enabled("brandmeister")
             steps = request.get("steps")
-            if isinstance(steps, bool) or not isinstance(steps, int) or steps == 0 or abs(steps) > 10:
-                raise ValueError("BrandMeister steps must be between -10 and 10")
-            channels = self.store.channels("brandmeister")
-            if not channels:
-                raise ValueError("the BrandMeister talkgroup list is empty")
-            ids = [int(item["id"]) for item in channels]
+            if isinstance(steps, bool) or not isinstance(steps, int) or steps == 0 or abs(steps) > 250:
+                raise ValueError("BrandMeister steps must be between -250 and 250")
+            entries = self._brandmeister_catalog_entries(allow_network=True)
+            if not entries:
+                entries = [
+                    {
+                        "talkgroup": metadata.get("talkgroup"),
+                        "name": str(channel["name"]),
+                    }
+                    for channel in self.store.channels("brandmeister")
+                    for metadata in [channel.get("metadata")]
+                    if isinstance(metadata, dict)
+                    and isinstance(metadata.get("talkgroup"), int)
+                ]
+            if not entries:
+                raise ValueError("the BrandMeister talkgroup catalog is empty")
+            talkgroups = [int(entry["talkgroup"]) for entry in entries]
             current = (
-                ids.index(self.selected_brandmeister_channel_id)
-                if self.selected_brandmeister_channel_id in ids
+                talkgroups.index(self.selected_brandmeister_talkgroup)
+                if self.selected_brandmeister_talkgroup in talkgroups
                 else 0
             )
-            self.selected_brandmeister_channel_id = ids[(current + steps) % len(ids)]
-            return {"channel_id": self.selected_brandmeister_channel_id}
+            selected = entries[(current + steps) % len(entries)]
+            talkgroup = int(selected["talkgroup"])
+            self.selected_brandmeister_talkgroup = talkgroup
+            saved = self._saved_brandmeister_channel_for_talkgroup(talkgroup)
+            self.selected_brandmeister_channel_id = int(saved["id"]) if saved is not None else None
+            return {
+                "channel_id": self.selected_brandmeister_channel_id,
+                "talkgroup": talkgroup,
+                "name": str(selected["name"]),
+            }
         elif action == "brandmeister_toggle_selected":
             self._require_enabled("brandmeister")
-            channel = self._selected_brandmeister_channel()
+            entry = self._selected_brandmeister_entry()
+            if entry is None:
+                raise ValueError("no BrandMeister talkgroup is selected")
+            talkgroup = int(entry["talkgroup"])
+            channel = self._saved_brandmeister_channel_for_talkgroup(talkgroup)
             if channel is None:
-                raise ValueError("the BrandMeister talkgroup list is empty")
+                channels = self.store.channels("brandmeister")
+                if len(channels) >= 30:
+                    raise ValueError("at most 30 BrandMeister talkgroups can be saved")
+                if len(self._enabled_brandmeister_talkgroups()) >= 5:
+                    raise ValueError("at most five BrandMeister talkgroups can be active")
+                channel_id = self.store.add_channel(
+                    "brandmeister",
+                    str(talkgroup),
+                    str(entry["name"]),
+                    {"talkgroup": talkgroup, "enabled": True},
+                )
+                self.selected_brandmeister_channel_id = channel_id
+                state = self._restart_brandmeister_receiver()
+                return {
+                    "channel_id": channel_id,
+                    "talkgroup": talkgroup,
+                    "enabled": True,
+                    "brandmeister": state,
+                }
             metadata = channel.get("metadata")
             metadata = dict(metadata) if isinstance(metadata, dict) else {}
             enabled = metadata.get("enabled") is not True
@@ -1258,8 +1358,15 @@ class ServiceCatalog:
                 raise ValueError("at most five BrandMeister talkgroups can be active")
             metadata["enabled"] = enabled
             self.store.update_channel(int(channel["id"]), str(channel["name"]), metadata)
+            self.selected_brandmeister_talkgroup = talkgroup
+            self.selected_brandmeister_channel_id = int(channel["id"])
             state = self._restart_brandmeister_receiver()
-            return {"channel_id": int(channel["id"]), "enabled": enabled, "brandmeister": state}
+            return {
+                "channel_id": int(channel["id"]),
+                "talkgroup": talkgroup,
+                "enabled": enabled,
+                "brandmeister": state,
+            }
         elif action == "brandmeister_talkgroup_add":
             self._require_enabled("brandmeister")
             talkgroup = request.get("talkgroup")
@@ -1295,6 +1402,7 @@ class ServiceCatalog:
                     metadata.update({"talkgroup": talkgroup, "enabled": enabled})
                     self.store.update_channel(channel_id, str(existing["name"]), metadata)
             self.selected_brandmeister_channel_id = channel_id
+            self.selected_brandmeister_talkgroup = talkgroup
             if enabled:
                 self._restart_brandmeister_receiver()
             return {"channel_id": channel_id}
@@ -1330,6 +1438,10 @@ class ServiceCatalog:
             ids = [int(item["id"]) for item in remaining]
             if self.selected_brandmeister_channel_id not in ids:
                 self.selected_brandmeister_channel_id = ids[0] if ids else None
+                selected = self.store.channel(self.selected_brandmeister_channel_id) if self.selected_brandmeister_channel_id is not None else None
+                metadata = selected.get("metadata") if selected is not None else None
+                talkgroup = metadata.get("talkgroup") if isinstance(metadata, dict) else None
+                self.selected_brandmeister_talkgroup = talkgroup if isinstance(talkgroup, int) else None
             self._restart_brandmeister_receiver()
             return {"deleted": deleted}
         elif action == "brandmeister_talkgroup_move":
@@ -2130,12 +2242,9 @@ class ServiceCatalog:
                 ),
             }
         if requested == "DMR":
-            channels = self.store.channels("brandmeister")
-            selected = self._selected_brandmeister_channel()
-            metadata = selected.get("metadata") if selected is not None else None
-            selected_talkgroup = (
-                metadata.get("talkgroup") if isinstance(metadata, dict) else None
-            )
+            selected = self._selected_brandmeister_entry()
+            selected_talkgroup = self.selected_brandmeister_talkgroup
+            selected_name = str(selected.get("name") or "BrandMeister") if selected else "BrandMeister"
             state = self.brandmeister.snapshot()
             destination = state.get("destination")
             active_talkgroup = (
@@ -2146,13 +2255,13 @@ class ServiceCatalog:
             source = state.get("source")
             alias = state.get("alias")
             status = str(state.get("status") or "stopped")
-            channel_ids = [int(item["id"]) for item in channels]
-            selected_id = int(selected["id"]) if selected is not None else None
+            catalog_entries = self._brandmeister_catalog_entries(allow_network=False)
+            catalog_talkgroups = [int(item["talkgroup"]) for item in catalog_entries]
             listening = status in {"connecting", "listening", "call", "reconnecting"}
             return {
                 "service": "DMR",
                 "station": f"TG {active_talkgroup}" if isinstance(active_talkgroup, int) else "BrandMeister",
-                "title": str(alias)[:80] if isinstance(alias, str) and alias else "BrandMeister",
+                "title": str(alias)[:80] if isinstance(alias, str) and alias else selected_name,
                 "subtitle": (
                     f"DMR ID {source}"
                     if isinstance(source, int) and not isinstance(source, bool)
@@ -2163,10 +2272,11 @@ class ServiceCatalog:
                 "playing": listening,
                 "volume": int(state.get("volume", playback.volume)),
                 "channel": (
-                    channel_ids.index(selected_id) + 1
-                    if selected_id is not None and selected_id in channel_ids
-                    else None
+                    catalog_talkgroups.index(selected_talkgroup) + 1
+                    if selected_talkgroup is not None and selected_talkgroup in catalog_talkgroups
+                    else 1
                 ),
+                "channel_label": str(selected_talkgroup) if selected_talkgroup is not None else "--",
                 "flag_code": country_code(active_talkgroup) if isinstance(active_talkgroup, int) else None,
             }
         service_label = {

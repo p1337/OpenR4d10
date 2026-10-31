@@ -15,6 +15,7 @@ from openr4d10.device_ui import (
     DeviceUiState,
     HEIGHT,
     MAIN_MENU_ITEMS,
+    SERVICES,
     WIDTH,
     _display_text,
     _font,
@@ -177,6 +178,27 @@ class DeviceUiTests(unittest.TestCase):
             label_xy, label_font = positions[label]
             label_right = measure.textbbox(label_xy, label, font=label_font)[2]
             self.assertEqual(label_right, 212)
+
+    def test_dmr_header_shows_real_encoder_functions_and_talkgroup(self) -> None:
+        labels = []
+        original_text = ImageDraw.ImageDraw.text
+
+        def capture_text(draw, xy, text, *args, **kwargs):
+            labels.append(str(text))
+            return original_text(draw, xy, text, *args, **kwargs)
+
+        state = DeviceUiState(
+            service_index=SERVICES.index("DMR"),
+            channel=27,
+            channel_label="262",
+            language="de",
+        )
+        with patch.object(ImageDraw.ImageDraw, "text", new=capture_text):
+            render_device_ui(state)
+        for expected in ("LAU", "SPR", "25", "TG", "262", "DST", "DMR", "WAHL"):
+            self.assertIn(expected, labels)
+        self.assertNotIn("SQL", labels)
+        self.assertNotIn("KAN", labels)
 
     def test_date_and_redundant_player_text_are_not_rendered(self) -> None:
         first = DeviceUiState(

@@ -590,6 +590,64 @@ class ServiceCatalogTests(unittest.TestCase):
             finally:
                 reopened.close()
 
+    def test_brandmeister_device_browses_full_catalog_and_toggles_unsaved_group(self) -> None:
+        class Receiver:
+            def __init__(self):
+                self.state = {
+                    "status": "stopped", "talkgroups": [], "destination": None,
+                    "source": None, "alias": "", "volume": 30, "error": None,
+                    "country_code": None,
+                }
+
+            def snapshot(self):
+                return dict(self.state)
+
+            def set_volume(self, volume):
+                self.state["volume"] = volume
+                return self.snapshot()
+
+            def listen(self, talkgroups):
+                self.state["status"] = "listening"
+                self.state["talkgroups"] = list(talkgroups)
+                return self.snapshot()
+
+            def stop(self):
+                self.state["status"] = "stopped"
+                self.state["talkgroups"] = []
+                return self.snapshot()
+
+            def close(self):
+                self.stop()
+
+        class Talkgroups:
+            def entries(self):
+                return [
+                    {"talkgroup": number, "name": f"TG {number}", "country_code": None}
+                    for number in range(91, 151)
+                ]
+
+        with tempfile.TemporaryDirectory() as raw:
+            catalog = ServiceCatalog(
+                Path(raw).resolve(),
+                brandmeister=Receiver(),  # type: ignore[arg-type]
+                brandmeister_catalog=Talkgroups(),  # type: ignore[arg-type]
+                executable_lookup=lambda _name: "/bin/true",
+            )
+            try:
+                catalog._load_brandmeister_catalog()
+                one = catalog.control({"action": "brandmeister_step", "steps": 1})
+                self.assertEqual(one["talkgroup"], 92)
+                fast = catalog.control({"action": "brandmeister_step", "steps": 25})
+                self.assertEqual(fast["talkgroup"], 117)
+                toggled = catalog.control({"action": "brandmeister_toggle_selected"})
+                self.assertTrue(toggled["enabled"])
+                self.assertEqual(toggled["talkgroup"], 117)
+                snapshot = catalog.snapshot()["brandmeister"]
+                self.assertEqual(snapshot["selected_talkgroup"], 117)
+                self.assertIn(117, snapshot["talkgroups"])
+            finally:
+                catalog.close()
+
     def test_solix_adapter_exposes_only_bounded_public_energy_metrics(self) -> None:
         class Registry:
             def configured(self, service_id):
