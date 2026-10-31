@@ -160,6 +160,18 @@ class DeviceUiTests(unittest.TestCase):
         self.assertNotIn("OpenR4d10", drawn)
         self.assertEqual(drawn.count("RADIO"), 1)
 
+    def test_device_language_localizes_fixed_player_help_text(self) -> None:
+        state = DeviceUiState(
+            source="SWR3",
+            title="SWR3",
+            subtitle="Play starts this audio service",
+            service_index=1,
+            language="de",
+        )
+        drawn = self._drawn_text(state)
+        self.assertTrue(any(value.startswith("Mit PLAY") for value in drawn))
+        self.assertNotIn("Play starts this audio service", drawn)
+
     def test_main_menu_hides_complete_player_and_uses_localized_heading(self) -> None:
         state = DeviceUiState(
             source="SWR3",

@@ -1080,7 +1080,10 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 - Die Sprachwahl im Web darf nicht nur den Browser übersetzen. Sie setzt und
   persistiert primär die Sprache des physischen Geräts und synchronisiert den
-  Browser damit. Die bestehende gegenteilige Festlegung ist aufgehoben.
+  Browser damit. Die bestehende gegenteilige Festlegung ist aufgehoben. Auch
+  feste Hilfs-, Bereitschafts- und Playertexte im Geräteinhalt werden durch den
+  kuratierten Gerätekatalog übersetzt; nur echte Sender-, Titel- und
+  Inhaltsmetadaten bleiben unverändert.
 - Der reale Stack flackert bei Zwischenhelligkeiten trotz `lgpio` seltener
   weiter. Codeprüfung identifiziert das erneute Starten derselben PWM-Welle nach
   jedem UI-Frame als konkrete Ursache; `_LgpioPwm` merkt sich deshalb den

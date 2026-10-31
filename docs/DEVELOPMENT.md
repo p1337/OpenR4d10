@@ -121,6 +121,9 @@ storage as an early-load cache and must also call the bounded
 redraws the physical display, persists `ui.language` in SQLite and publishes it
 under `services.settings.language`. Tests must cover restart persistence,
 delivery to `WhisplayDisplay`, invalid codes and browser control wiring.
+Fixed renderer-owned help, readiness, menu-description and loading strings must
+also use the same device catalog. Station names, programme titles and other
+real content metadata remain verbatim.
 
 `display_brightness` accepts exactly one integer `brightness_percent` from 0
 through 100. The application applies it through the configured display adapter

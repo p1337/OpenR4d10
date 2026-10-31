@@ -57,6 +57,20 @@ DISPLAY_TEXT = {
         "wifi_name": "NETWORK",
         "wifi_password": "PASSWORD",
         "wifi_open": "OPEN ON PHONE",
+        "play_audio_service": "Press PLAY to start this audio service",
+        "receiver_ready": "Receiver ready",
+        "system_online": "System online",
+        "select_media_play": "Select media and press PLAY",
+        "select_channel_play": "Select a channel and press PLAY",
+        "recording_controls": "Recording controls",
+        "ready": "Ready",
+        "paused": "Paused",
+        "audio_stream_active": "Audio stream active",
+        "settings_active_service": "Settings for the active service",
+        "rotate_service_select": "Rotate SERVICE to select",
+        "recording_playback_actions": "Recording and playback actions",
+        "radar_loading": "Loading rain radar",
+        "satellite_loading": "Loading satellite images",
     },
     "de": {
         "controls": ("LAU", "SQL", "KAN", "DST"),
@@ -82,6 +96,20 @@ DISPLAY_TEXT = {
         "wifi_name": "NETZWERK",
         "wifi_password": "KENNWORT",
         "wifi_open": "AM HANDY ÖFFNEN",
+        "play_audio_service": "Mit PLAY diesen Audiodienst starten",
+        "receiver_ready": "Empfänger bereit",
+        "system_online": "System online",
+        "select_media_play": "Medium wählen und PLAY drücken",
+        "select_channel_play": "Kanal wählen und PLAY drücken",
+        "recording_controls": "Aufnahmesteuerung",
+        "ready": "Bereit",
+        "paused": "Pausiert",
+        "audio_stream_active": "Audiostream aktiv",
+        "settings_active_service": "Einstellungen des aktiven Dienstes",
+        "rotate_service_select": "DIENST drehen zum Auswählen",
+        "recording_playback_actions": "Aufnahme- und Wiedergabeaktionen",
+        "radar_loading": "Regenradar wird geladen",
+        "satellite_loading": "Satellitenbilder werden geladen",
     },
     "pl": {
         "controls": ("GŁO", "SQL", "KAN", "USŁ"),
@@ -107,6 +135,20 @@ DISPLAY_TEXT = {
         "wifi_name": "SIEĆ",
         "wifi_password": "HASŁO",
         "wifi_open": "OTWÓRZ W TELEFONIE",
+        "play_audio_service": "Naciśnij GRAJ, aby uruchomić audio",
+        "receiver_ready": "Odbiornik gotowy",
+        "system_online": "System online",
+        "select_media_play": "Wybierz plik i naciśnij GRAJ",
+        "select_channel_play": "Wybierz kanał i naciśnij GRAJ",
+        "recording_controls": "Sterowanie nagrywaniem",
+        "ready": "Gotowe",
+        "paused": "Pauza",
+        "audio_stream_active": "Strumień audio aktywny",
+        "settings_active_service": "Ustawienia aktywnej usługi",
+        "rotate_service_select": "Obróć USŁ, aby wybrać",
+        "recording_playback_actions": "Nagrywanie i odtwarzanie",
+        "radar_loading": "Ładowanie radaru opadów",
+        "satellite_loading": "Ładowanie zdjęć satelitarnych",
     },
     "fr": {
         "controls": ("VOL", "SQL", "CAN", "SRV"),
@@ -132,6 +174,20 @@ DISPLAY_TEXT = {
         "wifi_name": "RÉSEAU",
         "wifi_password": "MOT DE PASSE",
         "wifi_open": "OUVRIR SUR MOBILE",
+        "play_audio_service": "Appuyer sur LIRE pour lancer l’audio",
+        "receiver_ready": "Récepteur prêt",
+        "system_online": "Système en ligne",
+        "select_media_play": "Choisir un média puis LIRE",
+        "select_channel_play": "Choisir un canal puis LIRE",
+        "recording_controls": "Commandes d’enregistrement",
+        "ready": "Prêt",
+        "paused": "En pause",
+        "audio_stream_active": "Flux audio actif",
+        "settings_active_service": "Réglages du service actif",
+        "rotate_service_select": "Tourner SERVICE pour choisir",
+        "recording_playback_actions": "Enregistrement et lecture",
+        "radar_loading": "Chargement du radar pluie",
+        "satellite_loading": "Chargement des images satellite",
     },
     "es": {
         "controls": ("VOL", "SQL", "CAN", "SRV"),
@@ -157,7 +213,38 @@ DISPLAY_TEXT = {
         "wifi_name": "RED",
         "wifi_password": "CONTRASEÑA",
         "wifi_open": "ABRIR EN EL MÓVIL",
+        "play_audio_service": "Pulsa PLAY para iniciar el audio",
+        "receiver_ready": "Receptor listo",
+        "system_online": "Sistema en línea",
+        "select_media_play": "Elige un medio y pulsa PLAY",
+        "select_channel_play": "Elige un canal y pulsa PLAY",
+        "recording_controls": "Controles de grabación",
+        "ready": "Listo",
+        "paused": "En pausa",
+        "audio_stream_active": "Flujo de audio activo",
+        "settings_active_service": "Ajustes del servicio activo",
+        "rotate_service_select": "Gira SERVICIO para elegir",
+        "recording_playback_actions": "Grabación y reproducción",
+        "radar_loading": "Cargando radar de lluvia",
+        "satellite_loading": "Cargando imágenes de satélite",
     },
+}
+
+DEVICE_TEXT_KEYS = {
+    "Play starts this audio service": "play_audio_service",
+    "Receiver ready": "receiver_ready",
+    "System online": "system_online",
+    "Select media and press play": "select_media_play",
+    "Select a channel and press play": "select_channel_play",
+    "Recording controls": "recording_controls",
+    "Ready": "ready",
+    "Paused": "paused",
+    "Audio stream active": "audio_stream_active",
+    "Settings for the active service": "settings_active_service",
+    "Rotate SERVICE to select": "rotate_service_select",
+    "Recording and playback actions": "recording_playback_actions",
+    "Regenradar wird geladen": "radar_loading",
+    "Satellitenbilder werden geladen": "satellite_loading",
 }
 
 
@@ -395,6 +482,11 @@ def _font(size: int, *, bold: bool = False) -> ImageFont.ImageFont:
 def _display_text(language: str) -> dict[str, object]:
     key = language.casefold().split("-", 1)[0]
     return DISPLAY_TEXT.get(key, DISPLAY_TEXT["en"])
+
+
+def _localized_device_text(value: str, text: Mapping[str, object]) -> str:
+    key = DEVICE_TEXT_KEYS.get(value)
+    return str(text.get(key, value)) if key is not None else value
 
 
 def _fit_text(
@@ -758,14 +850,19 @@ def render_device_ui(
         draw.line((14, content_top + 40, 226, content_top + 40), fill=(52, 67, 71), width=1)
         draw.multiline_text(
             (14, content_top + 56),
-            _fit_text(draw, state.title, body_font, 208),
+            _fit_text(draw, _localized_device_text(state.title, text), body_font, 208),
             font=body_font,
             fill=accent,
             spacing=4,
         )
         draw.multiline_text(
             (14, content_top + 100),
-            _fit_text(draw, state.subtitle, small_font, 208),
+            _fit_text(
+                draw,
+                _localized_device_text(state.subtitle, text),
+                small_font,
+                208,
+            ),
             font=small_font,
             fill=(178, 187, 189),
             spacing=4,
@@ -808,7 +905,12 @@ def render_device_ui(
                 width=2,
             )
             loading_font = _font(13, bold=True)
-            loading = _fit_text(draw, state.subtitle, loading_font, 180)
+            loading = _fit_text(
+                draw,
+                _localized_device_text(state.subtitle, text),
+                loading_font,
+                180,
+            )
             bounds = draw.textbbox((0, 0), loading, font=loading_font)
             draw.text(
                 (120 - (bounds[2] - bounds[0]) / 2, content_top + 107),
@@ -866,7 +968,11 @@ def render_device_ui(
         width=1,
     )
 
-    title = state.title if state.title.casefold() != state.source.casefold() else state.subtitle
+    title = (
+        state.title
+        if state.title.casefold() != state.source.casefold()
+        else _localized_device_text(state.subtitle, text)
+    )
     detail_font = _font(9, bold=True)
     draw.text(
         (14, content_top + 27),
