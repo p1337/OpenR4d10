@@ -1076,6 +1076,14 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-31 – Kopfzeilenkürzel und Werte exakt ausgerichtet
+
+- Die lokalisierten Kürzel `LAU`, `SQL`, `KAN`, `DST` beziehungsweise ihre
+  Sprachvarianten und die zugehörigen gelben Werte beginnen innerhalb jeder
+  Zeile auf exakt derselben sichtbaren Glyphenhöhe. Die Ausrichtung verwendet
+  die tatsächlichen Font-Bounding-Boxen statt eines geratenen festen
+  Zwei-Pixel-Versatzes und wird für beide Kopfzeilen getestet.
+
 ### 2026-10-31 – Play/Pause-Kreis bündig in der Player-Ecke
 
 - Der runde Play/Pause-Bedienknopf erhält im normalen Player denselben Abstand

@@ -100,6 +100,9 @@ fallback), larger values and a larger time without a date. The radio body does
 not repeat the selected service or a written playback state; playback remains
 visible through the button icon and actual media state. The old bottom status/
 brand strip is removed and its space belongs to the larger station artwork.
+Each localized control label and its larger value are positioned from their
+actual font bounding boxes so their visible glyph tops align exactly in both
+header rows.
 When `DeviceUiState.menu_open` identifies the main menu, the renderer exits the
 player branch entirely and paints the localized heading plus the documented
 ten-item settings list. The right outer encoder moves only the bounded menu

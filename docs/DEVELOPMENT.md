@@ -50,6 +50,9 @@ navigation, the framed filled back icon, player-only accent glow, label clearanc
 below the rounded top corners and the red/white edge-aligned PTT indicator only
 for an explicit ready PTT context. The five curated languages
 use the same renderer and fall back to English for unknown language codes.
+Header tests additionally compare the visible bounding-box top of every
+localized control label with its associated value; a fixed origin offset is
+insufficient because the two font sizes have different metrics.
 
 The normal `run` command also creates a migrated non-secret state database in
 the configured state directory. Tests must always point this at a temporary

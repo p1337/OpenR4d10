@@ -136,25 +136,35 @@ class DeviceUiTests(unittest.TestCase):
 
     def test_header_controls_and_network_text_use_requested_larger_fonts(self) -> None:
         sizes = {}
+        positions = {}
         original_text = ImageDraw.ImageDraw.text
 
         def capture_text(draw, xy, text, *args, **kwargs):
             font = kwargs.get("font")
             sizes.setdefault(str(text), getattr(font, "size", None))
+            positions.setdefault(str(text), (xy, font))
             return original_text(draw, xy, text, *args, **kwargs)
 
         state = DeviceUiState(
             wifi_label="p1337",
             ip_address="192.168.1.64",
             battery_percent=87,
+            language="de",
         )
         with patch.object(ImageDraw.ImageDraw, "text", new=capture_text):
             render_device_ui(state)
-        self.assertEqual(sizes["VOL"], 12)
+        self.assertEqual(sizes["LAU"], 12)
         self.assertEqual(sizes["30%"], 14)
         self.assertEqual(sizes["p1337"], 8)
         self.assertEqual(sizes["192.168.1.64"], 8)
         self.assertGreaterEqual(sizes["87%"], sizes["p1337"])
+        measure = ImageDraw.Draw(Image.new("RGB", (100, 100)))
+        for label, value in (("LAU", "30%"), ("SQL", "5"), ("KAN", "001"), ("DST", "SYSTEM")):
+            label_xy, label_font = positions[label]
+            value_xy, value_font = positions[value]
+            label_top = measure.textbbox(label_xy, label, font=label_font)[1]
+            value_top = measure.textbbox(value_xy, value, font=value_font)[1]
+            self.assertEqual(label_top, value_top)
 
     def test_date_and_redundant_player_text_are_not_rendered(self) -> None:
         first = DeviceUiState(

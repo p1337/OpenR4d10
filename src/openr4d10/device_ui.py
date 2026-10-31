@@ -567,8 +567,21 @@ def _control_value(
     # The physical 240 px panel needs the reviewed 1.2x larger header controls.
     small = _font(12, bold=True)
     large = _font(14, bold=True)
-    draw.text((x, y), label, font=small, fill=(128, 140, 145))
-    draw.text((x + 34, y - 2), value, font=large, fill=accent)
+    glyph_top = y + 3
+    label_box = draw.textbbox((0, 0), label, font=small)
+    value_box = draw.textbbox((0, 0), value, font=large)
+    draw.text(
+        (x, glyph_top - label_box[1]),
+        label,
+        font=small,
+        fill=(128, 140, 145),
+    )
+    draw.text(
+        (x + 34, glyph_top - value_box[1]),
+        value,
+        font=large,
+        fill=accent,
+    )
 
 
 def _draw_menu_heading(
