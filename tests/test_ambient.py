@@ -6,7 +6,12 @@ import unittest
 
 from PIL import Image
 
-from openr4d10.ambient import AMBIENT_ARTWORK_ROOT, AMBIENT_PRESETS, ambient_text
+from openr4d10.ambient import (
+    AMBIENT_ARTWORK_ROOT,
+    AMBIENT_BY_ID,
+    AMBIENT_PRESETS,
+    ambient_text,
+)
 from openr4d10.media import PlaybackState
 from openr4d10.services import ServiceCatalog
 
@@ -51,9 +56,15 @@ class AmbientPresetTests(unittest.TestCase):
         for item in AMBIENT_PRESETS:
             with self.subTest(item.preset_id):
                 self.assertTrue(item.audio_url.startswith("https://"))
-                self.assertTrue(item.audio_url.startswith("https://upload.wikimedia.org/"))
+                self.assertTrue(
+                    item.audio_url.startswith("https://upload.wikimedia.org/")
+                    or item.audio_url.startswith("https://cdn.freesound.org/")
+                )
                 self.assertNotIn("?", item.audio_url)
-                self.assertTrue(item.source_page.startswith("https://commons.wikimedia.org/"))
+                self.assertTrue(
+                    item.source_page.startswith("https://commons.wikimedia.org/")
+                    or item.source_page.startswith("https://freesound.org/")
+                )
                 self.assertTrue(item.license_url.startswith("https://"))
                 self.assertNotIn("audio_url", item.public())
                 self.assertEqual(
@@ -71,6 +82,19 @@ class AmbientPresetTests(unittest.TestCase):
     def test_device_text_is_localized_without_renaming_custom_scenes(self) -> None:
         self.assertEqual(ambient_text("forest", "de"), ("Wald", "Wald, Wind, Vögel und ferne Insekten"))
         self.assertIsNone(ambient_text("custom-example", "de"))
+
+    def test_cafe_uses_the_quiet_cc0_coffeehouse_recording(self) -> None:
+        cafe = AMBIENT_BY_ID["cafe"]
+        self.assertEqual(
+            cafe.audio_url,
+            "https://cdn.freesound.org/previews/46/46310_43834-lq.ogg",
+        )
+        self.assertEqual(cafe.credit, "moxobna")
+        self.assertEqual(cafe.license_name, "CC0 1.0")
+        self.assertEqual(
+            cafe.sha256,
+            "86c51e4fa5001c4fbf597c8725b50e36a347c31fbc0c499cad0a1bc27e9bb072",
+        )
 
 
 class AmbientServiceTests(unittest.TestCase):
@@ -94,10 +118,9 @@ class AmbientServiceTests(unittest.TestCase):
             try:
                 scenes = reopened.store.channels("ambient")
                 migrated = next(item for item in scenes if item["id"] == first["id"])
-                self.assertTrue(
-                    migrated["metadata"]["source_url"].startswith(
-                        "https://upload.wikimedia.org/"
-                    )
+                self.assertEqual(
+                    migrated["metadata"]["source_url"],
+                    AMBIENT_BY_ID[str(migrated["external_id"])].audio_url,
                 )
                 self.assertNotIn(deleted["id"], {item["id"] for item in scenes})
             finally:
@@ -142,6 +165,101 @@ class AmbientServiceTests(unittest.TestCase):
                 self.assertNotIn(first["preset_id"], {item["preset_id"] for item in scenes})
             finally:
                 reopened.close()
+
+    def test_channel_browsing_keeps_the_selected_scene_visible(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            player = Player()
+            catalog = ServiceCatalog(
+                Path(raw).resolve(), player=player, recorder=Recorder()
+            )
+            try:
+                first, second = catalog.snapshot()["ambient"]["scenes"][:2]
+                catalog.control({"action": "ambient_play", "scene_id": first["id"]})
+                catalog.control({"action": "ambient_step", "steps": 1})
+
+                selected = catalog.receiver_overlay("AMBIENT")
+                self.assertEqual(selected["channel"], 2)
+                self.assertEqual(selected["preset_id"], second["preset_id"])
+                self.assertFalse(selected["playing"])
+                self.assertEqual(catalog.active_ambient_scene_id, first["id"])
+                self.assertEqual(len(player.playlists), 1)
+
+                catalog.control({"action": "ambient_toggle"})
+                active = catalog.receiver_overlay("AMBIENT")
+                self.assertEqual(active["channel"], 2)
+                self.assertTrue(active["playing"])
+                self.assertEqual(catalog.active_ambient_scene_id, second["id"])
+                self.assertEqual(len(player.playlists), 2)
+            finally:
+                catalog.close()
+
+    def test_old_cafe_source_is_migrated_without_overwriting_custom_source(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            catalog = ServiceCatalog(root, player=Player(), recorder=Recorder())
+            cafe = next(
+                item
+                for item in catalog.store.channels("ambient")
+                if item["external_id"] == "cafe"
+            )
+            old_metadata = dict(cafe["metadata"])
+            old_metadata.update(
+                {
+                    "source_url": (
+                        "https://upload.wikimedia.org/wikipedia/commons/5/54/"
+                        "Cafe_ambiance.ogg"
+                    ),
+                    "source_page": (
+                        "https://commons.wikimedia.org/wiki/File:Cafe_ambiance.ogg"
+                    ),
+                    "credit": "Marble Toast",
+                }
+            )
+            catalog.store.update_channel(cafe["id"], cafe["name"], old_metadata)
+            catalog.store.set_setting("ambient.quiet_cafe_v1", False)
+            catalog.close()
+
+            reopened = ServiceCatalog(root, player=Player(), recorder=Recorder())
+            try:
+                migrated = next(
+                    item
+                    for item in reopened.store.channels("ambient")
+                    if item["external_id"] == "cafe"
+                )
+                self.assertEqual(
+                    migrated["metadata"]["source_url"],
+                    AMBIENT_BY_ID["cafe"].audio_url,
+                )
+                self.assertEqual(migrated["metadata"]["credit"], "moxobna")
+                self.assertEqual(
+                    migrated["metadata"]["sha256"], AMBIENT_BY_ID["cafe"].sha256
+                )
+            finally:
+                reopened.close()
+
+            custom_source = "https://example.org/my-quiet-cafe.ogg"
+            third = ServiceCatalog(root, player=Player(), recorder=Recorder())
+            cafe = next(
+                item
+                for item in third.store.channels("ambient")
+                if item["external_id"] == "cafe"
+            )
+            custom_metadata = dict(cafe["metadata"])
+            custom_metadata["source_url"] = custom_source
+            third.store.update_channel(cafe["id"], cafe["name"], custom_metadata)
+            third.store.set_setting("ambient.quiet_cafe_v1", False)
+            third.close()
+
+            final = ServiceCatalog(root, player=Player(), recorder=Recorder())
+            try:
+                preserved = next(
+                    item
+                    for item in final.store.channels("ambient")
+                    if item["external_id"] == "cafe"
+                )
+                self.assertEqual(preserved["metadata"]["source_url"], custom_source)
+            finally:
+                final.close()
 
     def test_bundled_artwork_is_served_only_for_known_presets(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

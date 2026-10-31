@@ -51,6 +51,10 @@ DEFAULT_ENABLED_SERVICES = {
 DISPLAY_BRIGHTNESS_KEY = "display.brightness_percent"
 DEFAULT_DISPLAY_BRIGHTNESS = 100
 AMBIENT_SOURCE_MIGRATION_KEY = "ambient.direct_sources_v1"
+QUIET_CAFE_MIGRATION_KEY = "ambient.quiet_cafe_v1"
+OLD_CAFE_AUDIO_URL = (
+    "https://upload.wikimedia.org/wikipedia/commons/5/54/Cafe_ambiance.ogg"
+)
 UI_ACCENT_COLOR_KEY = "ui.accent_color"
 DEFAULT_UI_ACCENT_COLOR = "#FDB813"
 UI_LANGUAGE_KEY = "ui.language"
@@ -253,6 +257,7 @@ class ServiceCatalog:
                         "credit": item.credit,
                         "license_name": item.license_name,
                         "license_url": item.license_url,
+                        **({"sha256": item.sha256} if item.sha256 else {}),
                     },
                 )
                 for item in AMBIENT_PRESETS
@@ -262,6 +267,7 @@ class ServiceCatalog:
         self._upgrade_germany_weather_default()
         self._seed_germany_satellite_upgrade()
         self._upgrade_ambient_source_urls()
+        self._upgrade_quiet_cafe_source()
         weather_channels = self.store.channels("weather")
         if weather_channels:
             self.active_weather_channel_id = int(weather_channels[0]["id"])
@@ -343,6 +349,56 @@ class ServiceCatalog:
             updated["source_url"] = preset.audio_url
             self.store.update_channel(int(scene["id"]), str(scene["name"]), updated)
         self.store.set_setting(AMBIENT_SOURCE_MIGRATION_KEY, True)
+
+    def _upgrade_quiet_cafe_source(self) -> None:
+        """Replace only the untouched busy built-in café recording once."""
+        if self.store.get_setting(QUIET_CAFE_MIGRATION_KEY, False) is True:
+            return
+        preset = AMBIENT_BY_ID["cafe"]
+        scene = next(
+            (
+                item
+                for item in self.store.channels("ambient")
+                if item["external_id"] == "cafe"
+            ),
+            None,
+        )
+        if scene is not None:
+            metadata = scene.get("metadata")
+            if (
+                isinstance(metadata, dict)
+                and (
+                    metadata.get("source_url") == OLD_CAFE_AUDIO_URL
+                    or (
+                        isinstance(metadata.get("source_url"), str)
+                        and "Special:Redirect/file/Cafe_ambiance.ogg"
+                        in str(metadata["source_url"])
+                    )
+                    or (
+                        metadata.get("source_url") == preset.audio_url
+                        and metadata.get("source_page")
+                        == "https://commons.wikimedia.org/wiki/File:Cafe_ambiance.ogg"
+                    )
+                )
+            ):
+                updated = dict(metadata)
+                updated.update(
+                    {
+                        "source_url": preset.audio_url,
+                        "description": preset.description,
+                        "source_page": preset.source_page,
+                        "credit": preset.credit,
+                        "license_name": preset.license_name,
+                        "license_url": preset.license_url,
+                        "sha256": preset.sha256,
+                    }
+                )
+                self.store.update_channel(
+                    int(scene["id"]),
+                    str(scene["name"]),
+                    updated,
+                )
+        self.store.set_setting(QUIET_CAFE_MIGRATION_KEY, True)
 
     def display_brightness(self) -> int:
         value = self.store.get_setting(
@@ -978,6 +1034,7 @@ class ServiceCatalog:
             self._require_enabled("ambient")
             if (
                 self.active_service == "ambient"
+                and self.active_ambient_scene_id == self.selected_ambient_scene_id
                 and self.player.state.state in {"playing", "paused"}
             ):
                 self.player.toggle_pause()
@@ -1730,6 +1787,42 @@ class ServiceCatalog:
                     "image_file": str(frame["file"]) if frame is not None else None,
                 }
         playback = self.player.state
+        if requested == "AMBIENT":
+            scenes = self.store.channels("ambient")
+            scene = (
+                self.store.channel(self.selected_ambient_scene_id)
+                if self.selected_ambient_scene_id is not None
+                else (scenes[0] if scenes else None)
+            )
+            scene_name, description = (
+                self._ambient_display_text(scene)
+                if scene is not None
+                else ("AmbientR4D10", "Choose a soundscape and press play")
+            )
+            ids = [int(item["id"]) for item in scenes]
+            scene_id = int(scene["id"]) if scene is not None else None
+            preset_id = str(scene["external_id"]) if scene is not None else ""
+            selected_is_playing = (
+                scene_id is not None
+                and self.active_service == "ambient"
+                and self.active_ambient_scene_id == scene_id
+                and playback.state in {"playing", "paused"}
+                and not playback.paused
+            )
+            return {
+                "service": "AMBIENT",
+                "station": scene_name,
+                "title": "AmbientR4D10",
+                "subtitle": description,
+                "playing": selected_is_playing,
+                "volume": playback.volume,
+                "preset_id": preset_id if preset_id in AMBIENT_BY_ID else None,
+                "channel": (
+                    ids.index(scene_id) + 1
+                    if scene_id is not None and scene_id in ids
+                    else None
+                ),
+            }
         service_label = {
             "webradio": "RADIO",
             "local_media": "PLAYER",
@@ -1767,34 +1860,6 @@ class ServiceCatalog:
                     "volume": playback.volume,
                     "preset_id": preset.preset_id if preset is not None else None,
                     "channel": 1 if station is not None else None,
-                }
-            if requested == "AMBIENT":
-                scenes = self.store.channels("ambient")
-                scene = (
-                    self.store.channel(self.selected_ambient_scene_id)
-                    if self.selected_ambient_scene_id is not None
-                    else (scenes[0] if scenes else None)
-                )
-                scene_name, description = (
-                    self._ambient_display_text(scene)
-                    if scene is not None
-                    else ("AmbientR4D10", "Choose a soundscape and press play")
-                )
-                ids = [int(item["id"]) for item in scenes]
-                preset_id = str(scene["external_id"]) if scene is not None else ""
-                return {
-                    "service": "AMBIENT",
-                    "station": scene_name,
-                    "title": "AmbientR4D10",
-                    "subtitle": description,
-                    "playing": False,
-                    "volume": playback.volume,
-                    "preset_id": preset_id if preset_id in AMBIENT_BY_ID else None,
-                    "channel": (
-                        ids.index(int(scene["id"])) + 1
-                        if scene is not None and int(scene["id"]) in ids
-                        else None
-                    ),
                 }
             defaults = {
                 "SYSTEM": ("OPENR4D10", "System online", "Receiver ready"),

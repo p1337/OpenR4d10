@@ -2516,3 +2516,24 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Whisplay. Die API akzeptiert ausschließlich IDs aus dem kuratierten
   Ambient-Katalog; benutzerdefinierte Szenen verwenden weiterhin den
   Initialen-Fallback.
+
+### 2026-10-31 – Ambient-Kanalwahl bleibt sichtbar; ruhigeres Café
+
+- Ein realer Test zeigt: Läuft bereits Ambient-Kanal 01, springt die Anzeige
+  nach dem Blättern auf einen anderen Ambient-Kanal wieder auf 01 zurück.
+  Ursache ist die erneute Darstellung des aktiven Audioeigentümers statt der
+  separat ausgewählten Szene. In der sichtbaren Ambient-Ansicht haben deshalb
+  Szenenauswahl und Kanalnummer Vorrang; der bisherige Klang läuft im
+  Hintergrund weiter, bis Play den neu ausgewählten Klang startet. Play/Pause
+  pausiert nur dann, wenn ausgewählte und tatsächlich aktive Szene identisch
+  sind.
+- Die bisherige Caféaufnahme mit dichter, hektischer Menschenmenge wird durch
+  eine deutlich ruhigere Coffeehouse-Aufnahme mit kleiner, leise sprechender
+  Gruppe ersetzt. Quelle ist `0105coffeehouse.wav` von `moxobna` auf
+  Freesound, veröffentlicht unter CC0. Verwendet wird die öffentliche,
+  queryfreie Ogg-Vorschau; deren SHA-256 lautet
+  `86c51e4fa5001c4fbf597c8725b50e36a347c31fbc0c499cad0a1bc27e9bb072`.
+  Die vorhandene Café-Grafik bleibt unverändert.
+- Eine einmalige Migration ändert ausschließlich die noch unveränderte alte
+  eingebaute Caféquelle. Gelöschte Szenen werden nicht wiederhergestellt und
+  benutzerdefinierte Quellen werden nicht überschrieben.

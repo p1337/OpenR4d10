@@ -16,9 +16,10 @@ class AmbientPreset:
     credit: str
     license_name: str
     license_url: str
+    sha256: str | None = None
 
     def public(self) -> dict[str, str]:
-        return {
+        value = {
             "preset_id": self.preset_id,
             "name": self.name,
             "description": self.description,
@@ -28,6 +29,9 @@ class AmbientPreset:
             "license_name": self.license_name,
             "license_url": self.license_url,
         }
+        if self.sha256 is not None:
+            value["sha256"] = self.sha256
+        return value
 
 
 COMMONS_UPLOAD = "https://upload.wikimedia.org/wikipedia/commons/"
@@ -41,12 +45,13 @@ AMBIENT_PRESETS = (
     AmbientPreset(
         "cafe",
         "Café",
-        "Gentle café room with quiet conversations",
-        COMMONS_UPLOAD + "5/54/Cafe_ambiance.ogg",
-        "https://commons.wikimedia.org/wiki/File:Cafe_ambiance.ogg",
-        "Marble Toast",
+        "Quiet coffeehouse with a small group talking softly",
+        "https://cdn.freesound.org/previews/46/46310_43834-lq.ogg",
+        "https://freesound.org/people/moxobna/sounds/46310/",
+        "moxobna",
         "CC0 1.0",
         CC0_URL,
+        "86c51e4fa5001c4fbf597c8725b50e36a347c31fbc0c499cad0a1bc27e9bb072",
     ),
     AmbientPreset(
         "forest",
@@ -105,7 +110,7 @@ AMBIENT_ARTWORK_ROOT = Path(__file__).resolve().parents[2] / "assets" / "ambient
 
 AMBIENT_TRANSLATIONS = {
     "de": {
-        "cafe": ("Café", "Ruhiges Café mit leisen Gesprächen"),
+        "cafe": ("Café", "Kleines ruhiges Café mit leisen Gesprächen"),
         "forest": ("Wald", "Wald, Wind, Vögel und ferne Insekten"),
         "beach": ("Meer & Strand", "Wellen an einem Kieselstrand"),
         "brook": ("Waldbach", "Ein kleiner Bach fließt durch den Wald"),
@@ -113,7 +118,7 @@ AMBIENT_TRANSLATIONS = {
         "night_crickets": ("Nachtfeld & Grillen", "Langes Grillenkonzert auf einem nächtlichen Feld"),
     },
     "pl": {
-        "cafe": ("Kawiarnia", "Spokojna kawiarnia z cichymi rozmowami"),
+        "cafe": ("Kawiarnia", "Mała spokojna kawiarnia z cichymi rozmowami"),
         "forest": ("Las", "Las, wiatr, ptaki i odległe owady"),
         "beach": ("Morze i plaża", "Fale na kamienistej plaży"),
         "brook": ("Leśny strumień", "Mały strumień płynący przez las"),
@@ -121,7 +126,7 @@ AMBIENT_TRANSLATIONS = {
         "night_crickets": ("Nocne pole i świerszcze", "Długi nocny chór świerszczy polnych"),
     },
     "fr": {
-        "cafe": ("Café", "Café calme avec conversations feutrées"),
+        "cafe": ("Café", "Petit café calme aux conversations feutrées"),
         "forest": ("Forêt", "Forêt, vent, oiseaux et insectes lointains"),
         "beach": ("Mer et plage", "Vagues sur une plage de galets"),
         "brook": ("Ruisseau forestier", "Petit ruisseau traversant une forêt"),
@@ -129,7 +134,7 @@ AMBIENT_TRANSLATIONS = {
         "night_crickets": ("Champ nocturne et grillons", "Long chœur nocturne de grillons des champs"),
     },
     "es": {
-        "cafe": ("Cafetería", "Cafetería tranquila con conversaciones suaves"),
+        "cafe": ("Cafetería", "Cafetería pequeña y tranquila con conversaciones suaves"),
         "forest": ("Bosque", "Bosque, viento, pájaros e insectos lejanos"),
         "beach": ("Mar y playa", "Olas sobre una playa de guijarros"),
         "brook": ("Arroyo del bosque", "Un pequeño arroyo que atraviesa el bosque"),
