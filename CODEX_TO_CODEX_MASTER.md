@@ -642,6 +642,11 @@ Im Dienst-Tab lassen sich alle Dienste aktivieren, deaktivieren und in ihrer
 Priorität nach oben oder unten verschieben. Die Reihenfolge ist damit keine
 fest verdrahtete Browserdarstellung.
 
+Im Radio-Tab darf die Überschrift `Sender & Wiedergabe` nicht den verfügbaren
+Inhaltsraum dominieren. Ihre Schriftgröße beträgt ungefähr 50 Prozent der
+bisherigen globalen großen `h1`-Darstellung; diese gezielte Korrektur verändert
+keine anderen Seiten-, Wetter- oder Systemüberschriften.
+
 Auf breiten Browserfenstern bleibt rechts oben eine nicht mitscrollende native
 240-x-280-Liveansicht sichtbar. Sie zeigt die Pixel desselben Pillow-Renderers,
 der das reale Whisplay versorgt, und keine separat nachgebaute Browsergrafik.
@@ -880,6 +885,13 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-31 – Radioüberschrift auf halbe Größe reduziert
+
+- Robert bewertet die Browserüberschrift `Sender & Wiedergabe` als deutlich zu
+  groß. Ausschließlich dieser Titel wird auf ungefähr 50 Prozent der bisherigen
+  responsiven `h1`-Größe verkleinert. Andere Überschriften und das Kartenlayout
+  bleiben unverändert.
 
 ### 2026-10-31 – DWD-Satellitenwetter und persistente Dienstpriorität
 

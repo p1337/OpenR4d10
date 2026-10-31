@@ -13,6 +13,7 @@ class WebTests(unittest.TestCase):
         web_root = Path(__file__).resolve().parents[1] / "web"
         html = web_root.joinpath("index.html").read_text(encoding="utf-8")
         script = web_root.joinpath("app.js").read_text(encoding="utf-8")
+        stylesheet = web_root.joinpath("app.css").read_text(encoding="utf-8")
         for control in (
             "left_outer",
             "left_inner",
@@ -74,6 +75,10 @@ class WebTests(unittest.TestCase):
         self.assertIn("station-row-artwork", script)
         self.assertIn('id="weather-image"', html)
         self.assertIn('id="weather-channel-list"', html)
+        self.assertIn(
+            "#radio-presets-title { font-size: clamp(1.175rem, 3vw, 2.5rem);",
+            stylesheet,
+        )
         self.assertIn('"weather_channel_move"', script)
         self.assertIn('"service_move"', script)
         self.assertIn("DWD / EUMETSAT", html)

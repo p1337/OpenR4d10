@@ -181,6 +181,7 @@ body {
 
 h1, h2, p { margin-top: 0; }
 h1 { max-width: 720px; margin-bottom: 14px; font-size: clamp(2.35rem, 6vw, 5rem); line-height: 0.98; letter-spacing: -0.055em; }
+#radio-presets-title { font-size: clamp(1.175rem, 3vw, 2.5rem); line-height: 1.02; letter-spacing: -0.035em; }
 .hero-copy { max-width: 650px; margin-bottom: 0; color: var(--muted); font-size: clamp(1rem, 2vw, 1.15rem); line-height: 1.65; }
 .hero-meta { flex: 0 0 auto; padding: 15px 0 4px 24px; border-left: 1px solid var(--line-strong); color: var(--muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.76rem; }
 .hero-meta span, .hero-meta time { display: block; }
