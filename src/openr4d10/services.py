@@ -18,7 +18,12 @@ import unicodedata
 import uuid
 from urllib.parse import urlsplit
 
-from .ambient import AMBIENT_BY_ID, AMBIENT_PRESETS, ambient_text
+from .ambient import (
+    AMBIENT_ARTWORK_ROOT,
+    AMBIENT_BY_ID,
+    AMBIENT_PRESETS,
+    ambient_text,
+)
 from .content import (
     CameraSnapshot,
     ContentError,
@@ -128,6 +133,7 @@ class ServiceCatalog:
         radio_buffer: IcyRadioBuffer | None = None,
         adapter_directory: Path | None = None,
         adapter_registry: ServiceAdapterRegistry | None = None,
+        ambient_artwork_root: Path | None = None,
     ) -> None:
         self.store = StateStore(state_directory / "openr4d10.sqlite3")
         self.executable_lookup = executable_lookup
@@ -144,6 +150,7 @@ class ServiceCatalog:
         self.artwork = artwork or PresetArtwork(state_directory / "cache")
         self.track_artwork = track_artwork or TrackArtwork(self.cover_root)
         self.weather = weather or DwdSatelliteFrames(state_directory / "cache")
+        self.ambient_artwork_root = ambient_artwork_root or AMBIENT_ARTWORK_ROOT
         self.radio_buffer = radio_buffer or (
             IcyRadioBuffer(self._store_buffered_track) if player is None else None
         )
@@ -660,6 +667,7 @@ class ServiceCatalog:
             )
         ambient_scenes = []
         for channel, item in enumerate(self.store.channels("ambient"), start=1):
+            preset_id = str(item["external_id"])
             metadata = item.get("metadata")
             metadata = metadata if isinstance(metadata, dict) else {}
             source_url = metadata.get("source_url")
@@ -671,8 +679,13 @@ class ServiceCatalog:
             ambient_scenes.append(
                 {
                     "id": int(item["id"]),
-                    "preset_id": str(item["external_id"]),
+                    "preset_id": preset_id,
                     "name": str(item["name"]),
+                    "artwork": (
+                        f"/api/ambient-art/{preset_id}"
+                        if preset_id in AMBIENT_BY_ID
+                        else None
+                    ),
                     "description": str(metadata.get("description") or ""),
                     "credit": str(metadata.get("credit") or ""),
                     "license_name": str(metadata.get("license_name") or ""),
@@ -1642,6 +1655,11 @@ class ServiceCatalog:
     def content_asset(self, path: str) -> tuple[str, bytes] | None:
         if path in {"camera-1.jpg", "camera-2.jpg"}:
             target = self.camera.cache_root / path
+        elif path.startswith("ambient-art/"):
+            preset_id = path.removeprefix("ambient-art/")
+            if preset_id not in AMBIENT_BY_ID:
+                return None
+            target = self.ambient_artwork_root / f"{preset_id}.jpg"
         elif path.startswith("radio-art/"):
             preset_id = path.removeprefix("radio-art/")
             preset = RADIO_BY_ID.get(preset_id)
@@ -1763,6 +1781,7 @@ class ServiceCatalog:
                     else ("AmbientR4D10", "Choose a soundscape and press play")
                 )
                 ids = [int(item["id"]) for item in scenes]
+                preset_id = str(scene["external_id"]) if scene is not None else ""
                 return {
                     "service": "AMBIENT",
                     "station": scene_name,
@@ -1770,6 +1789,7 @@ class ServiceCatalog:
                     "subtitle": description,
                     "playing": False,
                     "volume": playback.volume,
+                    "preset_id": preset_id if preset_id in AMBIENT_BY_ID else None,
                     "channel": (
                         ids.index(int(scene["id"])) + 1
                         if scene is not None and int(scene["id"]) in ids
@@ -1825,6 +1845,12 @@ class ServiceCatalog:
         elif self.active_service == "ambient" and self.active_ambient_scene_id is not None:
             if active_ambient_scene is not None:
                 track_line = self._ambient_display_text(active_ambient_scene)[1]
+        ambient_preset_id = (
+            str(active_ambient_scene["external_id"])
+            if active_ambient_scene is not None
+            and str(active_ambient_scene["external_id"]) in AMBIENT_BY_ID
+            else None
+        )
         return {
             "service": service_label,
             "station": station,
@@ -1835,7 +1861,9 @@ class ServiceCatalog:
                 self.recorder.state.state == "recording" or buffered_recording
             ),
             "volume": playback.volume,
-            "preset_id": selected["preset_id"] if selected is not None else None,
+            "preset_id": (
+                selected["preset_id"] if selected is not None else ambient_preset_id
+            ),
             "channel": (
                 selected["channel"]
                 if selected is not None

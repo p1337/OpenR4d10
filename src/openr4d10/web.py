@@ -134,6 +134,8 @@ class _DashboardHandler(BaseHTTPRequestHandler):
             self._serve_content(f"camera-{path[-1]}.jpg")
         elif re.fullmatch(r"/api/radio-art/[a-z][a-z0-9_]{1,63}", path):
             self._serve_content(f"radio-art/{path.rsplit('/', 1)[-1]}")
+        elif re.fullmatch(r"/api/ambient-art/[a-z][a-z0-9_]{1,63}", path):
+            self._serve_content(f"ambient-art/{path.rsplit('/', 1)[-1]}")
         elif re.fullmatch(r"/api/media-cover/\d{1,10}", path):
             self._serve_content(f"media-cover/{path.rsplit('/', 1)[-1]}")
         elif re.fullmatch(

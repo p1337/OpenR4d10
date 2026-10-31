@@ -4,7 +4,9 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from openr4d10.ambient import AMBIENT_PRESETS, ambient_text
+from PIL import Image
+
+from openr4d10.ambient import AMBIENT_ARTWORK_ROOT, AMBIENT_PRESETS, ambient_text
 from openr4d10.media import PlaybackState
 from openr4d10.services import ServiceCatalog
 
@@ -54,6 +56,17 @@ class AmbientPresetTests(unittest.TestCase):
                 self.assertTrue(item.source_page.startswith("https://commons.wikimedia.org/"))
                 self.assertTrue(item.license_url.startswith("https://"))
                 self.assertNotIn("audio_url", item.public())
+                self.assertEqual(
+                    item.public()["artwork"], f"/api/ambient-art/{item.preset_id}"
+                )
+
+    def test_each_preset_has_a_readable_bundled_square_artwork(self) -> None:
+        for item in AMBIENT_PRESETS:
+            with self.subTest(item.preset_id):
+                path = AMBIENT_ARTWORK_ROOT / f"{item.preset_id}.jpg"
+                with Image.open(path) as artwork:
+                    self.assertEqual(artwork.format, "JPEG")
+                    self.assertEqual(artwork.size, (768, 768))
 
     def test_device_text_is_localized_without_renaming_custom_scenes(self) -> None:
         self.assertEqual(ambient_text("forest", "de"), ("Wald", "Wald, Wind, Vögel und ferne Insekten"))
@@ -99,6 +112,9 @@ class AmbientServiceTests(unittest.TestCase):
                 snapshot = catalog.snapshot()["ambient"]
                 self.assertEqual(len(snapshot["scenes"]), 6)
                 self.assertNotIn("source_url", snapshot["scenes"][0])
+                self.assertEqual(
+                    snapshot["scenes"][0]["artwork"], "/api/ambient-art/cafe"
+                )
                 first, second = snapshot["scenes"][:2]
                 catalog.control({"action": "ambient_step", "steps": 1})
                 self.assertEqual(player.playlists, [])
@@ -126,6 +142,27 @@ class AmbientServiceTests(unittest.TestCase):
                 self.assertNotIn(first["preset_id"], {item["preset_id"] for item in scenes})
             finally:
                 reopened.close()
+
+    def test_bundled_artwork_is_served_only_for_known_presets(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            artwork_root = root / "artwork"
+            artwork_root.mkdir()
+            artwork_root.joinpath("cafe.jpg").write_bytes(b"cafe-art")
+            catalog = ServiceCatalog(
+                root,
+                player=Player(),
+                recorder=Recorder(),
+                ambient_artwork_root=artwork_root,
+            )
+            try:
+                self.assertEqual(
+                    catalog.content_asset("ambient-art/cafe"),
+                    ("image/jpeg", b"cafe-art"),
+                )
+                self.assertIsNone(catalog.content_asset("ambient-art/custom-example"))
+            finally:
+                catalog.close()
 
     def test_custom_scene_rejects_query_bearing_urls(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

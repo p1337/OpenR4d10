@@ -14,6 +14,15 @@ anonymous ffmpeg default client with HTTP 429. Updates seed the catalog only
 once and never recreate a scene that the user deliberately deleted from
 persistent state.
 
+Each built-in scene has a bundled, text-free square artwork in
+`assets/ambient/`. The six images deliberately share one visual language:
+cinematic miniature-diorama realism, deep charcoal/petrol shadows and restrained
+`#FDB813` amber light. They are generated project assets rather than remote
+downloads, so both the browser and the physical display keep working offline.
+The central composition remains readable as a 46-pixel list thumbnail and when
+cropped into the native 240 x 280 player. User-created scenes keep the existing
+initials fallback; arbitrary filenames are never accepted by the artwork API.
+
 | Scene | Recording | Credit | License |
 |---|---|---|---|
 | Café | [Cafe ambiance.ogg](https://commons.wikimedia.org/wiki/File:Cafe_ambiance.ogg) | Marble Toast | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |

@@ -19,6 +19,7 @@ from typing import Any, Protocol
 
 from PIL import Image
 
+from .ambient import AMBIENT_ARTWORK_ROOT, AMBIENT_BY_ID
 from .config import AdapterConfig, HardwareConfig
 from .device_ui import DISPLAY_TEXT, DeviceUiState, image_to_rgb565, render_device_ui
 from .input_events import InputEvent
@@ -124,11 +125,13 @@ class WhisplayDisplay:
         self,
         panel: WhisplayPanel | None = None,
         artwork_cache_root: Path | None = None,
+        ambient_artwork_root: Path | None = None,
         state_directory: Path | None = None,
     ) -> None:
         self.panel = panel or WhisplayPanel()
         self.state = DeviceUiState()
         self.artwork_cache_root = artwork_cache_root
+        self.ambient_artwork_root = ambient_artwork_root or AMBIENT_ARTWORK_ROOT
         self.hotspot_status_path = (
             state_directory / "hotspot-status.json"
             if state_directory is not None
@@ -215,6 +218,16 @@ class WhisplayDisplay:
             )
         ):
             path = self.artwork_cache_root / self.state.image_file
+            try:
+                with Image.open(path) as source:
+                    artwork = source.convert("RGB").copy()
+            except OSError:
+                artwork = None
+        elif (
+            self.state.service == "AMBIENT"
+            and self.state.preset_id in AMBIENT_BY_ID
+        ):
+            path = self.ambient_artwork_root / f"{self.state.preset_id}.jpg"
             try:
                 with Image.open(path) as source:
                     artwork = source.convert("RGB").copy()

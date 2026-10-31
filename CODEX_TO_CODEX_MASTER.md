@@ -2500,3 +2500,19 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   dreimal. Fehlende Hardware, ein noch nicht bereiter NetworkManager und ein
   fehlgeschlagener AP-Start werden ohne Zugangsdaten im Status festgehalten;
   der 30-Sekunden-Timer versucht die Wiederherstellung weiter.
+
+### 2026-10-31 – Einheitliche AmbientR4D10-Bildserie
+
+- Alle sechs eingebauten Ambient-Szenen besitzen lokale, textfreie
+  Quadratgrafiken: Café, Wald, Meer/Strand, Waldbach, sanfter Regen sowie
+  Nachtfeld/Grillen.
+- Verbindliche Bildsprache ist eine ruhige, hochwertige, filmische
+  Miniaturwelt mit dunklen Anthrazit-/Petroltönen und zurückhaltenden
+  `#FDB813`-Lichtakzenten. Hauptmotive bleiben im zentralen Bildbereich, damit
+  die Grafik sowohl als 46-Pixel-Web-Thumbnail als auch im zugeschnittenen
+  240-x-280-Geräteplayer lesbar bleibt.
+- Die Grafiken liegen unter `assets/ambient/`, werden offline aus dem Release
+  ausgeliefert und erscheinen sowohl in der Webliste als auch auf dem echten
+  Whisplay. Die API akzeptiert ausschließlich IDs aus dem kuratierten
+  Ambient-Katalog; benutzerdefinierte Szenen verwenden weiterhin den
+  Initialen-Fallback.

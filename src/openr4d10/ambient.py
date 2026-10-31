@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +22,7 @@ class AmbientPreset:
             "preset_id": self.preset_id,
             "name": self.name,
             "description": self.description,
+            "artwork": f"/api/ambient-art/{self.preset_id}",
             "source_page": self.source_page,
             "credit": self.credit,
             "license_name": self.license_name,
@@ -99,6 +101,7 @@ AMBIENT_PRESETS = (
 )
 
 AMBIENT_BY_ID = {item.preset_id: item for item in AMBIENT_PRESETS}
+AMBIENT_ARTWORK_ROOT = Path(__file__).resolve().parents[2] / "assets" / "ambient"
 
 AMBIENT_TRANSLATIONS = {
     "de": {

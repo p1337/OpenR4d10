@@ -780,6 +780,16 @@ function renderAmbient(catalog) {
   scenes.forEach((scene, index) => {
     const row = document.createElement("li");
     if (scene.active) row.dataset.active = "true";
+    const artwork = document.createElement("span");
+    artwork.className = "station-row-artwork ambient-row-artwork";
+    artwork.dataset.initials = initials(scene.name);
+    if (scene.artwork) {
+      const image = document.createElement("img");
+      image.src = scene.artwork;
+      image.alt = "";
+      image.loading = "lazy";
+      artwork.append(image);
+    }
     const copy = document.createElement("span");
     copy.className = "station-row-copy";
     const name = document.createElement("strong");
@@ -820,7 +830,7 @@ function renderAmbient(catalog) {
       down,
       ambientButton(t("Delete"), "ambient_scene_delete", { scene_id: scene.id }),
     );
-    row.append(copy, actions);
+    row.append(artwork, copy, actions);
     list.append(row);
   });
   setText("ambient-scene-count", scenes.length);

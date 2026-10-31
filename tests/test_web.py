@@ -183,6 +183,7 @@ class WebTests(unittest.TestCase):
                 if name in {
                     "camera-1.jpg",
                     "radio-art/swr3",
+                    "ambient-art/cafe",
                     "weather-dwd-deutschland-20261031T060000Z.jpg",
                 }
                 else None,
@@ -224,6 +225,9 @@ class WebTests(unittest.TestCase):
                 with urlopen(f"http://{host}:{port}/api/radio-art/swr3", timeout=2) as response:
                     self.assertEqual(response.headers["Content-Type"], "image/jpeg")
                     self.assertEqual(response.read(), b"radio-art/swr3")
+                with urlopen(f"http://{host}:{port}/api/ambient-art/cafe", timeout=2) as response:
+                    self.assertEqual(response.headers["Content-Type"], "image/jpeg")
+                    self.assertEqual(response.read(), b"ambient-art/cafe")
                 weather_name = "weather-dwd-deutschland-20261031T060000Z.jpg"
                 with urlopen(f"http://{host}:{port}/api/weather-frame/{weather_name}", timeout=2) as response:
                     self.assertEqual(response.headers["Content-Type"], "image/jpeg")

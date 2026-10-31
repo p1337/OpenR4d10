@@ -74,7 +74,8 @@ the installer report exactly which adapters still need configuration.
   search and playback through the existing audio owner
 - separate AmbientR4D10 audio service with six license-documented café,
   forest, beach, brook, rain and night soundscapes, endless looping and a
-  persistent sortable scene library
+  persistent sortable scene library with one consistent bundled artwork per
+  built-in scene in both the browser and physical display
 - standard-library-only test suite and GitHub Actions CI
 
 Hardware-specific integration still pending:
@@ -317,7 +318,9 @@ from reviewed public Wikimedia Commons files and looped by the existing private
 mpv owner. Browsing and scene selection do not disturb other audio; only an
 explicit Play replaces the current source. Scene order, deletion and custom
 credential-free HTTP(S) additions persist across updates. Sources, attribution
-and licenses are recorded in [`docs/AMBIENT.md`](docs/AMBIENT.md).
+and licenses are recorded in [`docs/AMBIENT.md`](docs/AMBIENT.md). The six
+matching scene artworks are bundled locally, so no external image service is
+needed at runtime.
 
 If the repository files are already present, the local command remains:
 

@@ -531,6 +531,34 @@ class WhisplayDisplayTests(unittest.TestCase):
         self.assertTrue(payload.startswith(b"\x89PNG\r\n\x1a\n"))
         self.assertEqual(Image.open(BytesIO(payload)).size, (WIDTH, HEIGHT))
 
+    def test_ambient_scene_uses_its_bundled_artwork(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            artwork_root = root / "ambient"
+            artwork_root.mkdir()
+            Image.new("RGB", (32, 32), (12, 98, 44)).save(
+                artwork_root / "forest.jpg"
+            )
+            display = WhisplayDisplay(
+                panel=FakePanel(),  # type: ignore[arg-type]
+                ambient_artwork_root=artwork_root,
+            )
+            display.state.service_index = 3
+            display.state.preset_id = "forest"
+            with patch("openr4d10.adapters.render_device_ui") as renderer:
+                renderer.return_value = Image.new("RGB", (WIDTH, HEIGHT))
+                display._render_image()
+            loaded = renderer.call_args.args[1]
+            self.assertIsNotNone(loaded)
+            self.assertTrue(
+                all(
+                    abs(actual - expected) <= 2
+                    for actual, expected in zip(
+                        loaded.getpixel((16, 16)), (12, 98, 44), strict=True
+                    )
+                )
+            )
+
     def test_hotspot_secret_is_read_only_by_the_physical_display_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             state_root = Path(raw)
