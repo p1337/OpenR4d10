@@ -1093,6 +1093,12 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 - Die reale Wiedergabe muss nach jeder Änderung auf dem Pi gestartet, über den
   öffentlichen Status als aktiver Ambient-Dienst bestätigt und anschließend
   wieder sauber gestoppt werden. Ein bloß grüner Unit-Test genügt hierfür nicht.
+- Der zweite reale Test bestätigt die neue HTTP-Kennung im laufenden
+  mpv-Prozess, zeigt bei der 20-Minuten-Cafédatei jedoch eine zweite Grenze:
+  Das Öffnen benötigt länger als das bisherige Drei-Sekunden-IPC-Fenster. Das
+  begrenzte Antwortfenster des einzigen Players wird auf 15 Sekunden erhöht.
+  URL-Validierung, Prozessisolation und die übrigen Content-Grenzen bleiben
+  unverändert; ein unbegrenztes Warten ist weiterhin verboten.
 
 ### 2026-10-31 – Eigener AmbientR4D10-Klanglandschaftsdienst
 

@@ -19,6 +19,9 @@ class MediaError(RuntimeError):
     pass
 
 
+MPV_IPC_TIMEOUT_SECONDS = 15.0
+
+
 def _is_absolute_target_path(path: Path) -> bool:
     """Recognize native host paths and absolute Linux target paths in tests."""
     return path.is_absolute() or str(path).startswith(("/", "\\"))
@@ -129,7 +132,7 @@ class MpvEngine:
             child.close()
             raise
         child.close()
-        parent.settimeout(3.0)
+        parent.settimeout(MPV_IPC_TIMEOUT_SECONDS)
         self._ipc = parent
         self._buffer = b""
 

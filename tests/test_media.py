@@ -5,6 +5,7 @@ import tempfile
 import unittest
 
 from openr4d10.media import (
+    MPV_IPC_TIMEOUT_SECONDS,
     MpvEngine,
     StreamRecorder,
     public_source_label,
@@ -68,6 +69,9 @@ class ProcessBoundaryTests(unittest.TestCase):
             "--user-agent=OpenR4d10 (+https://github.com/p1337/OpenR4d10)",
             command,
         )
+
+    def test_mpv_network_open_timeout_is_bounded_for_long_ambient_sources(self) -> None:
+        self.assertEqual(MPV_IPC_TIMEOUT_SECONDS, 15.0)
 
     def test_playlist_supports_shuffle_navigation_and_favorite_loop(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
