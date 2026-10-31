@@ -573,7 +573,12 @@ class ServiceCatalogTests(unittest.TestCase):
                     }
                 )
                 self.assertIsInstance(added["channel_id"], int)
+                self.assertEqual(receiver.state["talkgroups"], [])
+                catalog.active_service = "webradio"
+                started = catalog.control({"action": "brandmeister_toggle"})
                 self.assertEqual(receiver.state["talkgroups"], [91, 262])
+                self.assertEqual(started["brandmeister"]["status"], "listening")
+                self.assertEqual(catalog.active_service, "brandmeister")
             finally:
                 catalog.close()
             reopened = ServiceCatalog(
@@ -644,8 +649,10 @@ class ServiceCatalogTests(unittest.TestCase):
                 self.assertEqual(toggled["talkgroup"], 117)
                 snapshot = catalog.snapshot()["brandmeister"]
                 self.assertEqual(snapshot["selected_talkgroup"], 117)
-                self.assertIn(117, snapshot["talkgroups"])
+                self.assertEqual(snapshot["talkgroups"], [])
+                catalog.player.state.volume = 40
                 frame = catalog.receiver_overlay("DMR")
+                self.assertEqual(frame["volume"], 40)
                 self.assertEqual(frame["catalog_position"], 2)
                 self.assertEqual(frame["catalog_count"], 60)
                 self.assertEqual(
@@ -660,6 +667,13 @@ class ServiceCatalogTests(unittest.TestCase):
                         for item in catalog._brandmeister_device_entries(allow_network=False)[2:]
                     )
                 )
+                started = catalog.control({"action": "brandmeister_toggle"})
+                self.assertEqual(started["brandmeister"]["talkgroups"], [91, 117])
+                self.assertEqual(started["brandmeister"]["volume"], 40)
+                self.assertEqual(catalog.active_service, "brandmeister")
+                stopped = catalog.control({"action": "brandmeister_toggle"})
+                self.assertEqual(stopped["brandmeister"]["status"], "stopped")
+                self.assertEqual(catalog.active_service, "system")
                 jumped = catalog.control({"action": "brandmeister_jump_first"})
                 self.assertEqual(jumped["talkgroup"], 91)
                 jumped_snapshot = catalog.snapshot()["brandmeister"]

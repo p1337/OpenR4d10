@@ -2810,3 +2810,21 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   zentral serialisierten Anwendungspfad. Web, Tastatur und Hardwaretaster
   erhalten dadurch keine getrennte Navigation. Beim Schließen des Dienstes
   wird der Abfragethread vor der GPIO-Freigabe beendet.
+
+### 2026-10-31 – BrandMeister-Play und PTT-TG-Schaltung
+
+- Robert korrigiert die unmittelbar vorherige Klickbelegung erneut und
+  abschließend: In der normalen BrandMeister-Ansicht startet der kurze rechte
+  Druck die Empfangswiedergabe der bereits aktivierten Talkgroups. Er ist damit
+  die ausdrückliche Play-Aktion und ersetzt bei Bedarf laufendes Radioaudio.
+- Die PTT-Druckflanke aktiviert beziehungsweise deaktiviert die markierte
+  Talkgroup in der persistenten Quickliste. Die Loslassflanke bleibt inert und
+  es wird weiterhin keinerlei Sprache oder DMR-PTT gesendet. In geöffneten
+  Menüs bleibt PTT Zurück/Abbrechen; langer rechter Druck bleibt Schnellmenü.
+- Fünf bereits aktivierte Gruppen verhindern Play nicht. Das Fünferlimit gilt
+  ausschließlich für den Versuch, eine sechste Gruppe zu aktivieren.
+- Die Displaylautstärke stammt dienstübergreifend aus dem zentralen tatsächlichen
+  Audiopegel. Eine inaktive BrandMeister-Instanz darf während sichtbarer
+  DMR-Ansicht nicht ihren alten Wert – typischerweise 30 Prozent – über die
+  hörbar geänderte Radio-/Playerlautstärke schreiben. Beim Start des nativen
+  DMR-Empfängers wird genau dieser zentrale Pegel übernommen.

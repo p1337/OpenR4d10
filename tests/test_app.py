@@ -573,7 +573,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(opened["weather_channel_id"], 2)
         self.assertEqual(stepped["weather_channel_id"], 2)
 
-    def test_dmr_axes_browse_ptt_jumps_first_and_enter_toggles_talkgroup(self) -> None:
+    def test_dmr_axes_browse_ptt_toggles_talkgroup_and_enter_controls_playback(self) -> None:
         class InputDisplay:
             def __init__(self):
                 self.input_handler = None
@@ -637,8 +637,8 @@ class AppTests(unittest.TestCase):
             [
                 {"action": "brandmeister_step", "steps": 1},
                 {"action": "brandmeister_step", "steps": -25},
-                {"action": "brandmeister_jump_first"},
                 {"action": "brandmeister_toggle_selected"},
+                {"action": "brandmeister_toggle"},
             ],
         )
 

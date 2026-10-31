@@ -350,7 +350,7 @@ class OpenR4d10App:
             elif selected_service == "AMBIENT":
                 action = "ambient_toggle"
             elif selected_service == "DMR":
-                action = "brandmeister_toggle_selected"
+                action = "brandmeister_toggle"
             else:
                 action = None
             if action is not None:
@@ -363,7 +363,7 @@ class OpenR4d10App:
             and selected_service == "DMR"
         ):
             media_result = self.services.control(
-                {"action": "brandmeister_jump_first"}
+                {"action": "brandmeister_toggle_selected"}
             )
         elif (
             self.services is not None

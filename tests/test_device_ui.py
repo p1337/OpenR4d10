@@ -197,7 +197,7 @@ class DeviceUiTests(unittest.TestCase):
         )
         with patch.object(ImageDraw.ImageDraw, "text", new=capture_text):
             render_device_ui(state)
-        for expected in ("LAU", "SPR", "25", "TG", "262", "DST", "DMR", "AN"):
+        for expected in ("LAU", "SPR", "25", "TG", "262", "DST", "DMR", "PLAY"):
             self.assertIn(expected, labels)
         self.assertNotIn("SQL", labels)
         self.assertNotIn("KAN", labels)
@@ -206,7 +206,7 @@ class DeviceUiTests(unittest.TestCase):
         state.dmr_selected_enabled = True
         with patch.object(ImageDraw.ImageDraw, "text", new=capture_text):
             render_device_ui(state)
-        self.assertIn("AUS", labels)
+        self.assertIn("PLAY", labels)
 
     def test_dmr_view_pins_active_call_above_scrollable_catalog_rows(self) -> None:
         state = DeviceUiState(
@@ -253,7 +253,7 @@ class DeviceUiTests(unittest.TestCase):
         self.assertIn("2/1700", drawn)
         self.assertIn("ON", drawn)
         self.assertIn("OFF", drawn)
-        self.assertNotIn("PAUSE", drawn)
+        self.assertIn("PAUSE", drawn)
 
     def test_date_and_redundant_player_text_are_not_rendered(self) -> None:
         first = DeviceUiState(

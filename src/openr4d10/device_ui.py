@@ -1039,8 +1039,6 @@ def render_device_ui(
     left_action = str(text["menu"])
     if state.menu_open:
         right_action = "OK"
-    elif state.service == "DMR":
-        right_action = str(text["dmr_off"] if state.dmr_selected_enabled else text["dmr_on"])
     elif state.service in {"RADIO", "AMBIENT", "DMR", "PLAYER"}:
         right_action = str(text["pause"] if state.playing else text["play"])
     else:

@@ -581,6 +581,20 @@ class ServiceCatalog:
         self.active_ambient_scene_id = None
         return state
 
+    def _reconfigure_brandmeister_receiver(self) -> dict[str, object]:
+        """Apply TG changes without stealing audio from another active service."""
+
+        state = self.brandmeister.snapshot()
+        status = str(state.get("status") or "stopped")
+        if self.active_service == "brandmeister" or status in {
+            "connecting",
+            "listening",
+            "call",
+            "reconnecting",
+        }:
+            return self._restart_brandmeister_receiver()
+        return state
+
     def _stop_brandmeister_for_audio_owner(self) -> None:
         if self.active_service == "brandmeister":
             self.brandmeister.stop()
@@ -1515,6 +1529,22 @@ class ServiceCatalog:
                 "talkgroup": talkgroup,
                 "name": str(selected["name"]),
             }
+        elif action == "brandmeister_toggle":
+            self._require_enabled("brandmeister")
+            state = self.brandmeister.snapshot()
+            status = str(state.get("status") or "stopped")
+            if self.active_service == "brandmeister" and status in {
+                "connecting",
+                "listening",
+                "call",
+                "reconnecting",
+            }:
+                self.brandmeister.stop()
+                self.active_service = "system"
+                return {"brandmeister": self.brandmeister.snapshot()}
+            if not self._enabled_brandmeister_talkgroups():
+                raise ValueError("select at least one BrandMeister talkgroup before play")
+            return {"brandmeister": self._restart_brandmeister_receiver()}
         elif action == "brandmeister_toggle_selected":
             self._require_enabled("brandmeister")
             entry = self._selected_brandmeister_entry()
@@ -1535,7 +1565,7 @@ class ServiceCatalog:
                     {"talkgroup": talkgroup, "enabled": True},
                 )
                 self.selected_brandmeister_channel_id = channel_id
-                state = self._restart_brandmeister_receiver()
+                state = self._reconfigure_brandmeister_receiver()
                 return {
                     "channel_id": channel_id,
                     "talkgroup": talkgroup,
@@ -1551,7 +1581,7 @@ class ServiceCatalog:
             self.store.update_channel(int(channel["id"]), str(channel["name"]), metadata)
             self.selected_brandmeister_talkgroup = talkgroup
             self.selected_brandmeister_channel_id = int(channel["id"])
-            state = self._restart_brandmeister_receiver()
+            state = self._reconfigure_brandmeister_receiver()
             return {
                 "channel_id": int(channel["id"]),
                 "talkgroup": talkgroup,
@@ -1595,7 +1625,7 @@ class ServiceCatalog:
             self.selected_brandmeister_channel_id = channel_id
             self.selected_brandmeister_talkgroup = talkgroup
             if enabled:
-                self._restart_brandmeister_receiver()
+                self._reconfigure_brandmeister_receiver()
             return {"channel_id": channel_id}
         elif action == "brandmeister_talkgroup_set":
             self._require_enabled("brandmeister")
@@ -1614,7 +1644,7 @@ class ServiceCatalog:
                 raise ValueError("at most five BrandMeister talkgroups can be active")
             metadata["enabled"] = enabled
             self.store.update_channel(channel_id, str(channel["name"]), metadata)
-            state = self._restart_brandmeister_receiver()
+            state = self._reconfigure_brandmeister_receiver()
             return {"channel_id": channel_id, "enabled": enabled, "brandmeister": state}
         elif action == "brandmeister_talkgroup_delete":
             self._require_enabled("brandmeister")
@@ -1633,7 +1663,7 @@ class ServiceCatalog:
                 metadata = selected.get("metadata") if selected is not None else None
                 talkgroup = metadata.get("talkgroup") if isinstance(metadata, dict) else None
                 self.selected_brandmeister_talkgroup = talkgroup if isinstance(talkgroup, int) else None
-            self._restart_brandmeister_receiver()
+            self._reconfigure_brandmeister_receiver()
             return {"deleted": deleted}
         elif action == "brandmeister_talkgroup_move":
             self._require_enabled("brandmeister")
@@ -2573,7 +2603,7 @@ class ServiceCatalog:
                     else "Select talkgroups and press play"
                 ),
                 "playing": listening,
-                "volume": int(state.get("volume", playback.volume)),
+                "volume": playback.volume,
                 "channel": (
                     catalog_talkgroups.index(selected_talkgroup) + 1
                     if selected_talkgroup is not None and selected_talkgroup in catalog_talkgroups

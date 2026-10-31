@@ -41,11 +41,12 @@ speaking subscribed talkgroup is pinned above the scrolling rows and shows its
 destination, source ID and available alias. The device no longer renders a
 single decorative TG or country tile.
 
-The short right press while the BrandMeister view is open adds and enables the
-selected talkgroup in the persistent quick list or disables an already saved
-entry. PTT has a separate navigation role: its press edge returns the selection
-to the first entry of the enabled-first catalog, while release is inert. Inside
-a menu PTT keeps its normal back/cancel role. A long right press remains the
+The short right press while the BrandMeister view is open starts reception of
+the already enabled talkgroups. This is an explicit Play action and takes audio
+ownership from a running radio or another audio service. PTT instead adds and
+enables the selected talkgroup in the persistent quick list or disables an
+already saved entry; only its press edge toggles and release is inert. Inside a
+menu PTT keeps its normal back/cancel role. A long right press remains the
 service quick menu. The header changes with the service and shows the real DMR
 assignments instead of `SQL` and a generic channel label. Up to five checked
 talkgroups are subscribed at once. None of these controls transmits audio or a
@@ -61,10 +62,19 @@ list does not claim to enumerate silent members of a talkgroup. Geographic or
 callsign enrichment through third-party subscriber databases is deliberately
 not performed without a separately reviewed data-use contract.
 
-The selected talkgroup's right-button action is explicit: `ON`/localized `AN`
-means the next short right press enables it; `OFF`/localized `AUS` means the
-same action disables it. Browser rows combine the normal checkbox with the same
-translated written state. No separate save step is required.
+The selected row exposes `ON`/localized `AN` or `OFF`/localized `AUS`; PTT
+changes that state. The right-button edge label remains `PLAY` (or the localized
+equivalent) because that button starts reception. Browser rows combine the
+normal checkbox with the same translated written state. A list change updates
+an already running receiver but leaves a different audio service untouched;
+the right Play action remains the only takeover. No separate save step is
+required.
+
+Display volume has one authoritative value: the central audio-owner volume in
+`MpvEngine.state.volume`. A dormant BrandMeister receiver snapshot must not
+overwrite that value during a DMR-view refresh while radio is still the active
+audio owner. Starting BrandMeister copies the same value into its ALSA receiver,
+so the header and audible output remain synchronized across service changes.
 
 On 2026-10-31 the user heard a real subscribed HoseLine call through the fitted
 Whisplay speaker. This confirms the complete native WebSocket, MessagePack,

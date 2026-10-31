@@ -84,8 +84,8 @@ the installer report exactly which adapters still need configuration.
   checkbox quick list, complete searchable official catalog, country flags and
   compact per-talkgroup current/last-heard participant rows on web and device;
   the physical view pins the speaking TG above a scrollable enabled-first
-  catalog window; a short right click toggles the marked TG while PTT returns
-  the selection to the beginning of the catalog without transmitting;
+  catalog window; a short right click starts reception of the enabled TGs while
+  PTT toggles the marked TG without transmitting;
   no account password or user token
 - standard-library-only test suite and GitHub Actions CI
 
@@ -276,20 +276,22 @@ catalog one entry at a time, while the left inner axis jumps 25 entries per
 detent. The device renders a bounded window over the entire catalog with
 enabled entries first and all inactive entries below them. A speaking TG is
 pinned above that list and shows the DMR source ID plus the HoseLine talker
-alias when the network supplied one. The short right press toggles the selected
-TG. PTT instead returns the selection to the beginning of the enabled-first
-catalog on its press edge. Neither action transmits audio. A long right press
+alias when the network supplied one. The short right press starts BrandMeister
+reception for the enabled TGs and therefore explicitly takes over audio from
+radio or another audio service. PTT toggles the selected TG on its press edge;
+its release edge is inert. Neither action transmits audio. A long right press
 remains the service quick menu. The localized header shows these real assignments
 (`JMP`/`TG` in English) instead of the normal `SQL`/`CH` labels. On 2026-10-31
 a real subscribed HoseLine call was heard through the fitted Whisplay speaker,
 confirming the native ALSA path. Ended calls remain visibly marked as last
 heard until a new receiver session begins. This is observed HoseLine activity,
 not a claim that every member of a talkgroup is online.
-The vertical right-button label is deliberately action-oriented: `AN` means
-the currently selected talkgroup will be enabled by a short press, while `AUS`
-means the same press will disable it. In the browser every saved row has a
-normal checkbox plus a written On/Off state; changing one immediately restarts
-the bounded native subscription with the checked set.
+The vertical right-button label shows `PLAY` or its localized equivalent
+because the right press owns reception start. The selected catalog row still
+shows its translated On/Off state, and PTT changes that state. In the browser
+every saved row has a normal checkbox plus a written On/Off state. A change
+reconfigures an already running receiver immediately, but never steals audio
+from radio while BrandMeister is stopped.
 
 The service section accepts an explicit `http` or `https` audio URL for local
 playback and recording. It rejects credentials embedded in URLs and does not
