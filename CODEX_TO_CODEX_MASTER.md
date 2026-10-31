@@ -1076,6 +1076,22 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-31 – Reale PWM-Nachprüfung und geplanter LED-Messversuch
+
+- Die 60-Prozent-Helligkeit ist nach dem PWM-Caching im normalen Betrieb
+  weitgehend stabil. Ein einzelnes kurzes Flackern wurde im Batteriebetrieb
+  vermutlich während höherer Rechenlast beobachtet; Robert bewertet diese
+  sehr seltene Resterscheinung aktuell als akzeptabel. Die Korrektur wird daher
+  als deutlich wirksam, aber nicht als physikalisch absolut flackerfrei
+  dokumentiert.
+- Ein beaufsichtigter Messversuch mit ausgeschalteter RGB-LED, wechselndem
+  Umgebungslicht und Abdecken per Hand ist für später vorgesehen. Ein Raspberry
+  Pi kann am Digital-GPIO keinen Widerstand direkt messen. Denkbar wäre nur eine
+  zeitbasierte Photodioden-/Kapazitätsmessung nach vorheriger Verifikation von
+  Schaltung, GPIO-Richtung, gemeinsamer LED-Elektrode, Vorwiderstand und sicheren
+  Pegeln. Vor dieser Prüfung wird kein Pin rückwärts oder gegen einen Ausgang
+  getrieben.
+
 ### 2026-10-31 – Glow-Eckbalance, Randbeschriftung und Dienstkandidaten
 
 - Das reale Vorschaubild bestätigt den kräftigen Player-Glow und seinen

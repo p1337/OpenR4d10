@@ -254,6 +254,18 @@ waveform running continuously. Raspberry Pi OS also provides a kernel
 `pwm-gpio` driver for arbitrary GPIO, but a permanent boot overlay would claim
 BCM22 before the native boot animation can own it; it is therefore not enabled
 without a designed boot-to-application ownership handoff.
+Real follow-up at 60 percent confirms that this change makes the panel stable
+for normal use. One very brief residual flicker was seen on battery power,
+possibly during a compute-load transition, and is currently accepted by the
+owner. This evidence means "rare residual event", not a guarantee of
+zero-flicker electrical behavior.
+
+The proposed RGB-LED light experiment cannot be a direct resistance read: the
+Pi header exposes digital GPIO and no ADC. A later supervised test may look for
+light-dependent junction discharge timing only after the LED common terminal,
+series resistors, GPIO directions and safe voltage/reverse-bias limits have
+been verified on the actual board. Until then all three active-low LED GPIOs
+remain ordinary outputs and must not be driven against the Whisplay circuit.
 
 The application media boundary uses generic ALSA through Debian's mpv and
 ffmpeg packages. Its systemd unit allows the standard `char-alsa` device class
