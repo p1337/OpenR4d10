@@ -279,6 +279,11 @@ to the top and shows the DMR source ID plus the HoseLine talker alias when the
 network supplied one. Ended calls remain visibly marked as last heard until a
 new receiver session begins. This is observed HoseLine activity, not a claim
 that every member of a talkgroup is online.
+The vertical right-button label is deliberately action-oriented: `AN` means
+the currently selected talkgroup will be enabled by a short press, while `AUS`
+means the same press will disable it. In the browser every saved row has a
+normal checkbox plus a written On/Off state; changing one immediately restarts
+the bounded native subscription with the checked set.
 
 The service section accepts an explicit `http` or `https` audio URL for local
 playback and recording. It rejects credentials embedded in URLs and does not

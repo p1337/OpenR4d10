@@ -2751,3 +2751,8 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   weist für öffentliche Integrationen aber auf Genehmigung beziehungsweise
   API-Key und Nutzungsregeln hin. OpenR4d10 zeigt daher zunächst nur die real
   aus HoseLine empfangenen Identitäten.
+- Die Talkgroup-Umschaltung muss ohne Anleitung verständlich sein. Die rechte
+  vertikale Gerätebeschriftung zeigt deshalb aktionsbezogen `AN`, wenn ein
+  kurzer Druck die ausgewählte TG aktiviert, und `AUS`, wenn er sie
+  deaktiviert. Der Browser behält die Checkbox und schreibt zusätzlich den
+  übersetzten Zustand An/Aus in dieselbe kompakte Zeile.

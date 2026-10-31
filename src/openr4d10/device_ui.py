@@ -39,7 +39,8 @@ DISPLAY_TEXT = {
     "en": {
         "controls": ("VOL", "SQL", "CH", "SRV"),
         "dmr_controls": ("VOL", "JMP", "TG", "SRV"),
-        "dmr_toggle": "MARK",
+        "dmr_on": "ON",
+        "dmr_off": "OFF",
         "menu": "MENU",
         "play": "PLAY",
         "pause": "PAUSE",
@@ -83,7 +84,8 @@ DISPLAY_TEXT = {
     "de": {
         "controls": ("LAU", "SQL", "KAN", "DST"),
         "dmr_controls": ("LAU", "SPR", "TG", "DST"),
-        "dmr_toggle": "WAHL",
+        "dmr_on": "AN",
+        "dmr_off": "AUS",
         "menu": "MENÜ",
         "play": "PLAY",
         "pause": "PAUSE",
@@ -127,7 +129,8 @@ DISPLAY_TEXT = {
     "pl": {
         "controls": ("GŁO", "SQL", "KAN", "USŁ"),
         "dmr_controls": ("GŁO", "SKK", "TG", "USŁ"),
-        "dmr_toggle": "WYB",
+        "dmr_on": "WŁ",
+        "dmr_off": "WYŁ",
         "menu": "MENU",
         "play": "GRAJ",
         "pause": "PAUZA",
@@ -171,7 +174,8 @@ DISPLAY_TEXT = {
     "fr": {
         "controls": ("VOL", "SQL", "CAN", "SRV"),
         "dmr_controls": ("VOL", "SAU", "TG", "SRV"),
-        "dmr_toggle": "COCH",
+        "dmr_on": "ON",
+        "dmr_off": "OFF",
         "menu": "MENU",
         "play": "LIRE",
         "pause": "PAUSE",
@@ -215,7 +219,8 @@ DISPLAY_TEXT = {
     "es": {
         "controls": ("VOL", "SQL", "CAN", "SRV"),
         "dmr_controls": ("VOL", "SAL", "TG", "SRV"),
-        "dmr_toggle": "MARC",
+        "dmr_on": "ON",
+        "dmr_off": "OFF",
         "menu": "MENÚ",
         "play": "PLAY",
         "pause": "PAUSA",
@@ -296,6 +301,7 @@ class DeviceUiState:
     image_file: str | None = None
     flag_code: str | None = None
     activity_rows: list[dict[str, object]] = field(default_factory=list)
+    dmr_selected_enabled: bool = False
     title: str = "System online"
     subtitle: str = "Receiver ready"
     playing: bool = False
@@ -344,6 +350,7 @@ class DeviceUiState:
             "image_file": self.image_file,
             "flag_code": self.flag_code,
             "activity_rows": [dict(item) for item in self.activity_rows],
+            "dmr_selected_enabled": self.dmr_selected_enabled,
             "accent_color": "#{:02X}{:02X}{:02X}".format(*self.accent),
         }
 
@@ -475,6 +482,7 @@ class DeviceUiState:
             else None
         )
         activity_rows = receiver.get("activity_rows")
+        self.dmr_selected_enabled = receiver.get("selected_enabled") is True
         self.activity_rows = []
         if isinstance(activity_rows, list):
             for item in activity_rows[:5]:
@@ -992,7 +1000,7 @@ def render_device_ui(
     if state.menu_open:
         right_action = "OK"
     elif state.service == "DMR":
-        right_action = str(text["dmr_toggle"])
+        right_action = str(text["dmr_off"] if state.dmr_selected_enabled else text["dmr_on"])
     elif state.service in {"RADIO", "AMBIENT", "DMR", "PLAYER"}:
         right_action = str(text["pause"] if state.playing else text["play"])
     else:

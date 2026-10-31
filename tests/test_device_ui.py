@@ -195,10 +195,16 @@ class DeviceUiTests(unittest.TestCase):
         )
         with patch.object(ImageDraw.ImageDraw, "text", new=capture_text):
             render_device_ui(state)
-        for expected in ("LAU", "SPR", "25", "TG", "262", "DST", "DMR", "WAHL"):
+        for expected in ("LAU", "SPR", "25", "TG", "262", "DST", "DMR", "AN"):
             self.assertIn(expected, labels)
         self.assertNotIn("SQL", labels)
         self.assertNotIn("KAN", labels)
+
+        labels.clear()
+        state.dmr_selected_enabled = True
+        with patch.object(ImageDraw.ImageDraw, "text", new=capture_text):
+            render_device_ui(state)
+        self.assertIn("AUS", labels)
 
     def test_dmr_view_uses_compact_activity_rows_instead_of_artwork(self) -> None:
         state = DeviceUiState(

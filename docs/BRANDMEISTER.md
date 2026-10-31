@@ -52,6 +52,11 @@ list does not claim to enumerate silent members of a talkgroup. Geographic or
 callsign enrichment through third-party subscriber databases is deliberately
 not performed without a separately reviewed data-use contract.
 
+The selected talkgroup's device action is explicit: `ON`/localized `AN` means
+the next short right press enables it; `OFF`/localized `AUS` means the press
+disables it. Browser rows combine the normal checkbox with the same translated
+written state. No separate save step is required.
+
 On 2026-10-31 the user heard a real subscribed HoseLine call through the fitted
 Whisplay speaker. This confirms the complete native WebSocket, MessagePack,
 G.711 µ-law, PCM and `whisplaysound` ALSA path on the target hardware.

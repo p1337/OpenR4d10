@@ -1447,11 +1447,12 @@ function renderBrandmeisterTalkgroups(state = {}) {
     title.textContent = `${brandmeisterFlag(item.talkgroup)} TG ${item.talkgroup} · ${item.name}`;
     const participant = document.createElement("small");
     const identity = [item.alias, item.source ? `DMR ${item.source}` : ""].filter(Boolean).join(" · ");
+    const switchState = item.enabled ? t("On") : t("Off");
     participant.textContent = item.active
-      ? `${t("Active now")} · ${identity || t("Talker identity not supplied")}`
+      ? `${switchState} · ${t("Active now")} · ${identity || t("Talker identity not supplied")}`
       : identity
-        ? `${t("Last heard")} · ${identity}`
-        : t("Waiting for activity");
+        ? `${switchState} · ${t("Last heard")} · ${identity}`
+        : `${switchState} · ${t("Waiting for activity")}`;
     copy.append(title, participant);
     label.append(checkbox, copy);
     const actions = document.createElement("span");

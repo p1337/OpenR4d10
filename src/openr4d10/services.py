@@ -2436,6 +2436,11 @@ class ServiceCatalog:
         if requested == "DMR":
             selected = self._selected_brandmeister_entry()
             selected_talkgroup = self.selected_brandmeister_talkgroup
+            saved_selected = self._saved_brandmeister_channel_for_talkgroup(selected_talkgroup)
+            saved_metadata = saved_selected.get("metadata") if saved_selected is not None else None
+            selected_enabled = (
+                isinstance(saved_metadata, dict) and saved_metadata.get("enabled") is True
+            )
             selected_name = str(selected.get("name") or "BrandMeister") if selected else "BrandMeister"
             state = self.brandmeister.snapshot()
             destination = state.get("destination")
@@ -2472,6 +2477,7 @@ class ServiceCatalog:
                 "channel_label": str(selected_talkgroup) if selected_talkgroup is not None else "--",
                 "flag_code": country_code(active_talkgroup) if isinstance(active_talkgroup, int) else None,
                 "activity_rows": activity_rows,
+                "selected_enabled": selected_enabled,
             }
         service_label = {
             "webradio": "RADIO",
