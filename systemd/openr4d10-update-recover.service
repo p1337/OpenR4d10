@@ -1,0 +1,18 @@
+[Unit]
+Description=Recover OpenR4d10 update state after a reboot
+Documentation=https://github.com/p1337/OpenR4d10
+After=local-fs.target
+Before=openr4d10.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/local/sbin/openr4d10-update-recover
+UMask=0027
+PrivateTmp=true
+ProtectHome=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

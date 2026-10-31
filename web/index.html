@@ -138,6 +138,18 @@
               <output id="display-brightness-value" for="display-brightness">100%</output><input id="display-brightness" type="range" min="0" max="100" step="5" value="100"><output id="display-brightness-status" aria-live="polite" data-i18n="Loading saved setting.">Loading saved setting.</output>
             </div>
           </section>
+          <section class="panel settings-panel" aria-labelledby="wifi-repair-title">
+            <div class="panel-heading"><div><p class="eyebrow" data-i18n="WLAN REPAIR">WLAN REPAIR</p><h2 id="wifi-repair-title" data-i18n="Repair Wi-Fi configuration">Repair Wi-Fi configuration</h2></div><span class="version" data-i18n="NetworkManager">NetworkManager</span></div>
+            <form class="wifi-repair-form" id="wifi-repair-form">
+              <p class="services-note wifi-warning" data-i18n="Use only in your trusted private network. A successful repair can change the device address and disconnect this page.">Use only in your trusted private network. A successful repair can change the device address and disconnect this page.</p>
+              <label for="wifi-ssid"><strong data-i18n="Wi-Fi name (SSID)">Wi-Fi name (SSID)</strong><input id="wifi-ssid" name="ssid" type="text" maxlength="32" autocomplete="off" required></label>
+              <label for="wifi-passphrase"><strong data-i18n="Wi-Fi passphrase">Wi-Fi passphrase</strong><input id="wifi-passphrase" name="passphrase" type="password" minlength="8" maxlength="64" autocomplete="new-password" required></label>
+              <label class="wifi-check"><input id="wifi-replace-existing" type="checkbox" checked><span data-i18n="After the new connection works, remove all older Wi-Fi profiles.">After the new connection works, remove all older Wi-Fi profiles.</span></label>
+              <label class="wifi-check"><input id="wifi-confirm" type="checkbox" required><span data-i18n="I understand that wrong Wi-Fi data can make the device unreachable.">I understand that wrong Wi-Fi data can make the device unreachable.</span></label>
+              <button type="submit" id="wifi-repair-submit" data-i18n="Repair and connect Wi-Fi">Repair and connect Wi-Fi</button>
+              <output id="wifi-repair-status" aria-live="polite" data-i18n="No Wi-Fi repair is running.">No Wi-Fi repair is running.</output>
+            </form>
+          </section>
           <section class="panel device-control-panel" aria-labelledby="device-control-title">
             <div class="panel-heading"><div><p class="eyebrow" data-i18n="VIRTUAL ENCODERS">VIRTUAL ENCODERS</p><h2 id="device-control-title" data-i18n="Control the device without hardware">Control the device without hardware</h2></div><span class="version" data-i18n="directly on the LCD">directly on the LCD</span></div>
             <p class="keyboard-help"><kbd>W</kbd><kbd>S</kbd> <span data-i18n="Volume">Volume</span> · <kbd>A</kbd><kbd>D</kbd> <span data-i18n="Squelch">Squelch</span> · <kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="Channel/item">Channel/item</span> · <kbd>←</kbd><kbd>→</kbd> <span data-i18n="Service">Service</span> · <kbd data-i18n="Space">Space</kbd> <span data-i18n="Menu">Menu</span> · <kbd>Enter</kbd> <span data-i18n="Select">Select</span></p>

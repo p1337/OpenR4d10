@@ -76,14 +76,25 @@ files in `web/` plus the following endpoints:
 - `/api/weather-frame/<validated-cache-name>` — locally decoded and re-encoded
   DWD satellite frame; remote WMS URLs are never browser image URLs
 
-The control endpoint accepts only JSON up to 4096 bytes, rejects mismatched
-browser origins and never accepts or stores credentials. It supports explicit
+The control endpoint accepts only JSON up to 4096 bytes and rejects mismatched
+browser origins. With the sole exception of the transient `wifi_repair`
+handoff described below, it never accepts credentials; no credential is stored
+in SQLite, status, backups or logs. It supports explicit
 playback, pause, stop, volume and stream-recording actions plus bounded feed and
 camera retrieval, saved station management and local media rescans. Saved
 station URLs containing query strings are rejected; temporary direct playback
 is not persisted. `service_set_enabled` persists module activation; `system`
 cannot be disabled and external modules still require their own adapter. Port,
 bind address and static directory live in `[web]` in `openr4d10.toml`.
+
+`wifi_repair` accepts exactly `ssid`, `passphrase`, `replace_existing` and
+`confirmed`, with both booleans required to be true for the destructive
+replacement mode. SSID is limited to 1–32 encoded bytes and passphrase to the
+WPA-PSK contract. The application may create only the fixed 0600 runtime
+request; it never calls `nmcli`. Tests must assert that neither status nor
+responses contain SSID/passphrase, that a second queued request is rejected,
+and that the installed helper uses the fixed `wlan0`/NetworkManager path with a
+root-only keyfile and creates the new connection before deleting old profiles.
 
 Browser localization tests extract every static `data-i18n*` reference and
 every literal runtime `t()` key, require it in the checked-in catalog, require
@@ -147,6 +158,10 @@ client-controlled argument forwarding. Status tests must also cover an older
 `running` record whose boot ID differs from the current boot; it is reported as
 failed so an earlier helper cannot wedge the update control forever or claim an
 unconfirmed success.
+The boot recovery helper must additionally persist this transition before the
+application starts, including `rebooting` to `completed`, while refusing to
+modify a same-boot active status. The browser button is disabled only for a
+current-boot `queued`, `running` or `rebooting` state.
 `install.sh` must create a portable state backup before `apt-get update` whenever
 the live SQLite database exists. A failed backup is a hard stop; do not move this
 protection behind package installation or release-symlink replacement.

@@ -5,6 +5,8 @@ After=local-fs.target
 Wants=network-online.target
 After=network-online.target
 After=openr4d10-boot.service
+Wants=openr4d10-update-recover.service
+After=openr4d10-update-recover.service
 
 [Service]
 Type=simple

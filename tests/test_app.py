@@ -102,6 +102,42 @@ class AppTests(unittest.TestCase):
                 b"update\n",
             )
 
+    def test_confirmed_wifi_repair_uses_only_the_fixed_runtime_request(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root / "run",
+                    state_directory=root / "state",
+                ),
+                display=FileDisplay(root / "frame.json"),
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+            )
+
+            result = app.control(
+                {
+                    "action": "wifi_repair",
+                    "ssid": "Private WLAN",
+                    "passphrase": "valid-passphrase",
+                    "replace_existing": True,
+                    "confirmed": True,
+                }
+            )
+
+            self.assertEqual(result["wifi_repair"]["state"], "queued")
+            self.assertNotIn("passphrase", result["wifi_repair"])
+            request = json.loads(
+                (root / "run" / "wifi-repair.request").read_text(encoding="utf-8")
+            )
+            self.assertEqual(request["ssid"], "Private WLAN")
+            self.assertEqual(request["passphrase"], "valid-passphrase")
+
     def test_virtual_device_input_is_bounded_and_uses_display_adapter(self) -> None:
         class InputDisplay:
             def __init__(self) -> None:

@@ -267,6 +267,15 @@ h2 { margin-bottom: 0; font-size: 1.15rem; letter-spacing: -0.02em; }
 #display-brightness { grid-column: 1 / -1; width: 100%; accent-color: var(--cyan); cursor: pointer; }
 #display-brightness:disabled { cursor: wait; opacity: .55; }
 #display-brightness-status { grid-column: 1 / -1; }
+.wifi-repair-form { display: grid; gap: 12px; margin-top: 20px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(5, 12, 14, .58); }
+.wifi-repair-form > label:not(.wifi-check) { display: grid; gap: 7px; color: var(--muted); font-size: .72rem; }
+.wifi-repair-form input[type="text"], .wifi-repair-form input[type="password"] { width: 100%; padding: 11px 12px; border: 1px solid var(--line-strong); border-radius: 9px; color: var(--text); background: #071011; }
+.wifi-check { display: flex; align-items: flex-start; gap: 9px; color: var(--muted); font-size: .7rem; line-height: 1.4; }
+.wifi-check input { margin-top: 2px; accent-color: var(--cyan); }
+.wifi-warning { margin: 0; padding: 10px 12px; border-left: 3px solid var(--amber); color: var(--amber); background: rgba(255, 178, 66, .06); }
+#wifi-repair-submit { padding: 11px 14px; border: 1px solid rgba(253, 184, 19, .55); border-radius: 9px; color: #151005; background: var(--cyan); cursor: pointer; font-weight: 750; }
+#wifi-repair-submit:disabled { cursor: wait; opacity: .55; }
+#wifi-repair-status { min-height: 1.4em; color: var(--muted); font-size: .7rem; }
 .encoder-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 20px; }
 .encoder-control { padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: rgba(5, 12, 14, .58); }
 .encoder-control > span, .press-grid span { display: block; margin-bottom: 8px; color: var(--muted); font-size: .64rem; letter-spacing: .08em; text-transform: uppercase; }

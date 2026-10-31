@@ -20,6 +20,11 @@ class InstallerContractTests(unittest.TestCase):
         self.assertIn("bin/openr4d10-update", installer)
         self.assertIn("systemd/openr4d10-update.path", installer)
         self.assertIn("systemctl enable --now openr4d10-update.path", installer)
+        self.assertIn("bin/openr4d10-update-recover", installer)
+        self.assertIn("systemd/openr4d10-update-recover.service", installer)
+        self.assertIn("bin/openr4d10-wifi-repair", installer)
+        self.assertIn("systemd/openr4d10-wifi-repair.path", installer)
+        self.assertIn("network-manager", installer)
         self.assertIn("Backing up persistent OpenR4d10 state before the update", installer)
         self.assertIn("from openr4d10.backup import create_backup", installer)
         self.assertLess(
@@ -55,6 +60,31 @@ class InstallerContractTests(unittest.TestCase):
         self.assertIn("PathExists=/run/openr4d10/update.request", path_unit)
         self.assertIn("User=root", service)
         self.assertIn("ExecStart=/usr/local/sbin/openr4d10-update", service)
+
+    def test_reboot_recovery_and_wifi_repair_have_fixed_privilege_boundaries(self) -> None:
+        repository = Path(__file__).resolve().parents[1]
+        recover = (repository / "bin" / "openr4d10-update-recover").read_text(encoding="utf-8")
+        recover_unit = (repository / "systemd" / "openr4d10-update-recover.service").read_text(encoding="utf-8")
+        wifi = (repository / "bin" / "openr4d10-wifi-repair").read_text(encoding="utf-8")
+        wifi_path = (repository / "systemd" / "openr4d10-wifi-repair.path").read_text(encoding="utf-8")
+        wifi_service = (repository / "systemd" / "openr4d10-wifi-repair.service").read_text(encoding="utf-8")
+
+        self.assertIn('{"queued", "running", "rebooting"}', recover)
+        self.assertIn('new_state = "completed"', recover)
+        self.assertIn('new_state = "failed"', recover)
+        self.assertIn("Before=openr4d10.service", recover_unit)
+        self.assertIn("ExecStart=/usr/local/sbin/openr4d10-update-recover", recover_unit)
+        self.assertIn("INTERFACE=wlan0", wifi)
+        self.assertIn("/etc/NetworkManager/system-connections", wifi)
+        self.assertIn("os.O_EXCL, 0o600", wifi)
+        self.assertNotIn('psk "$passphrase"', wifi)
+        self.assertLess(
+            wifi.index('connection up uuid "$candidate_uuid"'),
+            wifi.index('connection delete uuid "$existing_uuid"'),
+        )
+        self.assertIn("PathExists=/run/openr4d10/wifi-repair.request", wifi_path)
+        self.assertIn("User=root", wifi_service)
+        self.assertIn("ExecStart=/usr/local/sbin/openr4d10-wifi-repair", wifi_service)
 
     def test_pinned_vendor_provenance_is_present(self) -> None:
         repository = Path(__file__).resolve().parents[1]

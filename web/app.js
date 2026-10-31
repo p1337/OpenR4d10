@@ -556,6 +556,7 @@ function render(data) {
   setAdapter("power-adapter", adapters.power);
   setText("footer-status", t("Last updated: {{time}}", { time: new Date().toLocaleTimeString(currentLocale) }));
   renderUpdate(data.update || {});
+  renderWifiRepair(data.wifi_repair || {});
   renderDeviceState(data.device_ui);
   renderServices(data.services || {});
   renderSettings(data.services?.settings || {});
@@ -583,6 +584,19 @@ function renderUpdate(update) {
         : t("Install update");
   const suffix = update.version ? t(" · version {{version}}", { version: update.version }) : "";
   setText("update-status", `${t(update.message || "No update is running.")}${suffix}`);
+}
+
+function renderWifiRepair(repair) {
+  const state = repair.state || "idle";
+  const busy = ["queued", "running"].includes(state);
+  const button = byId("wifi-repair-submit");
+  button.disabled = busy;
+  button.textContent = state === "queued"
+    ? t("Wi-Fi repair queued …")
+    : state === "running"
+      ? t("Connecting Wi-Fi …")
+      : t("Repair and connect Wi-Fi");
+  setText("wifi-repair-status", t(repair.message || "No Wi-Fi repair is running."));
 }
 
 function renderDeviceState(state) {
@@ -705,6 +719,43 @@ byId("system-update").addEventListener("click", async () => {
   } catch (error) {
     output.textContent = t("Update error: {{message}}", { message: error.message });
     button.disabled = false;
+  }
+});
+
+byId("wifi-repair-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const ssidInput = byId("wifi-ssid");
+  const passphraseInput = byId("wifi-passphrase");
+  const replaceExisting = byId("wifi-replace-existing").checked;
+  const confirmed = byId("wifi-confirm").checked;
+  if (!confirmed) return;
+  if (!window.confirm(t("Apply this Wi-Fi configuration now? The browser connection may close."))) return;
+  const button = byId("wifi-repair-submit");
+  const output = byId("wifi-repair-status");
+  button.disabled = true;
+  output.textContent = t("Requesting Wi-Fi repair …");
+  const request = {
+    action: "wifi_repair",
+    ssid: ssidInput.value,
+    passphrase: passphraseInput.value,
+    replace_existing: replaceExisting,
+    confirmed: true,
+  };
+  try {
+    const response = await fetch("/api/control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    renderWifiRepair(payload.wifi_repair || {});
+  } catch (error) {
+    output.textContent = t("Wi-Fi repair error: {{message}}", { message: error.message });
+    button.disabled = false;
+  } finally {
+    request.passphrase = "";
+    passphraseInput.value = "";
   }
 });
 

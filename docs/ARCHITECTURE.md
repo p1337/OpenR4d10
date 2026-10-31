@@ -120,6 +120,8 @@ path, not a second menu surface or a fabricated PTT adapter.
 - persistent application state: `/var/lib/openr4d10`
 - non-secret SQLite state: `/var/lib/openr4d10/openr4d10.sqlite3`
 - service logs: system journal, unit `openr4d10.service`
+- transient WLAN repair request: `/run/openr4d10/wifi-repair.request`
+- non-secret WLAN repair status: `/var/lib/openr4d10/wifi-repair-status.json`
 
 Portable core backups contain a SQLite online-backup snapshot plus a public
 manifest and SHA-256. Restore accepts exactly those two archive members,
@@ -262,6 +264,33 @@ changes. It uses the existing SQLite online-backup format to create a dated,
 secret-free archive below `/var/lib/openr4d10/backups`. Backup failure is fatal,
 so the update never starts without a recoverable copy of station order and all
 other non-secret state.
+
+A root-owned `openr4d10-update-recover.service` runs before the application on
+every boot. It atomically converts previous-boot `queued`/`running` records to
+`failed` and previous-boot `rebooting` to `completed`. It does not kill a live
+same-boot package transaction. The application keeps the same defensive
+read-time normalization, so both newly installed and older status files leave
+the update button retryable after reboot.
+
+## Privileged WLAN repair
+
+The unprivileged HTTP process accepts one strictly bounded repair request with
+SSID, passphrase and an explicit replace flag. It writes those values only to a
+new 0600 file at `/run/openr4d10/wifi-repair.request`; neither the SQLite store
+nor the public status snapshot receives a credential value. A root-owned
+systemd path starts the fixed `openr4d10-wifi-repair` helper, which accepts no
+arguments and supports only NetworkManager on the fixed `wlan0` interface.
+
+The helper validates SSID and WPA-PSK limits without printing the values and
+creates a root-only NetworkManager keyfile with a new UUID. Neither `nmcli` nor
+another process receives the passphrase in its argument vector. Only after the
+new profile is active may an explicitly confirmed replacement remove the other
+Wi-Fi profiles. A failed activation removes only the temporary new profile and
+leaves existing profiles available. The web request is removed on every exit;
+the bounded public status contains only
+queued/running/succeeded/failed plus a generic message. The current dashboard
+uses local HTTP, so this operation is documented for trusted private networks
+only until a local HTTPS provisioning boundary exists.
 
 ## Startup sequence
 

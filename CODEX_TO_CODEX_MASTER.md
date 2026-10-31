@@ -423,6 +423,21 @@ Startlogik:
 
 Der Hotspot darf später auch manuell aktiviert werden.
 
+Die lokale Weboberfläche erhält zusätzlich eine ausdrücklich zu bestätigende
+WLAN-Reparatur. Sie nimmt SSID und Kennwort nur für diesen Vorgang entgegen,
+speichert beides weder in SQLite noch im Status, in Backups oder Logs und
+übergibt sie über eine kurzlebige Datei an einen festen root-eigenen
+NetworkManager-Helfer. Auf dem bestätigten Debian-13-Zielsystem ist
+NetworkManager mit `nmcli` der aktive Netzwerkbesitzer; es wird kein zweiter
+`wpa_supplicant`- oder Netplan-Schreibpfad erfunden. Der Reparaturmodus legt
+zuerst ein neues Profil an und aktiviert es. Erst nach erfolgreicher Verbindung
+werden auf ausdrücklichen Wunsch die bisherigen WLAN-Profile ersetzt. Bei
+falschen Zugangsdaten bleibt das vorherige Profil erhalten, soweit
+NetworkManager es wieder aktivieren kann. Das Kennwort darf weder in einer
+Prozessargumentliste noch in einer öffentlichen Antwort auftauchen. Wegen der
+zunächst lokalen HTTP-Oberfläche muss die Eingabemaske deutlich darauf
+hinweisen, diese Funktion nur im vertrauenswürdigen eigenen LAN zu verwenden.
+
 ## 8. Audio und Bluetooth
 
 Standalone-Verhalten:
@@ -956,6 +971,29 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-31 – Update-Recovery nach Reboot und geschützte WLAN-Reparatur
+
+- Robert verlangt, dass ein alter Updatezustand nach einem Neustart niemals den
+  Updateknopf blockiert. Ein früheres `queued` oder `running` wird beim neuen
+  Boot automatisch als unterbrochen beendet; `rebooting` wird als abgeschlossen
+  markiert. Danach ist die Schaltfläche wieder anklickbar und darf einen neuen,
+  weiterhin serialisierten Lauf starten. Ein tatsächlich noch laufender
+  Installer im selben Boot wird nicht während Paket- oder Dateischreibvorgängen
+  abgebrochen; nach einem echten Neustart existiert dieser Prozess ohnehin
+  nicht mehr.
+- Zusätzlich verlangt Robert in den Einstellungen eine WLAN-Reparatur, die
+  eigene SSID und eigenes Kennwort setzt und auf ausdrückliche Bestätigung
+  bestehende WLAN-Profile ersetzt. Die reale Zielinstallation verwendet
+  NetworkManager 1.52.1 auf `wlan0`; der neue feste Root-Helfer nutzt deshalb
+  ausschließlich diesen vorhandenen Besitzer. Er testet das neue Profil vor
+  dem Löschen alter Profile. Die kurzlebige Webübergabe und das von
+  NetworkManager dauerhaft benötigte root-only Profil legen das Kennwort nie
+  in eine Prozessargumentliste.
+- WLAN-Zugangsdaten bleiben ausschließlich auf dem Gerät und werden weder in
+  Git, SQLite, Statusdaten, Backups noch Protokollen gespeichert. Die
+  unverschlüsselte lokale HTTP-Eingabe ist nur für ein vertrauenswürdiges LAN
+  vorgesehen und wird in der Oberfläche entsprechend gekennzeichnet.
 
 ### 2026-10-31 – EUMETSAT bleibt zusätzlich zum Regenradar erhalten
 

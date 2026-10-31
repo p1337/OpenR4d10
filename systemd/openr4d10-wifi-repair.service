@@ -1,0 +1,16 @@
+[Unit]
+Description=Apply an explicitly confirmed OpenR4d10 WLAN repair
+Documentation=https://github.com/p1337/OpenR4d10
+Requires=NetworkManager.service
+After=NetworkManager.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/local/sbin/openr4d10-wifi-repair
+TimeoutStartSec=90s
+UMask=0077
+PrivateTmp=true
+ProtectHome=true
+NoNewPrivileges=true

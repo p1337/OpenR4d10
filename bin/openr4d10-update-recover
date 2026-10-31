@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly STATUS_FILE=/var/lib/openr4d10/update-status.json
+
+[[ $# -eq 0 ]] || { echo "This helper accepts no arguments" >&2; exit 2; }
+[[ -f "$STATUS_FILE" && ! -L "$STATUS_FILE" ]] || exit 0
+
+python3 - "$STATUS_FILE" <<'PY'
+from datetime import UTC, datetime
+import grp
+import json
+import os
+from pathlib import Path
+import stat
+import sys
+import tempfile
+
+path = Path(sys.argv[1])
+current_boot = Path("/proc/sys/kernel/random/boot_id").read_text(encoding="ascii").strip()
+descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+try:
+    metadata = os.fstat(descriptor)
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > 4096:
+        raise SystemExit(0)
+    with os.fdopen(descriptor, "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+    raise SystemExit(0)
+
+state = payload.get("state")
+previous_boot = payload.get("boot_id")
+if state not in {"queued", "running", "rebooting"}:
+    raise SystemExit(0)
+if previous_boot == current_boot:
+    raise SystemExit(0)
+
+if state == "rebooting":
+    new_state = "completed"
+    message = "Update und Neustart wurden abgeschlossen."
+else:
+    new_state = "failed"
+    message = "Der vorige Updatelauf wurde durch einen Neustart unterbrochen; ein erneuter Versuch ist möglich."
+
+result = {
+    "state": new_state,
+    "message": message,
+    "updated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+    "boot_id": current_boot,
+}
+version = payload.get("version")
+if isinstance(version, str) and len(version) <= 64:
+    result["version"] = version
+
+fd, temporary = tempfile.mkstemp(prefix=".update-status.", dir=path.parent)
+try:
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        json.dump(result, handle, sort_keys=True)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.chown(temporary, 0, grp.getgrnam("openr4d10").gr_gid)
+    os.chmod(temporary, 0o640)
+    os.replace(temporary, path)
+finally:
+    try:
+        os.unlink(temporary)
+    except FileNotFoundError:
+        pass
+PY

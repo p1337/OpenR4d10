@@ -15,6 +15,7 @@ from .input_events import Control, InputEvent
 from .models import Frame
 from .services import ServiceCatalog
 from .updates import UpdateController
+from .wifi import WifiRepairController
 from .ui import dashboard_frame
 from .web import WebServer
 
@@ -31,6 +32,7 @@ class OpenR4d10App:
         hardware: HardwareConfig | None = None,
         services: ServiceCatalog | None = None,
         updates: UpdateController | None = None,
+        wifi_repair: WifiRepairController | None = None,
     ) -> None:
         self.config = config
         self.display = display
@@ -39,6 +41,10 @@ class OpenR4d10App:
         self.hardware = hardware
         self.services = services
         self.updates = updates or UpdateController(
+            config.runtime_directory,
+            config.state_directory,
+        )
+        self.wifi_repair = wifi_repair or WifiRepairController(
             config.runtime_directory,
             config.state_directory,
         )
@@ -82,6 +88,7 @@ class OpenR4d10App:
             "frame": frame,
             "adapters": adapters,
             "update": self.updates.status(),
+            "wifi_repair": self.wifi_repair.status(),
         }
         display_snapshot = getattr(self.display, "snapshot", None)
         if callable(display_snapshot):
@@ -94,6 +101,8 @@ class OpenR4d10App:
         """Route bounded local browser controls to existing application boundaries."""
         if request.get("action") == "system_update":
             return self.updates.request(request)
+        if request.get("action") == "wifi_repair":
+            return self.wifi_repair.request(request)
         if request.get("action") == "display_brightness":
             if self.services is None:
                 raise RuntimeError("settings control is unavailable")

@@ -22,6 +22,8 @@ the installer report exactly which adapters still need configuration.
 - persistent browser language switch for English, Deutsch, Polski, Français
   and Español with an English fallback
 - explicitly confirmed system updates directly from the web dashboard
+- automatic recovery of stale web-update state after a reboot
+- confirmed NetworkManager WLAN repair without persistent web-side credentials
 - native Whisplay ST7789 boot animation installed and enabled automatically
 - safe display handoff both at boot and during an in-session installation
 - real-device-confirmed Whisplay SPI transport, colour order and orientation
@@ -127,6 +129,23 @@ suppresses the installer's own reboot, records the installed version and
 existing installation is changed, the installer must successfully create a
 consistent secret-free state backup below `/var/lib/openr4d10/backups`; a
 backup failure aborts the update.
+
+On every boot a fixed root-owned recovery unit reconciles an older update
+record before the dashboard starts. A previous-boot `queued` or `running` state
+becomes retryable failure, while a previous-boot `rebooting` state becomes
+completed. The update button is therefore never left permanently disabled by a
+reboot. A same-boot installer remains serialized and is not killed during
+package writes.
+
+The **Device → WLAN repair** panel can replace the device's Wi-Fi connection
+with a user-supplied SSID and passphrase. It uses the already active
+NetworkManager owner on `wlan0`: the root helper first creates and activates a
+new profile, and only after success removes older Wi-Fi profiles when the user
+explicitly selected replacement. The passphrase is carried in a short-lived
+0600 runtime handoff and then only in NetworkManager's root-only system profile,
+never in Git, SQLite, status JSON, backups, logs or a process argument. Because
+the current dashboard is plain local HTTP, enter WLAN
+credentials only from a trusted private LAN.
 
 The dashboard shows live service, system and adapter status. Until verified
 Whisplay and PiSugar adapters are configured, it labels those components as

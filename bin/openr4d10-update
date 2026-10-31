@@ -40,7 +40,7 @@ PY
 }
 
 update_failed() {
-    local status=$?
+    local status="${1:-$?}"
     rm -f -- "$REQUEST_FILE"
     write_status failed "Update fehlgeschlagen. Details: journalctl -u openr4d10-update" || true
     systemctl start openr4d10.service >/dev/null 2>&1 || true
@@ -54,6 +54,8 @@ if ! flock -n 9; then
 fi
 
 trap update_failed ERR
+trap 'update_failed 130' INT
+trap 'update_failed 143' TERM
 if [[ ! -f "$REQUEST_FILE" || -L "$REQUEST_FILE" ]] \
     || [[ "$(cat -- "$REQUEST_FILE" 2>/dev/null || true)" != update ]]; then
     rm -f -- "$REQUEST_FILE"
@@ -78,4 +80,4 @@ version="$(tr -d '[:space:]' </opt/openr4d10/current/VERSION)"
 write_status rebooting "Update $version installiert. Das Gerät startet neu." "$version"
 sync
 systemctl reboot --no-block
-trap - ERR
+trap - ERR INT TERM

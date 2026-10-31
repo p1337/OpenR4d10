@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly REQUEST_FILE=/run/openr4d10/wifi-repair.request
+readonly STATUS_FILE=/var/lib/openr4d10/wifi-repair-status.json
+readonly LOCK_FILE=/run/lock/openr4d10-wifi-repair.lock
+readonly INTERFACE=wlan0
+readonly NM_PROFILE_ROOT=/etc/NetworkManager/system-connections
+
+candidate_uuid=""
+profile_file=""
+
+[[ $# -eq 0 ]] || { echo "This helper accepts no arguments" >&2; exit 2; }
+
+write_status() {
+    local state="$1"
+    local message="$2"
+    local temporary
+    temporary="$(mktemp /var/lib/openr4d10/.wifi-repair-status.XXXXXXXX)"
+    local boot_id=""
+    boot_id="$(tr -d '[:space:]' </proc/sys/kernel/random/boot_id 2>/dev/null || true)"
+    python3 - "$temporary" "$state" "$message" "$boot_id" <<'PY'
+from datetime import UTC, datetime
+import json
+from pathlib import Path
+import sys
+
+target, state, message, boot_id = sys.argv[1:]
+payload = {
+    "state": state,
+    "message": message,
+    "updated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+}
+if boot_id:
+    payload["boot_id"] = boot_id
+Path(target).write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+PY
+    chown root:openr4d10 "$temporary"
+    chmod 0640 "$temporary"
+    mv -f -- "$temporary" "$STATUS_FILE"
+}
+
+cleanup_request() {
+    rm -f -- "$REQUEST_FILE"
+}
+
+repair_failed() {
+    local status="${1:-$?}"
+    cleanup_request
+    if [[ -n "$candidate_uuid" ]]; then
+        nmcli --wait 10 connection delete uuid "$candidate_uuid" >/dev/null 2>&1 || true
+    fi
+    if [[ -n "$profile_file" ]]; then
+        rm -f -- "$profile_file"
+        nmcli connection reload >/dev/null 2>&1 || true
+    fi
+    write_status failed "Wi-Fi repair failed; existing profiles were kept." || true
+    exit "$status"
+}
+
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    write_status running "Another Wi-Fi repair is already running."
+    exit 0
+fi
+
+trap repair_failed ERR
+trap 'repair_failed 130' INT
+trap 'repair_failed 143' TERM
+command -v nmcli >/dev/null
+systemctl is-active --quiet NetworkManager.service
+[[ -f "$REQUEST_FILE" && ! -L "$REQUEST_FILE" ]]
+[[ "$(stat -c '%a' "$REQUEST_FILE")" == 600 ]]
+
+install -d -m 0700 -o root -g root "$NM_PROFILE_ROOT"
+metadata_file="$(mktemp /run/lock/openr4d10-wifi-metadata.XXXXXXXX)"
+chmod 0600 "$metadata_file"
+python3 - "$REQUEST_FILE" "$NM_PROFILE_ROOT" "$metadata_file" <<'PY'
+import json
+import os
+from pathlib import Path
+import re
+import sys
+import uuid
+
+request_path = Path(sys.argv[1])
+profile_root = Path(sys.argv[2])
+metadata_path = Path(sys.argv[3])
+payload = json.loads(request_path.read_text(encoding="utf-8"))
+if set(payload) != {"ssid", "passphrase", "replace_existing", "confirmed"}:
+    raise SystemExit("invalid request")
+ssid = payload["ssid"]
+passphrase = payload["passphrase"]
+replace_existing = payload["replace_existing"]
+if payload["confirmed"] is not True or not isinstance(replace_existing, bool):
+    raise SystemExit("invalid confirmation")
+if not isinstance(ssid, str) or not ssid or len(ssid.encode("utf-8")) > 32:
+    raise SystemExit("invalid SSID")
+if any(ord(character) < 32 or ord(character) == 127 for character in ssid):
+    raise SystemExit("invalid SSID")
+valid_psk = isinstance(passphrase, str) and (
+    re.fullmatch(r"[0-9A-Fa-f]{64}", passphrase) is not None
+    or (8 <= len(passphrase) <= 63 and all(32 <= ord(character) <= 126 for character in passphrase))
+)
+if not valid_psk:
+    raise SystemExit("invalid passphrase")
+
+def keyfile_escape(value: str) -> str:
+    return value.replace("\\", "\\\\").replace(" ", "\\s").replace("\t", "\\t").replace("\r", "\\r").replace("\n", "\\n")
+
+profile_uuid = str(uuid.uuid4())
+profile_path = profile_root / f"openr4d10-repair-{profile_uuid}.nmconnection"
+content = f"""[connection]
+id=openr4d10-repair-{profile_uuid}
+uuid={profile_uuid}
+type=wifi
+interface-name=wlan0
+autoconnect=true
+autoconnect-priority=100
+
+[wifi]
+mode=infrastructure
+ssid={keyfile_escape(ssid)}
+security=802-11-wireless-security
+
+[wifi-security]
+key-mgmt=wpa-psk
+psk={keyfile_escape(passphrase)}
+
+[ipv4]
+method=auto
+
+[ipv6]
+addr-gen-mode=default
+method=auto
+"""
+descriptor = os.open(profile_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+    handle.write(content)
+    handle.flush()
+    os.fsync(handle.fileno())
+metadata_path.write_text(
+    profile_uuid + "\n" + str(profile_path) + "\n" + ("true" if replace_existing else "false") + "\n",
+    encoding="utf-8",
+)
+PY
+
+mapfile -t metadata <"$metadata_file"
+rm -f -- "$metadata_file"
+candidate_uuid="${metadata[0]}"
+profile_file="${metadata[1]}"
+replace_existing="${metadata[2]}"
+cleanup_request
+
+write_status running "The new Wi-Fi profile is being tested and connected."
+nmcli connection load "$profile_file" >/dev/null
+nmcli --wait 45 connection up uuid "$candidate_uuid" ifname "$INTERFACE" >/dev/null
+
+if [[ "$replace_existing" == true ]]; then
+    while IFS=: read -r existing_uuid connection_type; do
+        if [[ "$connection_type" == 802-11-wireless && "$existing_uuid" != "$candidate_uuid" ]]; then
+            nmcli --wait 10 connection delete uuid "$existing_uuid" >/dev/null
+        fi
+    done < <(nmcli --terse --fields UUID,TYPE connection show)
+fi
+nmcli connection modify uuid "$candidate_uuid" connection.id "OpenR4d10 WiFi" \
+    connection.autoconnect yes connection.autoconnect-priority 100 >/dev/null
+
+write_status succeeded "Wi-Fi connected and configuration saved securely."
+profile_file=""
+candidate_uuid=""
+trap - ERR INT TERM
