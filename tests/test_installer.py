@@ -43,7 +43,12 @@ class InstallerContractTests(unittest.TestCase):
             "https://raw.githubusercontent.com/p1337/OpenR4d10/main/bootstrap.sh",
             helper,
         )
-        self.assertIn("bash \"$bootstrap\"", helper)
+        self.assertIn('bash "$bootstrap" --no-reboot', helper)
+        self.assertLess(
+            helper.index("write_status rebooting"),
+            helper.index("systemctl reboot --no-block"),
+        )
+        self.assertIn("sync", helper)
         self.assertIn("[[ $# -eq 0 ]]", helper)
         self.assertNotIn("$@", helper)
         self.assertNotIn("sudo", helper)

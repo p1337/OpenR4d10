@@ -730,6 +730,12 @@ einen begrenzten Status und nutzt weiterhin den einzigen vorhandenen
 `bootstrap.sh`-/`install.sh`-Installationsweg. Die Oberfläche muss Start,
 laufende Installation, Fehler und den anschließenden automatischen Neustart
 verständlich anzeigen und Mehrfachstarts verhindern.
+Der Root-Helfer ruft den Installer im Webupdatepfad ausdrücklich mit
+`--no-reboot` auf, schreibt nach vollständigem Erfolg zuerst den Status
+`rebooting` samt Boot-ID und löst erst danach selbst den Neustart aus. Ein beim
+Neustart übrig gebliebener älterer `running`-Status mit abweichender Boot-ID
+wird ehrlich als unterbrochener Lauf markiert und darf kein weiteres Update
+dauerhaft blockieren.
 
 Vor jeder tatsächlichen Installation eines Updates muss der vorhandene
 secret-freie SQLite-Zustand mit der bestehenden konsistenten Backup-Funktion
@@ -949,6 +955,22 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-31 – Web-Updater schreibt Status vor dem Neustart
+
+- Der reale Pi zeigte nach einem Webupdate weiterhin `running`, obwohl der
+  systemd-Helfer nicht mehr lief. Ursache: Der vom Helfer gestartete normale
+  Installer löste seinen automatischen Neustart aus und beendete damit den
+  Helfer, bevor dieser `rebooting` schreiben konnte.
+- Im festen Webupdatepfad wird der einzige Bootstrap künftig mit
+  `--no-reboot` aufgerufen. Nach erfolgreicher Installation liest der
+  Root-Helfer die installierte Version, schreibt atomar `rebooting`,
+  synchronisiert und startet dann selbst neu. Fehler vor diesem Punkt bleiben
+  weiterhin `failed` und lösen keinen Neustart aus.
+- Als Rückwärtskompatibilität erkennt der unprivilegierte Statusleser auch
+  einen `running`-Eintrag aus einer früheren Boot-ID als unterbrochen und zeigt
+  ihn als `failed`. Dadurch blockiert ein älterer Webupdate-Neustart keine
+  späteren Updates mehr, ohne einen unbestätigten Erfolg zu behaupten.
 
 ### 2026-10-31 – Dienstansicht von Hintergrundaudio getrennt; DWD-Regenradar
 

@@ -240,13 +240,19 @@ existing bootstrap/install path.
 
 The helper publishes bounded, non-secret JSON at
 `/var/lib/openr4d10/update-status.json`; the application exposes it with normal
-status data. Requests are rejected while state is `queued` or `running`.
+status data. Requests are rejected while state is `queued` or `running` in the
+current boot.
 Installer failure preserves the normal configuration rules, records a generic
 failure pointing to the root helper's journal and attempts to start the current
 release so the dashboard can report the failure.
-Success records `rebooting`; the installer performs the already-defined
-automatic reboot. No arbitrary command, repository, branch or installer option
-crosses the web/root boundary.
+The helper passes only the fixed `--no-reboot` maintenance flag to the existing
+bootstrap, then reads the installed version, atomically records `rebooting`,
+syncs and requests the reboot itself. This ordering prevents reboot from killing
+the helper while its status still says `running`. For compatibility with older
+installed helpers, a `running` status carrying a different boot ID is treated as
+an interrupted failure rather than blocking all future requests or claiming an
+unconfirmed success. No arbitrary command, repository, branch or client-
+selected installer option crosses the web/root boundary.
 
 The sole installer detects an existing state database before package or release
 changes. It uses the existing SQLite online-backup format to create a dated,

@@ -71,9 +71,11 @@ curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
     --output "$bootstrap" "$BOOTSTRAP_URL"
 [[ -s "$bootstrap" ]]
 bash -n "$bootstrap"
-bash "$bootstrap"
+bash "$bootstrap" --no-reboot
 
 version="$(tr -d '[:space:]' </opt/openr4d10/current/VERSION)"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]]
-trap - ERR
 write_status rebooting "Update $version installiert. Das Gerät startet neu." "$version"
+sync
+systemctl reboot --no-block
+trap - ERR

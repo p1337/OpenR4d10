@@ -73,12 +73,19 @@ class UpdateController:
             "state": "idle",
             "message": "Kein Update läuft.",
         }
-        if result["state"] == "rebooting":
+        if result["state"] in {"running", "rebooting"}:
             previous_boot = result.get("boot_id")
             current_boot = self._boot_id()
             if previous_boot and current_boot and previous_boot != current_boot:
-                result["state"] = "completed"
-                result["message"] = "Update und Neustart wurden abgeschlossen."
+                if result["state"] == "rebooting":
+                    result["state"] = "completed"
+                    result["message"] = "Update und Neustart wurden abgeschlossen."
+                else:
+                    result["state"] = "failed"
+                    result["message"] = (
+                        "Der vorige Updatelauf wurde durch einen Neustart unterbrochen; "
+                        "ein erneuter Versuch ist möglich."
+                    )
         result.pop("boot_id", None)
         return result
 

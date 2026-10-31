@@ -68,6 +68,37 @@ class UpdateControllerTests(unittest.TestCase):
             self.assertNotIn("boot_id", status)
             self.assertNotIn("ignored", status)
 
+    def test_previous_boot_running_status_is_retryable_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            runtime = root / "run"
+            state = root / "state"
+            runtime.mkdir()
+            state.mkdir()
+            boot = root / "boot"
+            boot.write_text("new-boot\n", encoding="ascii")
+            (state / "update-status.json").write_text(
+                json.dumps(
+                    {
+                        "state": "running",
+                        "message": "installing",
+                        "boot_id": "old-boot",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            controller = UpdateController(runtime, state, boot_id_path=boot)
+
+            status = controller.status()
+            requested = controller.request(
+                {"action": "system_update", "confirmed": True}
+            )
+
+            self.assertEqual(status["state"], "failed")
+            self.assertIn("unterbrochen", status["message"])
+            self.assertNotIn("boot_id", status)
+            self.assertEqual(requested["update"]["state"], "queued")
+
 
 if __name__ == "__main__":
     unittest.main()

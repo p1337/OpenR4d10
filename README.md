@@ -119,9 +119,13 @@ releases without SSH. It requires an explicit browser confirmation, shows
 queued/running/failure/reboot status and uses a fixed root-owned systemd helper.
 The web service itself receives no sudo or arbitrary command capability. A
 successful web update follows the same bootstrap/installer checks and automatic
-reboot as the one-command installation. Before an existing installation is
-changed, the installer must successfully create a consistent secret-free state
-backup below `/var/lib/openr4d10/backups`; a backup failure aborts the update.
+reboot as the one-command installation. In this path the fixed root helper
+suppresses the installer's own reboot, records the installed version and
+`rebooting` state first, then requests the reboot itself; a previous-boot
+`running` record therefore cannot permanently block another update. Before an
+existing installation is changed, the installer must successfully create a
+consistent secret-free state backup below `/var/lib/openr4d10/backups`; a
+backup failure aborts the update.
 
 The dashboard shows live service, system and adapter status. Until verified
 Whisplay and PiSugar adapters are configured, it labels those components as

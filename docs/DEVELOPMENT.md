@@ -141,6 +141,12 @@ ownership/modes, the exact systemd path, the helper's fixed HTTPS source and
 absence of `sudo`/shell interpolation in the web process. Update progress is
 reported in `/api/status` under `update` and the browser disables its button
 for `queued`, `running` and `rebooting` states.
+The root helper contract test must require `bash "$bootstrap" --no-reboot`, a
+`rebooting` status write before `systemctl reboot --no-block`, and no
+client-controlled argument forwarding. Status tests must also cover an older
+`running` record whose boot ID differs from the current boot; it is reported as
+failed so an earlier helper cannot wedge the update control forever or claim an
+unconfirmed success.
 `install.sh` must create a portable state backup before `apt-get update` whenever
 the live SQLite database exists. A failed backup is a hard stop; do not move this
 protection behind package installation or release-symlink replacement.
