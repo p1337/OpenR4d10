@@ -1050,14 +1050,14 @@ def render_device_ui(
         _draw_back_or_ptt(draw, accent, True, content_top)
     else:
         # Exactly one compact metadata block high (station + track), never taller.
-        draw.ellipse((190, content_top + 5, 224, content_top + 39), fill=(12, 23, 27), outline=accent, width=2)
+        draw.ellipse((200, content_top + 5, 234, content_top + 39), fill=(12, 23, 27), outline=accent, width=2)
         if state.playing:
-            draw.rectangle((201, content_top + 15, 204, content_top + 29), fill=accent)
-            draw.rectangle((210, content_top + 15, 213, content_top + 29), fill=accent)
+            draw.rectangle((211, content_top + 15, 214, content_top + 29), fill=accent)
+            draw.rectangle((220, content_top + 15, 223, content_top + 29), fill=accent)
         else:
-            draw.polygon(((201, content_top + 13), (201, content_top + 31), (215, content_top + 22)), fill=accent)
+            draw.polygon(((211, content_top + 13), (211, content_top + 31), (225, content_top + 22)), fill=accent)
     if state.recording:
-        draw.ellipse((220, content_top + 4, 228, content_top + 12), fill=(255, 78, 78))
+        draw.ellipse((190, content_top + 4, 198, content_top + 12), fill=(255, 78, 78))
     return image.convert("RGB")
 
 

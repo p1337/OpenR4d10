@@ -305,7 +305,9 @@ class DeviceUiTests(unittest.TestCase):
     def test_play_control_is_below_battery_and_footer_is_empty(self) -> None:
         state = DeviceUiState(playing=True, service_index=1)
         image = render_device_ui(state)
-        self.assertEqual(image.getpixel((207, 68)), state.accent)
+        self.assertEqual(image.getpixel((217, 68)), state.accent)
+        self.assertEqual(image.getpixel((234, 85)), state.accent)
+        self.assertNotEqual(image.getpixel((235, 85)), state.accent)
         self.assertNotEqual(image.getpixel((220, 270)), state.accent)
 
     def test_clock_is_centered_on_the_full_display_width(self) -> None:

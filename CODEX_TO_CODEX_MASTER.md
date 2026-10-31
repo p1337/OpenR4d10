@@ -1076,6 +1076,13 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-31 – Play/Pause-Kreis bündig in der Player-Ecke
+
+- Der runde Play/Pause-Bedienknopf erhält im normalen Player denselben Abstand
+  zur oberen und zur rechten Playerkante. Kreis und inneres Play-/Pause-Symbol
+  werden gemeinsam nach rechts verschoben; Größe, Metadatenhöhe und
+  Touch-/Encoderfunktion bleiben unverändert.
+
 ### 2026-10-31 – Reale PWM-Nachprüfung und geplanter LED-Messversuch
 
 - Die 60-Prozent-Helligkeit ist nach dem PWM-Caching im normalen Betrieb
