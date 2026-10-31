@@ -109,7 +109,9 @@ returns one level unless the current semantic frame explicitly declares a
 ready PTT-owning context. The back/PTT affordance is one edge-aligned silhouette
 with a left-rounded, right-open frame and a filled mini arrow. The normal player
 always adds a pronounced two-stage, line-free soft glow around its physical rounded contour, with a
-straight upper glow immediately below the status row. Vertical header labels
+straight upper glow immediately below the status row. A soft attenuation mask
+reduces only the two lower corner pools while leaving the straight edge glow
+strong. Vertical header labels
 are offset down and inward from the rounded top corners and the right label is
 rotated for reading from the right/bottom edge. This remains one Pillow renderer
 and one logical input path, not a second menu surface or a fabricated PTT adapter.
@@ -219,13 +221,19 @@ redacted before appearing in status. Local media must resolve below the
 approved media directory.
 
 `IcyRadioBuffer` opens a second bounded, credential-free HTTP(S) read of the
-selected radio stream and requests ICY metadata. At most 32 MiB of the current
+selected radio stream and requests ICY metadata. Opening the radio view tunes
+this already existing silent buffer even before audible playback, so the UI can
+show `Artist – Title` and retain the beginning without adding a separate
+metadata adapter. If ICY metadata is absent, the device shows a localized
+end-user fallback rather than player, ALSA or backend diagnostics. At most 32 MiB of the current
 track is retained in memory. A radio-context PTT press marks that buffer for
 storage; the next metadata title boundary atomically writes the complete
 available track beginning. Continuous mode marks every delimited track. Missing
 or malformed metadata is never guessed: the bounded material remains a review
 item. The library normalizes `Artist – Song`, stores by artist, checks metadata,
 checksum and Chromaprint fingerprint duplicates, and never exposes local paths.
+The real SWR3 ICY format `Title / Artist` is the one verified reverse-order
+case and is normalized to `Artist – Title`; unknown formats remain verbatim.
 Optional covers use rate-limited MusicBrainz search and Cover Art Archive data,
 then pass through the existing bounded decode/re-encode boundary.
 
@@ -233,6 +241,11 @@ Recorded-media playback reuses the one private mpv instance. `My Soundmix`
 loads favorite recordings in random order with an endless playlist; the all-
 recordings action shuffles once. Previous, next, favorite and confirmed-delete
 operations use stable database IDs. Start volume is always 30 percent.
+
+Physical media surfaces use one shared asymmetric mask: 12-pixel upper corners,
+43-pixel lower corners matching the panel, and equal minimal side/bottom
+margins. This applies to station artwork and visual service media rather than
+one-off sender layouts.
 
 The web dashboard persists named radio stations without query strings and can
 rescan the private media directory for a bounded set of supported extensions.

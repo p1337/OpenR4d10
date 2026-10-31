@@ -586,6 +586,74 @@ class ServiceCatalogTests(unittest.TestCase):
         self.assertEqual(volume["playback"]["volume"], 70)
         self.assertFalse(paused_overlay["playing"])
 
+    def test_radio_view_fetches_icy_title_before_audible_playback(self) -> None:
+        class State:
+            state = "stopped"
+            source = None
+            paused = False
+            volume = 30
+
+            def as_dict(self):
+                return {
+                    "state": self.state,
+                    "source": self.source,
+                    "paused": self.paused,
+                    "volume": self.volume,
+                }
+
+        class Passive:
+            def __init__(self):
+                self.state = State()
+
+            def close(self):
+                pass
+
+        class Buffer:
+            def __init__(self):
+                self.value = {"state": "stopped", "station": None}
+                self.tuned = None
+
+            def tune(self, source, station):
+                self.tuned = (source, station)
+                self.value = {"state": "connecting", "station": station}
+                return dict(self.value)
+
+            def set_continuous(self, enabled):
+                self.value["continuous"] = enabled
+                return dict(self.value)
+
+            def snapshot(self):
+                return dict(self.value)
+
+            def close(self):
+                pass
+
+        with tempfile.TemporaryDirectory() as raw:
+            buffer = Buffer()
+            catalog = ServiceCatalog(
+                Path(raw).resolve(),
+                player=Passive(),
+                recorder=Passive(),
+                radio_buffer=buffer,  # type: ignore[arg-type]
+            )
+            try:
+                loading = catalog.receiver_overlay("RADIO")
+                buffer.value.update(
+                    {
+                        "state": "buffering",
+                        "artist": "The Artist",
+                        "title": "The Song",
+                    }
+                )
+                titled = catalog.receiver_overlay("RADIO")
+            finally:
+                catalog.close()
+        self.assertIsNotNone(buffer.tuned)
+        self.assertEqual(loading["subtitle"], "Loading title information")
+        self.assertEqual(titled["subtitle"], "The Artist – The Song")
+        self.assertFalse(titled["playing"])
+        self.assertNotIn("aplay", str(titled).casefold())
+
     def test_station_library_is_persistent_and_never_exposes_query_values(self) -> None:
         class State:
             def __init__(self, **values):

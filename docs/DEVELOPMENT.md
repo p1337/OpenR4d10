@@ -157,8 +157,9 @@ the player edge glow; `screen_border_enabled` is no longer a public or active
 setting. Tests cover persistence, malformed colors, the straight top glow below
 the status row, the R5 curve, a clearly visible minimum glow intensity and the
 absence of any pixel in the glow samples that exactly equals the accent color.
-That last assertion prevents a crisp line from returning. The web preview and all device media masks use the same
-43-pixel corner radius and contain no enable switch. New device text must use at
+That last assertion prevents a crisp line from returning. Device media use the
+shared asymmetric mask: 12-pixel top corners, 43-pixel panel-matched lower
+corners and equal minimal side/bottom margins. New device text must use at
 least the SSID font size; tests enforce this for the battery percentage.
 
 The `pisugar3` backend must verify registers `0x00 == 3` and `0x01 == 0x0F`
@@ -236,6 +237,9 @@ from Debian's `libchromaprint-tools`; a missing fingerprint tool may reduce
 duplicate detection quality but must never destroy a valid buffered recording.
 Cover tests use fake MusicBrainz/Cover Art Archive responses and may not depend
 on the public network.
+The stopped radio view must tune the same silent `IcyRadioBuffer`, surface its
+metadata before audible Play and use only localized end-user fallback text when
+metadata is unavailable. Tests must reject technical player/backend wording.
 The radio tab must expose the persistent station rows only once through the
 compact sortable station list. Browser regression tests reject the removed
 `radio-preset-grid` and require the retained list's primary play-button class.

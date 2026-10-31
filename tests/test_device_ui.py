@@ -91,6 +91,20 @@ class DeviceUiTests(unittest.TestCase):
         self.assertEqual(image.getpixel((140, 240)), (220, 20, 40))
         self.assertEqual(image.getpixel((220, 240)), (220, 20, 40))
 
+    def test_media_uses_tight_equal_margins_and_smaller_top_corners(self) -> None:
+        color = (220, 20, 40)
+        image = render_device_ui(
+            DeviceUiState(source="SWR3", service_index=1),
+            Image.new("RGB", (32, 32), color),
+        )
+        self.assertEqual(image.getpixel((8, 180)), color)
+        self.assertEqual(image.getpixel((231, 180)), color)
+        self.assertEqual(image.getpixel((120, 271)), color)
+        self.assertNotEqual(image.getpixel((8, 106)), color)
+        self.assertEqual(image.getpixel((20, 106)), color)
+        self.assertNotEqual(image.getpixel((8, 271)), color)
+        self.assertEqual(image.getpixel((50, 271)), color)
+
     def test_compact_header_and_localized_labels(self) -> None:
         self.assertEqual(_display_text("en")["controls"], ("VOL", "SQL", "CH", "SRV"))
         self.assertEqual(_display_text("de")["main_menu"], "HAUPTMENÜ")
@@ -117,7 +131,7 @@ class DeviceUiTests(unittest.TestCase):
         )
         self.assertEqual(
             [call.args[2] for call in vertical_label.call_args_list],
-            [5, 224],
+            [8, 221],
         )
 
     def test_header_controls_and_network_text_use_requested_larger_fonts(self) -> None:
@@ -283,6 +297,10 @@ class DeviceUiTests(unittest.TestCase):
                 sum(abs(channel - base) for channel, base in zip(pixel, background)),
                 35,
             )
+        self.assertLess(
+            sum(image.getpixel((60, HEIGHT - 1))),
+            sum(image.getpixel((120, HEIGHT - 1))),
+        )
 
     def test_play_control_is_below_battery_and_footer_is_empty(self) -> None:
         state = DeviceUiState(playing=True, service_index=1)

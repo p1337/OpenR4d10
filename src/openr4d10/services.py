@@ -1028,6 +1028,37 @@ class ServiceCatalog:
         if preset is not None:
             self._cache_preset_artwork(preset.preset_id)
 
+    @staticmethod
+    def _radio_track_line(buffered: dict[str, object]) -> str | None:
+        artist = buffered.get("artist")
+        title = buffered.get("title")
+        stream_title = buffered.get("stream_title")
+        if isinstance(artist, str) and isinstance(title, str):
+            return f"{artist} – {title}"
+        if isinstance(stream_title, str) and stream_title.strip():
+            return stream_title.strip()[:500]
+        return None
+
+    def _preview_radio_metadata(self, station: dict[str, object]) -> str:
+        """Use the existing silent ring buffer to expose ICY metadata before Play."""
+        if self.radio_buffer is None:
+            return "No title information"
+        buffered = self.radio_buffer.snapshot()
+        station_name = str(station["name"])
+        if buffered.get("station") != station_name:
+            try:
+                self.radio_buffer.tune(str(station["stream_url"]), station_name)
+            except (OSError, RuntimeError, ValueError) as exc:
+                LOG.info("Radio metadata unavailable for %s: %s", station_name, exc)
+                return "No title information"
+            buffered = self.radio_buffer.snapshot()
+        track_line = self._radio_track_line(buffered)
+        if track_line is not None:
+            return track_line
+        if buffered.get("state") == "connecting":
+            return "Loading title information"
+        return "No title information"
+
     def _cache_preset_artwork(self, preset_id: str) -> None:
         with self._artwork_guard:
             if preset_id in self._artwork_pending:
@@ -1267,11 +1298,16 @@ class ServiceCatalog:
                 stations = self.store.stations()
                 station = stations[0] if stations else None
                 preset = self._preset_for_station(station) if station is not None else None
+                track_line = (
+                    self._preview_radio_metadata(station)
+                    if station is not None
+                    else "No title information"
+                )
                 return {
                     "service": "RADIO",
                     "station": str(station["name"]) if station is not None else "Radio",
                     "title": str(station["name"]) if station is not None else "Radio",
-                    "subtitle": "Play starts this audio service",
+                    "subtitle": track_line,
                     "playing": False,
                     "volume": playback.volume,
                     "preset_id": preset.preset_id if preset is not None else None,
@@ -1303,7 +1339,7 @@ class ServiceCatalog:
             if selected is not None
             else playback.source or self.active_service
         )
-        track_line = "Paused" if playback.paused else "Audio stream active"
+        track_line = "No title information"
         buffered_recording = False
         if self.active_service == "webradio" and self.radio_buffer is not None:
             buffered = self.radio_buffer.snapshot()
@@ -1311,13 +1347,7 @@ class ServiceCatalog:
                 buffered.get("keep_current") is True
                 or buffered.get("continuous") is True
             )
-            artist = buffered.get("artist")
-            title = buffered.get("title")
-            stream_title = buffered.get("stream_title")
-            if isinstance(artist, str) and isinstance(title, str):
-                track_line = f"{artist} – {title}"
-            elif isinstance(stream_title, str) and stream_title.strip():
-                track_line = stream_title.strip()[:500]
+            track_line = self._radio_track_line(buffered) or track_line
         return {
             "service": service_label,
             "station": station,

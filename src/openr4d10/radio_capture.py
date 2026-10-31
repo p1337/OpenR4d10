@@ -37,6 +37,15 @@ def split_stream_title(value: str | None) -> tuple[str | None, str | None]:
             title = _SPACE.sub(" ", title).strip()[:240]
             if artist and title:
                 return artist, title
+    # SWR3's verified ICY stream uses ``Title / Artist`` rather than the more
+    # common order. Keep this deliberately narrow: only a spaced slash is
+    # treated as that format, so ordinary slashes inside names remain intact.
+    if " / " in value:
+        title, artist = value.split(" / ", 1)
+        artist = _SPACE.sub(" ", artist).strip()[:160]
+        title = _SPACE.sub(" ", title).strip()[:240]
+        if artist and title:
+            return artist, title
     return None, None
 
 

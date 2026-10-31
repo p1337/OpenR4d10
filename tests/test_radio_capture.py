@@ -20,6 +20,10 @@ class RadioCaptureTests(unittest.TestCase):
             split_stream_title("The Artist - The Song"),
             ("The Artist", "The Song"),
         )
+        self.assertEqual(
+            split_stream_title("Wings / Birdy"),
+            ("Birdy", "Wings"),
+        )
         self.assertEqual(split_stream_title("Station announcement"), (None, None))
 
     def test_ptt_keeps_the_buffered_beginning_at_the_next_title_boundary(self) -> None:

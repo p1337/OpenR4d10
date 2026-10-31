@@ -59,6 +59,8 @@ the installer report exactly which adapters still need configuration.
 - ICY-aware radio pre-buffer: PTT retains the current song including its
   buffered beginning; optional continuous capture splits on title metadata,
   suppresses duplicates and stores `Artist – Song` by artist
+- silent ICY title lookup in the radio view before audible Play, with localized
+  non-technical fallback text when a station supplies no title
 - simple recorded-music player with favorites, `My Soundmix`, shuffle,
   previous/next, optional cover cache and confirmed deletion
 - curated one-click radio and news-feed presets with locally re-encoded artwork
@@ -356,3 +358,6 @@ More detail is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
 [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md). The isolated protocol for
 account-bearing modules is documented in
 [`docs/SERVICE_ADAPTERS.md`](docs/SERVICE_ADAPTERS.md).
+Potential future integrations are ranked in
+[`docs/SERVICE_CANDIDATES.md`](docs/SERVICE_CANDIDATES.md); this is research,
+not an installed service catalog.

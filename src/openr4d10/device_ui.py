@@ -16,6 +16,8 @@ from .models import Frame
 WIDTH = 240
 HEIGHT = 280
 DISPLAY_CORNER_RADIUS = 43
+MEDIA_TOP_RADIUS = 12
+MEDIA_MARGIN = 7
 DEFAULT_ACCENT = (253, 184, 19)
 SERVICES = ("SYSTEM", "RADIO", "WEATHER", "DMR", "PLAYER", "REC")
 MAIN_MENU_ITEMS = (
@@ -71,6 +73,8 @@ DISPLAY_TEXT = {
         "recording_playback_actions": "Recording and playback actions",
         "radar_loading": "Loading rain radar",
         "satellite_loading": "Loading satellite images",
+        "title_loading": "Loading title information",
+        "title_unavailable": "No title information",
     },
     "de": {
         "controls": ("LAU", "SQL", "KAN", "DST"),
@@ -110,6 +114,8 @@ DISPLAY_TEXT = {
         "recording_playback_actions": "Aufnahme- und Wiedergabeaktionen",
         "radar_loading": "Regenradar wird geladen",
         "satellite_loading": "Satellitenbilder werden geladen",
+        "title_loading": "Titel wird ermittelt",
+        "title_unavailable": "Keine Titelinformation",
     },
     "pl": {
         "controls": ("GŁO", "SQL", "KAN", "USŁ"),
@@ -149,6 +155,8 @@ DISPLAY_TEXT = {
         "recording_playback_actions": "Nagrywanie i odtwarzanie",
         "radar_loading": "Ładowanie radaru opadów",
         "satellite_loading": "Ładowanie zdjęć satelitarnych",
+        "title_loading": "Pobieranie tytułu",
+        "title_unavailable": "Brak informacji o utworze",
     },
     "fr": {
         "controls": ("VOL", "SQL", "CAN", "SRV"),
@@ -188,6 +196,8 @@ DISPLAY_TEXT = {
         "recording_playback_actions": "Enregistrement et lecture",
         "radar_loading": "Chargement du radar pluie",
         "satellite_loading": "Chargement des images satellite",
+        "title_loading": "Recherche du titre",
+        "title_unavailable": "Titre indisponible",
     },
     "es": {
         "controls": ("VOL", "SQL", "CAN", "SRV"),
@@ -227,6 +237,8 @@ DISPLAY_TEXT = {
         "recording_playback_actions": "Grabación y reproducción",
         "radar_loading": "Cargando radar de lluvia",
         "satellite_loading": "Cargando imágenes de satélite",
+        "title_loading": "Buscando el título",
+        "title_unavailable": "Sin información del título",
     },
 }
 
@@ -245,6 +257,8 @@ DEVICE_TEXT_KEYS = {
     "Recording and playback actions": "recording_playback_actions",
     "Regenradar wird geladen": "radar_loading",
     "Satellitenbilder werden geladen": "satellite_loading",
+    "Loading title information": "title_loading",
+    "No title information": "title_unavailable",
 }
 
 
@@ -691,7 +705,16 @@ def _draw_player_edge_glow(
     content_mask = Image.new("L", (WIDTH, HEIGHT), 0)
     ImageDraw.Draw(content_mask).rectangle((0, top, WIDTH - 1, HEIGHT - 1), fill=255)
     panel_mask = ImageChops.multiply(panel_mask, content_mask)
-    visible.putalpha(ImageChops.multiply(visible.getchannel("A"), panel_mask))
+    # The real panel preview showed excessive light pooling in the two lower
+    # curves. Attenuate only those corner zones while preserving the strong
+    # straight-edge glow that gives the frame its useful depth.
+    corner_balance = Image.new("L", (WIDTH, HEIGHT), 255)
+    corner_draw = ImageDraw.Draw(corner_balance)
+    corner_draw.rectangle((0, HEIGHT - 62, 61, HEIGHT - 1), fill=135)
+    corner_draw.rectangle((WIDTH - 62, HEIGHT - 62, WIDTH - 1, HEIGHT - 1), fill=135)
+    corner_balance = corner_balance.filter(ImageFilter.GaussianBlur(radius=10))
+    alpha = ImageChops.multiply(visible.getchannel("A"), panel_mask)
+    visible.putalpha(ImageChops.multiply(alpha, corner_balance))
     image.alpha_composite(visible)
 
 
@@ -778,6 +801,55 @@ def _draw_hotspot_setup(
         )
 
 
+def _media_mask(size: tuple[int, int]) -> Image.Image:
+    """Return small top corners and panel-matched lower display corners."""
+    width, height = size
+    mask = Image.new("L", size, 0)
+    shape = ImageDraw.Draw(mask)
+    bottom_radius = min(DISPLAY_CORNER_RADIUS, width // 2, height // 2)
+    top_radius = min(MEDIA_TOP_RADIUS, width // 2, height // 2)
+    shape.rounded_rectangle(
+        (0, 0, width - 1, height - 1),
+        radius=bottom_radius,
+        fill=255,
+    )
+    shape.rectangle(
+        (0, top_radius, width - 1, height - bottom_radius),
+        fill=255,
+    )
+    shape.rounded_rectangle(
+        (0, 0, width - 1, min(height - 1, top_radius * 2)),
+        radius=top_radius,
+        fill=255,
+    )
+    return mask
+
+
+def _fill_media_shape(
+    image: Image.Image,
+    bounds: tuple[int, int, int, int],
+    color: tuple[int, int, int],
+) -> None:
+    x0, y0, x1, y1 = bounds
+    size = (x1 - x0 + 1, y1 - y0 + 1)
+    image.paste((*color, 255), (x0, y0, x1 + 1, y1 + 1), _media_mask(size))
+
+
+def _outline_media_shape(
+    image: Image.Image,
+    bounds: tuple[int, int, int, int],
+    color: tuple[int, int, int],
+) -> None:
+    x0, y0, x1, y1 = bounds
+    size = (x1 - x0 + 1, y1 - y0 + 1)
+    outer = _media_mask(size)
+    inner_shape = _media_mask((size[0] - 2, size[1] - 2))
+    inner = Image.new("L", size, 0)
+    inner.paste(inner_shape, (1, 1))
+    border = ImageChops.subtract(outer, inner)
+    image.paste((*color, 255), (x0, y0, x1 + 1, y1 + 1), border)
+
+
 def render_device_ui(
     state: DeviceUiState,
     artwork: Image.Image | None = None,
@@ -800,8 +872,8 @@ def render_device_ui(
     draw.rectangle((0, 0, WIDTH - 1, 39), fill=(2, 5, 7), outline=(35, 47, 51))
     draw.line((17, 19, 222, 19), fill=(25, 35, 39), width=1)
     draw.line((119, 2, 119, 37), fill=(25, 35, 39), width=1)
-    _vertical_label(image, left_action, 5, clockwise=False, header_height=header_height)
-    _vertical_label(image, right_action, 224, clockwise=False, header_height=header_height)
+    _vertical_label(image, left_action, 8, clockwise=False, header_height=header_height)
+    _vertical_label(image, right_action, 221, clockwise=False, header_height=header_height)
     _control_value(draw, 19, 1, str(controls[0]), f"{state.volume}%", accent)
     _control_value(draw, 19, 20, str(controls[1]), str(state.squelch), accent)
     _control_value(draw, 122, 1, str(controls[2]), f"{state.channel:03d}", accent)
@@ -886,29 +958,29 @@ def render_device_ui(
         credit = _fit_text(draw, state.title, credit_font, 128)
         credit_width = draw.textbbox((0, 0), credit, font=credit_font)[2]
         draw.text((226 - credit_width, content_top + 25), credit, font=credit_font, fill=accent)
+        weather_bounds = (
+            MEDIA_MARGIN,
+            content_top + 40,
+            WIDTH - 1 - MEDIA_MARGIN,
+            HEIGHT - 1 - MEDIA_MARGIN,
+        )
+        weather_xy = (weather_bounds[0] + 1, weather_bounds[1] + 1)
+        weather_size = (
+            weather_bounds[2] - weather_bounds[0] - 1,
+            weather_bounds[3] - weather_bounds[1] - 1,
+        )
         if artwork is not None:
             weather = ImageOps.contain(
                 artwork.convert("RGB"),
-                (212, 167),
+                weather_size,
                 method=Image.Resampling.LANCZOS,
             )
-            weather_x = 14 + (212 - weather.width) // 2
-            weather_y = content_top + 41 + (167 - weather.height) // 2
-            weather_mask = Image.new("L", weather.size, 0)
-            ImageDraw.Draw(weather_mask).rounded_rectangle(
-                (0, 0, weather.width - 1, weather.height - 1),
-                radius=DISPLAY_CORNER_RADIUS,
-                fill=255,
-            )
+            weather_x = weather_xy[0] + (weather_size[0] - weather.width) // 2
+            weather_y = weather_xy[1] + (weather_size[1] - weather.height) // 2
+            weather_mask = _media_mask(weather.size)
             image.paste(weather, (weather_x, weather_y), weather_mask)
         else:
-            draw.rounded_rectangle(
-                (14, content_top + 41, 225, 270),
-                radius=DISPLAY_CORNER_RADIUS,
-                fill=(13, 31, 35),
-                outline=accent,
-                width=2,
-            )
+            _fill_media_shape(image, weather_bounds, (13, 31, 35))
             loading_font = _font(13, bold=True)
             loading = _fit_text(
                 draw,
@@ -923,18 +995,22 @@ def render_device_ui(
                 font=loading_font,
                 fill=(196, 207, 209),
             )
-        draw.rounded_rectangle(
-            (13, content_top + 40, 226, 271),
-            radius=DISPLAY_CORNER_RADIUS,
-            outline=(75, 92, 96),
-            width=1,
-        )
+        _outline_media_shape(image, weather_bounds, (75, 92, 96))
         return image.convert("RGB")
 
     # Radio/player artwork spans the content width. ImageOps.fit deliberately
     # crops the lower edge instead of squeezing a square logo into a side tile.
-    tile_size = (212, 164)
-    tile_xy = (14, content_top + 43)
+    media_bounds = (
+        MEDIA_MARGIN,
+        content_top + 42,
+        WIDTH - 1 - MEDIA_MARGIN,
+        HEIGHT - 1 - MEDIA_MARGIN,
+    )
+    tile_xy = (media_bounds[0] + 1, media_bounds[1] + 1)
+    tile_size = (
+        media_bounds[2] - media_bounds[0] - 1,
+        media_bounds[3] - media_bounds[1] - 1,
+    )
     if artwork is not None:
         tile = ImageOps.fit(
             artwork.convert("RGB"),
@@ -942,21 +1018,10 @@ def render_device_ui(
             method=Image.Resampling.LANCZOS,
             centering=(0.5, 0.35),
         )
-        mask = Image.new("L", tile_size, 0)
-        ImageDraw.Draw(mask).rounded_rectangle(
-            (0, 0, tile_size[0] - 1, tile_size[1] - 1),
-            radius=DISPLAY_CORNER_RADIUS,
-            fill=255,
-        )
+        mask = _media_mask(tile_size)
         image.paste(tile, tile_xy, mask)
     else:
-        draw.rounded_rectangle(
-            (14, content_top + 43, 225, 269),
-            radius=DISPLAY_CORNER_RADIUS,
-            fill=(13, 31, 35),
-            outline=accent,
-            width=2,
-        )
+        _fill_media_shape(image, media_bounds, (13, 31, 35))
         initials = "".join(part[:1] for part in state.source.split()[:2]).upper() or "OR"
         initials_font = _font(34, bold=True)
         bounds = draw.textbbox((0, 0), initials, font=initials_font)
@@ -966,12 +1031,7 @@ def render_device_ui(
             font=initials_font,
             fill=accent,
         )
-    draw.rounded_rectangle(
-        (13, content_top + 42, 226, 271),
-        radius=DISPLAY_CORNER_RADIUS,
-        outline=(75, 92, 96),
-        width=1,
-    )
+    _outline_media_shape(image, media_bounds, (75, 92, 96))
 
     title = (
         state.title

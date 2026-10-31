@@ -358,7 +358,7 @@ gemeinsam ein rechts angedocktes PTT-Tastenfeld: links abgerundet, oben und
 unten gerahmt, ohne sichtbaren rechten Rand und rechnerisch über den rechten
 Displayrand hinauslaufend. Das rote aktive PTT-Feld verwendet dieselbe
 Silhouette. Die orange linke Akzentlinie bleibt im Menü klar und scharf; im
-normalen Player erhält sie einen kontrollierten weichen Glow.
+normalen Player erhält sie einen deutlich sichtbaren, kräftigen weichen Glow.
 
 Wegen der real abgerundeten Displayecken werden beide vertikalen
 Drucktasterbeschriftungen im oberen Funktionskopf einige Pixel nach unten
@@ -1075,6 +1075,44 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-31 – Glow-Eckbalance, Randbeschriftung und Dienstkandidaten
+
+- Das reale Vorschaubild bestätigt den kräftigen Player-Glow und seinen
+  gewünschten 3D-Eindruck. Nur die Lichtkonzentration in den beiden unteren
+  Rundungen wird reduziert; gerade Seiten, Unterkante und obere Glowkante
+  behalten ihre deutlich sichtbare Intensität.
+- Die gedrehten Randbeschriftungen `MENÜ` und `PLAY` werden einige weitere
+  Pixel nach innen gerückt, damit sie innerhalb der realen Rundung sicher
+  lesbar bleiben.
+- Weitere mögliche Anwendungen werden in einer priorisierten, unverbindlichen
+  Dienstkandidatenliste dokumentiert. Für jeden Kandidaten sind Nutzen,
+  vorhandener offizieller Integrationsweg, Pi-Zero-2-W-Tauglichkeit,
+  Zugangsdatenbedarf und wesentliche rechtliche beziehungsweise technische
+  Grenzen sichtbar. Die Liste installiert oder aktiviert noch keinen Dienst.
+
+### 2026-10-31 – Radio-Metadaten vor Play und pixelgenaue Medienfläche
+
+- In der Radioansicht werden Interpret und Titel nach Möglichkeit schon vor
+  dem Start der hörbaren Wiedergabe ermittelt. Dafür wird der bereits
+  vorhandene ICY-Ringspeicher beim Öffnen der Radioansicht auf den sichtbaren
+  Sender abgestimmt; er liefert Metadaten und den gewünschten Vorlauf, ohne
+  Audio an den Lautsprecher auszugeben. Es entsteht kein paralleler zweiter
+  Metadatenadapter.
+- Wenn ein Sender keine ICY-Titelinformation liefert, zeigt das Gerät einen
+  kurzen lokalisierten Endnutzertext. Technische Player-, ALSA-, `aplay`- oder
+  Backendmeldungen dürfen in dieser Zeile nicht erscheinen.
+- Der reale SWR3-Stream liefert ICY aktuell als `Titel / Interpret`. Dieses
+  belegte Format wird beim Einlesen in die einheitliche Anzeige und Ablage
+  `Interpret – Titel` gedreht; unbekannte Formate bleiben unverändert statt
+  geraten zu werden.
+- Die gemeinsame Medienmaske für Senderlogos, Wetter-, Kamera- und andere
+  Medienflächen erhält oben kleine Radien und unten weiterhin die große reale
+  Displayrundung. So wirkt nur die Unterkante durch das runde Display
+  beschnitten.
+- Seiten- und Unterabstand der Medienfläche sind identisch und werden auf das
+  für die reale Rundung nötige Minimum reduziert. Logos nutzen dadurch mehr
+  Breite; Einzelimplementierungen pro Sender oder Dienst sind nicht zulässig.
 
 ### 2026-10-31 – Player-Rahmen-Glow deutlich verstärkt
 
