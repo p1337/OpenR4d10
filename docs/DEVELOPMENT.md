@@ -137,6 +137,10 @@ values.
 pipe. Keep `WorkingDirectory=/run/openr4d10` in the application unit and test
 that the unit still retains `ProtectSystem=strict`; do not solve this by making
 `/` writable or broadening `ReadWritePaths`.
+Do not call `lgpio.tx_pwm(..., 0, 0)` unless the adapter has successfully
+started PWM on that claimed output. Raspberry Pi OS package 0.2.2 returns
+`bad PWM micros` for an idle stop. Tests must cover a steady endpoint before
+the first intermediate PWM value and cleanup in both active and idle states.
 
 The `device_input` action is the hardware-free input source for the native
 display. It accepts only the checked-in logical control names, rotary steps

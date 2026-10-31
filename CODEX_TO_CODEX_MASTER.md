@@ -1020,6 +1020,13 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   protokolliert aus. Der Dienst arbeitet nun in seinem bereits vorhandenen,
   privaten und beschreibbaren `RuntimeDirectory=/run/openr4d10`. `ProtectSystem`
   bleibt `strict`, und es wird kein zusätzlicher Schreibpfad freigegeben.
+- Der anschließende reale 0.10.23-Start deckte eine zweite versionsspezifische
+  Kante auf: Die installierte `lgpio`-Bindung dokumentiert Frequenz `0` als
+  Stop, antwortet ohne laufende PWM jedoch mit `bad PWM micros`. OpenR4d10
+  merkt sich deshalb, ob auf BCM22 tatsächlich PWM aktiv ist. Ein Stopbefehl
+  wird nur dann gesendet; bei einem festen 0-/100-Prozent-Pegel wird direkt
+  geschrieben. Damit bleibt auch das Schließen nach einem frühen Fehler
+  ausnahmefrei.
 - Der Displaykopf wird flacher, die Uhr exakt auf der Gesamtbreite zentriert
   und der Abstand zum Diensttitel verkleinert. Der frei werdende Platz wird dem
   unteren Inhalt zugeschlagen.

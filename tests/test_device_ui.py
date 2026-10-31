@@ -367,6 +367,10 @@ class WhisplayDisplayTests(unittest.TestCase):
         pwm = _LgpioPwm(lgpio, 0, 22, initial_high=True)
         lgpio.gpio_claim_output.assert_called_once_with(17, 22, 1)
 
+        pwm.set_duty_cycle(0)
+        lgpio.tx_pwm.assert_not_called()
+        lgpio.gpio_write.assert_called_with(17, 22, 0)
+
         pwm.set_duty_cycle(65)
         lgpio.tx_pwm.assert_called_with(17, 22, 1_000, 65)
 
@@ -378,6 +382,16 @@ class WhisplayDisplayTests(unittest.TestCase):
         lgpio.gpio_write.assert_called_with(17, 22, 1)
 
         pwm.close(final_high=False)
+        lgpio.gpio_free.assert_called_once_with(17, 22)
+        lgpio.gpiochip_close.assert_called_once_with(17)
+
+    def test_lgpio_pwm_idle_close_does_not_send_invalid_stop(self) -> None:
+        lgpio = Mock()
+        lgpio.gpiochip_open.return_value = 17
+        pwm = _LgpioPwm(lgpio, 0, 22, initial_high=False)
+        pwm.close(final_high=False)
+        lgpio.tx_pwm.assert_not_called()
+        lgpio.gpio_write.assert_called_once_with(17, 22, 0)
         lgpio.gpio_free.assert_called_once_with(17, 22)
         lgpio.gpiochip_close.assert_called_once_with(17)
 

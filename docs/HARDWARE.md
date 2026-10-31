@@ -200,6 +200,10 @@ The real 0.10.22 start additionally established that `lgpio` creates its
 private `.lgd-nfy*` pipe in the current directory. The service now uses its
 existing writable `/run/openr4d10` runtime directory as its working directory;
 the root filesystem remains protected read-only by systemd.
+The real 0.10.23 start also confirmed that `lgpio` 0.2.2 rejects an idle
+frequency-zero PWM stop with `bad PWM micros`. The adapter now records whether
+PWM is active, stops only an active waveform, and otherwise writes the steady
+active-low endpoint directly.
 
 The application media boundary uses generic ALSA through Debian's mpv and
 ffmpeg packages. Its systemd unit allows the standard `char-alsa` device class

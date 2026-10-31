@@ -157,6 +157,10 @@ process working directory during import. The hardened application unit therefore
 uses its existing `RuntimeDirectory=/run/openr4d10` as `WorkingDirectory`.
 That path was already the unit's private writable runtime boundary;
 `ProtectSystem=strict` and the existing `ReadWritePaths` remain unchanged.
+The packaged 0.2.2 binding rejects an idle `tx_pwm(..., 0, 0)` stop request
+with `bad PWM micros` despite its API text. `_LgpioPwm` therefore tracks
+whether it has successfully started PWM and sends the stop request only in
+that state. Steady endpoint writes never issue a speculative stop.
 
 ## Service catalog
 

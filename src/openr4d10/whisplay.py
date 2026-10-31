@@ -46,6 +46,7 @@ class _LgpioPwm:
         self._lgpio = lgpio
         self._line_offset = line_offset
         self._frequency_hz = frequency_hz
+        self._pwm_active = False
         self._handle = lgpio.gpiochip_open(chip_number)
         try:
             lgpio.gpio_claim_output(
@@ -62,7 +63,9 @@ class _LgpioPwm:
         if self._handle is None:
             return
         if duty_percent <= 0 or duty_percent >= 100:
-            self._lgpio.tx_pwm(self._handle, self._line_offset, 0, 0)
+            if self._pwm_active:
+                self._lgpio.tx_pwm(self._handle, self._line_offset, 0, 0)
+                self._pwm_active = False
             self._lgpio.gpio_write(
                 self._handle,
                 self._line_offset,
@@ -75,12 +78,15 @@ class _LgpioPwm:
             self._frequency_hz,
             duty_percent,
         )
+        self._pwm_active = True
 
     def close(self, *, final_high: bool) -> None:
         if self._handle is None:
             return
         try:
-            self._lgpio.tx_pwm(self._handle, self._line_offset, 0, 0)
+            if self._pwm_active:
+                self._lgpio.tx_pwm(self._handle, self._line_offset, 0, 0)
+                self._pwm_active = False
             self._lgpio.gpio_write(
                 self._handle,
                 self._line_offset,
