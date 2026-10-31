@@ -30,7 +30,7 @@ the installer report exactly which adapters still need configuration.
 - safe display handoff both at boot and during an in-session installation
 - real-device-confirmed Whisplay SPI transport, colour order and orientation
 - persistent, C-timed 0–100% Whisplay brightness control in the web settings
-- persistent accent color plus a permanent soft player-edge glow following
+- persistent accent color plus a permanent strong, soft player-edge glow following
   the rounded display contour and closing below the status row
 - read-only PiSugar 3 battery percentage over the manufacturer-documented I2C
   identity and capacity registers; no separate PiSugar web service or default
@@ -188,7 +188,7 @@ re-arming the same waveform caused the remaining rare bright/dark jump. Its
 private notification pipe stays inside `/run/openr4d10`, the already protected
 runtime directory, without weakening the service's read-only system boundary.
 The same settings area stores the selected accent color. The normal player
-always receives a soft edge glow in that color along the physical rounded
+always receives a clearly visible strong, soft edge glow in that color along the physical rounded
 contour, including a straight upper glow immediately below the status row. It
 has no crisp border line and no disable switch. Media, weather and camera
 images use the same 43-pixel corner radius as the panel. Device text is never

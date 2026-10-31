@@ -266,13 +266,23 @@ class DeviceUiTests(unittest.TestCase):
         image = render_device_ui(DeviceUiState(service_index=1))
         background = (6, 12, 15)
         for point in ((0, 180), (4, 180), (120, 279), (239, 180), (235, 180)):
-            self.assertNotEqual(image.getpixel(point), background)
-            self.assertNotEqual(image.getpixel(point), DEFAULT_ACCENT)
+            pixel = image.getpixel(point)
+            self.assertNotEqual(pixel, background)
+            self.assertNotEqual(pixel, DEFAULT_ACCENT)
+            self.assertGreaterEqual(
+                sum(abs(channel - base) for channel, base in zip(pixel, background)),
+                70,
+            )
         for clipped_corner in ((0, HEIGHT - 1), (WIDTH - 1, HEIGHT - 1)):
             self.assertEqual(image.getpixel(clipped_corner), background)
         for top_point in ((120, 63), (120, 71)):
-            self.assertNotEqual(image.getpixel(top_point), background)
-            self.assertNotEqual(image.getpixel(top_point), DEFAULT_ACCENT)
+            pixel = image.getpixel(top_point)
+            self.assertNotEqual(pixel, background)
+            self.assertNotEqual(pixel, DEFAULT_ACCENT)
+            self.assertGreaterEqual(
+                sum(abs(channel - base) for channel, base in zip(pixel, background)),
+                35,
+            )
 
     def test_play_control_is_below_battery_and_footer_is_empty(self) -> None:
         state = DeviceUiState(playing=True, service_index=1)

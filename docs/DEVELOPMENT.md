@@ -155,9 +155,9 @@ the first intermediate PWM value and cleanup in both active and idle states.
 The Whisplay renderer used for the physical panel and PNG preview always draws
 the player edge glow; `screen_border_enabled` is no longer a public or active
 setting. Tests cover persistence, malformed colors, the straight top glow below
-the status row, the R5 curve and the absence of any pixel in the glow samples
-that exactly equals the accent color. That last assertion prevents a crisp line
-from returning. The web preview and all device media masks use the same
+the status row, the R5 curve, a clearly visible minimum glow intensity and the
+absence of any pixel in the glow samples that exactly equals the accent color.
+That last assertion prevents a crisp line from returning. The web preview and all device media masks use the same
 43-pixel corner radius and contain no enable switch. New device text must use at
 least the SSID font size; tests enforce this for the battery percentage.
 

@@ -631,7 +631,7 @@ def _draw_player_edge_glow(
 ) -> None:
     """Glow inward from the physical player contour without a crisp line."""
     padding = 24
-    outside_offset = 8
+    outside_offset = 6
     left = padding - outside_offset
     right = padding + WIDTH - 1 + outside_offset
     bottom = padding + HEIGHT - 1 + outside_offset
@@ -667,16 +667,21 @@ def _draw_player_edge_glow(
         )
         target.line((right, tangent_y, right, glow_top), fill=color, width=width)
 
-    # Render the light source outside the physical viewport. Only its blurred
-    # spill is cropped back into the panel, so no solid border can remain.
-    glow = Image.new(
-        "RGBA",
-        (WIDTH + 2 * padding, HEIGHT + 2 * padding),
-        (0, 0, 0, 0),
-    )
-    draw_path(ImageDraw.Draw(glow), (*accent, 255), 13)
-    blurred = glow.filter(ImageFilter.GaussianBlur(radius=9))
-    visible = blurred.crop((padding, padding, padding + WIDTH, padding + HEIGHT))
+    # Combine a broad halo with a tighter bright halo. Both sources are
+    # blurred before cropping, so the stronger effect still has no solid line.
+    def blurred_pass(alpha: int, width: int, blur_radius: int) -> Image.Image:
+        glow = Image.new(
+            "RGBA",
+            (WIDTH + 2 * padding, HEIGHT + 2 * padding),
+            (0, 0, 0, 0),
+        )
+        draw_path(ImageDraw.Draw(glow), (*accent, alpha), width)
+        blurred = glow.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+        return blurred.crop((padding, padding, padding + WIDTH, padding + HEIGHT))
+
+    broad = blurred_pass(alpha=220, width=21, blur_radius=10)
+    tight = blurred_pass(alpha=245, width=11, blur_radius=4)
+    visible = Image.alpha_composite(broad, tight)
     panel_mask = Image.new("L", (WIDTH, HEIGHT), 0)
     ImageDraw.Draw(panel_mask).rounded_rectangle(
         (0, 0, WIDTH - 1, HEIGHT - 1),

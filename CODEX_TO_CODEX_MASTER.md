@@ -1076,6 +1076,19 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-31 – Player-Rahmen-Glow deutlich verstärkt
+
+- Die reale Anzeige zeigt, dass der bisherige permanente Player-Glow trotz
+  korrekter Kontur kaum wahrnehmbar ist. Er wird deshalb deutlich leuchtender
+  und klar sichtbar ausgeführt.
+- Die bestehende Form bleibt unverändert: geschlossene Kontur entlang der real
+  abgerundeten Displaykante und gerader oberer Glow unter der Statusleiste.
+  Weiterhin gibt es weder eine harte Akzentlinie noch einen Abschalter.
+- Der Effekt besteht aus einem breiten weichen Lichtschein und einem engeren,
+  kräftigeren Lichtschein. Ein Regressionstest fordert eine messbare
+  Mindesthelligkeit an Seiten-, Ober- und Unterkante, ohne reine
+  Akzentfarbpixel zuzulassen.
+
 ### 2026-10-31 – Gerätesprache, verbleibendes Flackern und Lichtsensor-Prüfung
 
 - Die Sprachwahl im Web darf nicht nur den Browser übersetzen. Sie setzt und

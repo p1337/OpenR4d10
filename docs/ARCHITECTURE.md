@@ -108,7 +108,7 @@ media controls. Menu history stays inside `DeviceUiState`; an active PTT press
 returns one level unless the current semantic frame explicitly declares a
 ready PTT-owning context. The back/PTT affordance is one edge-aligned silhouette
 with a left-rounded, right-open frame and a filled mini arrow. The normal player
-always adds a line-free soft glow around its physical rounded contour, with a
+always adds a pronounced two-stage, line-free soft glow around its physical rounded contour, with a
 straight upper glow immediately below the status row. Vertical header labels
 are offset down and inward from the rounded top corners and the right label is
 rotated for reading from the right/bottom edge. This remains one Pillow renderer
