@@ -15,14 +15,14 @@ import stat
 import subprocess
 import tempfile
 import threading
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 from PIL import Image
 
 from .ambient import AMBIENT_ARTWORK_ROOT, AMBIENT_BY_ID
 from .config import AdapterConfig, HardwareConfig
 from .device_ui import DISPLAY_TEXT, DeviceUiState, image_to_rgb565, render_device_ui
-from .input_events import InputEvent
+from .input_events import Control, InputEvent
 from .models import Frame
 from .whisplay import WhisplayError, WhisplayPanel
 
@@ -143,7 +143,27 @@ class WhisplayDisplay:
             else None
         )
         self.brightness_percent = 100
+        self._input_handler: Callable[[InputEvent], object] | None = None
         self._lock = threading.Lock()
+
+    def set_input_handler(
+        self, handler: Callable[[InputEvent], object] | None
+    ) -> None:
+        """Connect the verified physical Whisplay button to logical PTT."""
+
+        self._input_handler = handler
+        setter = getattr(self.panel, "set_button_callback", None)
+        if callable(setter):
+            setter(self._on_button_state if handler is not None else None)
+
+    def _on_button_state(self, active: bool) -> None:
+        handler = self._input_handler
+        if handler is None:
+            return
+        try:
+            handler(InputEvent(Control.PTT, active=active))
+        except Exception:
+            LOG.exception("Whisplay button input failed")
 
     def _show_state(self) -> None:
         self._refresh_hotspot_setup()
@@ -315,6 +335,10 @@ class WhisplayDisplay:
 
     def close(self) -> None:
         with self._lock:
+            self._input_handler = None
+            setter = getattr(self.panel, "set_button_callback", None)
+            if callable(setter):
+                setter(None)
             self.panel.close()
 
 

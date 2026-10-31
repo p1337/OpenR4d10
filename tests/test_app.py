@@ -6,7 +6,7 @@ import unittest
 from openr4d10.adapters import FileDisplay, SystemTelemetry, UnconfiguredTelemetry
 from openr4d10.app import OpenR4d10App
 from openr4d10.config import AppConfig
-from openr4d10.input_events import Control
+from openr4d10.input_events import Control, InputEvent
 
 
 class AppTests(unittest.TestCase):
@@ -545,6 +545,7 @@ class AppTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             services = Services()
+            display = InputDisplay()
             app = OpenR4d10App(
                 AppConfig(
                     log_level="INFO",
@@ -555,7 +556,7 @@ class AppTests(unittest.TestCase):
                     runtime_directory=root,
                     state_directory=root,
                 ),
-                display=InputDisplay(),
+                display=display,
                 power=UnconfiguredTelemetry("power"),
                 receiver=SystemTelemetry(),
                 services=services,
@@ -572,8 +573,11 @@ class AppTests(unittest.TestCase):
         self.assertEqual(opened["weather_channel_id"], 2)
         self.assertEqual(stepped["weather_channel_id"], 2)
 
-    def test_dmr_axes_browse_and_ptt_or_enter_toggle_selected_talkgroup(self) -> None:
+    def test_dmr_axes_browse_ptt_jumps_first_and_enter_toggles_talkgroup(self) -> None:
         class InputDisplay:
+            def __init__(self):
+                self.input_handler = None
+
             def render(self, _frame) -> None:
                 pass
 
@@ -582,6 +586,9 @@ class AppTests(unittest.TestCase):
 
             def apply_input(self, _event):
                 return self.snapshot()
+
+            def set_input_handler(self, handler):
+                self.input_handler = handler
 
         class Services:
             active_service = "brandmeister"
@@ -602,6 +609,7 @@ class AppTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             services = Services()
+            display = InputDisplay()
             app = OpenR4d10App(
                 AppConfig(
                     log_level="INFO",
@@ -612,15 +620,16 @@ class AppTests(unittest.TestCase):
                     runtime_directory=root,
                     state_directory=root,
                 ),
-                display=InputDisplay(),
+                display=display,
                 power=UnconfiguredTelemetry("power"),
                 receiver=SystemTelemetry(),
                 services=services,
             )
             app.control({"action": "device_input", "control": "right_outer", "steps": 1})
             app.control({"action": "device_input", "control": "left_inner", "steps": -1})
-            app.control({"action": "device_input", "control": "ptt", "active": True})
-            app.control({"action": "device_input", "control": "ptt", "active": False})
+            self.assertIsNotNone(display.input_handler)
+            display.input_handler(InputEvent(Control.PTT, active=True))
+            display.input_handler(InputEvent(Control.PTT, active=False))
             app.control({"action": "device_input", "control": "right_press"})
 
         self.assertEqual(
@@ -628,7 +637,7 @@ class AppTests(unittest.TestCase):
             [
                 {"action": "brandmeister_step", "steps": 1},
                 {"action": "brandmeister_step", "steps": -25},
-                {"action": "brandmeister_toggle_selected"},
+                {"action": "brandmeister_jump_first"},
                 {"action": "brandmeister_toggle_selected"},
             ],
         )

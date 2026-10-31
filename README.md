@@ -36,6 +36,8 @@ the installer report exactly which adapters still need configuration.
   identity and capacity registers; no separate PiSugar web service or default
   account is installed
 - native 240 x 280 physical UI with the agreed four-axis encoder layout
+- real Whisplay button on physical pin 11 / BCM17 routed to the logical PTT and
+  menu-back path with active-high debouncing
 - browser controls for all four virtual encoder axes and both press actions
 - semantic UI frame model and configurable text boot sequence
 - safe `unconfigured`, JSON-file and external-command display adapters
@@ -82,7 +84,8 @@ the installer report exactly which adapters still need configuration.
   checkbox quick list, complete searchable official catalog, country flags and
   compact per-talkgroup current/last-heard participant rows on web and device;
   the physical view pins the speaking TG above a scrollable enabled-first
-  catalog window and PTT toggles the marked TG locally without transmitting;
+  catalog window; a short right click toggles the marked TG while PTT returns
+  the selection to the beginning of the catalog without transmitting;
   no account password or user token
 - standard-library-only test suite and GitHub Actions CI
 
@@ -273,9 +276,10 @@ catalog one entry at a time, while the left inner axis jumps 25 entries per
 detent. The device renders a bounded window over the entire catalog with
 enabled entries first and all inactive entries below them. A speaking TG is
 pinned above that list and shows the DMR source ID plus the HoseLine talker
-alias when the network supplied one. PTT toggles the selected TG on its press
-edge; the short right press remains a compatibility shortcut. Neither action
-transmits audio. The localized header shows these real assignments
+alias when the network supplied one. The short right press toggles the selected
+TG. PTT instead returns the selection to the beginning of the enabled-first
+catalog on its press edge. Neither action transmits audio. A long right press
+remains the service quick menu. The localized header shows these real assignments
 (`JMP`/`TG` in English) instead of the normal `SQL`/`CH` labels. On 2026-10-31
 a real subscribed HoseLine call was heard through the fitted Whisplay speaker,
 confirming the native ALSA path. Ended calls remain visibly marked as last

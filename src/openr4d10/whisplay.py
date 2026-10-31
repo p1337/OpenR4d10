@@ -10,8 +10,9 @@ from __future__ import annotations
 from contextlib import AbstractContextManager
 import os
 from pathlib import Path
+import threading
 import time
-from typing import Any
+from typing import Any, Callable
 
 from .boot_display import claim_display
 
@@ -79,6 +80,9 @@ class WhisplayPanel:
     RESET_BCM = 4
     DC_BCM = 27
     BACKLIGHT_BCM = 22
+    BUTTON_BCM = 17
+    BUTTON_POLL_SECONDS = 0.01
+    BUTTON_DEBOUNCE_SECONDS = 0.03
 
     def __init__(self, speed_hz: int = 32_000_000) -> None:
         if not 1_000_000 <= speed_hz <= 100_000_000:
@@ -88,6 +92,10 @@ class WhisplayPanel:
         self._chip: Any = None
         self._reset: Any = None
         self._dc: Any = None
+        self._button: Any = None
+        self._button_callback: Callable[[bool], None] | None = None
+        self._button_stop = threading.Event()
+        self._button_thread: threading.Thread | None = None
         self._spi: Any = None
         self._value_active: Any = None
         self._value_inactive: Any = None
@@ -142,6 +150,7 @@ class WhisplayPanel:
                 gpiod, Direction, self.RESET_BCM, high=True
             )
             self._dc = self._request_output(gpiod, Direction, self.DC_BCM, high=True)
+            self._button = self._request_input(gpiod, Direction, self.BUTTON_BCM)
             self._spi = spidev.SpiDev()
             self._spi.open(0, 0)
             self._spi.max_speed_hz = self.speed_hz
@@ -149,6 +158,7 @@ class WhisplayPanel:
             self._spi.bits_per_word = 8
             if not initialized:
                 self._initialize_panel()
+            self._start_button_monitor()
         except Exception as exc:
             raise WhisplayError(f"cannot open Whisplay SPI/GPIO: {exc}") from exc
 
@@ -161,6 +171,62 @@ class WhisplayPanel:
             consumer="openr4d10-ui",
             config={offset: settings},
         )
+
+    def _request_input(self, gpiod: Any, direction: Any, offset: int) -> Any:
+        # The official Whisplay runtime documents an external pull-down on the
+        # active-high button line. Do not enable an internal pull-up here.
+        settings = gpiod.LineSettings(direction=direction.INPUT)
+        return self._chip.request_lines(
+            consumer="openr4d10-button",
+            config={offset: settings},
+        )
+
+    def set_button_callback(self, callback: Callable[[bool], None] | None) -> None:
+        self._button_callback = callback
+
+    def _button_pressed(self) -> bool:
+        return self._button.get_value(self.BUTTON_BCM) == self._value_active
+
+    def _start_button_monitor(self) -> None:
+        if self._button is None or self._button_thread is not None:
+            return
+        self._button_stop.clear()
+        self._button_thread = threading.Thread(
+            target=self._button_monitor,
+            name="openr4d10-whisplay-button",
+            daemon=True,
+        )
+        self._button_thread.start()
+
+    def _button_monitor(self) -> None:
+        try:
+            stable = self._button_pressed()
+        except Exception:
+            return
+        pending = stable
+        changed_at = time.monotonic()
+        while not self._button_stop.wait(self.BUTTON_POLL_SECONDS):
+            try:
+                current = self._button_pressed()
+            except Exception:
+                if self._button_stop.is_set():
+                    return
+                continue
+            now = time.monotonic()
+            if current != pending:
+                pending = current
+                changed_at = now
+                continue
+            if pending == stable or now - changed_at < self.BUTTON_DEBOUNCE_SECONDS:
+                continue
+            stable = pending
+            callback = self._button_callback
+            if callback is not None:
+                try:
+                    callback(stable)
+                except Exception:
+                    # A UI/control error must not kill future button events.
+                    pass
 
     @staticmethod
     def _already_initialized() -> bool:
@@ -242,7 +308,12 @@ class WhisplayPanel:
         self._apply_brightness()
 
     def close(self) -> None:
-        for request_name in ("_dc", "_reset"):
+        self._button_stop.set()
+        button_thread = self._button_thread
+        if button_thread is not None and button_thread is not threading.current_thread():
+            button_thread.join(timeout=0.5)
+        self._button_thread = None
+        for request_name in ("_button", "_dc", "_reset"):
             request = getattr(self, request_name)
             if request is not None:
                 try:

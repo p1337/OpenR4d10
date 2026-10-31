@@ -2782,3 +2782,31 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Loslassen schaltet nicht erneut. Der bisherige rechte Kurzdruck bleibt als
   kompatible Zweitbedienung. Beide Aktionen ändern nur die lokale Empfangsliste
   und erzeugen ausdrücklich keine Sendung oder BrandMeister-PTT-Nachricht.
+
+### 2026-10-31 – Eindeutige BrandMeister-Klickbelegung
+
+- Robert hebt die doppelte Umschaltung durch PTT und rechten Kurzdruck wieder
+  auf. In der normalen DMR-Katalogansicht aktiviert beziehungsweise deaktiviert
+  ausschließlich der kurze rechte Druck die markierte Talkgroup.
+- Eine PTT-Druckflanke springt stattdessen zum Anfang des aktuell gültigen
+  enabled-first Katalogs; die Loslassflanke bleibt wirkungslos. In geöffneten
+  Menüs behält PTT seine allgemeine Bedeutung Zurück beziehungsweise Abbrechen.
+- Ein mindestens zwei Sekunden gehaltener rechter Druck bleibt das
+  BrandMeister-Schnellmenü. Keine dieser Belegungen sendet Sprache oder eine
+  BrandMeister-PTT-Nachricht.
+
+### 2026-10-31 – Physischer Whisplay-Taster speist den PTT-Pfad
+
+- Roberts realer Druck auf den Whisplay-Taster neben dem gezeichneten
+  Zurück-Pfeil blieb ohne Wirkung, weil bisher ausschließlich Web/Backspace ein
+  logisches PTT-Ereignis erzeugten. Das Panel besitzt kein Touchscreen; die
+  gezeichnete Schaltfläche selbst ist deshalb kein Eingabegerät.
+- Die Herstellerdokumentation und der aktuelle offizielle Runtimequellcode
+  bestätigen für Raspberry Pi den Whisplay-Taster auf physischem Pin 11,
+  entsprechend BCM17. Die Platine besitzt dort einen externen Pulldown;
+  gedrückt ist HIGH und losgelassen LOW. Es wird kein interner Pullup erfunden.
+- Der vorhandene Whisplay-Adapter beansprucht BCM17 als Eingang, entprellt beide
+  Flanken und übergibt sie als dasselbe hardwareunabhängige PTT-Ereignis an den
+  zentral serialisierten Anwendungspfad. Web, Tastatur und Hardwaretaster
+  erhalten dadurch keine getrennte Navigation. Beim Schließen des Dienstes
+  wird der Abfragethread vor der GPIO-Freigabe beendet.

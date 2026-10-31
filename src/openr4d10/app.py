@@ -69,6 +69,20 @@ class OpenR4d10App:
         language_setter = getattr(self.display, "set_language", None)
         if callable(language_reader) and callable(language_setter):
             language_setter(language_reader())
+        input_setter = getattr(self.display, "set_input_handler", None)
+        if callable(input_setter):
+            input_setter(self._apply_hardware_input)
+
+    def _apply_hardware_input(self, event: InputEvent) -> dict[str, object]:
+        """Route physical controls through the same serialized application path."""
+
+        if self.stop_event.is_set():
+            return {}
+        handler = getattr(self.display, "apply_input", None)
+        if not callable(handler):
+            raise RuntimeError("the configured display does not accept device input")
+        with self._device_input_lock:
+            return self._apply_device_event(event, handler)
 
     def request_stop(self, signum: int | None = None, _frame: object = None) -> None:
         if signum is not None:
@@ -349,7 +363,7 @@ class OpenR4d10App:
             and selected_service == "DMR"
         ):
             media_result = self.services.control(
-                {"action": "brandmeister_toggle_selected"}
+                {"action": "brandmeister_jump_first"}
             )
         elif (
             self.services is not None

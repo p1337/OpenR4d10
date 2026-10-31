@@ -660,6 +660,13 @@ class ServiceCatalogTests(unittest.TestCase):
                         for item in catalog._brandmeister_device_entries(allow_network=False)[2:]
                     )
                 )
+                jumped = catalog.control({"action": "brandmeister_jump_first"})
+                self.assertEqual(jumped["talkgroup"], 91)
+                jumped_snapshot = catalog.snapshot()["brandmeister"]
+                self.assertEqual(jumped_snapshot["selected_talkgroup"], 91)
+                jumped_frame = catalog.receiver_overlay("DMR")
+                self.assertEqual(jumped_frame["catalog_position"], 1)
+                self.assertTrue(jumped_frame["catalog_rows"][0]["selected"])
             finally:
                 catalog.close()
 

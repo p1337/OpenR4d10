@@ -207,6 +207,13 @@ The main-menu body contains its large localized heading followed immediately by
 the documented vertical settings list and no player. The right outer encoder
 scrolls that list, the right press selects, and PTT returns one menu level unless
 a ready service explicitly owns PTT.
+The original Whisplay physical button is the verified PTT/back input. At pinned
+manufacturer commit `736975188ebbe146d319e450aad19c218a310611`, the runtime
+maps physical pin 11 to BCM17 and documents an external pulldown:
+pressed is high and released is low. OpenR4d10 claims that line as an input,
+debounces both edges and routes them through the same logical PTT path used by
+the browser. The drawn arrow is only a status/action cue; the LCD has no touch
+input.
 Logical encoder events are implemented and can be tested without hardware; no
 encoder GPIO assignment is active. The local web dashboard exposes all four
 rotations and both short/long press actions through the same input-event path

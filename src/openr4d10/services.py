@@ -1498,6 +1498,23 @@ class ServiceCatalog:
                 "talkgroup": talkgroup,
                 "name": str(selected["name"]),
             }
+        elif action == "brandmeister_jump_first":
+            self._require_enabled("brandmeister")
+            entries = self._brandmeister_device_entries(allow_network=True)
+            if not entries:
+                raise ValueError("the BrandMeister talkgroup catalog is empty")
+            selected = entries[0]
+            talkgroup = int(selected["talkgroup"])
+            self.selected_brandmeister_talkgroup = talkgroup
+            saved = self._saved_brandmeister_channel_for_talkgroup(talkgroup)
+            self.selected_brandmeister_channel_id = (
+                int(saved["id"]) if saved is not None else None
+            )
+            return {
+                "channel_id": self.selected_brandmeister_channel_id,
+                "talkgroup": talkgroup,
+                "name": str(selected["name"]),
+            }
         elif action == "brandmeister_toggle_selected":
             self._require_enabled("brandmeister")
             entry = self._selected_brandmeister_entry()

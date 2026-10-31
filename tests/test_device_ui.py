@@ -4,6 +4,8 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import threading
+import time
 import unittest
 from unittest.mock import Mock, patch
 
@@ -512,6 +514,7 @@ class FakePanel:
     def __init__(self) -> None:
         self.frames: list[bytes] = []
         self.brightness: list[int] = []
+        self.button_callback = None
         self.closed = False
 
     def show(self, frame: bytes) -> None:
@@ -520,11 +523,73 @@ class FakePanel:
     def set_brightness(self, brightness_percent: int) -> None:
         self.brightness.append(brightness_percent)
 
+    def set_button_callback(self, callback) -> None:
+        self.button_callback = callback
+
+    def emit_button(self, active: bool) -> None:
+        if self.button_callback is not None:
+            self.button_callback(active)
+
     def close(self) -> None:
         self.closed = True
 
 
 class WhisplayDisplayTests(unittest.TestCase):
+    def test_physical_button_monitor_debounces_active_high_edges(self) -> None:
+        class FakeButton:
+            def __init__(self) -> None:
+                self.value = 0
+                self.released = False
+
+            def get_value(self, _offset):
+                return self.value
+
+            def release(self) -> None:
+                self.released = True
+
+        panel = WhisplayPanel()
+        button = FakeButton()
+        panel._button = button
+        panel._value_active = 1
+        panel.BUTTON_POLL_SECONDS = 0.002
+        panel.BUTTON_DEBOUNCE_SECONDS = 0.01
+        events = []
+        first_edge = threading.Event()
+        second_edge = threading.Event()
+
+        def received(active):
+            events.append(active)
+            (first_edge if len(events) == 1 else second_edge).set()
+
+        panel.set_button_callback(received)
+        panel._start_button_monitor()
+        time.sleep(0.02)
+        button.value = 1
+        self.assertTrue(first_edge.wait(0.5))
+        button.value = 0
+        self.assertTrue(second_edge.wait(0.5))
+        panel.close()
+
+        self.assertEqual(events, [True, False])
+        self.assertTrue(button.released)
+
+    def test_physical_button_uses_verified_bcm17_and_logical_ptt_edges(self) -> None:
+        self.assertEqual(WhisplayPanel.BUTTON_BCM, 17)
+        panel = FakePanel()
+        display = WhisplayDisplay(panel=panel)  # type: ignore[arg-type]
+        events = []
+        display.set_input_handler(events.append)
+
+        panel.emit_button(True)
+        panel.emit_button(False)
+
+        self.assertEqual(
+            [(event.control, event.active) for event in events],
+            [(Control.PTT, True), (Control.PTT, False)],
+        )
+        display.close()
+        self.assertIsNone(panel.button_callback)
+
     def test_brightness_is_bounded_without_opening_hardware(self) -> None:
         panel = WhisplayPanel()
         panel.set_brightness(0)
