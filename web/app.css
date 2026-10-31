@@ -131,7 +131,7 @@ body {
   width: 240px;
   height: 280px;
   border: 1px solid #273234;
-  border-radius: 8px;
+  border-radius: 43px;
   background: #04080a;
 }
 .device-screen-dock span { color: var(--muted); font-size: .64rem; }

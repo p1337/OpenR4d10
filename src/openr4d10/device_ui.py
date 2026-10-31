@@ -15,6 +15,9 @@ from .models import Frame
 
 WIDTH = 240
 HEIGHT = 280
+DISPLAY_CORNER_RADIUS = 43
+PLAYER_BORDER_INSET = 5
+PLAYER_BORDER_RADIUS = DISPLAY_CORNER_RADIUS - PLAYER_BORDER_INSET
 DEFAULT_ACCENT = (253, 184, 19)
 SERVICES = ("SYSTEM", "RADIO", "WEATHER", "DMR", "PLAYER", "REC")
 MAIN_MENU_ITEMS = (
@@ -537,19 +540,44 @@ def _draw_player_accent_border(
     top: int,
     accent: tuple[int, int, int],
 ) -> None:
-    """Draw the requested open-top player border with a restrained glow."""
+    """Draw an inset open-top U that follows the physical rounded panel."""
+    left = PLAYER_BORDER_INSET
+    right = WIDTH - 1 - PLAYER_BORDER_INSET
+    bottom = HEIGHT - 1 - PLAYER_BORDER_INSET
+    radius = PLAYER_BORDER_RADIUS
+    tangent_y = bottom - radius
+
+    def draw_path(
+        target: ImageDraw.ImageDraw,
+        color: tuple[int, ...],
+        width: int,
+    ) -> None:
+        target.line((left, top, left, tangent_y), fill=color, width=width)
+        target.arc(
+            (left, bottom - 2 * radius, left + 2 * radius, bottom),
+            90,
+            180,
+            fill=color,
+            width=width,
+        )
+        target.line(
+            (left + radius, bottom, right - radius, bottom),
+            fill=color,
+            width=width,
+        )
+        target.arc(
+            (right - 2 * radius, bottom - 2 * radius, right, bottom),
+            0,
+            90,
+            fill=color,
+            width=width,
+        )
+        target.line((right, tangent_y, right, top), fill=color, width=width)
+
     glow = Image.new("RGBA", image.size, (0, 0, 0, 0))
-    glow_draw = ImageDraw.Draw(glow)
-    glow_draw.line(
-        ((2, top), (2, HEIGHT - 2), (WIDTH - 3, HEIGHT - 2), (WIDTH - 3, top)),
-        fill=(*accent, 185),
-        width=5,
-    )
+    draw_path(ImageDraw.Draw(glow), (*accent, 185), 5)
     image.alpha_composite(glow.filter(ImageFilter.GaussianBlur(radius=5)))
-    draw = ImageDraw.Draw(image)
-    draw.rectangle((0, top, 2, HEIGHT - 1), fill=accent)
-    draw.rectangle((0, HEIGHT - 3, WIDTH - 1, HEIGHT - 1), fill=accent)
-    draw.rectangle((WIDTH - 3, top, WIDTH - 1, HEIGHT - 1), fill=accent)
+    draw_path(ImageDraw.Draw(image), accent, 3)
 
 
 def _draw_main_menu_items(

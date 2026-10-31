@@ -87,6 +87,7 @@ class WebTests(unittest.TestCase):
         self.assertIn('id="display-screen-border" type="checkbox"', html)
         self.assertIn('action: "display_appearance"', script)
         self.assertIn("screen_border_enabled", script)
+        self.assertIn("border-radius: 43px", stylesheet)
         for tab in ("radio", "weather", "media", "device", "system", "services"):
             self.assertIn(f'data-tab="{tab}"', html)
             self.assertIn(f'data-tab-panel="{tab}"', html)

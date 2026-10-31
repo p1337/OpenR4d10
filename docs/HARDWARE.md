@@ -32,8 +32,20 @@ document the following:
 - interface: full Raspberry Pi 40-pin GPIO header
 - supply voltage: 5 V; logic voltage: 3.3 V
 - display: 1.69 inch, 240 x 280 RGB, ST7789, 4-wire SPI
+- exact panel in the
+  [official Whisplay display package](https://cdn.pisugar.com/pisugar-docs/documents/whisplay/1.69LCD.zip):
+  `ZJY169TP-IF95`,
+  27.972 x 32.634 mm active area and 0.11655 mm square pixel pitch
 - audio codec revision: WM8960 or ES8389
 - physical orientation: Whisplay button side faces the Pi USB-port side
+
+The panel has four visibly rounded corners. The
+[R5-mm geometry documented for this matching 1.69-inch panel family](https://www.waveshare.com/wiki/1.69inch_LCD_Module)
+corresponds to
+approximately 43 pixels at the documented pitch. UI decoration must therefore
+stay inside that contour. The optional player border uses a five-pixel inset
+and a 38-pixel inner bottom radius; drawing it at pixel 0/239/279 is known to
+make its bottom corners disappear on the actual glass.
 
 ### User-facing peripherals
 

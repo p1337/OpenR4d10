@@ -386,10 +386,13 @@ Die Geräteeinstellungen enthalten genau diese Hauptbereiche:
      Quellenname erscheint weder in der Geräte- noch in der Weboberfläche.
    - Die persistente Option **Bildschirmumrandung aktivieren** schaltet die
      Akzentumrandung des normalen Players. Aktiv bedeutet: linke, untere und
-     rechte Playerkante werden in der gewählten Akzentfarbe gezeichnet; die
-     obere Kante bleibt wegen Funktionskopf und Statuszeile offen. Deaktiviert
-     bedeutet: keine dekorative Playerumrandung. Menümarkierung, PTT-Hinweis
-     und funktionale Statusfarben bleiben davon unberührt.
+     rechte Playerkante werden in der gewählten Akzentfarbe gezeichnet. Die
+     Linie liegt innerhalb der sichtbaren Fläche und folgt unten den
+     abgerundeten Displayecken; sie darf niemals bis in die abgeschnittenen
+     Eckpixel laufen. Die obere Kante bleibt wegen Funktionskopf und
+     Statuszeile offen. Deaktiviert bedeutet: keine dekorative
+     Playerumrandung. Menümarkierung, PTT-Hinweis und funktionale Statusfarben
+     bleiben davon unberührt.
 3. **WLAN**
    - vollständige Standalone-Einrichtung am Gerät,
    - Netzsuche, SSID, Kennwort, DHCP/feste IP, gespeicherte Netze und Priorität.
@@ -1061,6 +1064,22 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-31 – Playerumrandung folgt den realen Displayrundungen
+
+- Robert weist anhand der Live-Anzeige darauf hin, dass die bisher bis an die
+  rechteckigen Pixelkanten gezeichnete Playerumrandung in den real
+  abgerundeten Ecken des Whisplay abgeschnitten wird.
+- Das offizielle Whisplay-Datenpaket benennt das 240-x-280-Panel als
+  `ZJY169TP-IF95` mit 0,11655 mm Pixelabstand; die dokumentierte Geometrie
+  dieser 1,69-Zoll-Panelfamilie hat vier R5-mm-Ecken, entsprechend rund
+  43 Pixeln Radius.
+- Die optionale Umrandung wird deshalb als innenliegende, oben offene U-Form
+  gezeichnet: 5 Pixel Abstand zur Außenkante, ungefähr 38 Pixel Innenradius,
+  abgerundete Übergänge unten links und unten rechts. Die Browser-Livevorschau
+  bildet denselben 43-Pixel-Panelausschnitt ab. Eckpixel außerhalb der realen
+  Sichtfläche dürfen nicht mehr als Teil der Umrandung getestet oder genutzt
+  werden.
 
 ### 2026-10-31 – Optionale Playerumrandung und echte PiSugar-3-Anzeige
 

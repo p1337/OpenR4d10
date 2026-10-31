@@ -78,7 +78,7 @@ class DeviceUiTests(unittest.TestCase):
         frame = Image.new("RGB", (480, 360), (40, 90, 130))
         image = render_device_ui(state, frame)
         self.assertEqual(image.getpixel((120, 180)), (40, 90, 130))
-        self.assertEqual(image.getpixel((2, 180)), DEFAULT_ACCENT)
+        self.assertEqual(image.getpixel((5, 180)), DEFAULT_ACCENT)
 
     def test_radio_artwork_replaces_the_local_initials_tile(self) -> None:
         state = DeviceUiState(source="SWR3", service_index=1, playing=True)
@@ -243,9 +243,11 @@ class DeviceUiTests(unittest.TestCase):
         disabled = render_device_ui(
             DeviceUiState(service_index=1, screen_border_enabled=False)
         )
-        for point in ((0, 180), (120, HEIGHT - 1), (WIDTH - 1, 180)):
+        for point in ((5, 180), (120, 274), (234, 180), (5, 236), (234, 236)):
             self.assertEqual(enabled.getpixel(point), DEFAULT_ACCENT)
             self.assertNotEqual(disabled.getpixel(point), DEFAULT_ACCENT)
+        for clipped_corner in ((0, HEIGHT - 1), (WIDTH - 1, HEIGHT - 1)):
+            self.assertNotEqual(enabled.getpixel(clipped_corner), DEFAULT_ACCENT)
         self.assertNotEqual(enabled.getpixel((120, 71)), DEFAULT_ACCENT)
 
     def test_play_control_is_below_battery_and_footer_is_empty(self) -> None:

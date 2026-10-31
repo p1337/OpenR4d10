@@ -31,7 +31,7 @@ the installer report exactly which adapters still need configuration.
 - real-device-confirmed Whisplay SPI transport, colour order and orientation
 - persistent, C-timed 0–100% Whisplay brightness control in the web settings
 - persistent accent color plus optional open-top player border around the
-  left, bottom and right display edges
+  inset rounded left, bottom and right display edges
 - read-only PiSugar 3 battery percentage over the manufacturer-documented I2C
   identity and capacity registers; no separate PiSugar web service or default
   account is installed
@@ -187,9 +187,10 @@ private notification pipe stays inside `/run/openr4d10`, the already protected
 runtime directory, without weakening the service's read-only system boundary.
 The same settings area stores the selected accent color and the option
 **Enable screen border**. When enabled, the normal player is outlined on its
-left, bottom and right edges in that accent color; the top remains open below
-the status row. Menu selection and PTT indicators stay functional regardless
-of this decorative option.
+inset left, rounded bottom and inset right edges in that accent color. The
+curve follows the physical panel corners instead of disappearing below them;
+the top remains open below the status row. Menu selection and PTT indicators
+stay functional regardless of this decorative option.
 
 Until the physical encoders are delivered, the **Virtuelle Encoder** panel in
 the same dashboard controls the real Whisplay immediately. Its volume, squelch,
