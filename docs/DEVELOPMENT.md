@@ -133,6 +133,10 @@ timing with `threading`, `sleep`, or `Event.wait`: that earlier path visibly
 flickered on the real Pi Zero 2 W. Unit tests must cover the active-low mapping,
 steady 0/100-percent endpoints and the `lgpio.tx_pwm` call for intermediate
 values.
+`lgpio` also requires a writable current directory for its private notification
+pipe. Keep `WorkingDirectory=/run/openr4d10` in the application unit and test
+that the unit still retains `ProtectSystem=strict`; do not solve this by making
+`/` writable or broadening `ReadWritePaths`.
 
 The `device_input` action is the hardware-free input source for the native
 display. It accepts only the checked-in logical control names, rotary steps

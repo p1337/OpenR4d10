@@ -1013,6 +1013,13 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   `WhisplayPanel` über `lgpio` und verwendet dessen C-getaktetes `tx_pwm` für
   Zwischenwerte; 0 und 100 Prozent sind feste Pegel. Der Python-Timingthread
   entfällt vollständig.
+- Der erste reale 0.10.22-Start zeigte dabei eine harte Systemintegration:
+  `lgpio` legt beim Modulimport seine interne `.lgd-nfy*`-Pipe im aktuellen
+  Arbeitsverzeichnis an. Der gehärtete Dienst startete in `/` und durfte dort
+  zurecht nicht schreiben; der Displayadapter fiel deshalb sichtbar und
+  protokolliert aus. Der Dienst arbeitet nun in seinem bereits vorhandenen,
+  privaten und beschreibbaren `RuntimeDirectory=/run/openr4d10`. `ProtectSystem`
+  bleibt `strict`, und es wird kein zusätzlicher Schreibpfad freigegeben.
 - Der Displaykopf wird flacher, die Uhr exakt auf der Gesamtbreite zentriert
   und der Abstand zum Diensttitel verkleinert. Der frei werdende Platz wird dem
   unteren Inhalt zugeschlagen.

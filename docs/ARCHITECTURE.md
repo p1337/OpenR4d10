@@ -152,6 +152,11 @@ BCM22 is not a native PWM output on the verified Zero 2 W mapping. The same
 packaged C library. Reset and data/command remain ordinary `libgpiod` lines.
 The replaced Python PWM thread must not be reintroduced; its scheduler jitter
 was visibly confirmed as brightness flicker on the real panel.
+The `lgpio` module creates its private `.lgd-nfy*` notification pipe in the
+process working directory during import. The hardened application unit therefore
+uses its existing `RuntimeDirectory=/run/openr4d10` as `WorkingDirectory`.
+That path was already the unit's private writable runtime boundary;
+`ProtectSystem=strict` and the existing `ReadWritePaths` remain unchanged.
 
 ## Service catalog
 

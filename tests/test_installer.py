@@ -6,6 +6,9 @@ class InstallerContractTests(unittest.TestCase):
     def test_main_installer_owns_whisplay_audio_installation(self) -> None:
         repository = Path(__file__).resolve().parents[1]
         installer = (repository / "install.sh").read_text(encoding="utf-8")
+        application_service = (
+            repository / "systemd" / "openr4d10.service"
+        ).read_text(encoding="utf-8")
 
         self.assertIn("vendor/pisugar-whisplay/audio/scripts/install.sh", installer)
         self.assertIn("WHISPLAY_PLATFORM=raspberry_pi", installer)
@@ -34,6 +37,12 @@ class InstallerContractTests(unittest.TestCase):
         self.assertLess(
             installer.index("Backing up persistent OpenR4d10 state before the update"),
             installer.index("apt-get update"),
+        )
+        self.assertIn("WorkingDirectory=/run/openr4d10", application_service)
+        self.assertIn("ProtectSystem=strict", application_service)
+        self.assertIn(
+            "ReadWritePaths=/run/openr4d10 /var/lib/openr4d10",
+            application_service,
         )
 
     def test_web_updater_has_a_fixed_privilege_boundary(self) -> None:

@@ -19,6 +19,7 @@ RestartSec=3s
 RuntimeDirectory=openr4d10 openr4d10-boot
 RuntimeDirectoryMode=0770
 RuntimeDirectoryPreserve=yes
+WorkingDirectory=/run/openr4d10
 StateDirectory=openr4d10
 StateDirectoryMode=0750
 UMask=0027

@@ -171,7 +171,9 @@ automatically when the application starts. The early native boot animation
 runs before that database is available; the saved value takes effect when the
 normal OpenR4d10 device UI takes over the panel. Intermediate values use the
 Raspberry Pi OS `lgpio` C-timed PWM facility on the manufacturer-verified
-active-low BCM22 backlight line; Python no longer schedules the pulses.
+active-low BCM22 backlight line; Python no longer schedules the pulses. Its
+private notification pipe stays inside `/run/openr4d10`, the already protected
+runtime directory, without weakening the service's read-only system boundary.
 
 Until the physical encoders are delivered, the **Virtuelle Encoder** panel in
 the same dashboard controls the real Whisplay immediately. Its volume, squelch,

@@ -196,6 +196,10 @@ steady levels without PWM. This does not claim that BCM22 has native hardware
 PWM. The web display setting remains persistent in
 SQLite. The native C boot player precedes SQLite startup and therefore retains
 its fixed boot brightness until the application takes ownership.
+The real 0.10.22 start additionally established that `lgpio` creates its
+private `.lgd-nfy*` pipe in the current directory. The service now uses its
+existing writable `/run/openr4d10` runtime directory as its working directory;
+the root filesystem remains protected read-only by systemd.
 
 The application media boundary uses generic ALSA through Debian's mpv and
 ffmpeg packages. Its systemd unit allows the standard `char-alsa` device class
