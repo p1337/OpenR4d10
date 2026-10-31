@@ -20,7 +20,7 @@ MEDIA_TOP_RADIUS = 12
 MEDIA_MARGIN = 7
 PLAYER_GLOW_STRENGTH = 1.3
 DEFAULT_ACCENT = (253, 184, 19)
-SERVICES = ("SYSTEM", "RADIO", "WEATHER", "DMR", "PLAYER", "REC")
+SERVICES = ("SYSTEM", "RADIO", "WEATHER", "AMBIENT", "DMR", "PLAYER", "REC")
 MAIN_MENU_ITEMS = (
     "display",
     "accent_color",
@@ -397,7 +397,7 @@ class DeviceUiState:
                 self.subtitle = "Recording and playback actions"
             elif self.menu_open:
                 self._select_menu_item()
-            elif self.service in {"RADIO", "DMR", "PLAYER"}:
+            elif self.service in {"RADIO", "AMBIENT", "DMR", "PLAYER"}:
                 self.playing = not self.playing
                 self.right_action = "PAUSE" if self.playing else "PLAY"
         elif event.control == Control.PTT:
@@ -888,7 +888,7 @@ def render_device_ui(
     left_action = str(text["menu"])
     if state.menu_open:
         right_action = "OK"
-    elif state.service in {"RADIO", "DMR", "PLAYER"}:
+    elif state.service in {"RADIO", "AMBIENT", "DMR", "PLAYER"}:
         right_action = str(text["pause"] if state.playing else text["play"])
     else:
         right_action = str(text["info"])
@@ -910,7 +910,13 @@ def render_device_ui(
         accent,
         mirrored=True,
     )
-    service_label = str(text["weather_service"]) if state.service == "WEATHER" else state.service
+    service_label = (
+        str(text["weather_service"])
+        if state.service == "WEATHER"
+        else "AMB"
+        if state.service == "AMBIENT"
+        else state.service
+    )
     _control_value(
         draw,
         122,

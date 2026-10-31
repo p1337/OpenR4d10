@@ -18,6 +18,7 @@ import unicodedata
 import uuid
 from urllib.parse import urlsplit
 
+from .ambient import AMBIENT_PRESETS, ambient_text
 from .content import (
     CameraSnapshot,
     ContentError,
@@ -40,7 +41,7 @@ MEDIA_EXTENSIONS = {
     ".aac", ".flac", ".m4a", ".mka", ".mp3", ".mp4", ".ogg", ".opus", ".wav",
 }
 DEFAULT_ENABLED_SERVICES = {
-    "system", "webradio", "weather", "local_media", "recorder", "rss", "podcasts", "webcam",
+    "system", "webradio", "weather", "ambient", "local_media", "recorder", "rss", "podcasts", "webcam",
 }
 DISPLAY_BRIGHTNESS_KEY = "display.brightness_percent"
 DEFAULT_DISPLAY_BRIGHTNESS = 100
@@ -84,6 +85,7 @@ BUILTIN_SERVICES = (
     ServiceManifest("system", "System", "core", "Status, updates and diagnostics", ("status", "diagnostics"), "native"),
     ServiceManifest("webradio", "Web Radio", "audio", "Internet radio playback and favorites", ("playback", "favorites", "recording"), "process", ("mpv",)),
     ServiceManifest("weather", "Weather", "information", "DWD rain radar and satellite image loops", ("images", "channels"), "native"),
+    ServiceManifest("ambient", "AmbientR4D10", "audio", "Looping café, nature, water, rain and night soundscapes", ("playback", "scenes", "loop"), "process", ("mpv",)),
     ServiceManifest("anker_solix", "Anker SOLIX", "energy", "Live photovoltaic, home, grid and battery telemetry", ("energy", "solar", "battery"), "external", requires_credentials=True, credential_hint="Prefer supported local Modbus TCP devices; otherwise configure the isolated community cloud adapter locally."),
     ServiceManifest("local_media", "Local Media", "audio", "Local MP3, FLAC, MP4 and recordings", ("playback", "library"), "process", ("mpv",)),
     ServiceManifest("recorder", "Recorder", "audio", "Record supported audio sources", ("recording", "library"), "process", ("ffmpeg",)),
@@ -171,6 +173,8 @@ class ServiceCatalog:
         self.active_preset_id: str | None = None
         self.active_station_id: int | None = None
         self.active_weather_channel_id: int | None = None
+        self.selected_ambient_scene_id: int | None = None
+        self.active_ambient_scene_id: int | None = None
         self.store.ensure_services(
             tuple(item.service_id for item in BUILTIN_SERVICES),
             DEFAULT_ENABLED_SERVICES,
@@ -228,11 +232,33 @@ class ServiceCatalog:
             ),
             marker="weather.defaults_seeded_v1",
         )
+        self.store.seed_channels_once(
+            "ambient",
+            tuple(
+                (
+                    item.preset_id,
+                    item.name,
+                    {
+                        "source_url": item.audio_url,
+                        "description": item.description,
+                        "source_page": item.source_page,
+                        "credit": item.credit,
+                        "license_name": item.license_name,
+                        "license_url": item.license_url,
+                    },
+                )
+                for item in AMBIENT_PRESETS
+            ),
+            marker="ambient.defaults_seeded_v1",
+        )
         self._upgrade_germany_weather_default()
         self._seed_germany_satellite_upgrade()
         weather_channels = self.store.channels("weather")
         if weather_channels:
             self.active_weather_channel_id = int(weather_channels[0]["id"])
+        ambient_scenes = self.store.channels("ambient")
+        if ambient_scenes:
+            self.selected_ambient_scene_id = int(ambient_scenes[0]["id"])
         if self.radio_buffer is not None:
             self.radio_buffer.set_continuous(
                 self.store.get_setting(RADIO_CONTINUOUS_KEY, False) is True
@@ -613,6 +639,33 @@ class ServiceCatalog:
                     ],
                 }
             )
+        ambient_scenes = []
+        for channel, item in enumerate(self.store.channels("ambient"), start=1):
+            metadata = item.get("metadata")
+            metadata = metadata if isinstance(metadata, dict) else {}
+            source_url = metadata.get("source_url")
+            source_host = (
+                urlsplit(source_url).hostname or ""
+                if isinstance(source_url, str)
+                else ""
+            )
+            ambient_scenes.append(
+                {
+                    "id": int(item["id"]),
+                    "preset_id": str(item["external_id"]),
+                    "name": str(item["name"]),
+                    "description": str(metadata.get("description") or ""),
+                    "credit": str(metadata.get("credit") or ""),
+                    "license_name": str(metadata.get("license_name") or ""),
+                    "license_url": str(metadata.get("license_url") or ""),
+                    "source_page": str(metadata.get("source_page") or ""),
+                    "source": source_host,
+                    "position": channel - 1,
+                    "channel": channel,
+                    "selected": int(item["id"]) == self.selected_ambient_scene_id,
+                    "active": int(item["id"]) == self.active_ambient_scene_id,
+                }
+            )
         return {
             "schema_version": SCHEMA_VERSION,
             "settings": {
@@ -654,6 +707,11 @@ class ServiceCatalog:
                 "provider": "DWD / EUMETSAT",
                 "refresh_floor_seconds": 300,
             },
+            "ambient": {
+                "selected_scene_id": self.selected_ambient_scene_id,
+                "active_scene_id": self.active_ambient_scene_id,
+                "scenes": ambient_scenes,
+            },
             "media": media,
             "items": services,
         }
@@ -681,6 +739,7 @@ class ServiceCatalog:
                     self.active_preset_id = None
                     self.active_station_id = None
                     self._active_podcast_episode = None
+                    self.active_ambient_scene_id = None
                 if service_id == "recorder":
                     self.recorder.stop()
             self.store.set_service_enabled(service_id, enabled)
@@ -714,6 +773,7 @@ class ServiceCatalog:
             self.active_preset_id = None
             self.active_station_id = None
             self._active_podcast_episode = None
+            self.active_ambient_scene_id = None
         elif action == "pause":
             if self.player.state.state not in {"playing", "paused"}:
                 raise ValueError("no active media to pause or resume")
@@ -726,6 +786,7 @@ class ServiceCatalog:
             self.active_preset_id = None
             self.active_station_id = None
             self._active_podcast_episode = None
+            self.active_ambient_scene_id = None
         elif action == "volume":
             self.player.set_volume(request.get("value"))  # type: ignore[arg-type]
         elif action == "volume_step":
@@ -850,6 +911,91 @@ class ServiceCatalog:
                 "webradio", preset.name, preset.stream_url
             )
             return {"station_id": station_id, "preset_id": preset_id}
+        elif action == "ambient_select":
+            self._require_enabled("ambient")
+            scene = self._ambient_scene(request.get("scene_id"))
+            self.selected_ambient_scene_id = int(scene["id"])
+            return {"scene_id": self.selected_ambient_scene_id}
+        elif action == "ambient_step":
+            self._require_enabled("ambient")
+            steps = request.get("steps")
+            if (
+                isinstance(steps, bool)
+                or not isinstance(steps, int)
+                or steps == 0
+                or abs(steps) > 10
+            ):
+                raise ValueError("ambient steps must be between -10 and 10, excluding zero")
+            scenes = self.store.channels("ambient")
+            if not scenes:
+                raise ValueError("the ambient scene list is empty")
+            ids = [int(item["id"]) for item in scenes]
+            current = (
+                ids.index(self.selected_ambient_scene_id)
+                if self.selected_ambient_scene_id in ids
+                else 0
+            )
+            self.selected_ambient_scene_id = ids[(current + steps) % len(ids)]
+            return {"scene_id": self.selected_ambient_scene_id}
+        elif action == "ambient_play":
+            self._require_enabled("ambient")
+            scene_id = request.get("scene_id", self.selected_ambient_scene_id)
+            scene = self._ambient_scene(scene_id)
+            self._play_ambient_scene(scene)
+        elif action == "ambient_toggle":
+            self._require_enabled("ambient")
+            if (
+                self.active_service == "ambient"
+                and self.player.state.state in {"playing", "paused"}
+            ):
+                self.player.toggle_pause()
+            else:
+                scene = self._ambient_scene(self.selected_ambient_scene_id)
+                self._play_ambient_scene(scene)
+        elif action == "ambient_scene_save":
+            self._require_enabled("ambient")
+            name = request.get("name")
+            source = request.get("source")
+            if not isinstance(name, str) or not isinstance(source, str):
+                raise ValueError("ambient_scene_save requires name and source")
+            approved = validate_media_source(source, (self.media_root,))
+            parsed = urlsplit(approved)
+            if parsed.query:
+                raise ValueError("ambient scene URLs with a query cannot be saved")
+            external_id = f"custom-{hashlib.sha256(approved.encode('utf-8')).hexdigest()[:16]}"
+            scene_id = self.store.add_channel(
+                "ambient",
+                external_id,
+                name,
+                {
+                    "source_url": approved,
+                    "description": "Custom ambient scene",
+                    "credit": "User source",
+                },
+            )
+            self.selected_ambient_scene_id = scene_id
+            return {"scene_id": scene_id}
+        elif action == "ambient_scene_delete":
+            self._require_enabled("ambient")
+            scene = self._ambient_scene(request.get("scene_id"))
+            scene_id = int(scene["id"])
+            if self.active_ambient_scene_id == scene_id:
+                self.player.stop()
+                self.active_service = "system"
+                self.active_ambient_scene_id = None
+            deleted = self.store.delete_channel(scene_id)
+            remaining = self.store.channels("ambient")
+            remaining_ids = [int(item["id"]) for item in remaining]
+            if self.selected_ambient_scene_id not in remaining_ids:
+                self.selected_ambient_scene_id = remaining_ids[0] if remaining_ids else None
+            return {"deleted": deleted}
+        elif action == "ambient_scene_move":
+            self._require_enabled("ambient")
+            scene = self._ambient_scene(request.get("scene_id"))
+            direction = request.get("direction")
+            if isinstance(direction, bool) or not isinstance(direction, int):
+                raise ValueError("ambient_scene_move requires an integer direction")
+            return {"moved": self.store.move_channel(int(scene["id"]), direction)}
         elif action == "media_scan":
             self._require_enabled("local_media")
             return {"scanned": self.scan_media()}
@@ -866,6 +1012,7 @@ class ServiceCatalog:
             self.active_preset_id = None
             self.active_station_id = None
             self._active_podcast_episode = None
+            self.active_ambient_scene_id = None
         elif action == "media_favorite":
             self._require_enabled("local_media")
             media_id = request.get("media_id")
@@ -926,6 +1073,7 @@ class ServiceCatalog:
             self.active_preset_id = None
             self.active_station_id = None
             self._active_podcast_episode = None
+            self.active_ambient_scene_id = None
         elif action == "media_next":
             self._require_enabled("local_media")
             self.player.next()
@@ -1004,6 +1152,7 @@ class ServiceCatalog:
                 "podcast": str(feed.get("title") or "Podcast"),
                 "title": str(episode.get("title") or "Untitled episode"),
             }
+            self.active_ambient_scene_id = None
         elif action == "podcast_unsubscribe":
             subscription_id = request.get("subscription_id")
             self._podcast_subscription(subscription_id)
@@ -1175,6 +1324,40 @@ class ServiceCatalog:
             "selected_preset": self._selected_preset(),
         }
 
+    def _ambient_scene(self, scene_id: object) -> dict[str, object]:
+        if isinstance(scene_id, bool) or not isinstance(scene_id, int):
+            raise ValueError("ambient scene id must be an integer")
+        scene = self.store.channel(scene_id)
+        if scene is None or scene["service_id"] != "ambient":
+            raise ValueError("ambient scene was not found")
+        return scene
+
+    def _ambient_display_text(self, scene: dict[str, object]) -> tuple[str, str]:
+        metadata = scene.get("metadata")
+        description = (
+            str(metadata.get("description") or "Ambient soundscape")
+            if isinstance(metadata, dict)
+            else "Ambient soundscape"
+        )
+        translated = ambient_text(str(scene.get("external_id") or ""), self.display_language())
+        return translated or (str(scene["name"]), description)
+
+    def _play_ambient_scene(self, scene: dict[str, object]) -> None:
+        metadata = scene.get("metadata")
+        if not isinstance(metadata, dict) or not isinstance(metadata.get("source_url"), str):
+            raise ValueError("ambient scene has no media source")
+        source = validate_media_source(str(metadata["source_url"]), (self.media_root,))
+        if self.radio_buffer is not None:
+            self.radio_buffer.stop(flush=True)
+        self.player.load_playlist([source], loop=True)
+        scene_id = int(scene["id"])
+        self.active_service = "ambient"
+        self.selected_ambient_scene_id = scene_id
+        self.active_ambient_scene_id = scene_id
+        self.active_preset_id = None
+        self.active_station_id = None
+        self._active_podcast_episode = None
+
     def _play_preset(self, preset_id: str) -> None:
         preset = RADIO_BY_ID[preset_id]
         station = next(
@@ -1198,6 +1381,7 @@ class ServiceCatalog:
         self.active_service = "webradio"
         self.active_station_id = int(station["id"])
         self._active_podcast_episode = None
+        self.active_ambient_scene_id = None
         preset = self._preset_for_station(station)
         self.active_preset_id = preset.preset_id if preset is not None else None
         if preset is not None:
@@ -1470,7 +1654,7 @@ class ServiceCatalog:
     def receiver_overlay(self, view_service: str | None = None) -> dict[str, object]:
         """Return metadata for the selected view without changing audio ownership."""
         requested = str(view_service or "").upper()
-        valid_views = {"SYSTEM", "RADIO", "WEATHER", "DMR", "PLAYER", "REC"}
+        valid_views = {"SYSTEM", "RADIO", "WEATHER", "AMBIENT", "DMR", "PLAYER", "REC"}
         if not self._initial_view_resolved:
             if requested not in valid_views:
                 remembered = str(self.store.get_setting(LAST_VIEW_KEY, "RADIO")).upper()
@@ -1518,6 +1702,7 @@ class ServiceCatalog:
             "zdf_mediathek": "PLAYER",
             "international_media": "PLAYER",
             "podcasts": "PLAYER",
+            "ambient": "AMBIENT",
             "brandmeister": "DMR",
             "remote_sdr": "DMR",
             "private_ptt": "DMR",
@@ -1546,6 +1731,32 @@ class ServiceCatalog:
                     "preset_id": preset.preset_id if preset is not None else None,
                     "channel": 1 if station is not None else None,
                 }
+            if requested == "AMBIENT":
+                scenes = self.store.channels("ambient")
+                scene = (
+                    self.store.channel(self.selected_ambient_scene_id)
+                    if self.selected_ambient_scene_id is not None
+                    else (scenes[0] if scenes else None)
+                )
+                scene_name, description = (
+                    self._ambient_display_text(scene)
+                    if scene is not None
+                    else ("AmbientR4D10", "Choose a soundscape and press play")
+                )
+                ids = [int(item["id"]) for item in scenes]
+                return {
+                    "service": "AMBIENT",
+                    "station": scene_name,
+                    "title": "AmbientR4D10",
+                    "subtitle": description,
+                    "playing": False,
+                    "volume": playback.volume,
+                    "channel": (
+                        ids.index(int(scene["id"])) + 1
+                        if scene is not None and int(scene["id"]) in ids
+                        else None
+                    ),
+                }
             defaults = {
                 "SYSTEM": ("OPENR4D10", "System online", "Receiver ready"),
                 "PLAYER": ("LOCAL MEDIA", "Local media", "Select media and press play"),
@@ -1567,9 +1778,16 @@ class ServiceCatalog:
         if playback.state not in {"playing", "paused"}:
             return {"service": requested or "SYSTEM", "playing": False, "volume": playback.volume}
         selected = self._selected_preset() if self.active_service == "webradio" else None
+        active_ambient_scene = (
+            self.store.channel(self.active_ambient_scene_id)
+            if self.active_service == "ambient" and self.active_ambient_scene_id is not None
+            else None
+        )
         station = (
             str(selected["name"])
             if selected is not None
+            else self._ambient_display_text(active_ambient_scene)[0]
+            if active_ambient_scene is not None
             else str(self._active_podcast_episode["podcast"])
             if self.active_service == "podcasts" and self._active_podcast_episode is not None
             else playback.source or self.active_service
@@ -1585,6 +1803,9 @@ class ServiceCatalog:
             track_line = self._radio_track_line(buffered) or track_line
         elif self.active_service == "podcasts" and self._active_podcast_episode is not None:
             track_line = str(self._active_podcast_episode["title"])
+        elif self.active_service == "ambient" and self.active_ambient_scene_id is not None:
+            if active_ambient_scene is not None:
+                track_line = self._ambient_display_text(active_ambient_scene)[1]
         return {
             "service": service_label,
             "station": station,
@@ -1596,7 +1817,22 @@ class ServiceCatalog:
             ),
             "volume": playback.volume,
             "preset_id": selected["preset_id"] if selected is not None else None,
-            "channel": selected["channel"] if selected is not None else None,
+            "channel": (
+                selected["channel"]
+                if selected is not None
+                else next(
+                    (
+                        index
+                        for index, item in enumerate(
+                            self.store.channels("ambient"), start=1
+                        )
+                        if self.active_ambient_scene_id == int(item["id"])
+                    ),
+                    None,
+                )
+                if self.active_service == "ambient"
+                else None
+            ),
         }
 
     def close(self) -> None:

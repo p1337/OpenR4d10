@@ -1,0 +1,149 @@
+"""Curated, license-documented AmbientR4D10 soundscape presets."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True, slots=True)
+class AmbientPreset:
+    preset_id: str
+    name: str
+    description: str
+    audio_url: str
+    source_page: str
+    credit: str
+    license_name: str
+    license_url: str
+
+    def public(self) -> dict[str, str]:
+        return {
+            "preset_id": self.preset_id,
+            "name": self.name,
+            "description": self.description,
+            "source_page": self.source_page,
+            "credit": self.credit,
+            "license_name": self.license_name,
+            "license_url": self.license_url,
+        }
+
+
+COMMONS_REDIRECT = "https://commons.wikimedia.org/wiki/Special:Redirect/file/"
+CC0_URL = "https://creativecommons.org/publicdomain/zero/1.0/"
+PUBLIC_DOMAIN_URL = "https://creativecommons.org/publicdomain/mark/1.0/"
+CC_BY_SA_3_URL = "https://creativecommons.org/licenses/by-sa/3.0/"
+CC_BY_SA_4_URL = "https://creativecommons.org/licenses/by-sa/4.0/"
+
+
+AMBIENT_PRESETS = (
+    AmbientPreset(
+        "cafe",
+        "Café",
+        "Gentle café room with quiet conversations",
+        COMMONS_REDIRECT + "Cafe_ambiance.ogg",
+        "https://commons.wikimedia.org/wiki/File:Cafe_ambiance.ogg",
+        "Marble Toast",
+        "CC0 1.0",
+        CC0_URL,
+    ),
+    AmbientPreset(
+        "forest",
+        "Forest",
+        "Forest, wind, birds and distant insects",
+        COMMONS_REDIRECT + "20090610_0_ambience.ogg",
+        "https://commons.wikimedia.org/wiki/File:20090610_0_ambience.ogg",
+        "nille",
+        "Public domain",
+        PUBLIC_DOMAIN_URL,
+    ),
+    AmbientPreset(
+        "beach",
+        "Sea & beach",
+        "Waves rolling across a pebble beach",
+        COMMONS_REDIRECT + "On_a_pebble_beach.ogg",
+        "https://commons.wikimedia.org/wiki/File:On_a_pebble_beach.ogg",
+        "earthcalling",
+        "Public domain",
+        PUBLIC_DOMAIN_URL,
+    ),
+    AmbientPreset(
+        "brook",
+        "Forest brook",
+        "A small brook flowing through a forest",
+        COMMONS_REDIRECT + "Brook.ogg",
+        "https://commons.wikimedia.org/wiki/File:Brook.ogg",
+        "Onegoodtune",
+        "CC BY-SA 3.0",
+        CC_BY_SA_3_URL,
+    ),
+    AmbientPreset(
+        "rain",
+        "Gentle rain",
+        "Light rainfall without synthetic music",
+        COMMONS_REDIRECT + "Sound_of_light_rainfall.ogg",
+        "https://commons.wikimedia.org/wiki/File:Sound_of_light_rainfall.ogg",
+        "Mijesty",
+        "CC BY-SA 4.0",
+        CC_BY_SA_4_URL,
+    ),
+    AmbientPreset(
+        "night_crickets",
+        "Night field & crickets",
+        "A long field-cricket chorus at night",
+        COMMONS_REDIRECT + "Crickets_choir.ogg",
+        "https://commons.wikimedia.org/wiki/File:Crickets_choir.ogg",
+        "Serg Childed",
+        "CC BY-SA 4.0",
+        CC_BY_SA_4_URL,
+    ),
+)
+
+AMBIENT_BY_ID = {item.preset_id: item for item in AMBIENT_PRESETS}
+
+AMBIENT_TRANSLATIONS = {
+    "de": {
+        "cafe": ("Café", "Ruhiges Café mit leisen Gesprächen"),
+        "forest": ("Wald", "Wald, Wind, Vögel und ferne Insekten"),
+        "beach": ("Meer & Strand", "Wellen an einem Kieselstrand"),
+        "brook": ("Waldbach", "Ein kleiner Bach fließt durch den Wald"),
+        "rain": ("Sanfter Regen", "Leichter Regen ohne künstliche Musik"),
+        "night_crickets": ("Nachtfeld & Grillen", "Langes Grillenkonzert auf einem nächtlichen Feld"),
+    },
+    "pl": {
+        "cafe": ("Kawiarnia", "Spokojna kawiarnia z cichymi rozmowami"),
+        "forest": ("Las", "Las, wiatr, ptaki i odległe owady"),
+        "beach": ("Morze i plaża", "Fale na kamienistej plaży"),
+        "brook": ("Leśny strumień", "Mały strumień płynący przez las"),
+        "rain": ("Delikatny deszcz", "Lekki deszcz bez syntetycznej muzyki"),
+        "night_crickets": ("Nocne pole i świerszcze", "Długi nocny chór świerszczy polnych"),
+    },
+    "fr": {
+        "cafe": ("Café", "Café calme avec conversations feutrées"),
+        "forest": ("Forêt", "Forêt, vent, oiseaux et insectes lointains"),
+        "beach": ("Mer et plage", "Vagues sur une plage de galets"),
+        "brook": ("Ruisseau forestier", "Petit ruisseau traversant une forêt"),
+        "rain": ("Pluie douce", "Pluie légère sans musique synthétique"),
+        "night_crickets": ("Champ nocturne et grillons", "Long chœur nocturne de grillons des champs"),
+    },
+    "es": {
+        "cafe": ("Cafetería", "Cafetería tranquila con conversaciones suaves"),
+        "forest": ("Bosque", "Bosque, viento, pájaros e insectos lejanos"),
+        "beach": ("Mar y playa", "Olas sobre una playa de guijarros"),
+        "brook": ("Arroyo del bosque", "Un pequeño arroyo que atraviesa el bosque"),
+        "rain": ("Lluvia suave", "Lluvia ligera sin música sintética"),
+        "night_crickets": ("Campo nocturno y grillos", "Largo coro nocturno de grillos de campo"),
+    },
+}
+
+
+def ambient_text(preset_id: str, language: str) -> tuple[str, str] | None:
+    """Return translated built-in scene text without changing custom names."""
+
+    preset = AMBIENT_BY_ID.get(preset_id)
+    if preset is None:
+        return None
+    if language == "en":
+        return preset.name, preset.description
+    return AMBIENT_TRANSLATIONS.get(language, {}).get(
+        preset_id, (preset.name, preset.description)
+    )

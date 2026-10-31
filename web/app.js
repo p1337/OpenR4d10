@@ -281,6 +281,7 @@ function renderServices(catalog) {
   }
   renderPresets(catalog);
   renderLibrary(catalog);
+  renderAmbient(catalog);
   renderPodcasts(catalog);
   renderWeather(catalog);
 }
@@ -763,6 +764,95 @@ async function podcastCommand(action, extra = {}) {
   }
 }
 
+function ambientButton(label, action, extra, primary = false) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = label;
+  if (primary) button.classList.add("library-play");
+  button.addEventListener("click", () => ambientCommand(action, extra));
+  return button;
+}
+
+function renderAmbient(catalog) {
+  const scenes = Array.isArray(catalog?.ambient?.scenes) ? catalog.ambient.scenes : [];
+  const list = byId("ambient-scene-list");
+  list.replaceChildren();
+  scenes.forEach((scene, index) => {
+    const row = document.createElement("li");
+    if (scene.active) row.dataset.active = "true";
+    const copy = document.createElement("span");
+    copy.className = "station-row-copy";
+    const name = document.createElement("strong");
+    name.textContent = t(scene.name);
+    const description = document.createElement("small");
+    description.textContent = t(scene.description || "Custom ambient scene");
+    const attribution = document.createElement("small");
+    attribution.className = "ambient-attribution";
+    if (scene.source_page) {
+      const source = document.createElement("a");
+      source.href = scene.source_page;
+      source.target = "_blank";
+      source.rel = "noopener noreferrer";
+      source.textContent = scene.credit || t("Source");
+      attribution.append(source);
+    } else {
+      attribution.textContent = scene.credit || t("User source");
+    }
+    if (scene.license_url) {
+      attribution.append(document.createTextNode(" · "));
+      const license = document.createElement("a");
+      license.href = scene.license_url;
+      license.target = "_blank";
+      license.rel = "noopener noreferrer";
+      license.textContent = scene.license_name || t("License");
+      attribution.append(license);
+    }
+    copy.append(name, description, attribution);
+    const actions = document.createElement("span");
+    actions.className = "library-actions";
+    const up = ambientButton("↑", "ambient_scene_move", { scene_id: scene.id, direction: -1 });
+    const down = ambientButton("↓", "ambient_scene_move", { scene_id: scene.id, direction: 1 });
+    up.disabled = index === 0;
+    down.disabled = index === scenes.length - 1;
+    actions.append(
+      ambientButton(scene.active ? t("Play / Pause") : t("Play"), scene.active ? "ambient_toggle" : "ambient_play", { scene_id: scene.id }, true),
+      up,
+      down,
+      ambientButton(t("Delete"), "ambient_scene_delete", { scene_id: scene.id }),
+    );
+    row.append(copy, actions);
+    list.append(row);
+  });
+  setText("ambient-scene-count", scenes.length);
+  if (!scenes.length) {
+    const row = document.createElement("li");
+    row.textContent = t("No soundscapes configured.");
+    list.append(row);
+  }
+}
+
+async function ambientCommand(action, extra = {}) {
+  const output = byId("ambient-status");
+  output.textContent = t("Working …");
+  try {
+    const response = await fetch("/api/control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...extra }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    output.textContent = action === "ambient_play" || action === "ambient_toggle"
+      ? t("Soundscape playback changed.")
+      : action === "ambient_scene_delete"
+        ? t("Soundscape deleted.")
+        : t("Soundscape change saved.");
+    await refresh();
+  } catch (error) {
+    output.textContent = t("Error: {{message}}", { message: error.message });
+  }
+}
+
 function render(data) {
   latestStatus = data;
   const frame = data.frame || {};
@@ -1227,6 +1317,15 @@ byId("station-category").addEventListener("change", (event) => {
 byId("podcast-subscribe-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   await podcastCommand("podcast_subscribe", { url: byId("podcast-feed-url").value });
+  event.currentTarget.reset();
+});
+
+byId("ambient-scene-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await ambientCommand("ambient_scene_save", {
+    name: byId("ambient-scene-name").value,
+    source: byId("ambient-scene-url").value,
+  });
   event.currentTarget.reset();
 });
 

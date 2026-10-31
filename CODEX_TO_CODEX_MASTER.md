@@ -1075,6 +1075,33 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-31 – Eigener AmbientR4D10-Klanglandschaftsdienst
+
+- Robert legt einen eigenständigen Audiodienst mit dem sichtbaren Namen
+  **AmbientR4D10** fest. Er ist weder Webradio noch Teil der normalen
+  Musikbibliothek und verwendet keine fremde Marke wie Noisli/Noisly.
+- Die erste Szenenauswahl umfasst mindestens Café/Cafeteria, Wald,
+  Meer/Strand, Bach beziehungsweise Regen und ein nächtliches Feld mit
+  Grillen. Die Bezeichnungen werden in allen fünf kuratierten Gerätesprachen
+  sinngemäß übersetzt.
+- AmbientR4D10 folgt der vorhandenen Audio-Ownership: Das Öffnen oder
+  Durchblättern der Szenen verändert laufendes Radio nicht. Erst ausdrückliches
+  Play startet die gewählte Klanglandschaft und ersetzt die bisherige
+  Audioquelle. Danach läuft sie beim Wechsel zu Wetter oder anderen visuellen
+  Diensten im Hintergrund endlos weiter, bis Pause, Stopp oder Play eines
+  anderen Audiodienstes erfolgt.
+- Szenen sind persistent sortierbar, aktivierbar und erweiterbar. Eigene
+  Klangdateien beziehungsweise später geprüfte Downloadpakete werden im
+  geschützten Mediendatenbereich gespeichert und durch Updates nicht ersetzt.
+  Das Repository enthält keine erfundenen, ungeprüften oder lizenzrechtlich
+  unklaren Binärklänge. Jeder mitgelieferte oder automatisch geladene Klang
+  benötigt dokumentierte Quelle, Lizenz, Urheberhinweis und Prüfsumme.
+- Die Wiedergabe verwendet den vorhandenen isolierten Medienplayer mit echter
+  Endlosschleife. Es entsteht weder ein zweiter Audio-Stack noch eine
+  dekorative Fake-Wiedergabe. Auf dem Gerät zeigt der Dienst Szenenname,
+  verständliches lokales Motiv und Play/Pause; technische Pfade oder
+  Prozessmeldungen bleiben verborgen.
+
 ### 2026-10-31 – Solix-Energie, freie Kameras, VPN und großer Dienstideen-Katalog
 
 - Robert verlangt zusätzlich zur bisherigen kurzen Kandidatenauswahl eine

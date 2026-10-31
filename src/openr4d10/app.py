@@ -266,6 +266,7 @@ class OpenR4d10App:
             else {
                 "webradio": "RADIO",
                 "weather": "WEATHER",
+                "ambient": "AMBIENT",
                 "local_media": "PLAYER",
                 "podcasts": "PLAYER",
                 "brandmeister": "DMR",
@@ -295,6 +296,15 @@ class OpenR4d10App:
                 {"action": "weather_step", "steps": event.steps}
             )
         elif (
+            self.services is not None
+            and event.control == Control.RIGHT_OUTER
+            and not menu_open
+            and selected_service == "AMBIENT"
+        ):
+            media_result = self.services.control(
+                {"action": "ambient_step", "steps": event.steps}
+            )
+        elif (
             event.control == Control.RIGHT_PRESS
             and event.held_seconds < 2.0
             and not menu_open
@@ -305,6 +315,8 @@ class OpenR4d10App:
                 action = "weather_open"
             elif selected_service == "RADIO":
                 action = "radio_toggle"
+            elif selected_service == "AMBIENT":
+                action = "ambient_toggle"
             else:
                 action = None
             if action is not None:
@@ -340,6 +352,8 @@ class OpenR4d10App:
                 response["selected_preset"] = media_result.get("selected_preset")
             if "channel_id" in media_result:
                 response["weather_channel_id"] = media_result["channel_id"]
+            if "scene_id" in media_result:
+                response["ambient_scene_id"] = media_result["scene_id"]
             if "radio_buffer" in media_result:
                 response["radio_buffer"] = media_result["radio_buffer"]
         return response

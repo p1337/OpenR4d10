@@ -193,7 +193,7 @@ PiSugar network service are intentionally absent.
 ## Service catalog
 
 `ServiceCatalog` is the single inventory for device and web UI. It currently
-covers system, web radio, podcasts, local media, recorder, BrandMeister, remote SDR,
+covers system, web radio, AmbientR4D10, podcasts, local media, recorder, BrandMeister, remote SDR,
 private PTT, Mumble, Discord, Telegram, feeds, webcams, YouTube audio, Spotify,
 ARD/ZDF/international media, speech, Bluetooth, remote Codex and TeamSpeak.
 Each entry declares capabilities, implementation boundary, external executable
@@ -287,6 +287,17 @@ hands it to the one `MpvEngine`; therefore explicit podcast playback replaces
 the previous audio owner, while browsing subscriptions does not. Persistent
 feed URLs with query strings are rejected to prevent signed/private tokens from
 entering SQLite and portable backups.
+
+AmbientR4D10 stores its ordered scene library in the existing generic
+`channels` table under the `ambient` service ID. Built-in definitions in
+`ambient.py` bind each public audio URL to a review page, credit and license;
+public snapshots expose those attribution fields but never the playable URL.
+The seed marker runs once, so user deletion, custom additions and ordering are
+not undone by an update. Scene selection changes only navigation state.
+`ambient_play` alone resolves the private source and hands a one-item endless
+playlist to the single `MpvEngine`, thereby deliberately replacing the prior
+audio owner. Device labels and descriptions are localized independently of the
+browser while custom user names remain unchanged. See `AMBIENT.md`.
 
 Curated radio and news source definitions remain reviewable data in `presets.py`,
 separate from playback and parser logic. Radio definitions are seeded exactly

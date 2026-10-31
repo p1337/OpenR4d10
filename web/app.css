@@ -363,6 +363,8 @@ kbd { display: inline-block; min-width: 24px; padding: 3px 6px; border: 1px soli
 .station-row-copy strong, .station-row-copy small { display: block; }
 .station-row-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .station-row-copy small { margin-top: 4px; color: var(--muted); font-size: .64rem; }
+.ambient-scene-list li[data-active="true"] { box-shadow: inset 3px 0 0 var(--accent); }
+.ambient-attribution a { color: var(--accent); }
 .station-control { margin-top: 16px; }
 .library-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .library-actions button.library-play { color: #151005; border-color: var(--cyan); background: var(--cyan); font-weight: 750; }
