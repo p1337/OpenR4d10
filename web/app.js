@@ -787,7 +787,7 @@ function renderAmbient(catalog) {
       const image = document.createElement("img");
       image.src = scene.artwork;
       image.alt = "";
-      image.loading = "lazy";
+      image.loading = "eager";
       artwork.append(image);
     }
     const copy = document.createElement("span");
@@ -1228,8 +1228,8 @@ const keyboardDeviceInputs = {
   KeyS: { control: "left_outer", steps: -1 },
   KeyA: { control: "left_inner", steps: -1 },
   KeyD: { control: "left_inner", steps: 1 },
-  ArrowUp: { control: "right_outer", steps: 1 },
-  ArrowDown: { control: "right_outer", steps: -1 },
+  ArrowUp: { control: "right_outer", steps: -1 },
+  ArrowDown: { control: "right_outer", steps: 1 },
   ArrowLeft: { control: "right_inner", steps: -1 },
   ArrowRight: { control: "right_inner", steps: 1 },
   Space: { control: "left_press" },
@@ -1237,12 +1237,7 @@ const keyboardDeviceInputs = {
 };
 
 function keyboardDeviceRequest(code) {
-  const request = keyboardDeviceInputs[code];
-  if (!request) return null;
-  if (latestDeviceState?.menu_open && request.control === "right_outer") {
-    return { ...request, steps: -request.steps };
-  }
-  return request;
+  return keyboardDeviceInputs[code] || null;
 }
 
 function isEditableTarget(target) {

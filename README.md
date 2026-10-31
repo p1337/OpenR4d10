@@ -231,6 +231,10 @@ fields; until a verified PTT
 service adapter is configured it deliberately shows input state without
 claiming audio transmission.
 
+The browser arrow direction matches the visible direction everywhere: Up
+selects the previous/upper channel or menu item and Down selects the
+next/lower one. There is no separate menu-only inversion.
+
 For the radio service, `W`/`S` changes the actual mpv output volume in
 10-percentage-point steps and up/down immediately loads the previous or next
 station in the personal order. Enter pauses or resumes the real stream; while
@@ -322,7 +326,9 @@ only an explicit Play replaces the current source. Scene order, deletion and
 custom credential-free HTTP(S) additions persist across updates. Sources, attribution
 and licenses are recorded in [`docs/AMBIENT.md`](docs/AMBIENT.md). The six
 matching scene artworks are bundled locally, so no external image service is
-needed at runtime.
+needed at runtime. The Ambient tab loads those local thumbnails immediately
+through the bounded OpenR4d10 content endpoint rather than deferring them as
+off-screen browser images.
 
 If the repository files are already present, the local command remains:
 

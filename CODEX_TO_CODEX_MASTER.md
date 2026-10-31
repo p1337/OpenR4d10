@@ -248,7 +248,7 @@ Eingaben zusätzlich auf eine PC-Tastatur ab:
 
 - `W`/`S`: linker äußerer Encoder (Lautstärke höher/niedriger),
 - `A`/`D`: linker innerer Encoder (Squelch niedriger/höher),
-- Pfeil hoch/runter: rechter äußerer Encoder (Kanal vor/zurück),
+- Pfeil hoch/runter: rechter äußerer Encoder (vorheriger/nächster Kanal),
 - Pfeil links/rechts: rechter innerer Encoder (Dienst zurück/vor),
 - Leertaste: linker Drucktaster,
 - Enter: rechter Drucktaster,
@@ -256,12 +256,13 @@ Eingaben zusätzlich auf eine PC-Tastatur ab:
   anderen bearbeitbaren Feldern bleibt Backspace ausschließlich die normale
   Löschtaste und löst niemals PTT oder Zurück aus.
 
-Im geöffneten Gerätemenü folgt die Browser-Pfeiltastatur der sichtbaren
-Listenrichtung: Pfeil hoch bewegt die Markierung genau einen Eintrag nach oben,
-Pfeil runter genau einen Eintrag nach unten. Außerhalb eines Menüs bleibt die
-festgelegte Kanalbedienung unverändert. Browser und späterer Encoder senden
-weiterhin denselben logischen `right_outer`-Eingabepfad; nur die Zuordnung der
-Browserpfeile wird im Menü kontextgerecht gespiegelt.
+Die Browser-Pfeiltastatur folgt überall der sichtbaren Richtung: Pfeil hoch
+sendet auf dem gemeinsamen `right_outer`-Eingabepfad einen negativen Schritt
+und wählt den vorherigen beziehungsweise oberen Eintrag, Pfeil runter sendet
+einen positiven Schritt und wählt den nächsten beziehungsweise unteren
+Eintrag. Eine zusätzliche kontextabhängige Umkehr im geöffneten Gerätemenü ist
+verboten. Browser und späterer Encoder verwenden weiterhin denselben logischen
+Eingabepfad; die Browserzuordnung bleibt lediglich eine Eingabeabbildung.
 
 Die Tastatursteuerung ist in Text- und Auswahlfeldern inaktiv, damit Eingaben
 nicht versehentlich Gerätesteuerungen oder PTT auslösen. In jedem geöffneten
@@ -1074,6 +1075,20 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-31 – Einheitliche Web-Pfeilrichtung und direkt geladene Ambient-Bilder
+
+- Robert korrigiert die Browser-Kanalrichtung: Pfeil hoch muss stets den
+  vorherigen beziehungsweise oberen Eintrag wählen, Pfeil runter stets den
+  nächsten beziehungsweise unteren. Die bisherige Grundbelegung war außerhalb
+  des Menüs vertauscht und wurde im Menü durch eine zweite Umkehr kaschiert.
+  Die Grundbelegung lautet nun `ArrowUp = -1`, `ArrowDown = +1`; eine
+  Menü-Sonderumkehr entfällt.
+- Die sechs kuratierten Ambient-Grafiken werden in der Webliste unmittelbar als
+  lokale `<img>`-Inhalte aus den bereits begrenzten
+  `/api/ambient-art/<preset>`-Endpunkten geladen. Lazy-Loading darf die direkte
+  Sichtbarkeit nach dem Öffnen des Ambient-Tabs nicht verzögern. Fremde
+  Bildadressen oder ein zweiter Bildpfad werden nicht eingeführt.
 
 ### 2026-10-31 – Reale Ambient-Wiedergabe und Wikimedia-HTTP-Kennung
 
