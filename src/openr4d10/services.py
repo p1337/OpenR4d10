@@ -25,6 +25,7 @@ from .ambient import (
     ambient_text,
 )
 from .content import (
+    AmbientAudioCache,
     CameraSnapshot,
     ContentError,
     DWD_RADAR_GIF_URL,
@@ -138,6 +139,7 @@ class ServiceCatalog:
         adapter_directory: Path | None = None,
         adapter_registry: ServiceAdapterRegistry | None = None,
         ambient_artwork_root: Path | None = None,
+        ambient_audio_cache: AmbientAudioCache | None = None,
     ) -> None:
         self.store = StateStore(state_directory / "openr4d10.sqlite3")
         self.executable_lookup = executable_lookup
@@ -155,6 +157,9 @@ class ServiceCatalog:
         self.track_artwork = track_artwork or TrackArtwork(self.cover_root)
         self.weather = weather or DwdSatelliteFrames(state_directory / "cache")
         self.ambient_artwork_root = ambient_artwork_root or AMBIENT_ARTWORK_ROOT
+        self.ambient_audio = ambient_audio_cache or AmbientAudioCache(
+            self.media_root / "ambient"
+        )
         self.radio_buffer = radio_buffer or (
             IcyRadioBuffer(self._store_buffered_track) if player is None else None
         )
@@ -279,6 +284,18 @@ class ServiceCatalog:
                 self.store.get_setting(RADIO_CONTINUOUS_KEY, False) is True
             )
         self._initial_view_resolved = False
+        self._ambient_prefetch_started = False
+
+    def prefetch_ambient_audio(self) -> None:
+        """Populate the reviewed offline cache once in the real service process."""
+
+        if self._ambient_prefetch_started:
+            return
+        self._ambient_prefetch_started = True
+        self._start_worker(
+            "openr4d10-ambient-offline-cache",
+            self._cache_builtin_ambient_audio,
+        )
 
     def _upgrade_germany_weather_default(self) -> None:
         """Change only the untouched seeded Germany channel; never recreate it."""
@@ -1024,6 +1041,9 @@ class ServiceCatalog:
                 else 0
             )
             self.selected_ambient_scene_id = ids[(current + steps) % len(ids)]
+            self._play_ambient_scene(
+                self._ambient_scene(self.selected_ambient_scene_id)
+            )
             return {"scene_id": self.selected_ambient_scene_id}
         elif action == "ambient_play":
             self._require_enabled("ambient")
@@ -1436,6 +1456,15 @@ class ServiceCatalog:
         if not isinstance(metadata, dict) or not isinstance(metadata.get("source_url"), str):
             raise ValueError("ambient scene has no media source")
         source = validate_media_source(str(metadata["source_url"]), (self.media_root,))
+        preset = AMBIENT_BY_ID.get(str(scene.get("external_id") or ""))
+        if (
+            preset is not None
+            and preset.sha256 is not None
+            and source == preset.audio_url
+        ):
+            cached = self.ambient_audio.cached(preset.preset_id, preset.sha256)
+            if cached is not None:
+                source = validate_media_source(str(cached), (self.media_root,))
         if self.radio_buffer is not None:
             self.radio_buffer.stop(flush=True)
         self.player.load_playlist([source], loop=True)
@@ -1446,6 +1475,27 @@ class ServiceCatalog:
         self.active_preset_id = None
         self.active_station_id = None
         self._active_podcast_episode = None
+
+    def _cache_builtin_ambient_audio(self) -> None:
+        for preset in AMBIENT_PRESETS:
+            if preset.sha256 is None:
+                LOG.warning(
+                    "Ambient preset %s has no checksum; skipping cache",
+                    preset.preset_id,
+                )
+                continue
+            try:
+                self.ambient_audio.ensure(
+                    preset.preset_id,
+                    preset.audio_url,
+                    preset.sha256,
+                )
+            except (ContentError, OSError, ValueError) as exc:
+                LOG.warning(
+                    "Ambient offline audio unavailable for %s: %s",
+                    preset.preset_id,
+                    exc,
+                )
 
     def _play_preset(self, preset_id: str) -> None:
         preset = RADIO_BY_ID[preset_id]

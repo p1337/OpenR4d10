@@ -16,6 +16,17 @@ let stationSearchQuery = "";
 let stationLanguageFilter = "";
 let stationCategoryFilter = "";
 let podcastSearchQuery = "";
+const BRANDMEISTER_STORAGE_KEY = "openr4d10.brandmeister.talkgroups";
+let brandmeisterTalkgroups = [];
+let brandmeisterReceiver = null;
+
+const BRANDMEISTER_FLAGS = new Map([
+  ["204", "🇳🇱"], ["208", "🇫🇷"], ["214", "🇪🇸"], ["222", "🇮🇹"],
+  ["228", "🇨🇭"], ["232", "🇦🇹"], ["234", "🇬🇧"], ["235", "🇬🇧"],
+  ["260", "🇵🇱"], ["262", "🇩🇪"], ["268", "🇵🇹"], ["302", "🇨🇦"],
+  ["310", "🇺🇸"], ["311", "🇺🇸"], ["312", "🇺🇸"], ["313", "🇺🇸"],
+  ["314", "🇺🇸"], ["315", "🇺🇸"], ["316", "🇺🇸"], ["505", "🇦🇺"],
+]);
 
 function t(key, variables = {}) {
   const template = translations[currentLocale]?.[key] ?? translations.en?.[key] ?? key;
@@ -1332,6 +1343,148 @@ byId("ambient-scene-form").addEventListener("submit", async (event) => {
     source: byId("ambient-scene-url").value,
   });
   event.currentTarget.reset();
+});
+
+function brandmeisterFlag(talkgroup) {
+  const text = String(talkgroup);
+  return BRANDMEISTER_FLAGS.get(text.slice(0, 3)) || "🌐";
+}
+
+function saveBrandmeisterTalkgroups() {
+  try {
+    localStorage.setItem(BRANDMEISTER_STORAGE_KEY, JSON.stringify(brandmeisterTalkgroups));
+  } catch (_error) {
+    // Listening still works when browser storage is unavailable.
+  }
+}
+
+function loadBrandmeisterTalkgroups() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(BRANDMEISTER_STORAGE_KEY) || "[]");
+    if (Array.isArray(saved)) {
+      let enabledCount = 0;
+      brandmeisterTalkgroups = saved
+        .filter((item) => Number.isInteger(item?.id) && item.id > 90 && item.id <= 9999999)
+        .slice(0, 30)
+        .map((item) => {
+          const enabled = item.enabled === true && enabledCount < 5;
+          if (enabled) enabledCount += 1;
+          return { id: item.id, enabled };
+        });
+    }
+  } catch (_error) {
+    brandmeisterTalkgroups = [];
+  }
+}
+
+function selectedBrandmeisterTalkgroups() {
+  return brandmeisterTalkgroups.filter((item) => item.enabled).map((item) => item.id);
+}
+
+function renderBrandmeisterTalkgroups() {
+  const list = byId("brandmeister-talkgroup-list");
+  list.replaceChildren();
+  for (const item of brandmeisterTalkgroups) {
+    const row = document.createElement("li");
+    const label = document.createElement("label");
+    label.className = "station-row-copy";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = item.enabled;
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked && selectedBrandmeisterTalkgroups().length >= 5) {
+        checkbox.checked = false;
+        byId("brandmeister-hoseline-status").textContent = t("At most five talkgroups can be active at once.");
+        return;
+      }
+      item.enabled = checkbox.checked;
+      saveBrandmeisterTalkgroups();
+      renderBrandmeisterTalkgroups();
+    });
+    const copy = document.createElement("strong");
+    copy.textContent = `${brandmeisterFlag(item.id)} TG ${item.id}`;
+    label.append(checkbox, copy);
+    const actions = document.createElement("span");
+    actions.className = "library-actions";
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = t("Delete");
+    remove.addEventListener("click", () => {
+      brandmeisterTalkgroups = brandmeisterTalkgroups.filter((entry) => entry !== item);
+      saveBrandmeisterTalkgroups();
+      renderBrandmeisterTalkgroups();
+    });
+    actions.append(remove);
+    row.append(label, actions);
+    list.append(row);
+  }
+  byId("brandmeister-talkgroup-count").textContent = `${selectedBrandmeisterTalkgroups().length} / 5`;
+}
+
+function addBrandmeisterTalkgroup() {
+  const input = byId("brandmeister-talkgroup");
+  const talkgroup = Number(input.value);
+  if (!Number.isInteger(talkgroup) || talkgroup <= 90 || talkgroup > 9999999) {
+    byId("brandmeister-hoseline-status").textContent = t("Enter a valid talkgroup above 90.");
+    return false;
+  }
+  let item = brandmeisterTalkgroups.find((entry) => entry.id === talkgroup);
+  if (!item) {
+    item = { id: talkgroup, enabled: selectedBrandmeisterTalkgroups().length < 5 };
+    brandmeisterTalkgroups.push(item);
+  }
+  saveBrandmeisterTalkgroups();
+  renderBrandmeisterTalkgroups();
+  input.value = "";
+  return true;
+}
+
+function updateBrandmeisterState(state) {
+  const output = byId("brandmeister-hoseline-status");
+  const call = byId("brandmeister-call");
+  byId("brandmeister-disconnect").disabled = ["closed", "error"].includes(state.status);
+  call.hidden = true;
+  if (state.status === "connecting") output.textContent = t("Connecting to HoseLine …");
+  if (state.status === "connected") output.textContent = t("Listening to {{count}} talkgroups.", { count: state.talkgroups.length });
+  if (state.status === "closed") output.textContent = t("HoseLine reception stopped.");
+  if (state.status === "error") output.textContent = t("HoseLine connection failed. Use the official player link below.");
+  if (state.status === "call") {
+    const destination = Number(state.destination);
+    output.textContent = t("Active talkgroup: {{talkgroup}}", { talkgroup: destination || "–" });
+    call.textContent = `${brandmeisterFlag(destination)} TG ${destination || "–"} · ${state.source || "–"}${state.alias ? ` · ${state.alias}` : ""}`;
+    call.hidden = false;
+  }
+}
+
+loadBrandmeisterTalkgroups();
+renderBrandmeisterTalkgroups();
+if (window.OpenR4d10HoseLine) {
+  brandmeisterReceiver = new window.OpenR4d10HoseLine(updateBrandmeisterState);
+}
+
+byId("brandmeister-add-talkgroup").addEventListener("click", addBrandmeisterTalkgroup);
+
+byId("brandmeister-hoseline-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const output = byId("brandmeister-hoseline-status");
+  if (byId("brandmeister-talkgroup").value) addBrandmeisterTalkgroup();
+  const talkgroups = selectedBrandmeisterTalkgroups();
+  if (!talkgroups.length) {
+    output.textContent = t("Activate at least one talkgroup.");
+    return;
+  }
+  if (!brandmeisterReceiver) {
+    output.textContent = t("HoseLine reception is unavailable in this browser.");
+    return;
+  }
+  brandmeisterReceiver.connect(talkgroups).catch(() => updateBrandmeisterState({
+    status: "error",
+    talkgroups,
+  }));
+});
+
+byId("brandmeister-disconnect").addEventListener("click", () => {
+  brandmeisterReceiver?.disconnect();
 });
 
 byId("podcast-search").addEventListener("input", (event) => {

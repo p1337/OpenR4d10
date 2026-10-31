@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
+import hashlib
 from html import unescape
 from io import BytesIO
 import json
@@ -77,6 +78,99 @@ class BoundedFetcher:
         if len(payload) > max_bytes:
             raise ContentError("remote content exceeds the size limit")
         return payload, content_type
+
+
+class AmbientAudioCache:
+    """Checksum-verified local cache for reviewed AmbientR4D10 recordings."""
+
+    MAX_BYTES = 64 * 1024 * 1024
+
+    def __init__(self, cache_root: Path, fetcher: BoundedFetcher | None = None) -> None:
+        if not cache_root.is_absolute():
+            raise ValueError("ambient audio cache path must be absolute")
+        self.cache_root = cache_root
+        self.fetcher = fetcher or BoundedFetcher()
+        self._lock = threading.Lock()
+        self._verified: dict[Path, tuple[int, int]] = {}
+
+    @staticmethod
+    def _identity(preset_id: str, checksum: str) -> tuple[str, str]:
+        if re.fullmatch(r"[a-z][a-z0-9_]{1,63}", preset_id) is None:
+            raise ValueError("ambient preset id is invalid")
+        normalized = checksum.casefold()
+        if re.fullmatch(r"[0-9a-f]{64}", normalized) is None:
+            raise ValueError("ambient audio checksum must be SHA-256")
+        return preset_id, normalized
+
+    def path(self, preset_id: str, checksum: str) -> Path:
+        preset_id, checksum = self._identity(preset_id, checksum)
+        return self.cache_root / f"{preset_id}-{checksum[:12]}.ogg"
+
+    def cached(self, preset_id: str, checksum: str) -> Path | None:
+        target = self.path(preset_id, checksum)
+        with self._lock:
+            try:
+                stat = target.stat()
+                signature = (stat.st_size, stat.st_mtime_ns)
+                if stat.st_size <= 0 or not target.is_file():
+                    return None
+                if self._verified.get(target) == signature:
+                    return target
+                if self._file_sha256(target) == checksum.casefold():
+                    self._verified[target] = signature
+                    return target
+                self._verified.pop(target, None)
+                target.unlink(missing_ok=True)
+            except OSError:
+                return None
+        return None
+
+    @staticmethod
+    def _file_sha256(path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open("rb") as source:
+            while chunk := source.read(1024 * 1024):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    def ensure(self, preset_id: str, url: str, checksum: str) -> Path:
+        preset_id, checksum = self._identity(preset_id, checksum)
+        target = self.path(preset_id, checksum)
+        with self._lock:
+            if target.is_file():
+                digest = self._file_sha256(target)
+                if digest == checksum:
+                    stat = target.stat()
+                    self._verified[target] = (stat.st_size, stat.st_mtime_ns)
+                    return target
+                target.unlink(missing_ok=True)
+            payload, _content_type = self.fetcher.fetch(
+                url,
+                max_bytes=self.MAX_BYTES,
+                accepted_types=("audio/ogg", "application/ogg", "audio/*"),
+                timeout=600.0,
+            )
+            if hashlib.sha256(payload).hexdigest() != checksum:
+                raise ContentError("ambient audio checksum does not match")
+            self.cache_root.mkdir(parents=True, exist_ok=True, mode=0o750)
+            temporary = target.with_name(
+                f".{target.name}.{os.getpid()}.{threading.get_ident()}.part"
+            )
+            try:
+                with temporary.open("xb") as output:
+                    output.write(payload)
+                    output.flush()
+                    os.fsync(output.fileno())
+                temporary.chmod(0o640)
+                os.replace(temporary, target)
+                stat = target.stat()
+                self._verified[target] = (stat.st_size, stat.st_mtime_ns)
+            finally:
+                temporary.unlink(missing_ok=True)
+            for stale in self.cache_root.glob(f"{preset_id}-*.ogg"):
+                if stale != target:
+                    stale.unlink(missing_ok=True)
+            return target
 
 
 _TAGS = re.compile(r"<[^>]+>")

@@ -122,6 +122,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "run"
         else None
     )
+    if services is not None:
+        services.prefetch_ambient_audio()
     application = OpenR4d10App(
         app_config,
         display=display,

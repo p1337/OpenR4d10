@@ -62,6 +62,7 @@ AMBIENT_PRESETS = (
         "nille",
         "Public domain",
         PUBLIC_DOMAIN_URL,
+        "43848c3eda5f42829f1033112c2a91ba3e5c91b79a0532fda264c9f59856d431",
     ),
     AmbientPreset(
         "beach",
@@ -72,6 +73,7 @@ AMBIENT_PRESETS = (
         "earthcalling",
         "Public domain",
         PUBLIC_DOMAIN_URL,
+        "4e506141b9a285d03debdb8e0fbc9c1e30aaa29f82f8b2f368f70d5491a636b6",
     ),
     AmbientPreset(
         "brook",
@@ -82,6 +84,7 @@ AMBIENT_PRESETS = (
         "Onegoodtune",
         "CC BY-SA 3.0",
         CC_BY_SA_3_URL,
+        "9847be31041e84dff3a70a52cfaf9f8a1b3d12bf836033e5a157daef8b036efb",
     ),
     AmbientPreset(
         "rain",
@@ -92,6 +95,7 @@ AMBIENT_PRESETS = (
         "Mijesty",
         "CC BY-SA 4.0",
         CC_BY_SA_4_URL,
+        "e0233652d8173650149adcf3d6e5ddc01b73e8a93ce61b8d7809abfe582251a8",
     ),
     AmbientPreset(
         "night_crickets",
@@ -102,6 +106,7 @@ AMBIENT_PRESETS = (
         "Serg Childed",
         "CC BY-SA 4.0",
         CC_BY_SA_4_URL,
+        "f0d82e6b96d110d09615ccca2b2f0b8945f06b0be50c09864c66b9e440b1a7b3",
     ),
 )
 

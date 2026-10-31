@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#071011">
   <title>OpenR4d10</title>
   <link rel="stylesheet" href="/app.css">
+  <script src="/hoseline.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -39,6 +40,7 @@
 
     <nav class="workspace-tabs" role="tablist" aria-label="OpenR4d10 sections" data-i18n-aria-label="OpenR4d10 sections">
       <button type="button" role="tab" aria-selected="true" data-tab="radio" data-i18n="Radio">Radio</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="brandmeister" data-i18n="BrandMeister">BrandMeister</button>
       <button type="button" role="tab" aria-selected="false" data-tab="ambient" data-i18n="AmbientR4D10">AmbientR4D10</button>
       <button type="button" role="tab" aria-selected="false" data-tab="podcasts" data-i18n="Podcasts">Podcasts</button>
       <button type="button" role="tab" aria-selected="false" data-tab="weather" data-i18n="Weather">Weather</button>
@@ -88,15 +90,32 @@
           </section>
         </section>
 
+        <section class="tab-panel" role="tabpanel" data-tab-panel="brandmeister" hidden>
+          <section class="panel services-panel" aria-labelledby="brandmeister-title">
+            <div class="panel-heading"><div><p class="eyebrow" data-i18n="BRANDMEISTER">BRANDMEISTER</p><h1 class="tab-title" id="brandmeister-title" data-i18n="Listen to a talkgroup">Listen to a talkgroup</h1></div><span class="version" data-i18n="Official HoseLine">Official HoseLine</span></div>
+            <p class="services-note" data-i18n="Receive a BrandMeister talkgroup directly in this browser. OpenR4d10 stores no password or user token and never transmits.">Receive a BrandMeister talkgroup directly in this browser. OpenR4d10 stores no password or user token and never transmits.</p>
+            <form class="content-control" id="brandmeister-hoseline-form">
+              <label for="brandmeister-talkgroup" data-i18n="Talkgroup number">Talkgroup number</label>
+              <div class="media-source-row"><input id="brandmeister-talkgroup" type="number" inputmode="numeric" min="91" max="9999999" step="1" placeholder="262"><button id="brandmeister-add-talkgroup" type="button" data-i18n="Add talkgroup">Add talkgroup</button></div>
+              <div class="library-heading"><strong data-i18n="Talkgroup quick list">Talkgroup quick list</strong><span id="brandmeister-talkgroup-count">0 / 5</span></div>
+              <ul id="brandmeister-talkgroup-list" class="library-list"></ul>
+              <div class="media-source-row"><button type="submit" data-i18n="Connect and listen">Connect and listen</button><button id="brandmeister-disconnect" type="button" data-i18n="Disconnect" disabled>Disconnect</button></div>
+              <output id="brandmeister-hoseline-status" aria-live="polite" data-i18n="Enter a talkgroup above 90.">Enter a talkgroup above 90.</output>
+              <p id="brandmeister-call" class="services-note" hidden></p>
+            </form>
+            <p class="services-note"><a href="https://hose.brandmeister.network/" target="_blank" rel="noopener noreferrer" data-i18n="Open the complete official HoseLine player">Open the complete official HoseLine player</a></p>
+          </section>
+        </section>
+
         <section class="tab-panel" role="tabpanel" data-tab-panel="ambient" hidden>
           <section class="panel services-panel" aria-labelledby="ambient-title">
             <div class="panel-heading"><div><p class="eyebrow" data-i18n="AMBIENTR4D10">AMBIENTR4D10</p><h1 class="tab-title" id="ambient-title" data-i18n="Soundscapes &amp; focus">Soundscapes &amp; focus</h1></div><span class="version" data-i18n="Endless loop">Endless loop</span></div>
-            <p class="services-note" data-i18n="Café and nature soundscapes play in a seamless loop. Opening this page never interrupts other audio; Play deliberately takes over playback.">Café and nature soundscapes play in a seamless loop. Opening this page never interrupts other audio; Play deliberately takes over playback.</p>
+            <p class="services-note" data-i18n="Café and nature soundscapes play offline in a seamless loop. Opening this page never interrupts other audio; changing the channel starts the selected soundscape.">Café and nature soundscapes play offline in a seamless loop. Opening this page never interrupts other audio; changing the channel starts the selected soundscape.</p>
             <form class="content-control" id="ambient-scene-form">
               <label for="ambient-scene-name" data-i18n="Add a custom soundscape">Add a custom soundscape</label>
               <input id="ambient-scene-name" type="text" maxlength="160" placeholder="Scene name" data-i18n-placeholder="Scene name" autocomplete="off" required>
               <div class="media-source-row"><input id="ambient-scene-url" type="url" placeholder="https://…/sound.ogg" autocomplete="off" required><button type="submit" data-i18n="Add scene">Add scene</button></div>
-              <output id="ambient-status" aria-live="polite" data-i18n="Select a soundscape and press Play.">Select a soundscape and press Play.</output>
+              <output id="ambient-status" aria-live="polite" data-i18n="Changing the channel starts the selected soundscape.">Changing the channel starts the selected soundscape.</output>
             </form>
             <div class="library-heading"><strong data-i18n="Soundscapes">Soundscapes</strong><span id="ambient-scene-count">0</span></div>
             <ul id="ambient-scene-list" class="library-list ambient-scene-list"></ul>

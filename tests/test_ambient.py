@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 import tempfile
 import unittest
@@ -12,6 +13,7 @@ from openr4d10.ambient import (
     AMBIENT_PRESETS,
     ambient_text,
 )
+from openr4d10.content import AmbientAudioCache, ContentError
 from openr4d10.media import PlaybackState
 from openr4d10.services import ServiceCatalog
 
@@ -66,9 +68,44 @@ class AmbientPresetTests(unittest.TestCase):
                     or item.source_page.startswith("https://freesound.org/")
                 )
                 self.assertTrue(item.license_url.startswith("https://"))
+                self.assertRegex(item.sha256 or "", r"^[0-9a-f]{64}$")
                 self.assertNotIn("audio_url", item.public())
                 self.assertEqual(
                     item.public()["artwork"], f"/api/ambient-art/{item.preset_id}"
+                )
+
+    def test_offline_cache_is_bounded_checksum_verified_and_reused(self) -> None:
+        payload = b"OggS" + b"quiet" * 32
+
+        class Fetcher:
+            calls = 0
+
+            def fetch(self, url, *, max_bytes, accepted_types, timeout):
+                self.calls += 1
+                self.url = url
+                self.max_bytes = max_bytes
+                self.accepted_types = accepted_types
+                self.timeout = timeout
+                return payload, "audio/ogg"
+
+        checksum = hashlib.sha256(payload).hexdigest()
+        with tempfile.TemporaryDirectory() as raw:
+            fetcher = Fetcher()
+            cache = AmbientAudioCache(Path(raw).resolve(), fetcher)
+            first = cache.ensure("cafe", "https://example.org/cafe.ogg", checksum)
+            second = cache.ensure("cafe", "https://example.org/cafe.ogg", checksum)
+            self.assertEqual(first, second)
+            self.assertEqual(first.read_bytes(), payload)
+            self.assertEqual(fetcher.calls, 1)
+            self.assertEqual(fetcher.max_bytes, 64 * 1024 * 1024)
+            self.assertIn("audio/ogg", fetcher.accepted_types)
+            self.assertEqual(fetcher.timeout, 600.0)
+
+            with self.assertRaisesRegex(ContentError, "checksum"):
+                cache.ensure(
+                    "forest",
+                    "https://example.org/forest.ogg",
+                    "0" * 64,
                 )
 
     def test_each_preset_has_a_readable_bundled_square_artwork(self) -> None:
@@ -126,7 +163,7 @@ class AmbientServiceTests(unittest.TestCase):
             finally:
                 reopened.close()
 
-    def test_scenes_are_persistent_and_play_only_on_explicit_action(self) -> None:
+    def test_scenes_are_persistent_and_channel_step_plays_immediately(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw).resolve()
             player = Player()
@@ -140,8 +177,7 @@ class AmbientServiceTests(unittest.TestCase):
                 )
                 first, second = snapshot["scenes"][:2]
                 catalog.control({"action": "ambient_step", "steps": 1})
-                self.assertEqual(player.playlists, [])
-                catalog.control({"action": "ambient_play", "scene_id": second["id"]})
+                self.assertEqual(len(player.playlists), 1)
                 self.assertEqual(player.playlists[-1][1:], (False, True))
                 self.assertEqual(catalog.active_service, "ambient")
                 catalog.control({"action": "ambient_toggle"})
@@ -166,7 +202,7 @@ class AmbientServiceTests(unittest.TestCase):
             finally:
                 reopened.close()
 
-    def test_channel_browsing_keeps_the_selected_scene_visible(self) -> None:
+    def test_channel_browsing_starts_the_selected_scene(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             player = Player()
             catalog = ServiceCatalog(
@@ -180,14 +216,14 @@ class AmbientServiceTests(unittest.TestCase):
                 selected = catalog.receiver_overlay("AMBIENT")
                 self.assertEqual(selected["channel"], 2)
                 self.assertEqual(selected["preset_id"], second["preset_id"])
-                self.assertFalse(selected["playing"])
-                self.assertEqual(catalog.active_ambient_scene_id, first["id"])
-                self.assertEqual(len(player.playlists), 1)
+                self.assertTrue(selected["playing"])
+                self.assertEqual(catalog.active_ambient_scene_id, second["id"])
+                self.assertEqual(len(player.playlists), 2)
 
                 catalog.control({"action": "ambient_toggle"})
                 active = catalog.receiver_overlay("AMBIENT")
                 self.assertEqual(active["channel"], 2)
-                self.assertTrue(active["playing"])
+                self.assertFalse(active["playing"])
                 self.assertEqual(catalog.active_ambient_scene_id, second["id"])
                 self.assertEqual(len(player.playlists), 2)
             finally:

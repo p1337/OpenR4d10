@@ -24,6 +24,7 @@ STATIC_FILES = {
     "/index.html": ("index.html", "text/html; charset=utf-8"),
     "/app.css": ("app.css", "text/css; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/hoseline.js": ("hoseline.js", "text/javascript; charset=utf-8"),
     "/i18n.json": ("i18n.json", "application/json; charset=utf-8"),
 }
 
@@ -46,7 +47,7 @@ class _DashboardHandler(BaseHTTPRequestHandler):
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header(
             "Content-Security-Policy",
-            "default-src 'self'; connect-src 'self'; img-src 'self'; "
+            "default-src 'self'; connect-src 'self' wss://hose.brandmeister.network; img-src 'self'; "
             "style-src 'self'; script-src 'self'; frame-ancestors 'none'",
         )
         self.send_header("Cache-Control", "no-store")

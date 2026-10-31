@@ -1076,6 +1076,39 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-31 – Ambient-Sofortwechsel, Offline-Audio und HoseLine-Zugang
+
+- Innerhalb von AmbientR4D10 spielt jede Kanaländerung die neu gewählte Szene
+  unmittelbar ab. Die zuvor getrennte Vorwahl ohne Audioübernahme ist damit
+  aufgehoben. Das bloße Öffnen des Dienstes bleibt ohne Audioseiteffekt.
+- Die sechs geprüften eingebauten Ogg-Aufnahmen werden nicht bei jedem Play neu
+  gestreamt. OpenR4d10 lädt sie im Hintergrund jeweils höchstens einmal in den
+  geschützten lokalen Medienbereich, begrenzt die Einzeldatei auf 64 MiB,
+  prüft die kuratierte SHA-256-Prüfsumme und veröffentlicht sie erst danach
+  atomar als lokale Offline-Datei. Vorhandene gültige Dateien werden bei
+  Neustart und Update wiederverwendet; bei noch nicht fertigem Cache bleibt die
+  geprüfte öffentliche Quelle als Übergang verfügbar. Die Binärdateien werden
+  nicht in jedes GitHub-Release eingebettet.
+- Robert verlangt echten BrandMeister-Hörempfang nach dem Vorbild der offiziellen
+  HoseLine-Seite und übernimmt ausdrücklich die Verantwortung für die direkte
+  Browserintegration. Der verifizierte Fallback-Pfad ist
+  `https://hose.brandmeister.network/?subscribe=<talkgroup>`; Talkgroups müssen
+  numerisch und größer als 90 sein. Die lokale Weboberfläche erhält dafür einen
+  eigenen, klar als HoseLine-Empfang gekennzeichneten Bereich, ohne Passwort,
+  Benutzer-Token oder nachgebauten angeblichen MP3-Link.
+- Die aktuelle offizielle HoseLine-Webanwendung verwendet öffentlich
+  `wss://hose.brandmeister.network/spotter/`, MessagePack-Steuernachrichten und
+  8-kHz-G.711-µ-law-Audiopakete. OpenR4d10 implementiert diesen belegten Pfad
+  deshalb direkt im Webbrowser: bis zu fünf numerische Talkgroups gleichzeitig
+  über eine kompakte Quickliste mit Checkboxen und Länderflaggen abonnieren,
+  µ-law-Dekodierung über Web Audio und Anzeige von Quelle, Ziel und Talker Alias.
+  Sobald eine der abonnierten Gruppen spricht, erhält dieser aktive Ruf die
+  sichtbare Priorität; die übrigen Gruppen bleiben abonniert.
+  Der offizielle Komplettplayer bleibt als Fallback verlinkt. Diese Integration
+  gibt Ton im bedienenden Browser aus; eine Ausgabe über den Whisplay-Lautsprecher
+  darf erst nach einem separaten realen Pi-Audiotest behauptet werden. Senden/PTT
+  ist ausdrücklich nicht Teil dieser Ausbaustufe.
+
 ### 2026-10-31 – Einheitliche Web-Pfeilrichtung und direkt geladene Ambient-Bilder
 
 - Robert korrigiert die Browser-Kanalrichtung: Pfeil hoch muss stets den
@@ -1124,12 +1157,14 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Meer/Strand, Bach beziehungsweise Regen und ein nächtliches Feld mit
   Grillen. Die Bezeichnungen werden in allen fünf kuratierten Gerätesprachen
   sinngemäß übersetzt.
-- AmbientR4D10 folgt der vorhandenen Audio-Ownership: Das Öffnen oder
-  Durchblättern der Szenen verändert laufendes Radio nicht. Erst ausdrückliches
-  Play startet die gewählte Klanglandschaft und ersetzt die bisherige
-  Audioquelle. Danach läuft sie beim Wechsel zu Wetter oder anderen visuellen
-  Diensten im Hintergrund endlos weiter, bis Pause, Stopp oder Play eines
-  anderen Audiodienstes erfolgt.
+- AmbientR4D10 folgt der vorhandenen Audio-Ownership: Das bloße Öffnen des
+  Dienstes verändert laufendes Radio nicht. Das Drehen der Kanalachse innerhalb
+  von AmbientR4D10 startet dagegen sofort die neu gewählte Klanglandschaft und
+  ersetzt die bisherige Audioquelle; ein zusätzlicher Play-Druck ist nicht
+  mehr erforderlich. Danach läuft sie beim Wechsel zu Wetter oder anderen
+  visuellen Diensten im Hintergrund endlos weiter, bis Pause, Stopp oder Play
+  eines anderen Audiodienstes erfolgt. Diese spätere Bedienentscheidung ersetzt
+  die frühere reine Vorwahl beim Durchblättern.
 - Szenen sind persistent sortierbar, aktivierbar und erweiterbar. Eigene
   Klangdateien beziehungsweise später geprüfte Downloadpakete werden im
   geschützten Mediendatenbereich gespeichert und durch Updates nicht ersetzt.

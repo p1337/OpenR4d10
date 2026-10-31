@@ -76,6 +76,9 @@ the installer report exactly which adapters still need configuration.
   forest, beach, brook, rain and night soundscapes, endless looping and a
   persistent sortable scene library with one consistent bundled artwork per
   built-in scene in both the browser and physical display
+- direct receive-only BrandMeister HoseLine browser audio with a persistent
+  multi-talkgroup checkbox quick list, country flags and active-call display;
+  no account password, user token, PTT or claimed Whisplay-speaker routing
 - standard-library-only test suite and GitHub Actions CI
 
 Hardware-specific integration still pending:
@@ -317,13 +320,14 @@ credentials or persistent query strings are refused so signed/private feed
 tokens cannot accidentally enter backups or public state.
 
 The **AmbientR4D10** tab is an independent audio service, not a radio-station
-group or a third-party branded clone. Its six initial soundscapes are streamed
-from reviewed public CC sources and looped by the existing private mpv owner;
+group or a third-party branded clone. Its six initial soundscapes are fetched
+once from reviewed public CC sources, checksum-verified into the protected
+local media cache and looped offline by the existing private mpv owner;
 the café uses a quieter CC0 coffeehouse recording with a small group instead
-of dense crowd noise. Browsing and scene selection do not disturb other audio;
-the selected channel remains visible while the previous sound continues, and
-only an explicit Play replaces the current source. Scene order, deletion and
-custom credential-free HTTP(S) additions persist across updates. Sources, attribution
+of dense crowd noise. Opening the service does not disturb other audio. Once
+its channel control is turned, the newly selected scene starts immediately and
+replaces the previous audio source. Scene order, deletion and custom
+credential-free HTTP(S) additions persist across updates. Sources, attribution
 and licenses are recorded in [`docs/AMBIENT.md`](docs/AMBIENT.md). The six
 matching scene artworks are bundled locally, so no external image service is
 needed at runtime. The Ambient tab loads those local thumbnails immediately
@@ -412,3 +416,5 @@ account-bearing modules is documented in
 Potential future integrations are ranked in
 [`docs/SERVICE_CANDIDATES.md`](docs/SERVICE_CANDIDATES.md); this is research,
 not an installed service catalog.
+The verified receive-only browser transport and its explicit limits are in
+[`docs/BRANDMEISTER.md`](docs/BRANDMEISTER.md).
