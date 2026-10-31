@@ -95,7 +95,9 @@ class DeviceUiTests(unittest.TestCase):
         self.assertEqual(_display_text("es")["main_menu"], "MENÚ PRINCIPAL")
         self.assertEqual(DEFAULT_ACCENT, (253, 184, 19))
         image = render_device_ui(DeviceUiState())
-        self.assertEqual(image.getpixel((100, 60)), (12, 20, 23))
+        # Sample below the font bounding boxes so this remains independent of
+        # platform-specific DejaVu glyph rasterisation.
+        self.assertEqual(image.getpixel((100, 69)), (12, 20, 23))
         for corner in ((0, 0, 13, 6), (227, 0, 240, 6)):
             self.assertNotIn(
                 (135, 143, 148),
