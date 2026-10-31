@@ -64,6 +64,10 @@ class ProcessBoundaryTests(unittest.TestCase):
         self.assertIn("--input-ipc-client=fd://17", command)
         self.assertNotIn("shell", " ".join(command))
         self.assertIn("--volume=30", command)
+        self.assertIn(
+            "--user-agent=OpenR4d10 (+https://github.com/p1337/OpenR4d10)",
+            command,
+        )
 
     def test_playlist_supports_shuffle_navigation_and_favorite_loop(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

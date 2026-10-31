@@ -18,7 +18,7 @@ import unicodedata
 import uuid
 from urllib.parse import urlsplit
 
-from .ambient import AMBIENT_PRESETS, ambient_text
+from .ambient import AMBIENT_BY_ID, AMBIENT_PRESETS, ambient_text
 from .content import (
     CameraSnapshot,
     ContentError,
@@ -45,6 +45,7 @@ DEFAULT_ENABLED_SERVICES = {
 }
 DISPLAY_BRIGHTNESS_KEY = "display.brightness_percent"
 DEFAULT_DISPLAY_BRIGHTNESS = 100
+AMBIENT_SOURCE_MIGRATION_KEY = "ambient.direct_sources_v1"
 UI_ACCENT_COLOR_KEY = "ui.accent_color"
 DEFAULT_UI_ACCENT_COLOR = "#FDB813"
 UI_LANGUAGE_KEY = "ui.language"
@@ -253,6 +254,7 @@ class ServiceCatalog:
         )
         self._upgrade_germany_weather_default()
         self._seed_germany_satellite_upgrade()
+        self._upgrade_ambient_source_urls()
         weather_channels = self.store.channels("weather")
         if weather_channels:
             self.active_weather_channel_id = int(weather_channels[0]["id"])
@@ -317,6 +319,23 @@ class ServiceCatalog:
                 },
             )
         self.store.set_setting(GERMANY_SATELLITE_MIGRATION_KEY, True)
+
+    def _upgrade_ambient_source_urls(self) -> None:
+        """Replace only existing built-in redirect URLs; never recreate scenes."""
+        if self.store.get_setting(AMBIENT_SOURCE_MIGRATION_KEY, False) is True:
+            return
+        for scene in self.store.channels("ambient"):
+            preset = AMBIENT_BY_ID.get(str(scene["external_id"]))
+            metadata = scene.get("metadata")
+            if preset is None or not isinstance(metadata, dict):
+                continue
+            source = metadata.get("source_url")
+            if not isinstance(source, str) or "commons.wikimedia.org/wiki/Special:Redirect/file/" not in source:
+                continue
+            updated = dict(metadata)
+            updated["source_url"] = preset.audio_url
+            self.store.update_channel(int(scene["id"]), str(scene["name"]), updated)
+        self.store.set_setting(AMBIENT_SOURCE_MIGRATION_KEY, True)
 
     def display_brightness(self) -> int:
         value = self.store.get_setting(

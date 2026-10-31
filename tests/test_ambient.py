@@ -49,6 +49,8 @@ class AmbientPresetTests(unittest.TestCase):
         for item in AMBIENT_PRESETS:
             with self.subTest(item.preset_id):
                 self.assertTrue(item.audio_url.startswith("https://"))
+                self.assertTrue(item.audio_url.startswith("https://upload.wikimedia.org/"))
+                self.assertNotIn("?", item.audio_url)
                 self.assertTrue(item.source_page.startswith("https://commons.wikimedia.org/"))
                 self.assertTrue(item.license_url.startswith("https://"))
                 self.assertNotIn("audio_url", item.public())
@@ -59,6 +61,35 @@ class AmbientPresetTests(unittest.TestCase):
 
 
 class AmbientServiceTests(unittest.TestCase):
+    def test_redirect_sources_migrate_without_recreating_deleted_scenes(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            catalog = ServiceCatalog(root, player=Player(), recorder=Recorder())
+            first = catalog.store.channels("ambient")[0]
+            metadata = dict(first["metadata"])
+            metadata["source_url"] = (
+                "https://commons.wikimedia.org/wiki/Special:Redirect/file/"
+                "Cafe_ambiance.ogg"
+            )
+            catalog.store.update_channel(first["id"], first["name"], metadata)
+            catalog.store.set_setting("ambient.direct_sources_v1", False)
+            deleted = catalog.store.channels("ambient")[1]
+            catalog.store.delete_channel(deleted["id"])
+            catalog.close()
+
+            reopened = ServiceCatalog(root, player=Player(), recorder=Recorder())
+            try:
+                scenes = reopened.store.channels("ambient")
+                migrated = next(item for item in scenes if item["id"] == first["id"])
+                self.assertTrue(
+                    migrated["metadata"]["source_url"].startswith(
+                        "https://upload.wikimedia.org/"
+                    )
+                )
+                self.assertNotIn(deleted["id"], {item["id"] for item in scenes})
+            finally:
+                reopened.close()
+
     def test_scenes_are_persistent_and_play_only_on_explicit_action(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw).resolve()

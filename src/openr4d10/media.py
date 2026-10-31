@@ -100,6 +100,7 @@ class MpvEngine:
             "--audio-display=no",
             "--terminal=no",
             "--really-quiet",
+            "--user-agent=OpenR4d10 (+https://github.com/p1337/OpenR4d10)",
             "--ao=alsa",
             f"--volume={self.state.volume}",
             f"--input-ipc-client=fd://{ipc_fd}",

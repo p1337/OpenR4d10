@@ -5,11 +5,14 @@ room soundscapes. Selecting the service or browsing scenes never replaces
 currently playing radio. Only an explicit Play command gives AmbientR4D10
 audio ownership. Weather and other visual services do not interrupt it.
 
-The first catalog uses stable Wikimedia Commons file redirects. Audio is
-streamed by the existing isolated `mpv` process and looped indefinitely; the
-binary recordings are not copied into this repository. Updates seed the
-catalog only once and never recreate a scene that the user deliberately
-deleted from persistent state.
+The first catalog uses stable, query-free Wikimedia Commons original-file
+addresses. Audio is streamed by the existing isolated `mpv` process and looped
+indefinitely; the binary recordings are not copied into this repository. mpv
+identifies the project with
+`OpenR4d10 (+https://github.com/p1337/OpenR4d10)` because Wikimedia rejects the
+anonymous ffmpeg default client with HTTP 429. Updates seed the catalog only
+once and never recreate a scene that the user deliberately deleted from
+persistent state.
 
 | Scene | Recording | Credit | License |
 |---|---|---|---|

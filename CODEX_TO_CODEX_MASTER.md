@@ -1075,6 +1075,25 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-31 – Reale Ambient-Wiedergabe und Wikimedia-HTTP-Kennung
+
+- Der erste reale AmbientR4D10-Test auf dem Pi zeigt: Wikimedia liefert dem
+  unveränderten ffmpeg/mpv-Standardclient HTTP 429, obwohl derselbe öffentliche
+  Ogg-Inhalt per Browser beziehungsweise `curl` erreichbar ist. Das ist kein
+  ALSA- oder Whisplay-Fehler; die Karte `whisplaysound` ist aktiv.
+- Wikimedia akzeptiert die Wiedergabe mit einer eindeutigen, kontaktierbaren
+  HTTP-Kennung `OpenR4d10 (+https://github.com/p1337/OpenR4d10)`. Der einzige
+  vorhandene `MpvEngine` setzt diese Kennung deshalb zentral. Es entsteht kein
+  zweiter Player und kein unbeschränkter Downloadhelfer.
+- Die sechs eingebauten Szenen verwenden die stabilen, queryfreien
+  `upload.wikimedia.org`-Originaladressen statt der zusätzlichen
+  `Special:Redirect`-Stufe. Quellen-, Lizenz- und Urheberseiten bleiben
+  unverändert sichtbar. Eigene Szenen durchlaufen weiter die vorhandene
+  credential- und queryfreie Medienvalidierung.
+- Die reale Wiedergabe muss nach jeder Änderung auf dem Pi gestartet, über den
+  öffentlichen Status als aktiver Ambient-Dienst bestätigt und anschließend
+  wieder sauber gestoppt werden. Ein bloß grüner Unit-Test genügt hierfür nicht.
+
 ### 2026-10-31 – Eigener AmbientR4D10-Klanglandschaftsdienst
 
 - Robert legt einen eigenständigen Audiodienst mit dem sichtbaren Namen

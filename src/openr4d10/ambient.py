@@ -28,7 +28,7 @@ class AmbientPreset:
         }
 
 
-COMMONS_REDIRECT = "https://commons.wikimedia.org/wiki/Special:Redirect/file/"
+COMMONS_UPLOAD = "https://upload.wikimedia.org/wikipedia/commons/"
 CC0_URL = "https://creativecommons.org/publicdomain/zero/1.0/"
 PUBLIC_DOMAIN_URL = "https://creativecommons.org/publicdomain/mark/1.0/"
 CC_BY_SA_3_URL = "https://creativecommons.org/licenses/by-sa/3.0/"
@@ -40,7 +40,7 @@ AMBIENT_PRESETS = (
         "cafe",
         "Café",
         "Gentle café room with quiet conversations",
-        COMMONS_REDIRECT + "Cafe_ambiance.ogg",
+        COMMONS_UPLOAD + "5/54/Cafe_ambiance.ogg",
         "https://commons.wikimedia.org/wiki/File:Cafe_ambiance.ogg",
         "Marble Toast",
         "CC0 1.0",
@@ -50,7 +50,7 @@ AMBIENT_PRESETS = (
         "forest",
         "Forest",
         "Forest, wind, birds and distant insects",
-        COMMONS_REDIRECT + "20090610_0_ambience.ogg",
+        COMMONS_UPLOAD + "0/0a/20090610_0_ambience.ogg",
         "https://commons.wikimedia.org/wiki/File:20090610_0_ambience.ogg",
         "nille",
         "Public domain",
@@ -60,7 +60,7 @@ AMBIENT_PRESETS = (
         "beach",
         "Sea & beach",
         "Waves rolling across a pebble beach",
-        COMMONS_REDIRECT + "On_a_pebble_beach.ogg",
+        COMMONS_UPLOAD + "7/73/On_a_pebble_beach.ogg",
         "https://commons.wikimedia.org/wiki/File:On_a_pebble_beach.ogg",
         "earthcalling",
         "Public domain",
@@ -70,7 +70,7 @@ AMBIENT_PRESETS = (
         "brook",
         "Forest brook",
         "A small brook flowing through a forest",
-        COMMONS_REDIRECT + "Brook.ogg",
+        COMMONS_UPLOAD + "8/88/Brook.ogg",
         "https://commons.wikimedia.org/wiki/File:Brook.ogg",
         "Onegoodtune",
         "CC BY-SA 3.0",
@@ -80,7 +80,7 @@ AMBIENT_PRESETS = (
         "rain",
         "Gentle rain",
         "Light rainfall without synthetic music",
-        COMMONS_REDIRECT + "Sound_of_light_rainfall.ogg",
+        COMMONS_UPLOAD + "1/15/Sound_of_light_rainfall.ogg",
         "https://commons.wikimedia.org/wiki/File:Sound_of_light_rainfall.ogg",
         "Mijesty",
         "CC BY-SA 4.0",
@@ -90,7 +90,7 @@ AMBIENT_PRESETS = (
         "night_crickets",
         "Night field & crickets",
         "A long field-cricket chorus at night",
-        COMMONS_REDIRECT + "Crickets_choir.ogg",
+        COMMONS_UPLOAD + "4/4c/Crickets_choir.ogg",
         "https://commons.wikimedia.org/wiki/File:Crickets_choir.ogg",
         "Serg Childed",
         "CC BY-SA 4.0",
