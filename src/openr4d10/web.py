@@ -133,6 +133,11 @@ class _DashboardHandler(BaseHTTPRequestHandler):
             self._serve_content(f"camera-{path[-1]}.jpg")
         elif re.fullmatch(r"/api/radio-art/[a-z][a-z0-9_]{1,63}", path):
             self._serve_content(f"radio-art/{path.rsplit('/', 1)[-1]}")
+        elif re.fullmatch(
+            r"/api/weather-frame/weather-[a-z][a-z0-9_-]{1,63}-\d{8}T\d{6}Z\.jpg",
+            path,
+        ):
+            self._serve_content(path.rsplit("/", 1)[-1])
         elif path == "/healthz":
             self._send(200, "text/plain; charset=utf-8", b"ok\n")
         else:

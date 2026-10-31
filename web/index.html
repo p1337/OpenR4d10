@@ -27,6 +27,7 @@
 
     <nav class="workspace-tabs" role="tablist" aria-label="OpenR4d10 Bereiche">
       <button type="button" role="tab" aria-selected="true" data-tab="radio">Radio</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="weather">Wetter</button>
       <button type="button" role="tab" aria-selected="false" data-tab="media">Medien &amp; News</button>
       <button type="button" role="tab" aria-selected="false" data-tab="device">Gerät</button>
       <button type="button" role="tab" aria-selected="false" data-tab="system">System</button>
@@ -59,6 +60,37 @@
               <input id="station-name" type="text" maxlength="160" placeholder="Sendername" autocomplete="off" required>
               <div class="media-source-row"><input id="station-url" type="url" placeholder="https://…/stream" autocomplete="off" required><button type="submit">Speichern</button></div>
               <ul id="station-list" class="library-list station-list"></ul>
+            </form>
+          </section>
+        </section>
+
+        <section class="tab-panel" role="tabpanel" data-tab-panel="weather" hidden>
+          <section class="panel weather-panel" aria-labelledby="weather-title">
+            <div class="panel-heading"><div><p class="eyebrow">DWD SATELLITENWETTER</p><h1 id="weather-title">Deutschland &amp; Europa</h1></div><span class="version">DWD / EUMETSAT</span></div>
+            <div class="weather-layout">
+              <figure class="weather-viewer">
+                <img id="weather-image" alt="Aktuelles DWD-Satellitenbild" hidden>
+                <div id="weather-empty">Kanal auswählen und Bilder laden.</div>
+                <figcaption><strong id="weather-channel-name">–</strong><span id="weather-frame-time">Noch keine Frames im lokalen Cache</span></figcaption>
+              </figure>
+              <div>
+                <p class="services-note">Die jüngsten verfügbaren METEOSAT-Bilder laufen lokal in einer Endlosschleife. Neue DWD-Daten werden höchstens alle fünf Minuten geprüft.</p>
+                <button type="button" id="weather-refresh">Ausgewählten Kanal aktualisieren</button>
+                <output id="weather-status" aria-live="polite">Bereit.</output>
+                <ul id="weather-channel-list" class="library-list weather-channel-list"></ul>
+              </div>
+            </div>
+            <form class="content-control weather-channel-form" id="weather-channel-form">
+              <label for="weather-channel-name-input">DWD-Satellitenausschnitt konfigurieren</label>
+              <input id="weather-channel-id" type="hidden">
+              <div class="weather-channel-fields">
+                <input id="weather-channel-name-input" type="text" maxlength="160" placeholder="Name" required>
+                <input id="weather-south" type="number" min="23" max="77" step="0.1" placeholder="Süd" required>
+                <input id="weather-west" type="number" min="-54" max="54" step="0.1" placeholder="West" required>
+                <input id="weather-north" type="number" min="23" max="77" step="0.1" placeholder="Nord" required>
+                <input id="weather-east" type="number" min="-54" max="54" step="0.1" placeholder="Ost" required>
+                <button type="submit">Speichern</button><button type="button" id="weather-channel-cancel">Neu</button>
+              </div>
             </form>
           </section>
         </section>

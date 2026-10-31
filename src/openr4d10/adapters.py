@@ -139,6 +139,20 @@ class WhisplayDisplay:
         artwork = None
         if (
             self.artwork_cache_root is not None
+            and self.state.image_file is not None
+            and re.fullmatch(
+                r"weather-[a-z][a-z0-9_-]{1,63}-\d{8}T\d{6}Z\.jpg",
+                self.state.image_file,
+            )
+        ):
+            path = self.artwork_cache_root / self.state.image_file
+            try:
+                with Image.open(path) as source:
+                    artwork = source.convert("RGB").copy()
+            except OSError:
+                artwork = None
+        elif (
+            self.artwork_cache_root is not None
             and self.state.preset_id is not None
             and re.fullmatch(r"[a-z][a-z0-9_]{1,63}", self.state.preset_id)
         ):

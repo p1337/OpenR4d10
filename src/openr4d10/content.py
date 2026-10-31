@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from html import unescape
 from io import BytesIO
 import os
 from pathlib import Path
 import re
 import threading
+import time
 from typing import Any, Callable
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
 
@@ -244,3 +245,246 @@ class PresetArtwork:
             temporary.write_bytes(encoded.getvalue())
             os.replace(temporary, output)
             return output
+
+
+DWD_WMS_URL = "https://maps.dwd.de/geoserver/dwd/wms"
+DWD_SATELLITE_LAYER = "Satellite_meteosat_1km_euat_rgb_day_hrv_and_night_ir108_3h"
+WEATHER_REFRESH_SECONDS = 300
+WEATHER_FRAME_COUNT = 8
+
+
+class DwdSatelliteFrames:
+    """Bounded, locally re-encoded frame cache for the official DWD WMS layer."""
+
+    def __init__(self, cache_root: Path, fetcher: BoundedFetcher | None = None) -> None:
+        if not cache_root.is_absolute():
+            raise ValueError("weather cache path must be absolute")
+        self.cache_root = cache_root
+        self.fetcher = fetcher or BoundedFetcher()
+        self._lock = threading.RLock()
+        self._last_refresh: dict[str, float] = {}
+        self._capability_times: tuple[datetime, ...] = ()
+        self._capabilities_checked = 0.0
+
+    @staticmethod
+    def _slug(value: str) -> str:
+        if not re.fullmatch(r"[a-z][a-z0-9_-]{1,63}", value):
+            raise ValueError("invalid weather channel id")
+        return value
+
+    @staticmethod
+    def _parse_instant(value: str) -> datetime:
+        return datetime.fromisoformat(value.strip().replace("Z", "+00:00")).astimezone(UTC)
+
+    @classmethod
+    def parse_capability_times(cls, payload: bytes) -> tuple[datetime, ...]:
+        try:
+            root = ET.fromstring(payload)
+        except ET.ParseError as exc:
+            raise ContentError(f"invalid DWD capabilities XML: {exc}") from exc
+        for layer in root.iter():
+            if layer.tag.rsplit("}", 1)[-1] != "Layer":
+                continue
+            name = next(
+                (
+                    child.text.strip()
+                    for child in layer
+                    if child.tag.rsplit("}", 1)[-1] == "Name" and child.text
+                ),
+                "",
+            )
+            if name != DWD_SATELLITE_LAYER:
+                continue
+            dimension = next(
+                (
+                    child
+                    for child in layer
+                    if child.tag.rsplit("}", 1)[-1] == "Dimension"
+                    and child.attrib.get("name") == "time"
+                    and child.text
+                ),
+                None,
+            )
+            if dimension is None or not dimension.text:
+                break
+            value = dimension.text.strip()
+            if "/" in value:
+                parts = value.split("/")
+                if len(parts) != 3 or parts[2] != "PT3H":
+                    raise ContentError("unsupported DWD satellite time interval")
+                start, end = cls._parse_instant(parts[0]), cls._parse_instant(parts[1])
+                values: list[datetime] = []
+                current = start
+                while current <= end and len(values) < 1000:
+                    values.append(current)
+                    current += timedelta(hours=3)
+                return tuple(values)
+            return tuple(cls._parse_instant(item) for item in value.split(",") if item.strip())
+        raise ContentError("DWD satellite layer has no time dimension")
+
+    def _available_times(self) -> tuple[datetime, ...]:
+        now = time.monotonic()
+        if self._capability_times and now - self._capabilities_checked < WEATHER_REFRESH_SECONDS:
+            return self._capability_times
+        query = urlencode(
+            {
+                "service": "WMS",
+                "request": "GetCapabilities",
+                "version": "1.3.0",
+            }
+        )
+        payload, _content_type = self.fetcher.fetch(
+            f"{DWD_WMS_URL}?{query}",
+            max_bytes=2 * 1024 * 1024,
+            accepted_types=("text/xml", "application/xml"),
+            timeout=12.0,
+        )
+        values = self.parse_capability_times(payload)
+        if not values:
+            raise ContentError("DWD satellite time list is empty")
+        self._capability_times = values
+        self._capabilities_checked = now
+        return values
+
+    @staticmethod
+    def _timestamp_name(value: datetime) -> str:
+        return value.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+
+    def frames(self, channel_key: str) -> list[dict[str, object]]:
+        slug = self._slug(channel_key)
+        frames: list[dict[str, object]] = []
+        for path in sorted(self.cache_root.glob(f"weather-{slug}-*.jpg")):
+            match = re.fullmatch(
+                rf"weather-{re.escape(slug)}-(\d{{8}}T\d{{6}}Z)\.jpg",
+                path.name,
+            )
+            if match is None:
+                continue
+            try:
+                timestamp = datetime.strptime(match.group(1), "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC)
+            except ValueError:
+                continue
+            frames.append(
+                {
+                    "file": path.name,
+                    "timestamp": timestamp.isoformat(timespec="minutes").replace("+00:00", "Z"),
+                }
+            )
+        return frames[-WEATHER_FRAME_COUNT:]
+
+    def invalidate(self, channel_key: str) -> None:
+        """Remove frames after a channel crop changes or is deleted."""
+        slug = self._slug(channel_key)
+        with self._lock:
+            for path in self.cache_root.glob(f"weather-{slug}-*.jpg"):
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
+            self._last_refresh.pop(slug, None)
+
+    def _fetch_frame(
+        self,
+        channel_key: str,
+        bbox: tuple[float, float, float, float],
+        timestamp: datetime,
+    ) -> Path:
+        slug = self._slug(channel_key)
+        output = self.cache_root / f"weather-{slug}-{self._timestamp_name(timestamp)}.jpg"
+        if output.is_file():
+            return output
+        query = urlencode(
+            {
+                "service": "WMS",
+                "version": "1.3.0",
+                "request": "GetMap",
+                "layers": DWD_SATELLITE_LAYER,
+                "styles": "raster",
+                "crs": "EPSG:4326",
+                "format": "image/png",
+                "transparent": "false",
+                "width": "480",
+                "height": "360",
+                # WMS 1.3 uses latitude,longitude axis order for EPSG:4326.
+                "bbox": ",".join(f"{item:g}" for item in bbox),
+                "time": timestamp.isoformat(timespec="seconds").replace("+00:00", "Z"),
+            }
+        )
+        payload, _content_type = self.fetcher.fetch(
+            f"{DWD_WMS_URL}?{query}",
+            max_bytes=2 * 1024 * 1024,
+            accepted_types=("image/*",),
+            timeout=12.0,
+        )
+        try:
+            with Image.open(BytesIO(payload)) as source:
+                if source.width * source.height > 4_000_000:
+                    raise ContentError("DWD satellite image dimensions exceed the safety limit")
+                source.verify()
+            with Image.open(BytesIO(payload)) as source:
+                image = source.convert("RGB")
+                image.thumbnail((480, 360), Image.Resampling.LANCZOS)
+        except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
+            raise ContentError(f"invalid DWD satellite image: {exc}") from exc
+        self.cache_root.mkdir(parents=True, exist_ok=True, mode=0o750)
+        encoded = BytesIO()
+        image.save(encoded, format="JPEG", quality=88, optimize=True)
+        temporary = output.with_suffix(".jpg.tmp")
+        temporary.write_bytes(encoded.getvalue())
+        os.replace(temporary, output)
+        return output
+
+    def refresh(
+        self,
+        channel_key: str,
+        bbox: tuple[float, float, float, float],
+    ) -> list[dict[str, object]]:
+        slug = self._slug(channel_key)
+        with self._lock:
+            cached = self.frames(slug)
+            now = time.monotonic()
+            if cached:
+                newest_mtime = max(
+                    (
+                        (self.cache_root / str(item["file"])).stat().st_mtime
+                        for item in cached
+                    ),
+                    default=0.0,
+                )
+                if (
+                    now - self._last_refresh.get(slug, 0.0) < WEATHER_REFRESH_SECONDS
+                    or time.time() - newest_mtime < WEATHER_REFRESH_SECONDS
+                ):
+                    return cached
+            try:
+                selected: list[datetime] = []
+                last_error: Exception | None = None
+                for timestamp in reversed(self._available_times()):
+                    try:
+                        self._fetch_frame(slug, bbox, timestamp)
+                    except (ContentError, OSError, ValueError) as exc:
+                        last_error = exc
+                        continue
+                    selected.append(timestamp)
+                    if len(selected) >= WEATHER_FRAME_COUNT:
+                        break
+                selected.sort()
+                if not selected:
+                    if last_error is not None:
+                        raise last_error
+                    raise ContentError("DWD returned no usable satellite frames")
+                keep = {
+                    f"weather-{slug}-{self._timestamp_name(timestamp)}.jpg"
+                    for timestamp in selected
+                }
+                for path in self.cache_root.glob(f"weather-{slug}-*.jpg"):
+                    if path.name not in keep:
+                        try:
+                            path.unlink()
+                        except OSError:
+                            pass
+                self._last_refresh[slug] = now
+            except (ContentError, OSError, ValueError):
+                if not cached:
+                    raise
+            return self.frames(slug)

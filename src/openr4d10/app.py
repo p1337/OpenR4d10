@@ -203,6 +203,15 @@ class OpenR4d10App:
                 {"action": "preset_step", "steps": event.steps}
             )
         elif (
+            self.services is not None
+            and event.control == Control.RIGHT_OUTER
+            and not menu_open
+            and self.services.active_service == "weather"
+        ):
+            media_result = self.services.control(
+                {"action": "weather_step", "steps": event.steps}
+            )
+        elif (
             event.control == Control.RIGHT_PRESS
             and event.held_seconds < 2.0
             and not menu_open
@@ -214,11 +223,16 @@ class OpenR4d10App:
                 isinstance(current_ui, dict)
                 and current_ui.get("service") == "RADIO"
             )
-            action = (
-                "radio_toggle"
-                if radio_selected or self.services.active_service == "webradio"
-                else "pause"
+            weather_selected = (
+                isinstance(current_ui, dict)
+                and current_ui.get("service") == "WEATHER"
             )
+            if weather_selected or self.services.active_service == "weather":
+                action = "weather_open"
+            elif radio_selected or self.services.active_service == "webradio":
+                action = "radio_toggle"
+            else:
+                action = "pause"
             media_result = self.services.control({"action": action})
         device_state = handler(event)
         if media_result is not None:
@@ -236,8 +250,12 @@ class OpenR4d10App:
             "device_ui": device_state,
         }
         if media_result is not None:
-            response["playback"] = media_result["playback"]
-            response["selected_preset"] = media_result.get("selected_preset")
+            if "playback" in media_result:
+                response["playback"] = media_result["playback"]
+            if "selected_preset" in media_result:
+                response["selected_preset"] = media_result.get("selected_preset")
+            if "channel_id" in media_result:
+                response["weather_channel_id"] = media_result["channel_id"]
         return response
 
     def device_screen(self) -> bytes | None:

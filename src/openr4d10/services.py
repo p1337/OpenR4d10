@@ -5,12 +5,21 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 import logging
 from pathlib import Path
+import re
 import shutil
 import threading
+import time
 from typing import Callable
+import uuid
 from urllib.parse import urlsplit
 
-from .content import CameraSnapshot, ContentError, FeedReader, PresetArtwork
+from .content import (
+    CameraSnapshot,
+    ContentError,
+    DwdSatelliteFrames,
+    FeedReader,
+    PresetArtwork,
+)
 from .media import MpvEngine, StreamRecorder, public_source_label, validate_media_source
 from .presets import FEED_BY_ID, FEED_PRESETS, RADIO_BY_ID, RADIO_PRESETS
 from .service_adapters import ServiceAdapterError, ServiceAdapterRegistry
@@ -22,7 +31,7 @@ MEDIA_EXTENSIONS = {
     ".aac", ".flac", ".m4a", ".mka", ".mp3", ".mp4", ".ogg", ".opus", ".wav",
 }
 DEFAULT_ENABLED_SERVICES = {
-    "system", "webradio", "local_media", "recorder", "rss", "webcam",
+    "system", "webradio", "weather", "local_media", "recorder", "rss", "webcam",
 }
 DISPLAY_BRIGHTNESS_KEY = "display.brightness_percent"
 DEFAULT_DISPLAY_BRIGHTNESS = 100
@@ -46,6 +55,7 @@ class ServiceManifest:
 BUILTIN_SERVICES = (
     ServiceManifest("system", "System", "core", "Status, updates and diagnostics", ("status", "diagnostics"), "native"),
     ServiceManifest("webradio", "Web Radio", "audio", "Internet radio playback and favorites", ("playback", "favorites", "recording"), "process", ("mpv",)),
+    ServiceManifest("weather", "Weather", "information", "DWD satellite image loops for configured regions", ("images", "channels"), "native"),
     ServiceManifest("local_media", "Local Media", "audio", "Local MP3, FLAC, MP4 and recordings", ("playback", "library"), "process", ("mpv",)),
     ServiceManifest("recorder", "Recorder", "audio", "Record supported audio sources", ("recording", "library"), "process", ("ffmpeg",)),
     ServiceManifest("brandmeister", "BrandMeister", "radio", "DMR audio over a configured lawful gateway", ("playback", "talkgroups", "recording"), "external", requires_credentials=True, credential_hint="Configure an individual BrandMeister-compatible account or gateway locally."),
@@ -79,6 +89,7 @@ class ServiceCatalog:
         feed_reader: FeedReader | None = None,
         camera: CameraSnapshot | None = None,
         artwork: PresetArtwork | None = None,
+        weather: DwdSatelliteFrames | None = None,
         adapter_directory: Path | None = None,
         adapter_registry: ServiceAdapterRegistry | None = None,
     ) -> None:
@@ -93,8 +104,13 @@ class ServiceCatalog:
         self.feed_reader = feed_reader or FeedReader()
         self.camera = camera or CameraSnapshot(state_directory / "cache")
         self.artwork = artwork or PresetArtwork(state_directory / "cache")
+        self.weather = weather or DwdSatelliteFrames(state_directory / "cache")
         self._artwork_pending: set[str] = set()
         self._artwork_guard = threading.Lock()
+        self._weather_pending: set[str] = set()
+        self._weather_guard = threading.Lock()
+        self._worker_threads: set[threading.Thread] = set()
+        self._worker_guard = threading.Lock()
         external_ids = {
             item.service_id
             for item in BUILTIN_SERVICES
@@ -112,6 +128,7 @@ class ServiceCatalog:
         self.active_service = "system"
         self.active_preset_id: str | None = None
         self.active_station_id: int | None = None
+        self.active_weather_channel_id: int | None = None
         self.store.ensure_services(
             tuple(item.service_id for item in BUILTIN_SERVICES),
             DEFAULT_ENABLED_SERVICES,
@@ -121,6 +138,25 @@ class ServiceCatalog:
             tuple((item.name, item.stream_url) for item in RADIO_PRESETS),
             marker="radio.defaults_seeded_v1",
         )
+        self.store.seed_channels_once(
+            "weather",
+            (
+                (
+                    "dwd-deutschland",
+                    "Deutschland",
+                    {"bbox": [47.0, 5.0, 55.5, 16.0], "provider": "DWD / EUMETSAT"},
+                ),
+                (
+                    "dwd-europa",
+                    "Europa",
+                    {"bbox": [30.0, -25.0, 72.0, 45.0], "provider": "DWD / EUMETSAT"},
+                ),
+            ),
+            marker="weather.defaults_seeded_v1",
+        )
+        weather_channels = self.store.channels("weather")
+        if weather_channels:
+            self.active_weather_channel_id = int(weather_channels[0]["id"])
 
     def display_brightness(self) -> int:
         value = self.store.get_setting(
@@ -145,7 +181,11 @@ class ServiceCatalog:
     def snapshot(self) -> dict[str, object]:
         states = self.store.service_states()
         services: list[dict[str, object]] = []
-        for manifest in BUILTIN_SERVICES:
+        manifests = sorted(
+            BUILTIN_SERVICES,
+            key=lambda item: (int(states[item.service_id]["position"]), item.service_id),
+        )
+        for manifest in manifests:
             state = states[manifest.service_id]
             missing = [
                 executable
@@ -213,6 +253,30 @@ class ServiceCatalog:
             }
             for item in self.store.media_items()
         ]
+        weather_channels = []
+        for channel, item in enumerate(self.store.channels("weather"), start=1):
+            metadata = item.get("metadata")
+            bbox = metadata.get("bbox") if isinstance(metadata, dict) else None
+            frames = self.weather.frames(str(item["external_id"]))
+            weather_channels.append(
+                {
+                    "id": int(item["id"]),
+                    "external_id": str(item["external_id"]),
+                    "name": str(item["name"]),
+                    "position": channel - 1,
+                    "channel": channel,
+                    "bbox": bbox,
+                    "provider": "DWD / EUMETSAT",
+                    "active": int(item["id"]) == self.active_weather_channel_id,
+                    "frames": [
+                        {
+                            **frame,
+                            "url": f"/api/weather-frame/{frame['file']}",
+                        }
+                        for frame in frames
+                    ],
+                }
+            )
         return {
             "schema_version": SCHEMA_VERSION,
             "settings": {
@@ -230,6 +294,12 @@ class ServiceCatalog:
                 "feeds": [item.public() for item in FEED_PRESETS],
             },
             "stations": stations,
+            "weather": {
+                "active_channel_id": self.active_weather_channel_id,
+                "channels": weather_channels,
+                "provider": "DWD / EUMETSAT",
+                "refresh_floor_seconds": 300,
+            },
             "media": media,
             "items": services,
         }
@@ -258,6 +328,15 @@ class ServiceCatalog:
                     self.recorder.stop()
             self.store.set_service_enabled(service_id, enabled)
             return {"service_id": service_id, "enabled": enabled}
+        if action == "service_move":
+            service_id = request.get("service_id")
+            direction = request.get("direction")
+            known = {item.service_id for item in BUILTIN_SERVICES}
+            if not isinstance(service_id, str) or service_id not in known:
+                raise ValueError("unknown service")
+            if isinstance(direction, bool) or not isinstance(direction, int):
+                raise ValueError("service_move requires an integer direction")
+            return {"moved": self.store.move_service(service_id, direction)}
         if action == "play":
             service_id = request.get("service_id", "webradio")
             source = request.get("source")
@@ -466,6 +545,94 @@ class ServiceCatalog:
             assert isinstance(cameras, dict)
             cameras[str(slot)] = camera
             return {"camera": camera}
+        elif action == "weather_channel_save":
+            self._require_enabled("weather")
+            channel_id = request.get("channel_id")
+            name = request.get("name")
+            bbox = self._weather_bbox(request.get("bbox"))
+            if not isinstance(name, str):
+                raise ValueError("weather_channel_save requires a name")
+            metadata = {"bbox": list(bbox), "provider": "DWD / EUMETSAT"}
+            if channel_id is None:
+                external_id = f"custom-{uuid.uuid4().hex[:12]}"
+                saved_id = self.store.add_channel("weather", external_id, name, metadata)
+            else:
+                if isinstance(channel_id, bool) or not isinstance(channel_id, int):
+                    raise ValueError("weather channel id must be an integer")
+                channel = self.store.channel(channel_id)
+                if channel is None or channel["service_id"] != "weather":
+                    raise ValueError("weather channel was not found")
+                self.store.update_channel(channel_id, name, metadata)
+                invalidate = getattr(self.weather, "invalidate", None)
+                if callable(invalidate):
+                    invalidate(str(channel["external_id"]))
+                saved_id = channel_id
+            return {"channel_id": saved_id}
+        elif action == "weather_channel_delete":
+            channel_id = request.get("channel_id")
+            if isinstance(channel_id, bool) or not isinstance(channel_id, int):
+                raise ValueError("weather_channel_delete requires an integer channel_id")
+            channel = self.store.channel(channel_id)
+            if channel is None or channel["service_id"] != "weather":
+                return {"deleted": False}
+            deleted = self.store.delete_channel(channel_id)
+            invalidate = getattr(self.weather, "invalidate", None)
+            if deleted and callable(invalidate):
+                invalidate(str(channel["external_id"]))
+            if deleted and self.active_weather_channel_id == channel_id:
+                remaining = self.store.channels("weather")
+                self.active_weather_channel_id = int(remaining[0]["id"]) if remaining else None
+                if not remaining:
+                    self.active_service = "system"
+            return {"deleted": deleted}
+        elif action == "weather_channel_move":
+            channel_id = request.get("channel_id")
+            direction = request.get("direction")
+            if isinstance(channel_id, bool) or not isinstance(channel_id, int):
+                raise ValueError("weather_channel_move requires an integer channel_id")
+            if isinstance(direction, bool) or not isinstance(direction, int):
+                raise ValueError("weather_channel_move requires an integer direction")
+            channel = self.store.channel(channel_id)
+            if channel is None or channel["service_id"] != "weather":
+                raise ValueError("weather channel was not found")
+            return {"moved": self.store.move_channel(channel_id, direction)}
+        elif action == "weather_open":
+            self._require_enabled("weather")
+            channel_id = request.get("channel_id", self.active_weather_channel_id)
+            self._select_weather_channel(channel_id)
+            self.active_service = "weather"
+            channel = self.store.channel(self.active_weather_channel_id)  # type: ignore[arg-type]
+            assert channel is not None
+            self._cache_weather(channel)
+            return {"active_service": "weather", "channel_id": self.active_weather_channel_id}
+        elif action == "weather_step":
+            self._require_enabled("weather")
+            steps = request.get("steps")
+            if isinstance(steps, bool) or not isinstance(steps, int) or steps == 0 or abs(steps) > 10:
+                raise ValueError("weather steps must be between -10 and 10, excluding zero")
+            channels = self.store.channels("weather")
+            if not channels:
+                raise ValueError("the weather channel list is empty")
+            ids = [int(item["id"]) for item in channels]
+            current = ids.index(self.active_weather_channel_id) if self.active_weather_channel_id in ids else 0
+            self.active_weather_channel_id = ids[(current + steps) % len(ids)]
+            self.active_service = "weather"
+            selected = self.store.channel(self.active_weather_channel_id)
+            assert selected is not None
+            self._cache_weather(selected)
+            return {"active_service": "weather", "channel_id": self.active_weather_channel_id}
+        elif action == "weather_refresh":
+            self._require_enabled("weather")
+            channel_id = request.get("channel_id", self.active_weather_channel_id)
+            self._select_weather_channel(channel_id)
+            channel = self.store.channel(self.active_weather_channel_id)  # type: ignore[arg-type]
+            assert channel is not None
+            frames = self.weather.refresh(
+                str(channel["external_id"]),
+                self._weather_bbox(channel["metadata"].get("bbox")),
+            )
+            self.active_service = "weather"
+            return {"channel_id": self.active_weather_channel_id, "frames": len(frames)}
         else:
             raise ValueError("unsupported control action")
         return {
@@ -513,11 +680,7 @@ class ServiceCatalog:
                 with self._artwork_guard:
                     self._artwork_pending.discard(preset_id)
 
-        threading.Thread(
-            target=cache,
-            name=f"openr4d10-artwork-{preset_id}",
-            daemon=True,
-        ).start()
+        self._start_worker(f"openr4d10-artwork-{preset_id}", cache)
 
     def _selected_preset(self) -> dict[str, object] | None:
         if self.active_station_id is None:
@@ -550,6 +713,61 @@ class ServiceCatalog:
     def _require_enabled(self, service_id: str) -> None:
         if not self.store.service_enabled(service_id):
             raise ValueError(f"service is disabled: {service_id}")
+
+    @staticmethod
+    def _weather_bbox(value: object) -> tuple[float, float, float, float]:
+        if not isinstance(value, (list, tuple)) or len(value) != 4:
+            raise ValueError("weather bbox must contain south, west, north and east")
+        if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in value):
+            raise ValueError("weather bbox values must be numbers")
+        south, west, north, east = (float(item) for item in value)
+        if not (-90 <= south < north <= 90 and -180 <= west < east <= 180):
+            raise ValueError("weather bbox is outside valid latitude/longitude bounds")
+        if not (23 <= south < north <= 77 and -54 <= west < east <= 54):
+            raise ValueError("weather bbox is outside the DWD METEOSAT layer coverage")
+        return south, west, north, east
+
+    def _select_weather_channel(self, channel_id: object) -> None:
+        if isinstance(channel_id, bool) or not isinstance(channel_id, int):
+            raise ValueError("weather channel id must be an integer")
+        channel = self.store.channel(channel_id)
+        if channel is None or channel["service_id"] != "weather":
+            raise ValueError("weather channel was not found")
+        self.active_weather_channel_id = channel_id
+
+    def _cache_weather(self, channel: dict[str, object]) -> None:
+        key = str(channel["external_id"])
+        with self._weather_guard:
+            if key in self._weather_pending:
+                return
+            self._weather_pending.add(key)
+
+        def cache() -> None:
+            try:
+                metadata = channel.get("metadata")
+                if not isinstance(metadata, dict):
+                    raise ValueError("weather channel metadata is invalid")
+                self.weather.refresh(key, self._weather_bbox(metadata.get("bbox")))
+            except (ContentError, OSError, ValueError) as exc:
+                LOG.warning("DWD weather frames unavailable for %s: %s", key, exc)
+            finally:
+                with self._weather_guard:
+                    self._weather_pending.discard(key)
+
+        self._start_worker(f"openr4d10-weather-{key}", cache)
+
+    def _start_worker(self, name: str, target: Callable[[], None]) -> None:
+        def run() -> None:
+            try:
+                target()
+            finally:
+                with self._worker_guard:
+                    self._worker_threads.discard(threading.current_thread())
+
+        worker = threading.Thread(target=run, name=name, daemon=True)
+        with self._worker_guard:
+            self._worker_threads.add(worker)
+        worker.start()
 
     def scan_media(self) -> int:
         self.media_root.mkdir(parents=True, exist_ok=True, mode=0o750)
@@ -589,6 +807,8 @@ class ServiceCatalog:
             except (ContentError, OSError, ValueError) as exc:
                 LOG.warning("Station artwork unavailable for %s: %s", preset_id, exc)
                 return None
+        elif re.fullmatch(r"weather-[a-z][a-z0-9_-]{1,63}-\d{8}T\d{6}Z\.jpg", path):
+            target = self.weather.cache_root / path
         else:
             return None
         try:
@@ -597,6 +817,24 @@ class ServiceCatalog:
             return None
 
     def receiver_overlay(self) -> dict[str, object]:
+        if self.active_service == "weather" and self.active_weather_channel_id is not None:
+            channel = self.store.channel(self.active_weather_channel_id)
+            if channel is not None:
+                channels = self.store.channels("weather")
+                ids = [int(item["id"]) for item in channels]
+                frames = self.weather.frames(str(channel["external_id"]))
+                frame = frames[int(time.monotonic() / 2) % len(frames)] if frames else None
+                return {
+                    "service": "WEATHER",
+                    "station": str(channel["name"]),
+                    "title": "DWD / EUMETSAT",
+                    "subtitle": (
+                        str(frame["timestamp"]) if frame is not None else "Satellitenbilder werden geladen"
+                    ),
+                    "playing": bool(frames),
+                    "channel": ids.index(self.active_weather_channel_id) + 1 if self.active_weather_channel_id in ids else 1,
+                    "image_file": str(frame["file"]) if frame is not None else None,
+                }
         playback = self.player.state
         if playback.state not in {"playing", "paused"}:
             return {}
@@ -623,6 +861,17 @@ class ServiceCatalog:
         }
 
     def close(self) -> None:
+        deadline = time.monotonic() + 15.0
+        while True:
+            with self._worker_guard:
+                workers = tuple(self._worker_threads)
+            if not workers:
+                break
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            for worker in workers:
+                worker.join(timeout=max(0.0, remaining / len(workers)))
         self.recorder.close()
         self.player.close()
         self.store.close()

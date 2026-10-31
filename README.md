@@ -33,6 +33,8 @@ the installer report exactly which adapters still need configuration.
 - runtime data in `/run/openr4d10` and state in `/var/lib/openr4d10`
 - versioned SQLite state for non-secret settings, services, stations, channels,
   media and recordings
+- native DWD METEOSAT weather loops for Germany and Europe with bounded local
+  frame caching plus persistent channel and service priority
 - central catalog covering all specified service modules with honest dependency,
   adapter and local-login readiness
 - persistent enable/disable lifecycle for native and external service modules
@@ -54,6 +56,9 @@ Hardware-specific integration still pending:
 
 Those values must come from the exact hardware documentation. See
 [`docs/HARDWARE.md`](docs/HARDWARE.md).
+
+The verified DWD product, request limits, attribution and cache contract are
+documented in [`docs/WEATHER.md`](docs/WEATHER.md).
 
 ## Install
 

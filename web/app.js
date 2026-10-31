@@ -1,5 +1,10 @@
 const byId = (id) => document.getElementById(id);
 let presetSignature = "";
+let weatherSignature = "";
+let weatherAnimationFrames = [];
+let weatherAnimationIndex = 0;
+let latestWeather = null;
+let weatherRefreshPending = false;
 
 function activateTab(name) {
   for (const button of document.querySelectorAll("[data-tab]")) {
@@ -8,10 +13,15 @@ function activateTab(name) {
   for (const panel of document.querySelectorAll("[data-tab-panel]")) {
     panel.hidden = panel.dataset.tabPanel !== name;
   }
+  if (name === "weather") ensureWeatherFrames();
 }
 
 for (const button of document.querySelectorAll("[data-tab]")) {
   button.addEventListener("click", () => activateTab(button.dataset.tab));
+}
+const requestedTab = new URLSearchParams(window.location.search).get("tab");
+if ([...document.querySelectorAll("[data-tab]")].some((item) => item.dataset.tab === requestedTab)) {
+  activateTab(requestedTab);
 }
 
 function refreshDeviceScreen() {
@@ -74,7 +84,7 @@ function renderServices(catalog) {
   const items = Array.isArray(catalog?.items) ? catalog.items : [];
   grid.replaceChildren();
   setText("service-count", items.length ? `${catalog.ready}/${catalog.total} bereit` : "Keine Daten");
-  for (const service of items) {
+  items.forEach((service, index) => {
     const card = document.createElement("article");
     card.className = "service-card";
     card.dataset.readiness = service.readiness;
@@ -98,6 +108,13 @@ function renderServices(catalog) {
           ? "Offizielle Anmeldung erforderlich"
           : "Lokaler Adapter";
     card.append(heading, description, detail);
+    const actions = document.createElement("div");
+    actions.className = "service-card-actions";
+    const up = libraryButton("↑", "service_move", { service_id: service.service_id, direction: -1 });
+    const down = libraryButton("↓", "service_move", { service_id: service.service_id, direction: 1 });
+    up.disabled = index === 0;
+    down.disabled = index === items.length - 1;
+    actions.append(up, down);
     if (service.service_id !== "system") {
       const toggle = document.createElement("button");
       toggle.type = "button";
@@ -106,12 +123,137 @@ function renderServices(catalog) {
         service_id: service.service_id,
         enabled: !service.enabled,
       }));
-      card.append(toggle);
+      actions.append(toggle);
     }
+    card.append(actions);
     grid.append(card);
-  }
+  });
   renderPresets(catalog);
   renderLibrary(catalog);
+  renderWeather(catalog);
+}
+
+function setWeatherAnimation(frames) {
+  weatherAnimationFrames = Array.isArray(frames) ? frames : [];
+  weatherAnimationIndex = 0;
+  showWeatherFrame();
+}
+
+function showWeatherFrame() {
+  const image = byId("weather-image");
+  const empty = byId("weather-empty");
+  if (!weatherAnimationFrames.length) {
+    image.hidden = true;
+    empty.hidden = false;
+    setText("weather-frame-time", "Noch keine Frames im lokalen Cache");
+    return;
+  }
+  const frame = weatherAnimationFrames[weatherAnimationIndex % weatherAnimationFrames.length];
+  image.src = frame.url;
+  image.hidden = false;
+  empty.hidden = true;
+  setText("weather-frame-time", `${frame.timestamp} · Frame ${weatherAnimationIndex + 1}/${weatherAnimationFrames.length}`);
+}
+
+function renderWeather(catalog) {
+  const weather = catalog?.weather || {};
+  const channels = Array.isArray(weather.channels) ? weather.channels : [];
+  latestWeather = weather;
+  const selected = channels.find((item) => item.id === weather.active_channel_id) || channels[0] || null;
+  const signature = JSON.stringify([channels, weather.active_channel_id]);
+  if (signature !== weatherSignature) {
+    weatherSignature = signature;
+    setText("weather-channel-name", selected?.name, "Kein Wetterkanal");
+    setWeatherAnimation(selected?.frames || []);
+  }
+  const list = byId("weather-channel-list");
+  list.replaceChildren();
+  channels.forEach((channel, index) => {
+    const row = document.createElement("li");
+    if (channel.id === weather.active_channel_id) row.dataset.active = "true";
+    const copy = document.createElement("span");
+    const name = document.createElement("strong");
+    name.textContent = `${channel.channel}. ${channel.name}`;
+    const bbox = document.createElement("small");
+    bbox.textContent = Array.isArray(channel.bbox) ? `S/W/N/O ${channel.bbox.join(" / ")}` : "Ausschnitt nicht konfiguriert";
+    copy.append(name, bbox);
+    const actions = document.createElement("span");
+    actions.className = "library-actions";
+    const up = libraryButton("↑", "weather_channel_move", { channel_id: channel.id, direction: -1 });
+    const down = libraryButton("↓", "weather_channel_move", { channel_id: channel.id, direction: 1 });
+    up.disabled = index === 0;
+    down.disabled = index === channels.length - 1;
+    const open = document.createElement("button");
+    open.type = "button";
+    open.textContent = "Anzeigen";
+    open.addEventListener("click", () => weatherCommand("weather_open", { channel_id: channel.id }, true));
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.textContent = "Ändern";
+    edit.addEventListener("click", () => editWeatherChannel(channel));
+    actions.append(open, up, down, edit, libraryButton("Löschen", "weather_channel_delete", { channel_id: channel.id }));
+    row.append(copy, actions);
+    list.append(row);
+  });
+  if (!channels.length) {
+    const row = document.createElement("li");
+    row.textContent = "Keine Wetterkanäle konfiguriert.";
+    list.append(row);
+  }
+  const weatherPanel = document.querySelector('[data-tab-panel="weather"]');
+  if (weatherPanel && !weatherPanel.hidden && selected && !selected.frames?.length) {
+    window.setTimeout(ensureWeatherFrames, 0);
+  }
+}
+
+async function weatherCommand(action, extra = {}, refreshFrames = false) {
+  const output = byId("weather-status");
+  output.textContent = refreshFrames ? "DWD-Bilder werden aktualisiert …" : "Änderung wird gespeichert …";
+  try {
+    const response = await fetch("/api/control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...extra }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    if (refreshFrames) {
+      await fetch("/api/control", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "weather_refresh", channel_id: payload.channel_id || extra.channel_id }),
+      }).then(async (item) => {
+        const body = await item.json();
+        if (!item.ok) throw new Error(body.error || `HTTP ${item.status}`);
+        output.textContent = `${body.frames} DWD-Frames lokal bereit.`;
+      });
+    } else {
+      output.textContent = "Wetterkonfiguration gespeichert.";
+    }
+    await refresh();
+  } catch (error) {
+    output.textContent = `Wetterfehler: ${error.message}`;
+  } finally {
+    weatherRefreshPending = false;
+  }
+}
+
+function ensureWeatherFrames() {
+  if (weatherRefreshPending) return;
+  const channels = Array.isArray(latestWeather?.channels) ? latestWeather.channels : [];
+  const selected = channels.find((item) => item.id === latestWeather?.active_channel_id) || channels[0];
+  if (!selected || selected.frames?.length) return;
+  weatherRefreshPending = true;
+  weatherCommand("weather_open", { channel_id: selected.id }, true);
+}
+
+function editWeatherChannel(channel) {
+  byId("weather-channel-id").value = String(channel.id);
+  byId("weather-channel-name-input").value = channel.name;
+  const bbox = Array.isArray(channel.bbox) ? channel.bbox : ["", "", "", ""];
+  ["weather-south", "weather-west", "weather-north", "weather-east"].forEach((id, index) => {
+    byId(id).value = String(bbox[index] ?? "");
+  });
 }
 
 function initials(value) {
@@ -393,7 +535,7 @@ async function refresh() {
 }
 
 async function sendControl(action, extra = {}) {
-  const output = byId("control-result");
+  const output = action.startsWith("weather_") ? byId("weather-status") : byId("control-result");
   try {
     const response = await fetch("/api/control", {
       method: "POST",
@@ -409,9 +551,9 @@ async function sendControl(action, extra = {}) {
     } else if (Number.isInteger(payload.station_id)) {
       output.textContent = "Sender gespeichert.";
     } else if (typeof payload.deleted === "boolean") {
-      output.textContent = payload.deleted ? "Sender gelöscht." : "Sender nicht gefunden.";
+      output.textContent = payload.deleted ? "Eintrag gelöscht." : "Eintrag nicht gefunden.";
     } else if (typeof payload.moved === "boolean") {
-      output.textContent = payload.moved ? "Senderreihenfolge gespeichert." : "Sender ist bereits am Listenrand.";
+      output.textContent = payload.moved ? "Reihenfolge gespeichert." : "Eintrag ist bereits am Listenrand.";
     } else {
       output.textContent = `${payload.playback?.state || "stopped"} · ${payload.recording?.state || "stopped"}`;
     }
@@ -686,5 +828,40 @@ byId("camera-control").addEventListener("submit", async (event) => {
   }
 });
 
+byId("weather-refresh").addEventListener("click", () => {
+  const channels = Array.isArray(latestWeather?.channels) ? latestWeather.channels : [];
+  const selected = channels.find((item) => item.id === latestWeather?.active_channel_id) || channels[0];
+  if (!selected) {
+    byId("weather-status").textContent = "Zuerst einen Wetterkanal anlegen.";
+    return;
+  }
+  weatherRefreshPending = true;
+  weatherCommand("weather_open", { channel_id: selected.id }, true);
+});
+
+byId("weather-channel-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const rawId = byId("weather-channel-id").value;
+  const request = {
+    name: byId("weather-channel-name-input").value,
+    bbox: ["weather-south", "weather-west", "weather-north", "weather-east"].map((id) => Number(byId(id).value)),
+  };
+  if (rawId) request.channel_id = Number(rawId);
+  await weatherCommand("weather_channel_save", request);
+  event.currentTarget.reset();
+  byId("weather-channel-id").value = "";
+});
+
+byId("weather-channel-cancel").addEventListener("click", () => {
+  byId("weather-channel-form").reset();
+  byId("weather-channel-id").value = "";
+  byId("weather-status").textContent = "Neuer Ausschnitt kann angelegt werden.";
+});
+
 refresh();
 window.setInterval(refresh, 2000);
+window.setInterval(() => {
+  if (!weatherAnimationFrames.length) return;
+  weatherAnimationIndex = (weatherAnimationIndex + 1) % weatherAnimationFrames.length;
+  showWeatherFrame();
+}, 1400);

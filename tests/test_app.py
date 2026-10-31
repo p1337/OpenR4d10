@@ -360,6 +360,61 @@ class AppTests(unittest.TestCase):
             [Control.RIGHT_OUTER, Control.RIGHT_PRESS],
         )
 
+    def test_weather_enter_and_channel_axis_use_weather_controls(self) -> None:
+        class InputDisplay:
+            def render(self, _frame) -> None:
+                pass
+
+            def snapshot(self):
+                return {"service": "WEATHER", "menu_open": False}
+
+            def apply_input(self, _event):
+                return self.snapshot()
+
+        class Services:
+            active_service = "system"
+
+            def __init__(self):
+                self.requests = []
+
+            def control(self, request):
+                self.requests.append(request)
+                self.active_service = "weather"
+                return {"active_service": "weather", "channel_id": 2}
+
+            def receiver_overlay(self):
+                return {"service": "WEATHER", "station": "Europa", "channel": 2}
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=InputDisplay(),
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,
+            )
+            opened = app.control({"action": "device_input", "control": "right_press"})
+            stepped = app.control(
+                {"action": "device_input", "control": "right_outer", "steps": 1}
+            )
+
+        self.assertEqual(
+            services.requests,
+            [{"action": "weather_open"}, {"action": "weather_step", "steps": 1}],
+        )
+        self.assertEqual(opened["weather_channel_id"], 2)
+        self.assertEqual(stepped["weather_channel_id"], 2)
+
     def test_enter_starts_radio_when_radio_ui_is_selected_and_player_stopped(self) -> None:
         class InputDisplay:
             def render(self, _frame) -> None:

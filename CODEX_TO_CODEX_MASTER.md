@@ -510,6 +510,15 @@ gelangen ausschließlich über geprüfte Pull/Merge Requests in den Katalog.
 
 - BrandMeister/DMR-Audio über IP zum Hören,
 - Webradio,
+- Wetter als nativer Informationsdienst. Die Grundausstattung besteht zunächst
+  aus genau zwei sortierbaren DWD-METEOSAT-Kanälen: Deutschland und Europa.
+  Beide zeigen die jüngsten verfügbaren Satellitenbilder als endlose lokale
+  Bildfolge. Grundlage ist ausschließlich der offizielle DWD-WMS-Layer
+  `Satellite_meteosat_1km_euat_rgb_day_hrv_and_night_ir108_3h`; Deutschland
+  ist ein begrenzter Ausschnitt desselben Produkts. Die Quellenangabe nennt
+  DWD und EUMETSAT. Der Abruf von Fähigkeiten beziehungsweise neuen Daten darf
+  nicht häufiger als alle fünf Minuten erfolgen. Bei Netz- oder DWD-Ausfall
+  bleiben bereits sicher dekodierte lokale Frames verwendbar,
 - YouTube-Audio innerhalb der technisch und rechtlich verfügbaren Schnittstellen,
 - Mumble-Client mit Push-to-Talk,
 - Discord-Client mit Push-to-Talk,
@@ -559,6 +568,7 @@ In der Datenbank liegen:
 - Bluetooth-Geräteinformationen soweit zulässig,
 - installierte Module, Versionen und Zustände,
 - Dienstkonfigurationen,
+- aktivierte Dienste und deren benutzerdefinierte Priorität/Reihenfolge,
 - Sender, Kanäle, Favoriten und Verlauf,
 - Audio-Routing,
 - Aufnahme- und Mediendaten-Metadaten.
@@ -622,6 +632,15 @@ Sie ist keine endlose Einzelseite. Die großen Funktionsgruppen werden in klar
 beschriftete Tabs beziehungsweise gleichwertige getrennte Ansichten gegliedert,
 insbesondere Radio, Medien/Feeds, Gerät, System und Dienste. Ein Tabwechsel
 verändert keine Wiedergabe und lädt die Anwendung nicht neu.
+
+Der Wetterdienst besitzt einen eigenen Tab. Er spielt den ausgewählten
+Satellitenkanal als Endlosschleife aus lokal begrenzt geladenen und neu
+codierten Einzelbildern ab. Die beiden Standardkanäle werden nur beim ersten
+Lauf angelegt; ihre Reihenfolge und spätere Benutzeränderungen liegen wie die
+Radiosender dauerhaft in SQLite und werden durch Updates nicht zurückgesetzt.
+Im Dienst-Tab lassen sich alle Dienste aktivieren, deaktivieren und in ihrer
+Priorität nach oben oder unten verschieben. Die Reihenfolge ist damit keine
+fest verdrahtete Browserdarstellung.
 
 Auf breiten Browserfenstern bleibt rechts oben eine nicht mitscrollende native
 240-x-280-Liveansicht sichtbar. Sie zeigt die Pixel desselben Pillow-Renderers,
@@ -861,6 +880,23 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-31 – DWD-Satellitenwetter und persistente Dienstpriorität
+
+- Robert verlangt einen konfigurierbaren Wetterdienst. Die erste Ausbaustufe
+  besteht aus den beiden DWD-METEOSAT-Bildkanälen Deutschland und Europa; die
+  jüngsten verfügbaren 3-Stunden-Frames laufen jeweils in einer Endlosschleife.
+- Die Anwendung verwendet den offiziellen DWD-WMS-Dienst, hält mindestens fünf
+  Minuten Abstand zwischen Aktualitätsabfragen, validiert und codiert jedes
+  Bild lokal neu und zeigt bei einem Ausfall weiterhin den letzten sicheren
+  Cache. Sichtbar bleibt der Quellenvermerk `DWD / EUMETSAT`.
+- Wetterkanäle und Dienste erhalten eine dauerhafte Reihenfolge in der
+  versionierten SQLite-Datenbank. Benutzer dürfen sie verschieben,
+  priorisieren und konfigurieren; ein Softwareupdate stellt absichtlich
+  geänderte Reihenfolgen oder gelöschte Standardkanäle nicht wieder her.
+- Der rechte äußere Regler wechselt im aktiven Wetterdienst zyklisch zwischen
+  den Wetterkanälen. Der Browser erhält einen eigenen Wetter-Tab; die native
+  Geräteansicht verwendet dieselben lokal gecachten Frames.
 
 ### 2026-10-31 – Scrollbares Hauptmenü, PTT-Zurück und oranges Grundthema
 

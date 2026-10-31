@@ -5,6 +5,10 @@ BrandMeister, Mumble, Discord, Telegram, Spotify or other external adapter must
 run as its own unprivileged system service and expose protocol version 1 on a
 local Unix stream socket.
 
+Weather is a native, credential-free core service and does not use this
+external adapter contract. It is restricted to the official DWD WMS endpoint,
+locally re-encodes all frames and exposes only local cache paths to the UI.
+
 This is an integration boundary, not a claim that an account has already been
 configured. The dashboard reports an external service as ready only after its
 manifest exists, its socket accepts a connection and its `status` response

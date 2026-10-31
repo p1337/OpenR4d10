@@ -13,7 +13,7 @@ import threading
 from typing import Any
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 _SECRET_KEY = re.compile(
     r"(^|[._-])(password|passwd|token|secret|api[_-]?key|private[_-]?key)($|[._-])",
     re.IGNORECASE,
@@ -89,6 +89,11 @@ UPDATE service_state SET enabled = 1, updated_at = CURRENT_TIMESTAMP
 WHERE service_id IN ('system', 'webradio', 'local_media', 'recorder', 'rss', 'webcam');
 """
 
+MIGRATION_3 = """
+ALTER TABLE service_state ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE channels ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
+"""
+
 
 def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
@@ -137,6 +142,15 @@ class StateStore:
                     (2, _now()),
                 )
                 self.connection.execute("PRAGMA user_version = 2")
+            current = 2
+        if current < 3:
+            with self.transaction():
+                self.connection.executescript(MIGRATION_3)
+                self.connection.execute(
+                    "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+                    (3, _now()),
+                )
+                self.connection.execute("PRAGMA user_version = 3")
 
     @contextmanager
     def transaction(self) -> Iterator[None]:
@@ -177,14 +191,36 @@ class StateStore:
         now = _now()
         enabled = default_enabled or set()
         with self.transaction():
+            existing_rows = self.connection.execute(
+                "SELECT service_id, position FROM service_state"
+            ).fetchall()
+            existing = {str(row["service_id"]) for row in existing_rows}
+            reset_positions = bool(existing_rows) and all(
+                int(row["position"]) == 0 for row in existing_rows
+            )
+            next_position = (
+                max((int(row["position"]) for row in existing_rows), default=-1) + 1
+            )
+            inserts = []
+            for position, service_id in enumerate(service_ids):
+                assigned = position
+                if existing_rows and not reset_positions and service_id not in existing:
+                    assigned = next_position
+                    next_position += 1
+                inserts.append((service_id, int(service_id in enabled), now, assigned))
             self.connection.executemany(
                 """
                 INSERT OR IGNORE INTO service_state(
-                    service_id, enabled, config_state, updated_at
-                ) VALUES (?, ?, 'not_configured', ?)
+                    service_id, enabled, config_state, updated_at, position
+                ) VALUES (?, ?, 'not_configured', ?, ?)
                 """,
-                ((service_id, int(service_id in enabled), now) for service_id in service_ids),
+                inserts,
             )
+            if reset_positions:
+                self.connection.executemany(
+                    "UPDATE service_state SET position = ? WHERE service_id = ?",
+                    ((position, service_id) for position, service_id in enumerate(service_ids)),
+                )
 
     def set_service_enabled(self, service_id: str, enabled: bool) -> None:
         if not service_id or not isinstance(enabled, bool):
@@ -210,8 +246,8 @@ class StateStore:
         with self._lock:
             rows = self.connection.execute(
                 """
-                SELECT service_id, enabled, config_state, last_error, updated_at
-                FROM service_state ORDER BY service_id
+                SELECT service_id, enabled, config_state, last_error, updated_at, position
+                FROM service_state ORDER BY position, service_id
                 """
             ).fetchall()
             return {
@@ -220,9 +256,219 @@ class StateStore:
                     "config_state": str(row["config_state"]),
                     "last_error": row["last_error"],
                     "updated_at": str(row["updated_at"]),
+                    "position": int(row["position"]),
                 }
                 for row in rows
             }
+
+    def move_service(self, service_id: str, direction: int) -> bool:
+        if direction not in {-1, 1}:
+            raise ValueError("service direction must be -1 or 1")
+        with self.transaction():
+            rows = self.connection.execute(
+                "SELECT service_id FROM service_state ORDER BY position, service_id"
+            ).fetchall()
+            ordered = [str(row["service_id"]) for row in rows]
+            if service_id not in ordered:
+                return False
+            current = ordered.index(service_id)
+            target = current + direction
+            if target < 0 or target >= len(ordered):
+                return False
+            ordered[current], ordered[target] = ordered[target], ordered[current]
+            self.connection.executemany(
+                "UPDATE service_state SET position = ?, updated_at = ? WHERE service_id = ?",
+                ((position, _now(), item) for position, item in enumerate(ordered)),
+            )
+            return True
+
+    def seed_channels_once(
+        self,
+        service_id: str,
+        channels: tuple[tuple[str, str, dict[str, Any]], ...],
+        *,
+        marker: str,
+    ) -> bool:
+        """Seed an ordered channel list once and preserve later user changes."""
+        if not service_id or not marker or _SECRET_KEY.search(marker):
+            raise ValueError("channel seed service and non-secret marker are required")
+        with self.transaction():
+            seeded = self.connection.execute(
+                "SELECT value_json FROM settings WHERE key = ?", (marker,)
+            ).fetchone()
+            if seeded is not None and json.loads(seeded["value_json"]) is True:
+                return False
+            existing = self.connection.execute(
+                "SELECT id, external_id FROM channels WHERE service_id = ? ORDER BY position, id",
+                (service_id,),
+            ).fetchall()
+            by_external = {
+                str(row["external_id"]): int(row["id"]) for row in existing
+            }
+            ordered_ids: list[int] = []
+            for external_id, name, metadata in channels:
+                channel_id = by_external.get(external_id)
+                if channel_id is None:
+                    cursor = self.connection.execute(
+                        """
+                        INSERT INTO channels(
+                            service_id, external_id, name, metadata_json, position
+                        ) VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (
+                            service_id,
+                            external_id,
+                            name,
+                            json.dumps(metadata, ensure_ascii=False, separators=(",", ":")),
+                            len(ordered_ids),
+                        ),
+                    )
+                    channel_id = int(cursor.lastrowid)
+                ordered_ids.append(channel_id)
+            ordered_ids.extend(
+                int(row["id"])
+                for row in existing
+                if int(row["id"]) not in ordered_ids
+            )
+            self.connection.executemany(
+                "UPDATE channels SET position = ? WHERE id = ?",
+                ((position, channel_id) for position, channel_id in enumerate(ordered_ids)),
+            )
+            self.connection.execute(
+                """
+                INSERT INTO settings(key, value_json, updated_at) VALUES (?, 'true', ?)
+                ON CONFLICT(key) DO UPDATE SET value_json = 'true', updated_at = excluded.updated_at
+                """,
+                (marker, _now()),
+            )
+            return True
+
+    def channels(self, service_id: str) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self.connection.execute(
+                """
+                SELECT id, service_id, external_id, name, favorite, metadata_json, position
+                FROM channels WHERE service_id = ? ORDER BY position, id LIMIT 500
+                """,
+                (service_id,),
+            ).fetchall()
+        return [
+            {
+                **dict(row),
+                "metadata": json.loads(str(row["metadata_json"])),
+            }
+            for row in rows
+        ]
+
+    def channel(self, channel_id: int) -> dict[str, Any] | None:
+        with self._lock:
+            row = self.connection.execute(
+                """
+                SELECT id, service_id, external_id, name, favorite, metadata_json, position
+                FROM channels WHERE id = ?
+                """,
+                (channel_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return {**dict(row), "metadata": json.loads(str(row["metadata_json"]))}
+
+    def add_channel(
+        self,
+        service_id: str,
+        external_id: str,
+        name: str,
+        metadata: dict[str, Any],
+    ) -> int:
+        if not service_id or not external_id or not name.strip() or len(name) > 160:
+            raise ValueError("channel service, id and name are required")
+        with self.transaction():
+            existing = self.connection.execute(
+                "SELECT id FROM channels WHERE service_id = ? AND external_id = ?",
+                (service_id, external_id),
+            ).fetchone()
+            if existing is not None:
+                return int(existing["id"])
+            last = self.connection.execute(
+                "SELECT MAX(position) AS position FROM channels WHERE service_id = ?",
+                (service_id,),
+            ).fetchone()
+            position = 0 if last is None or last["position"] is None else int(last["position"]) + 1
+            cursor = self.connection.execute(
+                """
+                INSERT INTO channels(service_id, external_id, name, metadata_json, position)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    service_id,
+                    external_id,
+                    name.strip(),
+                    json.dumps(metadata, ensure_ascii=False, separators=(",", ":")),
+                    position,
+                ),
+            )
+            return int(cursor.lastrowid)
+
+    def update_channel(self, channel_id: int, name: str, metadata: dict[str, Any]) -> bool:
+        if not name.strip() or len(name) > 160:
+            raise ValueError("channel name is required")
+        with self.transaction():
+            cursor = self.connection.execute(
+                "UPDATE channels SET name = ?, metadata_json = ? WHERE id = ?",
+                (
+                    name.strip(),
+                    json.dumps(metadata, ensure_ascii=False, separators=(",", ":")),
+                    channel_id,
+                ),
+            )
+            return cursor.rowcount == 1
+
+    def delete_channel(self, channel_id: int) -> bool:
+        with self.transaction():
+            row = self.connection.execute(
+                "SELECT service_id FROM channels WHERE id = ?", (channel_id,)
+            ).fetchone()
+            if row is None:
+                return False
+            cursor = self.connection.execute("DELETE FROM channels WHERE id = ?", (channel_id,))
+            self._resequence_channels(str(row["service_id"]))
+            return cursor.rowcount == 1
+
+    def move_channel(self, channel_id: int, direction: int) -> bool:
+        if direction not in {-1, 1}:
+            raise ValueError("channel direction must be -1 or 1")
+        with self.transaction():
+            row = self.connection.execute(
+                "SELECT service_id FROM channels WHERE id = ?", (channel_id,)
+            ).fetchone()
+            if row is None:
+                return False
+            service_id = str(row["service_id"])
+            rows = self.connection.execute(
+                "SELECT id FROM channels WHERE service_id = ? ORDER BY position, id",
+                (service_id,),
+            ).fetchall()
+            ordered = [int(item["id"]) for item in rows]
+            current = ordered.index(channel_id)
+            target = current + direction
+            if target < 0 or target >= len(ordered):
+                return False
+            ordered[current], ordered[target] = ordered[target], ordered[current]
+            self.connection.executemany(
+                "UPDATE channels SET position = ? WHERE id = ?",
+                ((position, item_id) for position, item_id in enumerate(ordered)),
+            )
+            return True
+
+    def _resequence_channels(self, service_id: str) -> None:
+        rows = self.connection.execute(
+            "SELECT id FROM channels WHERE service_id = ? ORDER BY position, id",
+            (service_id,),
+        ).fetchall()
+        self.connection.executemany(
+            "UPDATE channels SET position = ? WHERE id = ?",
+            ((position, int(row["id"])) for position, row in enumerate(rows)),
+        )
 
     def seed_stations_once(
         self,

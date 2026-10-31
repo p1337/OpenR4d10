@@ -71,6 +71,8 @@ files in `web/` plus the following endpoints:
 - `/api/camera/1` and `/api/camera/2` — locally re-encoded camera snapshots
 - `/api/radio-art/<preset-id>` — bounded, locally re-encoded preset artwork
 - `/api/device-screen.png` — exact current native 240 × 280 renderer output
+- `/api/weather-frame/<validated-cache-name>` — locally decoded and re-encoded
+  DWD satellite frame; remote WMS URLs are never browser image URLs
 
 The control endpoint accepts only JSON up to 4096 bytes, rejects mismatched
 browser origins and never accepts or stores credentials. It supports explicit
@@ -135,6 +137,15 @@ internal stream or feed URL. Normal radio UI control uses `station_play`,
 Update source definitions and their evidence together in
 [`PRESETS.md`](PRESETS.md), then test the current addresses without adding
 cookies, tokens or signed URLs.
+
+Weather controls use `weather_open`, `weather_step`, `weather_refresh`,
+`weather_channel_save`, `weather_channel_move` and `weather_channel_delete`.
+The first two seeded channels are Germany and Europe; tests must prove that
+their user order and edits survive a new `ServiceCatalog`. `service_move`
+similarly persists every service priority. The DWD WMS integration must keep
+the five-minute capability refresh floor, tolerate missing timestamps and
+retain the last safe cache. Live network checks are diagnostic only; unit tests
+use bounded fake WMS responses.
 
 External account-based modules are never loaded into the web process. Their
 non-secret manifests live in `/etc/openr4d10/services.d`; see

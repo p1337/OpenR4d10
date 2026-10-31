@@ -179,6 +179,17 @@ is decoded and re-encoded to a maximum 256 x 256 JPEG in the private cache, and
 falls back to a browser-generated initials tile when retrieval fails. Current
 sources and their review references are recorded in `PRESETS.md`.
 
+The native weather module reuses the bounded-download boundary. It reads the
+official DWD WMS capabilities document no more often than every five minutes,
+selects up to eight recent timestamps from
+`Satellite_meteosat_1km_euat_rgb_day_hrv_and_night_ir108_3h`, validates each
+returned image and re-encodes it as a local JPEG. Missing individual timestamps
+are skipped; a DWD or network outage leaves the last valid cache usable. The
+default Germany and Europe crops are seeded exactly once into the ordered
+`channels` table. Channel edits, deletions and order, as well as the priority of
+all services, therefore survive installs and updates. Both the browser loop and
+the physical display read these local files and show `DWD / EUMETSAT`.
+
 For a fresh machine, `bootstrap.sh` downloads a GitHub-generated source archive
 over HTTPS into a private temporary directory. It checks paths and archive
 integrity before extraction, then invokes the same local `install.sh`. Git is

@@ -16,7 +16,7 @@ from .models import Frame
 WIDTH = 240
 HEIGHT = 280
 DEFAULT_ACCENT = (253, 184, 19)
-SERVICES = ("SYSTEM", "RADIO", "DMR", "PLAYER", "REC")
+SERVICES = ("SYSTEM", "RADIO", "WEATHER", "DMR", "PLAYER", "REC")
 MAIN_MENU_ITEMS = (
     "display",
     "accent_color",
@@ -37,6 +37,7 @@ DISPLAY_TEXT = {
         "menu": "MENU",
         "play": "PLAY",
         "pause": "PAUSE",
+        "weather_service": "WX",
         "main_menu": "MAIN MENU",
         "service_settings": "SERVICE SETTINGS",
         "quick_menu": "QUICK MENU",
@@ -56,6 +57,7 @@ DISPLAY_TEXT = {
         "menu": "MENÜ",
         "play": "PLAY",
         "pause": "PAUSE",
+        "weather_service": "WET",
         "main_menu": "HAUPTMENÜ",
         "service_settings": "DIENST-EINSTELLUNGEN",
         "quick_menu": "SCHNELLMENÜ",
@@ -75,6 +77,7 @@ DISPLAY_TEXT = {
         "menu": "MENU",
         "play": "GRAJ",
         "pause": "PAUZA",
+        "weather_service": "POG",
         "main_menu": "MENU GŁÓWNE",
         "service_settings": "USTAWIENIA USŁUGI",
         "quick_menu": "SZYBKIE MENU",
@@ -94,6 +97,7 @@ DISPLAY_TEXT = {
         "menu": "MENU",
         "play": "LIRE",
         "pause": "PAUSE",
+        "weather_service": "MÉT",
         "main_menu": "MENU PRINCIPAL",
         "service_settings": "RÉGLAGES SERVICE",
         "quick_menu": "MENU RAPIDE",
@@ -113,6 +117,7 @@ DISPLAY_TEXT = {
         "menu": "MENÚ",
         "play": "PLAY",
         "pause": "PAUSA",
+        "weather_service": "MET",
         "main_menu": "MENÚ PRINCIPAL",
         "service_settings": "AJUSTES SERVICIO",
         "quick_menu": "MENÚ RÁPIDO",
@@ -143,6 +148,7 @@ class DeviceUiState:
     battery_percent: int | None = None
     source: str = "OPENR4D10"
     preset_id: str | None = None
+    image_file: str | None = None
     title: str = "System online"
     subtitle: str = "Receiver ready"
     playing: bool = False
@@ -183,6 +189,7 @@ class DeviceUiState:
             "title": self.title,
             "subtitle": self.subtitle,
             "preset_id": self.preset_id,
+            "image_file": self.image_file,
         }
 
     @property
@@ -304,6 +311,8 @@ class DeviceUiState:
         )[:28]
         preset_id = receiver.get("preset_id")
         self.preset_id = preset_id if isinstance(preset_id, str) else None
+        image_file = receiver.get("image_file")
+        self.image_file = image_file if isinstance(image_file, str) else None
         if not self.menu_open:
             self.title = str(receiver.get("title") or frame.title)[:48]
             self.subtitle = str(receiver.get("subtitle") or frame.body)[:72]
@@ -519,7 +528,8 @@ def render_device_ui(
     _control_value(draw, 19, 7, str(controls[0]), f"{state.volume}%", accent)
     _control_value(draw, 19, 32, str(controls[1]), str(state.squelch), accent)
     _control_value(draw, 122, 7, str(controls[2]), f"{state.channel:03d}", accent)
-    _control_value(draw, 122, 32, str(controls[3]), state.service, accent)
+    service_label = str(text["weather_service"]) if state.service == "WEATHER" else state.service
+    _control_value(draw, 122, 32, str(controls[3]), service_label, accent)
 
     draw.rectangle((0, 53, WIDTH - 1, 81), fill=(12, 20, 23))
     _wifi_icon(draw, 5, 61, accent)
@@ -552,6 +562,38 @@ def render_device_ui(
     station_font = _font(18, bold=True)
     station = _fit_text(draw, state.source, station_font, 164)
     draw.text((14, 94), station, font=station_font, fill=(245, 248, 249))
+
+    if state.service == "WEATHER":
+        if artwork is not None:
+            weather = ImageOps.fit(
+                artwork.convert("RGB"),
+                (212, 148),
+                method=Image.Resampling.LANCZOS,
+            )
+            image.paste(weather, (14, 119))
+        else:
+            draw.rounded_rectangle(
+                (14, 119, 225, 266),
+                radius=10,
+                fill=(13, 31, 35),
+                outline=accent,
+                width=2,
+            )
+            loading_font = _font(13, bold=True)
+            loading = _fit_text(draw, state.subtitle, loading_font, 180)
+            bounds = draw.textbbox((0, 0), loading, font=loading_font)
+            draw.text(
+                (120 - (bounds[2] - bounds[0]) / 2, 185),
+                loading,
+                font=loading_font,
+                fill=(196, 207, 209),
+            )
+        draw.rounded_rectangle((13, 118, 226, 267), radius=10, outline=(75, 92, 96), width=1)
+        credit_font = _font(8, bold=True)
+        credit = _fit_text(draw, state.title, credit_font, 122)
+        draw.rounded_rectangle((18, 241, 148, 262), radius=5, fill=(2, 5, 7, 220))
+        draw.text((23, 247), credit, font=credit_font, fill=accent)
+        return image.convert("RGB")
 
     tile_size = 138
     tile_xy = (14, 126)

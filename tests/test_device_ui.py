@@ -51,7 +51,7 @@ class DeviceUiTests(unittest.TestCase):
             volume=42,
             squelch=6,
             channel=17,
-            service_index=2,
+            service_index=3,
             ip_address="192.168.1.64",
             battery_percent=81,
             source="BrandMeister",
@@ -63,6 +63,18 @@ class DeviceUiTests(unittest.TestCase):
         self.assertEqual(image.size, (WIDTH, HEIGHT))
         self.assertEqual(image.mode, "RGB")
         self.assertNotEqual(image.getpixel((2, 120)), image.getpixel((120, 120)))
+
+    def test_weather_frame_uses_the_large_native_image_area(self) -> None:
+        state = DeviceUiState(
+            service_index=2,
+            source="Deutschland",
+            title="DWD / EUMETSAT",
+            image_file="weather-dwd-deutschland-20261031T060000Z.jpg",
+        )
+        frame = Image.new("RGB", (480, 360), (40, 90, 130))
+        image = render_device_ui(state, frame)
+        self.assertEqual(image.getpixel((120, 180)), (40, 90, 130))
+        self.assertEqual(image.getpixel((2, 180)), DEFAULT_ACCENT)
 
     def test_radio_artwork_replaces_the_local_initials_tile(self) -> None:
         state = DeviceUiState(source="SWR3", service_index=1, playing=True)

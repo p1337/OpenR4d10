@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import sqlite3
 import tempfile
 import threading
 import unittest
@@ -9,10 +10,30 @@ from urllib.parse import urlsplit
 
 from openr4d10.services import BUILTIN_SERVICES, ServiceCatalog
 from openr4d10.presets import FEED_BY_ID, RADIO_BY_ID
-from openr4d10.storage import SCHEMA_VERSION, StateStore
+from openr4d10.storage import MIGRATION_1, SCHEMA_VERSION, StateStore
 
 
 class StateStoreTests(unittest.TestCase):
+    def test_v2_service_rows_receive_stable_manifest_positions(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw).resolve() / "state.sqlite3"
+            connection = sqlite3.connect(path)
+            connection.executescript(MIGRATION_1)
+            connection.executemany(
+                "INSERT INTO service_state(service_id, enabled, updated_at) VALUES (?, 1, 'now')",
+                ((item,) for item in ("system", "webradio", "rss")),
+            )
+            connection.execute("PRAGMA user_version = 2")
+            connection.commit()
+            connection.close()
+            store = StateStore(path)
+            try:
+                store.ensure_services(("system", "webradio", "weather", "rss"), {"weather"})
+                ordered = list(store.service_states())
+            finally:
+                store.close()
+        self.assertEqual(ordered, ["system", "webradio", "weather", "rss"])
+
     def test_migrates_persists_and_rejects_secret_settings(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             path = Path(raw).resolve() / "state.sqlite3"
@@ -33,6 +54,63 @@ class StateStoreTests(unittest.TestCase):
 
 
 class ServiceCatalogTests(unittest.TestCase):
+    def test_weather_defaults_channel_loop_and_service_priority_persist(self) -> None:
+        class Weather:
+            def __init__(self, root):
+                self.cache_root = root / "cache"
+                self.refreshed = threading.Event()
+
+            def frames(self, key):
+                return [
+                    {
+                        "file": f"weather-{key}-20261031T060000Z.jpg",
+                        "timestamp": "2026-10-31T06:00Z",
+                    }
+                ] if self.refreshed.is_set() else []
+
+            def refresh(self, key, bbox):
+                self.last = (key, bbox)
+                self.refreshed.set()
+                return self.frames(key)
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            weather = Weather(root)
+            catalog = ServiceCatalog(root, weather=weather)
+            try:
+                snapshot = catalog.snapshot()
+                channels = snapshot["weather"]["channels"]
+                self.assertEqual([item["name"] for item in channels], ["Deutschland", "Europa"])
+                self.assertEqual(channels[0]["provider"], "DWD / EUMETSAT")
+                with self.assertRaisesRegex(ValueError, "layer coverage"):
+                    catalog.control(
+                        {
+                            "action": "weather_channel_save",
+                            "name": "Ungültig",
+                            "bbox": [-90, -180, 90, 180],
+                        }
+                    )
+                catalog.control({"action": "weather_open", "channel_id": channels[0]["id"]})
+                self.assertTrue(weather.refreshed.wait(1))
+                overlay = catalog.receiver_overlay()
+                self.assertEqual(overlay["service"], "WEATHER")
+                self.assertTrue(str(overlay["image_file"]).startswith("weather-dwd-deutschland-"))
+                stepped = catalog.control({"action": "weather_step", "steps": 1})
+                self.assertEqual(stepped["channel_id"], channels[1]["id"])
+                catalog.control({"action": "weather_channel_move", "channel_id": channels[1]["id"], "direction": -1})
+                catalog.control({"action": "service_move", "service_id": "weather", "direction": -1})
+            finally:
+                catalog.close()
+
+            reopened = ServiceCatalog(root, weather=Weather(root))
+            try:
+                persisted = reopened.snapshot()
+                self.assertEqual(persisted["weather"]["channels"][0]["name"], "Europa")
+                service_ids = [item["service_id"] for item in persisted["items"]]
+                self.assertLess(service_ids.index("weather"), service_ids.index("webradio"))
+            finally:
+                reopened.close()
+
     def test_display_brightness_is_persistent_and_bounded(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             state_root = Path(raw).resolve()

@@ -12,6 +12,7 @@ from openr4d10.content import (
     BoundedFetcher,
     CameraSnapshot,
     ContentError,
+    DwdSatelliteFrames,
     FeedReader,
     PresetArtwork,
     validate_content_url,
@@ -100,3 +101,33 @@ class ContentTests(unittest.TestCase):
                 self.assertEqual(image.format, "JPEG")
                 self.assertLessEqual(image.width, 256)
                 self.assertLessEqual(image.height, 256)
+
+    def test_dwd_satellite_frames_are_bounded_reencoded_and_rate_limited(self) -> None:
+        capabilities = b"""<?xml version='1.0'?>
+        <WMS_Capabilities><Capability><Layer><Layer>
+          <Name>Satellite_meteosat_1km_euat_rgb_day_hrv_and_night_ir108_3h</Name>
+          <Dimension name='time'>2026-10-30T09:00:00.000Z/2026-10-31T06:00:00.000Z/PT3H</Dimension>
+        </Layer></Layer></Capability></WMS_Capabilities>"""
+        raw = BytesIO()
+        Image.new("RGB", (480, 360), (45, 80, 120)).save(raw, format="PNG")
+        calls = []
+
+        def opener(request, **_kwargs):
+            calls.append(request.full_url)
+            if "GetCapabilities" in request.full_url:
+                return FakeResponse(capabilities, "text/xml")
+            self.assertIn("request=GetMap", request.full_url)
+            self.assertIn("bbox=47%2C5%2C55.5%2C16", request.full_url)
+            return FakeResponse(raw.getvalue(), "image/png")
+
+        with tempfile.TemporaryDirectory() as directory:
+            cache = Path(directory).resolve()
+            weather = DwdSatelliteFrames(cache, BoundedFetcher(opener))
+            first = weather.refresh("dwd-deutschland", (47, 5, 55.5, 16))
+            second = weather.refresh("dwd-deutschland", (47, 5, 55.5, 16))
+            self.assertEqual(first, second)
+            self.assertEqual(len(first), 8)
+            self.assertEqual(len(calls), 9)
+            with Image.open(cache / str(first[0]["file"])) as image:
+                self.assertEqual(image.format, "JPEG")
+                self.assertLessEqual(image.width, 480)
