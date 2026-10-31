@@ -179,7 +179,14 @@ generated password and `http://10.42.0.1/`; connect the phone to that hotspot,
 open the shown address and use **Device → WLAN repair**. A successful repair
 replaces the hotspot with the new client connection. The hotspot password is
 generated only on the device and is excluded from Git, status JSON, SQLite,
-logs and backups.
+logs and backups. A merely selected or repeatedly authenticating infrastructure
+profile is not treated as connected: only NetworkManager's fully activated
+device state cancels the fallback. After the grace period the helper stops a
+stalled WPA/SAE attempt, forces the Wi-Fi software radio on and retries the
+local WPA2 hotspot three times. Its runtime directory is created by systemd
+before sandbox setup, so the fallback also works before the main application
+has started. The 30-second timer keeps retrying after missing hardware,
+NetworkManager startup delay or a failed AP activation.
 
 The dashboard shows live service, system and adapter status. The real Whisplay
 display and sound card are verified. The PiSugar 3 adapter uses the same SMBus

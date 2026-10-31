@@ -2456,3 +2456,47 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Masteranweisung zusammengeführt.
 - Regel eingeführt, dass jede neue Erkenntnis vor weiterer Arbeit in dieser
   Datei dokumentiert werden muss.
+
+### 2026-10-31 – Reale Offline-Ursache nach Reboot nachgewiesen
+
+- Nach dem erneuten Erscheinen des Geräts wurden die laufende Installation und
+  das aktuelle Bootjournal ausschließlich lesend untersucht. Installiert sind
+  Raspberry Pi Zero 2 W, Debian 13/Trixie, Kernel `6.18.50+rpt-rpi-v8`,
+  `network-manager 1.52.1-1+rpt4`, `wpasupplicant 2:2.10-24+rpt3` und
+  `firmware-brcm80211 1:20260519-1~bpo13+1+rpt1`.
+- NetworkManager übergibt für das bestehende `wpa-psk`-Profil fälschlich auch
+  `SAE FT-SAE`. Beim realen Boot scheiterte die Anmeldung am BSSID
+  `D4:24:DD:FE:8F:72`, das WPA2 und WPA3 anbietet, nach zehn Sekunden mit
+  `Authentication ... timed out`. Unmittelbar danach gelang die Verbindung zum
+  BSSID `2C:91:AB:94:F3:45`, das nur WPA2 anbietet, samt DHCP-Adresse
+  `192.168.1.64`. Das entspricht der bekannten Trixie-/`brcmfmac`-/SAE-
+  Regression für den BCM43430/1 und erklärt, warum derselbe Pi nach manchen
+  Reboots offline bleibt und nach einem weiteren Reboot wieder erscheint.
+- Die APT-Historie des OpenR4d10-Laufs am 31. Oktober um 12:17 zeigt nur die
+  Neuinstallation von `libchromaprint-tools`; NetworkManager, WLAN-Firmware und
+  `wpasupplicant` wurden dabei nicht geändert. Der fehlerhafte
+  `wpasupplicant` war bereits installiert. Der Reboot hat den vorhandenen
+  Fehler ausgelöst, nicht erst ein in diesem Lauf installiertes WLAN-Paket.
+- Das Journal ist derzeit nicht bootübergreifend persistent; `journalctl
+  --list-boots` enthielt nach dem Wiedererscheinen nur den aktuellen Boot. Ein
+  erneutes Flashen würde deshalb zusätzlich die noch vorhandenen APT- und
+  Dateisystemspuren vernichten.
+- Der erste Start von `openr4d10-hotspot.service` schlug im selben Boot mit
+  `status=226/NAMESPACE` fehl, weil `/run/openr4d10` für `ReadWritePaths` noch
+  nicht existierte. Spätere Timerläufe funktionierten. Außerdem darf der
+  Helfer eine lediglich aktivierende Infrastrukturverbindung nicht anhand von
+  UUID und Modus bereits als verbunden einstufen; der tatsächliche
+  NetworkManager-Gerätestatus muss Bestandteil der Fallback-Entscheidung sein.
+- Die linken Kopfzeilenbeschriftungen (`LAU`/`SQL` beziehungsweise ihre
+  Übersetzungen) stehen drei Pixel weiter rechts. Die Werte behalten ihre
+  bisherige Position, damit im 240-Pixel-Header kein zusätzlicher Platz
+  verloren geht.
+- Version 0.10.43 härtet den Fallback gegen genau den beobachteten Ausfall:
+  systemd legt `/run/openr4d10` vor dem Sandbox-Aufbau an; ausschließlich
+  NetworkManagers vollständig aktivierter Gerätestatus `100` zählt als
+  verbundener Client oder Access Point. Nach 60 Sekunden beendet der Helfer
+  einen festhängenden WPA-/SAE-Verbindungsversuch, schaltet das Software-WLAN
+  ein und versucht den sichtbaren, gerätespezifischen WPA2-Hotspot bis zu
+  dreimal. Fehlende Hardware, ein noch nicht bereiter NetworkManager und ein
+  fehlgeschlagener AP-Start werden ohne Zugangsdaten im Status festgehalten;
+  der 30-Sekunden-Timer versucht die Wiederherstellung weiter.

@@ -20,9 +20,6 @@ install -d -m 0770 -o openr4d10 -g openr4d10 "$RUNTIME_ROOT"
 exec 9>"$LOCK_FILE"
 flock -n 9 || exit 0
 
-command -v nmcli >/dev/null
-systemctl is-active --quiet NetworkManager.service
-
 write_status() {
     local state="$1"
     local message="$2"
@@ -64,11 +61,35 @@ PY
     mv -f -- "$temporary" "$STATUS_FILE"
 }
 
+if ! command -v nmcli >/dev/null; then
+    write_status unavailable "NetworkManager tools are unavailable; hotspot retry is pending."
+    exit 1
+fi
+if ! systemctl is-active --quiet NetworkManager.service; then
+    write_status unavailable "NetworkManager is not ready; hotspot retry is pending."
+    exit 1
+fi
+if [[ ! -e "/sys/class/net/$INTERFACE" ]]; then
+    write_status unavailable "Wi-Fi device is unavailable; hotspot retry is pending."
+    exit 1
+fi
+
+# A disabled software radio cannot recover by itself. NetworkManager remains
+# the sole owner; this does not bypass a physical rfkill condition.
+nmcli radio wifi on >/dev/null 2>&1 || true
+
 active_uuid=""
 active_id=""
 active_mode=""
 active_ssid=""
+active_state=""
 read_active_profile() {
+    active_state="$(
+        nmcli --get-values GENERAL.STATE device show "$INTERFACE" 2>/dev/null \
+            | sed -n 's/^\([0-9][0-9]*\).*/\1/p' \
+            | head -n 1 \
+            || true
+    )"
     active_uuid="$(nmcli --get-values GENERAL.CON-UUID device show "$INTERFACE" 2>/dev/null || true)"
     active_id="$(nmcli --get-values GENERAL.CONNECTION device show "$INTERFACE" 2>/dev/null || true)"
     active_mode=""
@@ -80,12 +101,12 @@ read_active_profile() {
 }
 
 read_active_profile
-if [[ "$active_mode" == infrastructure ]]; then
+if [[ "$active_state" == 100 && "$active_mode" == infrastructure ]]; then
     rm -f -- "$DISCONNECTED_AT_FILE"
     write_status client "Connected to saved Wi-Fi." "$active_ssid"
     exit 0
 fi
-if [[ "$active_mode" == ap ]]; then
+if [[ "$active_state" == 100 && "$active_mode" == ap ]]; then
     rm -f -- "$DISCONNECTED_AT_FILE"
     if [[ "$active_id" == "$CONNECTION_ID" ]]; then
         write_status hotspot "Setup hotspot is active." "$active_ssid" "$SETUP_ADDRESS"
@@ -102,7 +123,7 @@ if [[ ! -f "$DISCONNECTED_AT_FILE" || -L "$DISCONNECTED_AT_FILE" ]]; then
     write_status waiting "Trying saved Wi-Fi profiles before setup hotspot."
     nmcli --wait 15 device connect "$INTERFACE" >/dev/null 2>&1 || true
     read_active_profile
-    if [[ "$active_mode" == infrastructure ]]; then
+    if [[ "$active_state" == 100 && "$active_mode" == infrastructure ]]; then
         rm -f -- "$DISCONNECTED_AT_FILE"
         write_status client "Connected to saved Wi-Fi." "$active_ssid"
     fi
@@ -206,7 +227,27 @@ chmod 0600 "$SECRET_FILE"
 chown root:root "$PROFILE_FILE"
 chmod 0600 "$PROFILE_FILE"
 
-nmcli connection load "$PROFILE_FILE" >/dev/null
-nmcli --wait 20 connection up uuid "$hotspot_uuid" ifname "$INTERFACE" >/dev/null
+hotspot_started=false
+for attempt in 1 2 3; do
+    # Stop a WPA/SAE authentication loop before replacing it with the local
+    # WPA2 setup AP. A failed disconnect is harmless when wlan0 is already idle.
+    nmcli --wait 10 device disconnect "$INTERFACE" >/dev/null 2>&1 || true
+    nmcli radio wifi on >/dev/null 2>&1 || true
+    nmcli connection load "$PROFILE_FILE" >/dev/null 2>&1 || true
+    if nmcli --wait 20 connection up uuid "$hotspot_uuid" \
+            ifname "$INTERFACE" >/dev/null 2>&1; then
+        read_active_profile
+        if [[ "$active_state" == 100 && "$active_mode" == ap \
+                && "$active_id" == "$CONNECTION_ID" ]]; then
+            hotspot_started=true
+            break
+        fi
+    fi
+    sleep 2
+done
+if [[ "$hotspot_started" != true ]]; then
+    write_status failed "Setup hotspot could not start; an automatic retry is pending."
+    exit 1
+fi
 rm -f -- "$DISCONNECTED_AT_FILE"
 write_status hotspot "Setup hotspot is active." "$hotspot_ssid" "$SETUP_ADDRESS"

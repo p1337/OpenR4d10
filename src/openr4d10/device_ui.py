@@ -566,6 +566,7 @@ def _control_value(
     accent: tuple[int, int, int],
     *,
     mirrored: bool = False,
+    label_offset_x: int = 0,
 ) -> None:
     # The physical 240 px panel needs the reviewed 1.2x larger header controls.
     small = _font(12, bold=True)
@@ -577,7 +578,7 @@ def _control_value(
         value_x = x + 6
         label_x = x + 90 - label_box[2]
     else:
-        label_x = x
+        label_x = x + label_offset_x
         value_x = x + 34
     draw.text(
         (label_x, glyph_top - label_box[1]),
@@ -899,8 +900,24 @@ def render_device_ui(
     draw.line((119, 2, 119, 37), fill=(25, 35, 39), width=1)
     _vertical_label(image, left_action, 8, clockwise=False, header_height=header_height)
     _vertical_label(image, right_action, 221, clockwise=False, header_height=header_height)
-    _control_value(draw, 19, 1, str(controls[0]), f"{state.volume}%", accent)
-    _control_value(draw, 19, 20, str(controls[1]), str(state.squelch), accent)
+    _control_value(
+        draw,
+        19,
+        1,
+        str(controls[0]),
+        f"{state.volume}%",
+        accent,
+        label_offset_x=3,
+    )
+    _control_value(
+        draw,
+        19,
+        20,
+        str(controls[1]),
+        str(state.squelch),
+        accent,
+        label_offset_x=3,
+    )
     _control_value(
         draw,
         122,

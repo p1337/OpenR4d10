@@ -167,6 +167,10 @@ class DeviceUiTests(unittest.TestCase):
             value_top = measure.textbbox(value_xy, value, font=value_font)[1]
             self.assertEqual(label_top, value_top)
         self.assertLess(positions["LAU"][0][0], positions["30%"][0][0])
+        self.assertEqual(positions["LAU"][0][0], 22)
+        self.assertEqual(positions["SQL"][0][0], 22)
+        self.assertEqual(positions["30%"][0][0], 53)
+        self.assertEqual(positions["5"][0][0], 53)
         self.assertLess(positions["001"][0][0], positions["KAN"][0][0])
         self.assertLess(positions["SYSTEM"][0][0], positions["DST"][0][0])
         for label in ("KAN", "DST"):
