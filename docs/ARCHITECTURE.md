@@ -43,12 +43,16 @@ list; the logical input path and physical encoder semantics do not change.
 
 The dashboard navigation is a client-side tab switch over the existing local
 application sections, not a set of new routes or a second application state.
-Browser localization is another client-side presentation boundary. The
-checked-in `web/i18n.json` catalog contains the same complete message-key set
-for English, German, Polish, French and Spanish. The selected locale is stored
-only in browser-local storage; unknown or missing values fall back to English.
-It does not mutate `DeviceUiState.language` or the physical panel. The static
-server exposes this one catalog as a fixed same-origin asset.
+The checked-in `web/i18n.json` catalog contains the same complete browser
+message-key set for English, German, Polish, French and Spanish. Language is a
+shared device setting, not a browser-only preference: `ui.language` is stored
+by `ServiceCatalog` in SQLite, restored into `DeviceUiState.language` during
+application construction and changed through the bounded `display_language`
+control. The display is redrawn before the successful response; if persistence
+fails, the previous device language is restored. Browser-local storage caches
+the same value only for the early load phase. Every status snapshot makes the
+saved device value authoritative again, and unknown values fall back to
+English. The static server exposes the catalog as a fixed same-origin asset.
 Its fixed desktop device preview requests `/api/device-screen.png`; that image
 is encoded from the same `render_device_ui()` call and locked `DeviceUiState`
 used for SPI output. It therefore cannot drift into a separately maintained
@@ -161,7 +165,11 @@ That path was already the unit's private writable runtime boundary;
 The packaged 0.2.2 binding rejects an idle `tx_pwm(..., 0, 0)` stop request
 with `bad PWM micros` despite its API text. `_LgpioPwm` therefore tracks
 whether it has successfully started PWM and sends the stop request only in
-that state. Steady endpoint writes never issue a speculative stop.
+that state. Steady endpoint writes never issue a speculative stop. The real
+panel still showed a rarer bright/dark jump below 100 percent because the
+periodic renderer called the brightness path after every frame and re-armed an
+unchanged PWM waveform. `_LgpioPwm` now caches its current duty cycle and does
+not call `tx_pwm` unless the requested duty actually changes.
 
 The non-secret setting `ui.accent_color` (`#RRGGBB`) is restored into the one
 `WhisplayDisplay` renderer. The browser may change it only through the bounded
@@ -389,8 +397,8 @@ not substituted for the SSID.
 4. Adapters are created from explicit backend names.
 5. The service catalog migrates the non-secret state database and evaluates
    local dependencies.
-6. The persisted display brightness is loaded into the display adapter without
-   opening a second hardware path.
+6. The persisted display brightness and device language are loaded into the
+   display adapter without opening a second hardware path.
 7. The local web dashboard binds to the configured local address and port.
 8. The semantic text boot manifest is rendered when enabled.
 9. The semantic dashboard state is refreshed at the configured interval and

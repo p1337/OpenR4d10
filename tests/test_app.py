@@ -10,6 +10,66 @@ from openr4d10.input_events import Control
 
 
 class AppTests(unittest.TestCase):
+    def test_device_language_restores_and_persists_through_app_control(self) -> None:
+        class LanguageDisplay:
+            def __init__(self) -> None:
+                self.values = []
+
+            def render(self, _frame) -> None:
+                pass
+
+            def set_language(self, value, *, redraw=False):
+                if value not in {"en", "de", "pl", "fr", "es"}:
+                    raise ValueError("invalid language")
+                self.values.append((value, redraw))
+
+            def snapshot(self):
+                return {"language": self.values[-1][0]}
+
+        class Services:
+            active_service = "system"
+
+            def __init__(self) -> None:
+                self.value = "de"
+
+            def display_language(self):
+                return self.value
+
+            def set_display_language(self, value):
+                if value not in {"en", "de", "pl", "fr", "es"}:
+                    raise ValueError("invalid language")
+                self.value = value
+                return value
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            display = LanguageDisplay()
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=display,
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,  # type: ignore[arg-type]
+            )
+            self.assertEqual(display.values, [("de", False)])
+            result = app.control({"action": "display_language", "language": "pl"})
+            self.assertEqual(display.values[-1], ("pl", True))
+            self.assertEqual(services.value, "pl")
+            self.assertEqual(result["settings"], {"language": "pl"})
+            self.assertEqual(result["device_ui"]["language"], "pl")
+            with self.assertRaises(ValueError):
+                app.control({"action": "display_language", "language": "it"})
+            self.assertEqual(services.value, "pl")
+
     def test_display_brightness_restores_and_persists_through_app_control(self) -> None:
         class BrightnessDisplay:
             def __init__(self) -> None:

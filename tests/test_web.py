@@ -118,6 +118,9 @@ class WebTests(unittest.TestCase):
         self.assertIn('setText("weather-provider", selected?.provider, "DWD")', script)
         self.assertIn('data-i18n="DWD WEATHER"', html)
         self.assertIn('id="language-select"', html)
+        self.assertIn('action: "display_language"', script)
+        self.assertIn("settings.language", script)
+        self.assertIn("Device language saved.", script)
         for locale in ("en", "de", "pl", "fr", "es"):
             self.assertIn(f'<option value="{locale}">', html)
         self.assertNotIn("Geräteansicht", html)

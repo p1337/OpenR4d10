@@ -31,7 +31,8 @@ class _LgpioPwm:
 
     BCM22 has no native PWM function on the Zero 2 W.  ``lgpio.tx_pwm`` keeps
     the software timing in the packaged C library instead of a Python thread,
-    avoiding the scheduler jitter visible on the real Whisplay backlight.
+    avoiding the Python scheduler jitter visible on the real Whisplay
+    backlight. Repeated frames must not re-arm an unchanged waveform.
     """
 
     def __init__(
@@ -47,6 +48,7 @@ class _LgpioPwm:
         self._line_offset = line_offset
         self._frequency_hz = frequency_hz
         self._pwm_active = False
+        self._duty_percent = 100 if initial_high else 0
         self._handle = lgpio.gpiochip_open(chip_number)
         try:
             lgpio.gpio_claim_output(
@@ -62,6 +64,8 @@ class _LgpioPwm:
     def set_duty_cycle(self, duty_percent: int) -> None:
         if self._handle is None:
             return
+        if duty_percent == self._duty_percent:
+            return
         if duty_percent <= 0 or duty_percent >= 100:
             if self._pwm_active:
                 self._lgpio.tx_pwm(self._handle, self._line_offset, 0, 0)
@@ -71,6 +75,7 @@ class _LgpioPwm:
                 self._line_offset,
                 1 if duty_percent >= 100 else 0,
             )
+            self._duty_percent = 100 if duty_percent >= 100 else 0
             return
         self._lgpio.tx_pwm(
             self._handle,
@@ -79,6 +84,7 @@ class _LgpioPwm:
             duty_percent,
         )
         self._pwm_active = True
+        self._duty_percent = duty_percent
 
     def close(self, *, final_high: bool) -> None:
         if self._handle is None:

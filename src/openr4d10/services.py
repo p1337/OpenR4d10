@@ -45,6 +45,9 @@ DISPLAY_BRIGHTNESS_KEY = "display.brightness_percent"
 DEFAULT_DISPLAY_BRIGHTNESS = 100
 UI_ACCENT_COLOR_KEY = "ui.accent_color"
 DEFAULT_UI_ACCENT_COLOR = "#FDB813"
+UI_LANGUAGE_KEY = "ui.language"
+DEFAULT_UI_LANGUAGE = "en"
+SUPPORTED_UI_LANGUAGES = frozenset({"en", "de", "pl", "fr", "es"})
 RADAR_DEFAULT_MIGRATION_KEY = "weather.radar_default_v1"
 GERMANY_SATELLITE_MIGRATION_KEY = "weather.germany_satellite_v1"
 RADIO_DEFAULTS_V2_MIGRATION_KEY = "radio.defaults_seeded_v2"
@@ -308,6 +311,22 @@ class ServiceCatalog:
         self.store.set_setting(UI_ACCENT_COLOR_KEY, normalized)
         return {"accent_color": normalized}
 
+    def display_language(self) -> str:
+        value = self.store.get_setting(UI_LANGUAGE_KEY, DEFAULT_UI_LANGUAGE)
+        if not isinstance(value, str) or value not in SUPPORTED_UI_LANGUAGES:
+            LOG.warning("Ignoring invalid persisted UI language: %r", value)
+            return DEFAULT_UI_LANGUAGE
+        return value
+
+    def set_display_language(self, language: str) -> str:
+        if not isinstance(language, str):
+            raise ValueError("display language must be a supported language code")
+        normalized = language.casefold().split("-", 1)[0]
+        if normalized not in SUPPORTED_UI_LANGUAGES:
+            raise ValueError("display language must be one of en, de, pl, fr or es")
+        self.store.set_setting(UI_LANGUAGE_KEY, normalized)
+        return normalized
+
     @staticmethod
     def _track_part(value: str, fallback: str, limit: int) -> str:
         cleaned = unicodedata.normalize("NFKC", value or "")
@@ -528,6 +547,7 @@ class ServiceCatalog:
             "schema_version": SCHEMA_VERSION,
             "settings": {
                 "display_brightness_percent": self.display_brightness(),
+                "language": self.display_language(),
                 **self.display_appearance(),
             },
             "total": len(services),

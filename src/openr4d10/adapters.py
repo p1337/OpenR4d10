@@ -20,7 +20,7 @@ from typing import Any, Protocol
 from PIL import Image
 
 from .config import AdapterConfig, HardwareConfig
-from .device_ui import DeviceUiState, image_to_rgb565, render_device_ui
+from .device_ui import DISPLAY_TEXT, DeviceUiState, image_to_rgb565, render_device_ui
 from .input_events import InputEvent
 from .models import Frame
 from .whisplay import WhisplayError, WhisplayPanel
@@ -271,6 +271,15 @@ class WhisplayDisplay:
             self.state.accent = tuple(
                 int(accent_color[index : index + 2], 16) for index in (1, 3, 5)
             )
+            if redraw:
+                self._show_state()
+
+    def set_language(self, language: str, *, redraw: bool = False) -> None:
+        normalized = language.casefold().split("-", 1)[0] if isinstance(language, str) else ""
+        if normalized not in DISPLAY_TEXT:
+            raise ValueError("display language must be one of en, de, pl, fr or es")
+        with self._lock:
+            self.state.language = normalized
             if redraw:
                 self._show_state()
 

@@ -625,6 +625,10 @@ function render(data) {
 }
 
 function renderSettings(settings) {
+  const language = settings.language;
+  if (SUPPORTED_LOCALES.has(language) && language !== currentLocale) {
+    setLocale(language);
+  }
   const brightness = settings.display_brightness_percent;
   if (Number.isInteger(brightness) && brightness >= 0 && brightness <= 100) {
     const input = byId("display-brightness");
@@ -1126,8 +1130,29 @@ byId("weather-channel-cancel").addEventListener("click", () => {
   byId("weather-status").textContent = t("A new region can now be created.");
 });
 
-byId("language-select").addEventListener("change", (event) => {
-  setLocale(event.currentTarget.value);
+byId("language-select").addEventListener("change", async (event) => {
+  const select = event.currentTarget;
+  const language = select.value;
+  const output = byId("control-result");
+  setLocale(language);
+  select.disabled = true;
+  try {
+    const response = await fetch("/api/control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "display_language", language }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    setLocale(payload.settings?.language || language);
+    output.textContent = t("Device language saved.");
+    await refresh();
+  } catch (error) {
+    output.textContent = t("Error: {{message}}", { message: error.message });
+    await refresh();
+  } finally {
+    select.disabled = false;
+  }
 });
 
 initializeI18n().finally(() => {

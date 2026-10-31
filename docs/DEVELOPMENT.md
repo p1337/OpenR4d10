@@ -116,7 +116,11 @@ every literal runtime `t()` key, require it in the checked-in catalog, require
 all five non-empty translations, and compare placeholder sets. A new visible
 browser message therefore requires translations for English, German, Polish,
 French and Spanish in the same change. Locale switching persists in browser
-storage and must not write device or server settings.
+storage as an early-load cache and must also call the bounded
+`display_language` action. That action validates `en`, `de`, `pl`, `fr` or `es`,
+redraws the physical display, persists `ui.language` in SQLite and publishes it
+under `services.settings.language`. Tests must cover restart persistence,
+delivery to `WhisplayDisplay`, invalid codes and browser control wiring.
 
 `display_brightness` accepts exactly one integer `brightness_percent` from 0
 through 100. The application applies it through the configured display adapter
@@ -132,7 +136,9 @@ PWM timing to the installed `python3-lgpio` C runtime. Do not implement pulse
 timing with `threading`, `sleep`, or `Event.wait`: that earlier path visibly
 flickered on the real Pi Zero 2 W. Unit tests must cover the active-low mapping,
 steady 0/100-percent endpoints and the `lgpio.tx_pwm` call for intermediate
-values.
+values. Repeated calls with an unchanged intermediate value must not issue a
+second `tx_pwm`: the periodic renderer previously re-armed the waveform on
+every frame and the real panel still made rare bright/dark jumps.
 `lgpio` also requires a writable current directory for its private notification
 pipe. Keep `WorkingDirectory=/run/openr4d10` in the application unit and test
 that the unit still retains `ProtectSystem=strict`; do not solve this by making

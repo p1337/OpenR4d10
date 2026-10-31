@@ -416,6 +416,9 @@ class WhisplayDisplayTests(unittest.TestCase):
         pwm.set_duty_cycle(65)
         lgpio.tx_pwm.assert_called_with(17, 22, 1_000, 65)
 
+        pwm.set_duty_cycle(65)
+        self.assertEqual(lgpio.tx_pwm.call_count, 1)
+
         pwm.set_duty_cycle(0)
         lgpio.tx_pwm.assert_called_with(17, 22, 0, 0)
         lgpio.gpio_write.assert_called_with(17, 22, 0)
@@ -516,6 +519,17 @@ class WhisplayDisplayTests(unittest.TestCase):
         display.set_brightness(35)
         self.assertEqual(panel.brightness, [35])
         self.assertEqual(display.snapshot()["brightness_percent"], 35)
+
+    def test_display_language_updates_native_state_and_redraws(self) -> None:
+        panel = FakePanel()
+        display = WhisplayDisplay(panel=panel)  # type: ignore[arg-type]
+        display.render(Frame(screen="dashboard", title="OpenR4d10"))
+        display.set_language("de-DE", redraw=True)
+        self.assertEqual(display.snapshot()["language"], "de")
+        self.assertEqual(len(panel.frames), 2)
+        with self.assertRaises(ValueError):
+            display.set_language("it", redraw=True)
+        self.assertEqual(len(panel.frames), 2)
 
 
 if __name__ == "__main__":

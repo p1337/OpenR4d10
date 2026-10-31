@@ -60,6 +60,33 @@ The manufacturer documents these user-facing resources on the Whisplay HAT:
 - one programmable physical button;
 - the LCD and its controllable backlight listed above.
 
+### Can the RGB LED be used as an ambient-light sensor?
+
+An LED junction can physically act as a wavelength-selective photodiode. A
+common all-digital measurement first reverse-biases the junction capacitance,
+then changes the circuit to a high-impedance input and times how quickly the
+photocurrent discharges it. This is not a resistance measurement. The method is
+described in the MERL paper
+[`Very Low-Cost Sensing and Communication Using Bidirectional LEDs`](https://people.ece.cornell.edu/land/courses/ece4760/ideas/LEDsensor.pdf)
+and in the peer-reviewed paired-LED study
+[`A low-cost optical sensing device based on paired emitter-detector LEDs`](https://doi.org/10.1016/j.aca.2005.10.046).
+
+That general principle does **not** establish a safe sensing path on the fitted
+Whisplay. The manufacturer exposes only one Raspberry Pi line for each colour
+(physical P22/P18/P16, BCM25/24/23), and its official runtime claims all three
+as active-low outputs. No official Whisplay schematic currently documents the
+RGB LED common terminal, individual series resistors, reverse-voltage limit or
+an analogue sensing node. The Pi Zero 2 W header provides digital GPIO but no
+ADC. The published active-low drive makes a common-supply topology plausible,
+but that remains an inference and is insufficient authority to reverse-bias a
+board-mounted LED through unknown circuitry.
+
+Consequently OpenR4d10 does not repurpose or reverse-drive the onboard RGB LED
+as a light sensor. Automatic brightness requires either a manufacturer
+schematic plus bench measurements proving a safe two-terminal timing circuit,
+or a separate verified ambient-light sensor/ADC. Leaving the RGB LED unused
+does not create the missing electrical measurement path.
+
 The real OpenR4d10 stack reports `whisplaysound` as a WM8960 sound card for
 both ALSA capture and playback, with stable `mic` and `speaker` mixer controls.
 The manufacturer also ships ES8389 variants, so application code continues to
@@ -219,7 +246,14 @@ the root filesystem remains protected read-only by systemd.
 The real 0.10.23 start also confirmed that `lgpio` 0.2.2 rejects an idle
 frequency-zero PWM stop with `bad PWM micros`. The adapter now records whether
 PWM is active, stops only an active waveform, and otherwise writes the steady
-active-low endpoint directly.
+active-low endpoint directly. A later real-device observation found rarer
+flicker at every intermediate setting. Code inspection showed that each UI
+frame re-submitted the same `tx_pwm` request even when brightness had not
+changed. The adapter now caches the active duty and leaves an unchanged C-timed
+waveform running continuously. Raspberry Pi OS also provides a kernel
+`pwm-gpio` driver for arbitrary GPIO, but a permanent boot overlay would claim
+BCM22 before the native boot animation can own it; it is therefore not enabled
+without a designed boot-to-application ownership handoff.
 
 The application media boundary uses generic ALSA through Debian's mpv and
 ffmpeg packages. Its systemd unit allows the standard `char-alsa` device class

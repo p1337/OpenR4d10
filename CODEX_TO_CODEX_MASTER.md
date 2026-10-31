@@ -381,7 +381,8 @@ Die Geräteeinstellungen enthalten genau diese Hauptbereiche:
      Backlight BCM22, verlagert das Software-PWM-Timing aber in die bereits
      installierte C-Laufzeit von `lgpio`; der auf dem realen Gerät flackernde
      Python-PWM-Thread bleibt entfernt, und kein neuer Pin oder paralleler
-     Hardwareadapter wird erfunden.
+     Hardwareadapter wird erfunden. Ein unveränderter Tastgrad wird nicht bei
+     jedem UI-Frame erneut gestartet, sondern als durchlaufende Welle belassen.
 2. **Akzentfarbe**
    - normaler Menüeintrag wie alle anderen,
    - öffnet beim Anwählen eine eigene Farbauswahl,
@@ -425,7 +426,10 @@ Die Geräteeinstellungen enthalten genau diese Hauptbereiche:
    - Schnellwahl oben: English, Deutsch, Polski, Français, Español,
    - darunter vollständige, alphabetisch nach Eigenbezeichnung sortierte
      Sprachliste; die fünf Schnellwahlsprachen erscheinen dort ebenfalls,
-   - nicht wörtlich, sondern funktions- und kontextgerecht übersetzen.
+   - nicht wörtlich, sondern funktions- und kontextgerecht übersetzen,
+   - die Webauswahl ändert und persistiert dieselbe Gerätesprache; der Browser
+     folgt dieser Auswahl ebenfalls. Die Sprache des physischen Whisplay hat
+     dabei Vorrang vor einer rein lokalen Browserpräferenz.
 9. **System**
    - Updates, Diagnose, Protokolle, Neustart, Sicherung und Wiederherstellung.
 10. **Informationen & Support**
@@ -827,12 +831,13 @@ verdeckt wird.
 
 Die Browseroberfläche besitzt eine direkt sichtbare Sprachumschaltung für die
 fünf kuratierten Startsprachen English, Deutsch, Polski, Français und Español.
-Die Auswahl gilt für statische und dynamisch erzeugte Browsertexte, wird lokal
-im Browser dauerhaft gespeichert und fällt bei fehlenden Schlüsseln sauber auf
-Englisch zurück. Ohne gespeicherte Auswahl darf eine unterstützte
-Browsersprache übernommen werden; andernfalls ist Englisch der Standard. Die
-Browserauswahl verändert nicht stillschweigend die Sprache des physischen
-Whisplay-Renderers.
+Die Auswahl gilt für statische und dynamisch erzeugte Browsertexte, wird als
+nicht geheime Geräteeinstellung in SQLite dauerhaft gespeichert und sofort an
+den physischen Whisplay-Renderer weitergegeben. Der Browser speichert dieselbe
+Auswahl zusätzlich lokal für die frühe Ladephase und fällt bei fehlenden
+Schlüsseln sauber auf Englisch zurück. Ohne gespeicherte Geräteauswahl darf
+einmalig eine unterstützte Browsersprache übernommen werden; andernfalls ist
+Englisch der Standard.
 
 Systemupdates müssen direkt aus der lokalen Weboberfläche ausdrücklich
 bestätigt und gestartet werden können; eine SSH-Konsole darf dafür nicht
@@ -1070,6 +1075,27 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-31 – Gerätesprache, verbleibendes Flackern und Lichtsensor-Prüfung
+
+- Die Sprachwahl im Web darf nicht nur den Browser übersetzen. Sie setzt und
+  persistiert primär die Sprache des physischen Geräts und synchronisiert den
+  Browser damit. Die bestehende gegenteilige Festlegung ist aufgehoben.
+- Der reale Stack flackert bei Zwischenhelligkeiten trotz `lgpio` seltener
+  weiter. Codeprüfung identifiziert das erneute Starten derselben PWM-Welle nach
+  jedem UI-Frame als konkrete Ursache; `_LgpioPwm` merkt sich deshalb den
+  Tastgrad und ändert die laufende Welle nur bei einer echten Wertänderung. Der
+  vorhandene Kernel-`pwm-gpio`-Treiber wird nicht parallel per Boot-Overlay
+  aktiviert, weil er BCM22 vor dem nativen Bootplayer beanspruchen würde.
+- Eine LED kann wissenschaftlich als Photodiode über Photostrom oder die
+  lichtabhängige Entladezeit ihrer Sperrschichtkapazität verwendet werden; es
+  handelt sich nicht um eine Widerstandsmessung. Beim Whisplay sind jedoch nur
+  je eine aktive-low GPIO-Leitung der drei LED-Farben, kein ADC und kein
+  verifizierter Schaltplan für gemeinsamen Anschluss, Vorwiderstände und
+  Sperrspannung verfügbar. Die Onboard-RGB-LED ist daher aktuell kein sicherer,
+  kalibrierbarer Helligkeitssensor und wird weder rückwärts betrieben noch
+  experimentell umverdrahtet. Automatik erfordert einen dokumentierten externen
+  Sensor beziehungsweise einen nachgemessenen, geschützten Messpfad.
 
 ### 2026-10-31 – Flacher Kopf, lesbare Mindestschrift und geschlossener Glow
 

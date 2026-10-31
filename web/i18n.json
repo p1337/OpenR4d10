@@ -2,7 +2,8 @@
   "locales": ["en", "de", "pl", "fr", "es"],
   "messages": {
     "Language": ["Language", "Sprache", "Język", "Langue", "Idioma"],
-    "Interface language": ["Interface language", "Sprache der Oberfläche", "Język interfejsu", "Langue de l’interface", "Idioma de la interfaz"],
+    "Interface language": ["Device language", "Gerätesprache", "Język urządzenia", "Langue de l’appareil", "Idioma del dispositivo"],
+    "Device language saved.": ["Device language saved.", "Gerätesprache gespeichert.", "Zapisano język urządzenia.", "Langue de l’appareil enregistrée.", "Idioma del dispositivo guardado."],
     "OpenR4d10 home": ["OpenR4d10 home", "OpenR4d10-Startseite", "Strona główna OpenR4d10", "Accueil OpenR4d10", "Inicio de OpenR4d10"],
     "Receiver control": ["Receiver control", "Empfängersteuerung", "Sterowanie odbiornikiem", "Commande du récepteur", "Control del receptor"],
     "Checking connection": ["Checking connection", "Verbindung wird geprüft", "Sprawdzanie połączenia", "Vérification de la connexion", "Comprobando la conexión"],

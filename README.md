@@ -19,8 +19,8 @@ the installer report exactly which adapters still need configuration.
 - idempotent one-command online installer with no Git dependency
 - hardened `systemd` autostart service
 - responsive local web dashboard on `http://<raspberry-pi-ip>/`
-- persistent browser language switch for English, Deutsch, Polski, Français
-  and Español with an English fallback
+- persistent device-language switch for English, Deutsch, Polski, Français
+  and Español; browser and physical Whisplay use the same saved selection
 - explicitly confirmed system updates directly from the web dashboard
 - automatic recovery of stale web-update state after a reboot
 - confirmed NetworkManager WLAN repair without persistent web-side credentials
@@ -182,7 +182,9 @@ automatically when the application starts. The early native boot animation
 runs before that database is available; the saved value takes effect when the
 normal OpenR4d10 device UI takes over the panel. Intermediate values use the
 Raspberry Pi OS `lgpio` C-timed PWM facility on the manufacturer-verified
-active-low BCM22 backlight line; Python no longer schedules the pulses. Its
+active-low BCM22 backlight line; Python no longer schedules the pulses. An
+unchanged brightness value is not re-submitted on every display frame, because
+re-arming the same waveform caused the remaining rare bright/dark jump. Its
 private notification pipe stays inside `/run/openr4d10`, the already protected
 runtime directory, without weakening the service's read-only system boundary.
 The same settings area stores the selected accent color. The normal player
@@ -253,10 +255,11 @@ Repeated collections such as services, stations, weather channels and media use
 compact lists instead of card grids. The service list has a local search field
 covering its full public metadata; only verified local logos may replace the
 neutral initials marker.
-The language selector in the header translates static and generated browser
-controls, keeps its choice in local browser storage and does not silently
-change the independent physical-display language. The live-display card uses
-only its compact section label and has no redundant `Device view` heading.
+The language selector in the header changes the physical device language first,
+stores that non-secret value in SQLite and keeps the browser synchronized with
+the same selection. Browser-local storage is only the early-load cache before
+the device status arrives. The live-display card uses only its compact section
+label and has no redundant `Device view` heading.
 Local files copied below
 `/var/lib/openr4d10/media` appear after selecting **Neu einlesen**; their full
 paths never appear in the public status response.

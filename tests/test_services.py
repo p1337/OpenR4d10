@@ -199,6 +199,25 @@ class ServiceCatalogTests(unittest.TestCase):
             finally:
                 reopened.close()
 
+    def test_display_language_is_persistent_and_validated(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            state_root = Path(raw).resolve()
+            catalog = ServiceCatalog(state_root)
+            try:
+                self.assertEqual(catalog.display_language(), "en")
+                self.assertEqual(catalog.set_display_language("de-DE"), "de")
+                self.assertEqual(catalog.snapshot()["settings"]["language"], "de")
+                for invalid in ("it", "", True, None):
+                    with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                        catalog.set_display_language(invalid)  # type: ignore[arg-type]
+            finally:
+                catalog.close()
+            reopened = ServiceCatalog(state_root)
+            try:
+                self.assertEqual(reopened.display_language(), "de")
+            finally:
+                reopened.close()
+
     def test_display_appearance_is_persistent_and_validated(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             state_root = Path(raw).resolve()
