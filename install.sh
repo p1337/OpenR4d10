@@ -169,6 +169,16 @@ if ! id -u openr4d10 >/dev/null 2>&1; then
 fi
 usermod --append --groups gpio,spi,audio,i2c openr4d10
 
+# StateDirectory creates the root on first boot, but older/manual media folders
+# may have been created by root. Only repair the application-owned directory
+# boundaries; never recurse into or replace user media.
+install -d -m 0750 -o openr4d10 -g openr4d10 "$STATE_ROOT"
+install -d -m 0750 -o openr4d10 -g openr4d10 \
+    "$STATE_ROOT/media" \
+    "$STATE_ROOT/media/ambient" \
+    "$STATE_ROOT/recordings" \
+    "$STATE_ROOT/cache"
+
 # PiSugar 3 telemetry uses only the documented read-only I2C register path.
 # The character device module is loaded now and again automatically on boot.
 install -m 0644 -o root -g root \

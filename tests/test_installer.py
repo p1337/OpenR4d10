@@ -8,6 +8,17 @@ class InstallerContractTests(unittest.TestCase):
         installer = (repository / "install.sh").read_text(encoding="utf-8")
         self.assertIn("libchromaprint-tools", installer)
 
+    def test_application_media_boundaries_belong_to_the_service_user(self) -> None:
+        repository = Path(__file__).resolve().parents[1]
+        installer = (repository / "install.sh").read_text(encoding="utf-8")
+        self.assertIn(
+            'install -d -m 0750 -o openr4d10 -g openr4d10 "$STATE_ROOT"',
+            installer,
+        )
+        for relative in ("media", "media/ambient", "recordings", "cache"):
+            self.assertIn(f'"$STATE_ROOT/{relative}"', installer)
+        self.assertNotIn('chown -R openr4d10', installer)
+
     def test_main_installer_owns_whisplay_audio_installation(self) -> None:
         repository = Path(__file__).resolve().parents[1]
         installer = (repository / "install.sh").read_text(encoding="utf-8")

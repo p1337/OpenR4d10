@@ -1094,6 +1094,13 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   konnte Play auf die Hintergrundarbeit warten. Ab 0.10.48 liegt der gesamte
   Download ausdrücklich außerhalb der kurzen Dateisperre: Bedienung und
   URL-Fallback bleiben sofort verfügbar, während die Offline-Datei entsteht.
+- Derselbe reale Lauf zeigte bei einer bestehenden Installation
+  `Permission denied: /var/lib/openr4d10/media`: ältere, manuell oder als Root
+  angelegte Medienverzeichnisse besitzen nicht zwingend den Dienstbenutzer.
+  Der Installer stellt ab 0.10.49 deshalb ausschließlich die bekannten
+  schreibbaren Laufzeitverzeichnisse `media`, `media/ambient`, `recordings` und
+  `cache` mit Besitzer und Gruppe `openr4d10` sowie Modus 0750 her. Inhalte
+  werden weder gelöscht noch rekursiv umgeschrieben.
 - Robert verlangt echten BrandMeister-Hörempfang nach dem Vorbild der offiziellen
   HoseLine-Seite und übernimmt ausdrücklich die Verantwortung für die direkte
   Browserintegration. Der verifizierte Fallback-Pfad ist
