@@ -40,6 +40,13 @@ PYTHONPATH=src python3 -m openr4d10 \
   preview-ui --output /tmp/openr4d10-ui.png
 ```
 
+Physical-renderer regressions must inspect the native 240 × 280 pixels, not a
+browser approximation. Tests verify the compact header boundary, language
+mapping, absence of date/footer/player-status text, enlarged artwork bounds,
+the play button position and that main-menu rendering contains neither artwork
+nor player title. The five curated languages use the same renderer and fall
+back to English for unknown language codes.
+
 The normal `run` command also creates a migrated non-secret state database in
 the configured state directory. Tests must always point this at a temporary
 absolute directory. Never add tokens, passwords or keys to this database; its

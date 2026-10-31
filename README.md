@@ -146,6 +146,15 @@ list. The native radio view uses the station name
 and locally cached safe artwork (or an initials fallback), not a raw stream URL
 or a decorative fake equalizer.
 
+The physical 240 × 280 layout uses the compact, localized control labels
+`VOL`, `SQL`, `CH` and `SRV` in its English fallback. Its shorter control head
+uses larger type, the status row shows a larger clock without a date, and the
+radio view reserves the freed space for a 138 × 138 station image and a larger
+station heading. The redundant service caption, written playback state and
+bottom `READY`/`OpenR4d10` strip are not rendered. Opening the main menu hides
+the complete player and shows only the localized menu heading in the content
+area.
+
 The service section accepts an explicit `http` or `https` audio URL for local
 playback and recording. It rejects credentials embedded in URLs and does not
 persist URL query strings in public status. Actual sound requires an ALSA

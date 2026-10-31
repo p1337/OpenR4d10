@@ -65,6 +65,17 @@ The application serializes the semantic media action, device-state update and
 immediate repaint as one device-input transaction so keyboard repeat and future
 GPIO events cannot lose volume or channel steps through concurrent requests.
 
+The physical renderer owns one compact layout contract. Its normal header uses
+four localized three-character labels (`VOL`, `SQL`, `CH`, `SRV` in the English
+fallback), larger values and a larger time without a date. The radio body does
+not repeat the selected service or a written playback state; playback remains
+visible through the button icon and actual media state. The old bottom status/
+brand strip is removed and its space belongs to the larger station artwork.
+When `DeviceUiState.menu_open` identifies the main menu, the renderer exits the
+player branch entirely and paints only the localized menu heading in the body.
+This remains one Pillow renderer and one logical input path, not a second menu
+surface.
+
 ## Configuration and storage
 
 - repository defaults: `config/*.toml`

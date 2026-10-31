@@ -2,13 +2,14 @@ from datetime import datetime
 import unittest
 from unittest.mock import patch
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from openr4d10.adapters import WhisplayDisplay
 from openr4d10.device_ui import (
     DeviceUiState,
     HEIGHT,
     WIDTH,
+    _display_text,
     image_to_rgb565,
     render_device_ui,
 )
@@ -18,6 +19,30 @@ from openr4d10.whisplay import WhisplayPanel
 
 
 class DeviceUiTests(unittest.TestCase):
+    def _drawn_text(self, state: DeviceUiState, artwork=None) -> list[str]:
+        drawn: list[str] = []
+        original_text = ImageDraw.ImageDraw.text
+        original_multiline = ImageDraw.ImageDraw.multiline_text
+
+        def capture_text(draw, xy, text, *args, **kwargs):
+            drawn.append(str(text))
+            return original_text(draw, xy, text, *args, **kwargs)
+
+        def capture_multiline(draw, xy, text, *args, **kwargs):
+            drawn.append(str(text))
+            return original_multiline(draw, xy, text, *args, **kwargs)
+
+        with (
+            patch.object(ImageDraw.ImageDraw, "text", new=capture_text),
+            patch.object(
+                ImageDraw.ImageDraw,
+                "multiline_text",
+                new=capture_multiline,
+            ),
+        ):
+            render_device_ui(state, artwork)
+        return drawn
+
     def test_renderer_produces_native_portrait_frame(self) -> None:
         state = DeviceUiState(
             volume=42,
@@ -41,6 +66,60 @@ class DeviceUiTests(unittest.TestCase):
         artwork = Image.new("RGB", (32, 32), (220, 20, 40))
         image = render_device_ui(state, artwork)
         self.assertEqual(image.getpixel((50, 180)), (220, 20, 40))
+        self.assertEqual(image.getpixel((140, 240)), (220, 20, 40))
+
+    def test_compact_header_and_localized_labels(self) -> None:
+        self.assertEqual(_display_text("en")["controls"], ("VOL", "SQL", "CH", "SRV"))
+        self.assertEqual(_display_text("de")["main_menu"], "HAUPTMENÜ")
+        self.assertEqual(_display_text("pl")["main_menu"], "MENU GŁÓWNE")
+        self.assertEqual(_display_text("fr")["main_menu"], "MENU PRINCIPAL")
+        self.assertEqual(_display_text("es")["main_menu"], "MENÚ PRINCIPAL")
+        image = render_device_ui(DeviceUiState())
+        self.assertEqual(image.getpixel((100, 60)), (12, 20, 23))
+
+    def test_date_and_redundant_player_text_are_not_rendered(self) -> None:
+        first = DeviceUiState(
+            service_index=1,
+            playing=False,
+            timestamp=datetime(2026, 10, 30, 14, 5),
+        )
+        second = DeviceUiState(
+            service_index=1,
+            playing=False,
+            timestamp=datetime(2027, 6, 12, 14, 5),
+        )
+        self.assertEqual(render_device_ui(first).tobytes(), render_device_ui(second).tobytes())
+        drawn = self._drawn_text(first)
+        self.assertNotIn("PAUSED", drawn)
+        self.assertNotIn("READY", drawn)
+        self.assertNotIn("OpenR4d10", drawn)
+        self.assertEqual(drawn.count("RADIO"), 1)
+
+    def test_main_menu_hides_complete_player_and_uses_localized_heading(self) -> None:
+        state = DeviceUiState(
+            source="SWR3",
+            title="Current programme",
+            service_index=1,
+            playing=True,
+            menu_open=True,
+            menu_kind="main_menu",
+            language="de",
+        )
+        artwork = Image.new("RGB", (32, 32), (220, 20, 40))
+        image = render_device_ui(state, artwork)
+        colors = image.getcolors(maxcolors=WIDTH * HEIGHT)
+        self.assertIsNotNone(colors)
+        self.assertNotIn((220, 20, 40), {color for _, color in colors or []})
+        drawn = self._drawn_text(state, artwork)
+        self.assertIn("HAUPTMENÜ", drawn)
+        self.assertNotIn("SWR3", drawn)
+        self.assertNotIn("Current programme", drawn)
+
+    def test_play_control_is_below_battery_and_footer_is_empty(self) -> None:
+        state = DeviceUiState(playing=True)
+        image = render_device_ui(state)
+        self.assertEqual(image.getpixel((206, 88)), state.accent)
+        self.assertEqual(image.getpixel((220, 247)), (6, 12, 15))
 
     def test_rgb565_uses_big_endian_wire_order(self) -> None:
         for color, expected in (
@@ -104,6 +183,15 @@ class DeviceUiTests(unittest.TestCase):
         self.assertEqual(state.preset_id, "sunshine_live")
         self.assertEqual(state.channel, 2)
         self.assertEqual(state.volume, 73)
+
+        state.update_from_frame(
+            Frame(
+                screen="dashboard",
+                title="Radio",
+                fields={"ui": {"language": "pl-PL"}},
+            )
+        )
+        self.assertEqual(state.language, "pl")
 
     def test_invalid_input_shapes_are_rejected(self) -> None:
         with self.assertRaises(ValueError):

@@ -245,9 +245,14 @@ Die Druckfunktionen werden im oberen Displaybereich vertikal angezeigt:
 - links grau: **MENÜ**,
 - rechts grau: **PLAY** beziehungsweise die kontextabhängige Kurzfunktion.
 
-Die vier oberen Funktionsfelder zeigen immer die aktuelle Belegung und den
-aktuellen Wert. In Untermenüs dürfen die Achsen kontextabhängig anders belegt
-werden; die Felder müssen dies sofort anzeigen.
+Die vier oberen Funktionsfelder verwenden in der normalen Hauptansicht die
+kompakten Bezeichnungen **VOL**, **SQL**, **CH** und **SRV**. Diese Kürzel sind
+keine fest eingebrannten englischen Texte: jede kuratierte Oberflächensprache
+liefert korrespondierende, auf höchstens drei Zeichen begrenzte Kurzformen.
+Schrift und Werte werden gegenüber der bisherigen Fassung deutlich größer,
+die Höhe der einzelnen Felder gleichzeitig etwas kleiner. In Untermenüs dürfen
+die Achsen kontextabhängig anders belegt werden; die Felder müssen dies sofort
+anzeigen.
 
 ## 5. Verbindlicher Aufbau der Hauptanzeige
 
@@ -266,17 +271,30 @@ Statuszeile:
 
 - links WLAN-Symbol mit drei Bögen,
 - direkt daneben WLAN-Modus/SSID und IP-Adresse,
-- Datum und Uhrzeit mittig,
+- Uhrzeit deutlich größer; das Datum wird nicht angezeigt,
 - Batteriestand rechts.
 
 Medien-/Dienstbereich:
 
 - dienstabhängige Hauptinformationen,
-- Sender, Kanal, Titel, Status und Visualisierung,
-- großer interner Play-/Pause-Button im Mediendesign,
+- Sendername beziehungsweise Titel und Visualisierung,
+- kein redundanter Dienstname über dem Radiosender,
+- kein ausgeschriebener Playerzustand wie `PAUSED:`,
+- großer interner Play-/Pause-Button rechts oben unter der Batterie,
+- größeres Senderbild beziehungsweise Logo und größere Überschrift durch den
+  frei gewordenen Raum,
 - **keine künstliche Medien-Fortschrittsanzeige bei Live-Streams**,
 - keine dauerhaft sichtbare Meldung „REC bereit“,
 - kein permanenter Hinweis „Play halten Quick-Menü“.
+
+Die bisherige untere Leiste mit `READY` links und `OpenR4d10` rechts entfällt
+vollständig. Sie darf weder Text noch Ersatzstatus enthalten.
+
+Wenn das lokalisierte Hauptmenü (`MAIN MENU`, `HAUPTMENÜ` beziehungsweise die
+korrespondierende Übersetzung) geöffnet ist, wird der komplette Player- und
+Medienbereich ausgeblendet. Der freie Bereich zeigt ausschließlich das Menü
+in großer, gut lesbarer Schrift; Senderbild, Titel, Dienstname, Playerstatus
+und Play/Pause-Schaltfläche sind dort nicht sichtbar.
 
 Der Funktionskopf muss optisch eindeutig vom Medienbereich getrennt bleiben.
 
@@ -814,6 +832,20 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-31 – Kompakter Funktionskopf und aufgeräumte Geräteansicht
+
+- Robert verkürzt die vier normalen Funktionsbezeichnungen verbindlich auf
+  `VOL`, `SQL`, `CH` und `SRV`; andere Sprachen verwenden korrespondierende,
+  maximal dreistellige Kurzformen. Die Schrift und die Uhr werden größer,
+  während die vier Kopffelder weniger Höhe beanspruchen. Das Datum entfällt.
+- Im geöffneten lokalisierten Hauptmenü wird der komplette Player ausgeblendet;
+  der Inhaltsbereich zeigt ausschließlich das Menü in großen Buchstaben.
+- Die untere Leiste mit `READY` und `OpenR4d10`, der redundante Dienstname über
+  dem Radiosender sowie ausgeschriebene Playerzustände wie `PAUSED:` entfallen.
+- Der Play/Pause-Button sitzt rechts oben unter der Batterie. Der gewonnene
+  Raum gehört dem größeren Senderbild beziehungsweise Logo und der größeren
+  Senderüberschrift; es werden keine anderen Inhalte ergänzt.
 
 ### 2026-10-30 – Persistente Whisplay-Displayhelligkeit
 

@@ -135,12 +135,17 @@ for the early player to release the display lock, keeps that lock, requests
 only BCM4 reset, BCM27 data/command and BCM22 active-low backlight, and writes
 240 x 280 big-endian RGB565 frames through SPI0/CS0 at a conservative 32 MHz.
 
-The UI implements the documented four control fields, vertical `MENU`/`PLAY`
-click labels, WLAN/IP, date/time and battery status row, and the
-service-dependent media area. Logical encoder events are implemented and can be
-tested without hardware; no encoder GPIO assignment is active. The local web
-dashboard exposes all four rotations and both short/long press actions through
-the same input-event path and repaints the physical LCD immediately.
+The UI implements the documented four compact control fields, vertical
+`MENU`/`PLAY` click labels, WLAN/IP, a larger time without a date, the battery
+status and the service-dependent media area. The control header is shorter and
+uses larger labels/values. In radio mode the service caption, written player
+state and lower status/brand strip are omitted; the station artwork is 138 ×
+138 pixels and the play/pause icon sits at the upper right below the battery.
+The main-menu body contains only its large localized heading and no player.
+Logical encoder events are implemented and can be tested without hardware; no
+encoder GPIO assignment is active. The local web dashboard exposes all four
+rotations and both short/long press actions through the same input-event path
+and repaints the physical LCD immediately.
 
 The official PiSugar Whisplay
 [`runtime/whisplay.py`](https://github.com/PiSugar/Whisplay/blob/bb4cdcc5371838009804940559e828d6a7a7ba04/runtime/whisplay.py)
