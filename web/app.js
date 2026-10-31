@@ -1,10 +1,91 @@
 const byId = (id) => document.getElementById(id);
+const SUPPORTED_LOCALES = new Set(["en", "de", "pl", "fr", "es"]);
+const LOCALE_STORAGE_KEY = "openr4d10.web.language";
+let translations = {};
+let currentLocale = "en";
+let latestStatus = null;
 let presetSignature = "";
 let weatherSignature = "";
 let weatherAnimationFrames = [];
 let weatherAnimationIndex = 0;
 let latestWeather = null;
 let weatherRefreshPending = false;
+
+function t(key, variables = {}) {
+  const template = translations[currentLocale]?.[key] ?? translations.en?.[key] ?? key;
+  return String(template).replace(/\{\{([a-z_]+)\}\}/g, (_match, name) => String(variables[name] ?? ""));
+}
+
+function applyTranslations() {
+  document.documentElement.lang = currentLocale;
+  for (const element of document.querySelectorAll("[data-i18n]")) {
+    element.textContent = t(element.dataset.i18n);
+  }
+  for (const element of document.querySelectorAll("[data-i18n-placeholder]")) {
+    element.placeholder = t(element.dataset.i18nPlaceholder);
+  }
+  for (const element of document.querySelectorAll("[data-i18n-aria-label]")) {
+    element.setAttribute("aria-label", t(element.dataset.i18nAriaLabel));
+  }
+  for (const element of document.querySelectorAll("[data-i18n-alt]")) {
+    element.alt = t(element.dataset.i18nAlt);
+  }
+}
+
+function preferredLocale() {
+  try {
+    const saved = localStorage.getItem(LOCALE_STORAGE_KEY);
+    if (SUPPORTED_LOCALES.has(saved)) return saved;
+  } catch (_error) {
+    // A blocked localStorage must not prevent the local dashboard from loading.
+  }
+  for (const candidate of navigator.languages || [navigator.language]) {
+    const language = String(candidate || "").toLowerCase().split("-", 1)[0];
+    if (SUPPORTED_LOCALES.has(language)) return language;
+  }
+  return "en";
+}
+
+function setLocale(locale, persist = true) {
+  currentLocale = SUPPORTED_LOCALES.has(locale) ? locale : "en";
+  byId("language-select").value = currentLocale;
+  if (persist) {
+    try {
+      localStorage.setItem(LOCALE_STORAGE_KEY, currentLocale);
+    } catch (_error) {
+      // The selected language still applies for this page view.
+    }
+  }
+  applyTranslations();
+  presetSignature = "";
+  weatherSignature = "";
+  if (latestStatus) render(latestStatus);
+}
+
+async function initializeI18n() {
+  try {
+    const response = await fetch("/i18n.json", { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    if (!Array.isArray(payload?.locales) || !payload.messages || typeof payload.messages !== "object") {
+      throw new Error("invalid translation catalog");
+    }
+    const localeIndexes = new Map(payload.locales.map((locale, index) => [locale, index]));
+    if ([...SUPPORTED_LOCALES].some((locale) => !localeIndexes.has(locale))) {
+      throw new Error("incomplete translation locale list");
+    }
+    translations = Object.fromEntries([...SUPPORTED_LOCALES].map((locale) => [locale, {}]));
+    for (const [key, values] of Object.entries(payload.messages)) {
+      if (!Array.isArray(values) || values.length !== payload.locales.length) continue;
+      for (const locale of SUPPORTED_LOCALES) {
+        translations[locale][key] = values[localeIndexes.get(locale)];
+      }
+    }
+  } catch (_error) {
+    translations = {};
+  }
+  setLocale(preferredLocale(), false);
+}
 
 function activateTab(name) {
   for (const button of document.querySelectorAll("[data-tab]")) {
@@ -30,10 +111,10 @@ function refreshDeviceScreen() {
 }
 
 byId("device-screen-preview").addEventListener("load", () => {
-  setText("device-screen-status", "240 × 280 · live");
+  setText("device-screen-status", t("240 × 280 · live"));
 });
 byId("device-screen-preview").addEventListener("error", () => {
-  setText("device-screen-status", "Native Ansicht nicht verfügbar");
+  setText("device-screen-status", t("Native view unavailable"));
 });
 
 function setText(id, value, fallback = "–") {
@@ -45,19 +126,19 @@ function formatUptime(seconds) {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  if (days) return `${days} T ${hours} Std`;
-  if (hours) return `${hours} Std ${minutes} Min`;
-  return `${minutes} Minuten`;
+  if (days) return t("{{days}} d {{hours}} h", { days, hours });
+  if (hours) return t("{{hours}} h {{minutes}} min", { hours, minutes });
+  return t("{{minutes}} minutes", { minutes });
 }
 
 function adapterLabel(value) {
   const labels = {
-    system: "Systemdaten",
-    command: "Verbunden",
-    file: "Dateiausgabe",
+    system: t("System data"),
+    command: t("Connected"),
+    file: t("File output"),
     whisplay: "Whisplay LCD",
-    unconfigured: "Noch offen",
-    unknown: "Unbekannt",
+    unconfigured: t("Not configured"),
+    unknown: t("Unknown"),
   };
   return labels[value] || value;
 }
@@ -70,11 +151,11 @@ function setAdapter(id, value) {
 
 function readinessLabel(value) {
   const labels = {
-    ready: "Bereit",
-    configuration_required: "Konfiguration nötig",
-    missing_dependency: "Paket fehlt",
-    adapter_error: "Adapter nicht erreichbar",
-    disabled: "Deaktiviert",
+    ready: t("Ready"),
+    configuration_required: t("Configuration required"),
+    missing_dependency: t("Package missing"),
+    adapter_error: t("Adapter unavailable"),
+    disabled: t("Disabled"),
   };
   return labels[value] || value;
 }
@@ -83,7 +164,9 @@ function renderServices(catalog) {
   const grid = byId("service-grid");
   const items = Array.isArray(catalog?.items) ? catalog.items : [];
   grid.replaceChildren();
-  setText("service-count", items.length ? `${catalog.ready}/${catalog.total} bereit` : "Keine Daten");
+  setText("service-count", items.length
+    ? t("{{ready}}/{{total}} ready", { ready: catalog.ready, total: catalog.total })
+    : t("No data"));
   items.forEach((service, index) => {
     const card = document.createElement("article");
     card.className = "service-card";
@@ -92,21 +175,21 @@ function renderServices(catalog) {
     const heading = document.createElement("div");
     heading.className = "service-card-heading";
     const name = document.createElement("strong");
-    name.textContent = service.name;
+    name.textContent = t(service.name);
     const state = document.createElement("span");
     state.textContent = readinessLabel(service.readiness);
     heading.append(name, state);
 
     const description = document.createElement("p");
-    description.textContent = service.description;
+    description.textContent = t(service.description);
     const detail = document.createElement("small");
     detail.textContent = service.missing_executables?.length
-      ? `Fehlt: ${service.missing_executables.join(", ")}`
+      ? t("Missing: {{items}}", { items: service.missing_executables.join(", ") })
       : service.implementation === "native"
-        ? "OpenR4d10 Core"
+        ? t("OpenR4d10 Core")
         : service.implementation === "official_api"
-          ? "Offizielle Anmeldung erforderlich"
-          : "Lokaler Adapter";
+          ? t("Official login required")
+          : t("Local adapter");
     card.append(heading, description, detail);
     const actions = document.createElement("div");
     actions.className = "service-card-actions";
@@ -118,7 +201,7 @@ function renderServices(catalog) {
     if (service.service_id !== "system") {
       const toggle = document.createElement("button");
       toggle.type = "button";
-      toggle.textContent = service.enabled ? "Deaktivieren" : "Aktivieren";
+      toggle.textContent = service.enabled ? t("Disable") : t("Enable");
       toggle.addEventListener("click", () => sendControl("service_set_enabled", {
         service_id: service.service_id,
         enabled: !service.enabled,
@@ -145,14 +228,18 @@ function showWeatherFrame() {
   if (!weatherAnimationFrames.length) {
     image.hidden = true;
     empty.hidden = false;
-    setText("weather-frame-time", "Noch keine Frames im lokalen Cache");
+    setText("weather-frame-time", t("No frames in the local cache yet"));
     return;
   }
   const frame = weatherAnimationFrames[weatherAnimationIndex % weatherAnimationFrames.length];
   image.src = frame.url;
   image.hidden = false;
   empty.hidden = true;
-  setText("weather-frame-time", `${frame.timestamp} · Frame ${weatherAnimationIndex + 1}/${weatherAnimationFrames.length}`);
+  setText("weather-frame-time", t("{{timestamp}} · frame {{current}}/{{total}}", {
+    timestamp: frame.timestamp,
+    current: weatherAnimationIndex + 1,
+    total: weatherAnimationFrames.length,
+  }));
 }
 
 function renderWeather(catalog) {
@@ -163,7 +250,7 @@ function renderWeather(catalog) {
   const signature = JSON.stringify([channels, weather.active_channel_id]);
   if (signature !== weatherSignature) {
     weatherSignature = signature;
-    setText("weather-channel-name", selected?.name, "Kein Wetterkanal");
+    setText("weather-channel-name", selected?.name, t("No weather channel"));
     setWeatherAnimation(selected?.frames || []);
   }
   const list = byId("weather-channel-list");
@@ -175,7 +262,9 @@ function renderWeather(catalog) {
     const name = document.createElement("strong");
     name.textContent = `${channel.channel}. ${channel.name}`;
     const bbox = document.createElement("small");
-    bbox.textContent = Array.isArray(channel.bbox) ? `S/W/N/O ${channel.bbox.join(" / ")}` : "Ausschnitt nicht konfiguriert";
+    bbox.textContent = Array.isArray(channel.bbox)
+      ? t("S/W/N/E {{bbox}}", { bbox: channel.bbox.join(" / ") })
+      : t("Region not configured");
     copy.append(name, bbox);
     const actions = document.createElement("span");
     actions.className = "library-actions";
@@ -185,19 +274,19 @@ function renderWeather(catalog) {
     down.disabled = index === channels.length - 1;
     const open = document.createElement("button");
     open.type = "button";
-    open.textContent = "Anzeigen";
+    open.textContent = t("Show");
     open.addEventListener("click", () => weatherCommand("weather_open", { channel_id: channel.id }, true));
     const edit = document.createElement("button");
     edit.type = "button";
-    edit.textContent = "Ändern";
+    edit.textContent = t("Edit");
     edit.addEventListener("click", () => editWeatherChannel(channel));
-    actions.append(open, up, down, edit, libraryButton("Löschen", "weather_channel_delete", { channel_id: channel.id }));
+    actions.append(open, up, down, edit, libraryButton(t("Delete"), "weather_channel_delete", { channel_id: channel.id }));
     row.append(copy, actions);
     list.append(row);
   });
   if (!channels.length) {
     const row = document.createElement("li");
-    row.textContent = "Keine Wetterkanäle konfiguriert.";
+    row.textContent = t("No weather channels configured.");
     list.append(row);
   }
   const weatherPanel = document.querySelector('[data-tab-panel="weather"]');
@@ -208,7 +297,7 @@ function renderWeather(catalog) {
 
 async function weatherCommand(action, extra = {}, refreshFrames = false) {
   const output = byId("weather-status");
-  output.textContent = refreshFrames ? "DWD-Bilder werden aktualisiert …" : "Änderung wird gespeichert …";
+  output.textContent = refreshFrames ? t("Refreshing DWD images …") : t("Saving change …");
   try {
     const response = await fetch("/api/control", {
       method: "POST",
@@ -225,14 +314,14 @@ async function weatherCommand(action, extra = {}, refreshFrames = false) {
       }).then(async (item) => {
         const body = await item.json();
         if (!item.ok) throw new Error(body.error || `HTTP ${item.status}`);
-        output.textContent = `${body.frames} DWD-Frames lokal bereit.`;
+        output.textContent = t("{{frames}} DWD frames ready locally.", { frames: body.frames });
       });
     } else {
-      output.textContent = "Wetterkonfiguration gespeichert.";
+      output.textContent = t("Weather configuration saved.");
     }
     await refresh();
   } catch (error) {
-    output.textContent = `Wetterfehler: ${error.message}`;
+    output.textContent = t("Weather error: {{message}}", { message: error.message });
   } finally {
     weatherRefreshPending = false;
   }
@@ -284,7 +373,7 @@ function renderPresets(catalog) {
     if (station.artwork) {
       const image = document.createElement("img");
       image.src = station.artwork;
-      image.alt = `${station.name} Senderbild`;
+      image.alt = t("Artwork for {{station}}", { station: station.name });
       image.loading = "lazy";
       image.addEventListener("load", () => artwork.classList.add("has-image"));
       image.addEventListener("error", () => image.remove());
@@ -306,10 +395,10 @@ function renderPresets(catalog) {
     up.disabled = index === 0;
     down.disabled = index === stations.length - 1;
     actions.append(
-      libraryButton("Play", "station_play", { station_id: station.id }),
+      libraryButton(t("Play"), "station_play", { station_id: station.id }),
       up,
       down,
-      libraryButton("Löschen", "station_delete", { station_id: station.id }),
+      libraryButton(t("Delete"), "station_delete", { station_id: station.id }),
     );
     card.append(artwork, copy, actions);
     grid.append(card);
@@ -317,13 +406,13 @@ function renderPresets(catalog) {
   if (!stations.length) {
     const empty = document.createElement("p");
     empty.className = "services-note";
-    empty.textContent = "Die Senderliste ist leer. Unten kann ein Sender angelegt werden.";
+    empty.textContent = t("The station list is empty. Add a station below.");
     grid.append(empty);
   }
 
   const feedSelect = byId("feed-preset");
   const selected = feedSelect.value;
-  feedSelect.replaceChildren(new Option("Nachrichtenquelle auswählen …", ""));
+  feedSelect.replaceChildren(new Option(t("Select news source …"), ""));
   for (const feed of feeds) {
     feedSelect.add(new Option(`${feed.name} (${feed.language})`, feed.preset_id));
   }
@@ -359,7 +448,7 @@ function renderLibrary(catalog) {
     if (station.artwork) {
       const image = document.createElement("img");
       image.src = station.artwork;
-      image.alt = `${station.name} Senderbild`;
+      image.alt = t("Artwork for {{station}}", { station: station.name });
       image.loading = "lazy";
       image.addEventListener("error", () => image.remove());
       artwork.append(image);
@@ -378,17 +467,17 @@ function renderLibrary(catalog) {
     up.disabled = index === 0;
     down.disabled = index === stations.length - 1;
     actions.append(
-      libraryButton("Play", "station_play", { station_id: station.id }),
+      libraryButton(t("Play"), "station_play", { station_id: station.id }),
       up,
       down,
-      libraryButton("Löschen", "station_delete", { station_id: station.id }),
+      libraryButton(t("Delete"), "station_delete", { station_id: station.id }),
     );
     row.append(artwork, label, actions);
     stationList.append(row);
   });
   if (!stations.length) {
     const row = document.createElement("li");
-    row.textContent = "Noch keine Sender gespeichert.";
+    row.textContent = t("No stations saved yet.");
     stationList.append(row);
   }
 
@@ -400,19 +489,20 @@ function renderLibrary(catalog) {
     const label = document.createElement("span");
     const size = Number.isFinite(item.size_bytes)
       ? `${(item.size_bytes / 1024 / 1024).toFixed(1)} MB`
-      : "Größe unbekannt";
+      : t("Size unknown");
     label.textContent = `${item.title} · ${size}`;
-    row.append(label, libraryButton("Play", "media_play", { media_id: item.id }));
+    row.append(label, libraryButton(t("Play"), "media_play", { media_id: item.id }));
     mediaList.append(row);
   }
   if (!media.length) {
     const row = document.createElement("li");
-    row.textContent = "Noch keine lokalen Audiodateien eingelesen.";
+    row.textContent = t("No local audio files scanned yet.");
     mediaList.append(row);
   }
 }
 
 function render(data) {
+  latestStatus = data;
   const frame = data.frame || {};
   const fields = frame.fields || {};
   const receiver = fields.receiver || {};
@@ -422,48 +512,52 @@ function render(data) {
   const displayOpen = adapters.display === "unconfigured";
   const powerOpen = adapters.power === "unconfigured";
 
-  let heroTitle = "OpenR4d10 ist bereit.";
-  let heroCopy = "Alle konfigurierten Dienste liefern aktuelle Daten.";
+  let heroTitle = t("OpenR4d10 is ready.");
+  let heroCopy = t("All configured services provide current data.");
   if (displayOpen && powerOpen) {
-    heroTitle = "System online. Display und Energie noch offen.";
-    heroCopy = "Die Weboberfläche läuft. Display und Energieversorgung warten auf verifizierte Hardwareadapter.";
+    heroTitle = t("System online. Display and power are not configured yet.");
+    heroCopy = t("The web interface is running. Display and power are waiting for verified hardware adapters.");
   } else if (displayOpen) {
-    heroTitle = "System online. Display noch offen.";
-    heroCopy = "Die Weboberfläche und Energieabfrage laufen; der Displayadapter ist noch nicht konfiguriert.";
+    heroTitle = t("System online. Display is not configured yet.");
+    heroCopy = t("The web interface and power query are running; the display adapter is not configured yet.");
   } else if (powerOpen) {
-    heroTitle = "System und Display online. Energieanzeige noch offen.";
-    heroCopy = "Das Whisplay ist verbunden. Nur die verifizierte PiSugar-Telemetrie fehlt noch.";
+    heroTitle = t("System and display online. Power telemetry is not configured yet.");
+    heroCopy = t("The Whisplay is connected. Only verified PiSugar telemetry is still missing.");
   }
 
   byId("connection").dataset.state = "online";
-  setText("connection-label", "Dienst verbunden");
+  setText("connection-label", t("Service connected"));
   setText("hero-title", heroTitle);
   setText("hero-copy", heroCopy);
   setText("hostname", receiver.hostname, "OpenR4d10");
-  setText("updated", frame.timestamp ? new Date(frame.timestamp).toLocaleString("de-DE") : "gerade eben");
+  setText("updated", frame.timestamp ? new Date(frame.timestamp).toLocaleString(currentLocale) : t("just now"));
   setText("version", `v${data.version || "–"}`);
 
-  setText("receiver-state", receiver.state === "online" ? "Online" : adapterLabel(adapters.receiver));
-  setText("receiver-detail", receiver.hostname ? `Quelle: ${receiver.hostname}` : "Statusquelle aktiv");
-  setText("power-state", power.state === "unconfigured" ? "PiSugar vorhanden" : power.state);
+  setText("receiver-state", receiver.state === "online" ? t("Online") : adapterLabel(adapters.receiver));
+  setText("receiver-detail", receiver.hostname
+    ? t("Source: {{hostname}}", { hostname: receiver.hostname })
+    : t("Status source active"));
+  setText("power-state", power.state === "unconfigured" ? t("PiSugar present") : t(power.state));
   setText(
     "power-detail",
     adapters.power === "unconfigured"
-      ? "Akkubetrieb bestätigt · Messwerte noch offen"
-      : "PiSugar-Telemetrie verbunden"
+      ? t("Battery operation confirmed · telemetry not configured")
+      : t("PiSugar telemetry connected")
   );
-  setText("display-state", adapters.display === "unconfigured" ? "Headless" : "Verbunden");
-  setText("display-detail", adapters.display === "unconfigured" ? "Whisplay-Adapter fehlt" : `Backend: ${adapters.display}`);
+  setText("display-state", adapters.display === "unconfigured" ? t("Headless") : t("Connected"));
+  setText("display-detail", adapters.display === "unconfigured"
+    ? t("Whisplay adapter missing")
+    : t("Backend: {{backend}}", { backend: adapters.display }));
   setText("uptime", formatUptime(receiver.uptime_seconds));
   setText("load", receiver.load_1m);
 
-  setText("screen-title", frame.title);
-  setText("screen-body", frame.body);
+  setText("screen-title", t(frame.title || "Service is starting"));
+  setText("screen-body", t(frame.body || "Please wait a moment."));
   byId("status-orb").dataset.severity = severity;
   setAdapter("receiver-adapter", adapters.receiver);
   setAdapter("display-adapter", adapters.display);
   setAdapter("power-adapter", adapters.power);
-  setText("footer-status", `Letzte Aktualisierung: ${new Date().toLocaleTimeString("de-DE")}`);
+  setText("footer-status", t("Last updated: {{time}}", { time: new Date().toLocaleTimeString(currentLocale) }));
   renderUpdate(data.update || {});
   renderDeviceState(data.device_ui);
   renderServices(data.services || {});
@@ -484,14 +578,14 @@ function renderUpdate(update) {
   const button = byId("system-update");
   button.disabled = busy;
   button.textContent = state === "queued"
-    ? "Update wartet …"
+    ? t("Update queued …")
     : state === "running"
-      ? "Update läuft …"
+      ? t("Update running …")
       : state === "rebooting"
-        ? "Neustart läuft …"
-        : "Update installieren";
-  const suffix = update.version ? ` · Version ${update.version}` : "";
-  setText("update-status", `${update.message || "Kein Update läuft."}${suffix}`);
+        ? t("Restarting …")
+        : t("Install update");
+  const suffix = update.version ? t(" · version {{version}}", { version: update.version }) : "";
+  setText("update-status", `${t(update.message || "No update is running.")}${suffix}`);
 }
 
 function renderDeviceState(state) {
@@ -505,21 +599,21 @@ function renderDeviceState(state) {
   setText(
     "device-ptt",
     state.ptt_active
-      ? "PTT aktiv"
+      ? t("PTT active")
       : state.ptt_context_active
-        ? "PTT-Dienst bereit"
+        ? t("PTT service ready")
         : state.menu_open
-          ? "PTT / Q = eine Menüebene zurück"
-          : "Kein aktiver PTT-Dienst"
+          ? t("PTT / Q = back one menu level")
+          : t("No active PTT service")
   );
 }
 
 function renderOffline() {
   byId("connection").dataset.state = "offline";
-  setText("connection-label", "Dienst nicht erreichbar");
-  setText("hero-title", "Verbindung unterbrochen");
-  setText("hero-copy", "Die Oberfläche wartet auf den OpenR4d10-Dienst.");
-  setText("footer-status", "Erneuter Versuch läuft …");
+  setText("connection-label", t("Service unavailable"));
+  setText("hero-title", t("Connection interrupted"));
+  setText("hero-copy", t("The interface is waiting for the OpenR4d10 service."));
+  setText("footer-status", t("Retrying …"));
   byId("status-orb").dataset.severity = "error";
 }
 
@@ -545,21 +639,21 @@ async function sendControl(action, extra = {}) {
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
     if (typeof payload.enabled === "boolean") {
-      output.textContent = `Dienst ${payload.enabled ? "aktiviert" : "deaktiviert"}.`;
+      output.textContent = payload.enabled ? t("Service enabled.") : t("Service disabled.");
     } else if (Number.isInteger(payload.scanned)) {
-      output.textContent = `${payload.scanned} Mediendateien eingelesen.`;
+      output.textContent = t("{{count}} media files scanned.", { count: payload.scanned });
     } else if (Number.isInteger(payload.station_id)) {
-      output.textContent = "Sender gespeichert.";
+      output.textContent = t("Station saved.");
     } else if (typeof payload.deleted === "boolean") {
-      output.textContent = payload.deleted ? "Eintrag gelöscht." : "Eintrag nicht gefunden.";
+      output.textContent = payload.deleted ? t("Entry deleted.") : t("Entry not found.");
     } else if (typeof payload.moved === "boolean") {
-      output.textContent = payload.moved ? "Reihenfolge gespeichert." : "Eintrag ist bereits am Listenrand.";
+      output.textContent = payload.moved ? t("Order saved.") : t("Entry is already at the edge of the list.");
     } else {
       output.textContent = `${payload.playback?.state || "stopped"} · ${payload.recording?.state || "stopped"}`;
     }
     await refresh();
   } catch (error) {
-    output.textContent = `Fehler: ${error.message}`;
+    output.textContent = t("Error: {{message}}", { message: error.message });
   }
 }
 
@@ -571,7 +665,7 @@ displayBrightness.addEventListener("change", async () => {
   const status = byId("display-brightness-status");
   const brightness = Number(displayBrightness.value);
   displayBrightness.disabled = true;
-  status.textContent = "Helligkeit wird gespeichert …";
+  status.textContent = t("Saving brightness …");
   try {
     const response = await fetch("/api/control", {
       method: "POST",
@@ -586,9 +680,9 @@ displayBrightness.addEventListener("change", async () => {
     const saved = payload.settings?.display_brightness_percent;
     displayBrightness.value = String(saved);
     setText("display-brightness-value", `${saved}%`);
-    status.textContent = `Displayhelligkeit ${saved}% dauerhaft gespeichert.`;
+    status.textContent = t("Display brightness {{brightness}}% saved permanently.", { brightness: saved });
   } catch (error) {
-    status.textContent = `Fehler: ${error.message}`;
+    status.textContent = t("Error: {{message}}", { message: error.message });
     await refresh();
   } finally {
     displayBrightness.disabled = false;
@@ -596,11 +690,11 @@ displayBrightness.addEventListener("change", async () => {
 });
 
 byId("system-update").addEventListener("click", async () => {
-  if (!window.confirm("Aktuelle OpenR4d10-Version installieren? Das Gerät startet danach automatisch neu.")) return;
+  if (!window.confirm(t("Install the latest OpenR4d10 version? The device will restart automatically afterwards."))) return;
   const button = byId("system-update");
   const output = byId("update-status");
   button.disabled = true;
-  output.textContent = "Update wird angefordert …";
+  output.textContent = t("Requesting update …");
   try {
     const response = await fetch("/api/control", {
       method: "POST",
@@ -611,7 +705,7 @@ byId("system-update").addEventListener("click", async () => {
     if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
     renderUpdate(payload.update || {});
   } catch (error) {
-    output.textContent = `Updatefehler: ${error.message}`;
+    output.textContent = t("Update error: {{message}}", { message: error.message });
     button.disabled = false;
   }
 });
@@ -631,20 +725,23 @@ async function postDeviceInput(request, button = null) {
     refreshDeviceScreen();
     const state = payload.device_ui || {};
     if (payload.selected_preset && request.control === "right_outer") {
-      output.textContent = `Kanal ${payload.selected_preset.channel} · ${payload.selected_preset.name}`;
+      output.textContent = t("Channel {{channel}} · {{name}}", {
+        channel: payload.selected_preset.channel,
+        name: payload.selected_preset.name,
+      });
     } else if (payload.playback && request.control === "left_outer") {
-      output.textContent = `Wiedergabelautstärke ${payload.playback.volume}%`;
+      output.textContent = t("Playback volume {{volume}}%", { volume: payload.playback.volume });
     } else if (payload.playback && request.control === "right_press") {
       output.textContent = payload.playback.paused
-        ? "Wiedergabe pausiert"
-        : "Wiedergabe läuft";
+        ? t("Playback paused")
+        : t("Playback running");
     } else {
       output.textContent = request.control === "ptt"
-        ? (state.ptt_active ? "PTT aktiv" : state.menu_open ? "PTT / Q = Zurück" : "Eingabe übernommen")
-        : `${state.service || "Gerät"} · ${state.title || "Eingabe übernommen"}`;
+        ? (state.ptt_active ? t("PTT active") : state.menu_open ? t("PTT / Q = Back") : t("Input accepted"))
+        : `${state.service || t("Device")} · ${state.title || t("Input accepted")}`;
     }
   } catch (error) {
-    output.textContent = `Fehler: ${error.message}`;
+    output.textContent = t("Error: {{message}}", { message: error.message });
   } finally {
     if (button) button.disabled = false;
   }
@@ -778,18 +875,18 @@ async function loadFeed(request) {
       if (itemUrl) {
         const link = document.createElement("a");
         link.href = itemUrl;
-        link.textContent = item.title || item.summary || "Ohne Titel";
+        link.textContent = item.title || item.summary || t("Untitled");
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         row.append(link);
       } else {
-        row.textContent = item.title || item.summary || "Ohne Titel";
+        row.textContent = item.title || item.summary || t("Untitled");
       }
       output.append(row);
     }
   } catch (error) {
     const row = document.createElement("li");
-    row.textContent = `Fehler: ${error.message}`;
+    row.textContent = t("Error: {{message}}", { message: error.message });
     output.append(row);
   }
 }
@@ -802,7 +899,7 @@ byId("feed-control").addEventListener("submit", async (event) => {
 byId("feed-preset-load").addEventListener("click", () => {
   const presetId = byId("feed-preset").value;
   if (!presetId) {
-    byId("control-result").textContent = "Bitte zuerst eine Nachrichtenquelle auswählen.";
+    byId("control-result").textContent = t("Please select a news source first.");
     return;
   }
   loadFeed({ action: "feed_fetch_preset", preset_id: presetId });
@@ -821,10 +918,13 @@ byId("camera-control").addEventListener("submit", async (event) => {
     if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
     image.src = `/api/camera/1?t=${Date.now()}`;
     image.hidden = false;
-    image.alt = `Kamerabild ${payload.camera.width} × ${payload.camera.height}`;
+    image.alt = t("Camera image {{width}} × {{height}}", {
+      width: payload.camera.width,
+      height: payload.camera.height,
+    });
   } catch (error) {
     image.hidden = true;
-    byId("control-result").textContent = `Kamerafehler: ${error.message}`;
+    byId("control-result").textContent = t("Camera error: {{message}}", { message: error.message });
   }
 });
 
@@ -832,7 +932,7 @@ byId("weather-refresh").addEventListener("click", () => {
   const channels = Array.isArray(latestWeather?.channels) ? latestWeather.channels : [];
   const selected = channels.find((item) => item.id === latestWeather?.active_channel_id) || channels[0];
   if (!selected) {
-    byId("weather-status").textContent = "Zuerst einen Wetterkanal anlegen.";
+    byId("weather-status").textContent = t("Create a weather channel first.");
     return;
   }
   weatherRefreshPending = true;
@@ -855,13 +955,19 @@ byId("weather-channel-form").addEventListener("submit", async (event) => {
 byId("weather-channel-cancel").addEventListener("click", () => {
   byId("weather-channel-form").reset();
   byId("weather-channel-id").value = "";
-  byId("weather-status").textContent = "Neuer Ausschnitt kann angelegt werden.";
+  byId("weather-status").textContent = t("A new region can now be created.");
 });
 
-refresh();
-window.setInterval(refresh, 2000);
-window.setInterval(() => {
-  if (!weatherAnimationFrames.length) return;
-  weatherAnimationIndex = (weatherAnimationIndex + 1) % weatherAnimationFrames.length;
-  showWeatherFrame();
-}, 1400);
+byId("language-select").addEventListener("change", (event) => {
+  setLocale(event.currentTarget.value);
+});
+
+initializeI18n().finally(() => {
+  refresh();
+  window.setInterval(refresh, 2000);
+  window.setInterval(() => {
+    if (!weatherAnimationFrames.length) return;
+    weatherAnimationIndex = (weatherAnimationIndex + 1) % weatherAnimationFrames.length;
+    showWeatherFrame();
+  }, 1400);
+});

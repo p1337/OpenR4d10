@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -12,26 +12,38 @@
   <div class="ambient" aria-hidden="true"></div>
   <main class="shell">
     <header class="topbar">
-      <a class="brand" href="/" aria-label="OpenR4d10 Startseite">
+      <a class="brand" href="/" aria-label="OpenR4d10 home" data-i18n-aria-label="OpenR4d10 home">
         <span class="brand-mark" aria-hidden="true">O</span>
         <span>
           <strong>OpenR4d10</strong>
-          <small>Receiver Control</small>
+          <small data-i18n="Receiver control">Receiver control</small>
         </span>
       </a>
-      <div class="connection" id="connection" data-state="loading">
-        <span class="pulse" aria-hidden="true"></span>
-        <span id="connection-label">Verbindung wird geprüft</span>
+      <div class="topbar-actions">
+        <label class="language-picker" for="language-select">
+          <span data-i18n="Language">Language</span>
+          <select id="language-select" aria-label="Interface language" data-i18n-aria-label="Interface language">
+            <option value="en">English</option>
+            <option value="de">Deutsch</option>
+            <option value="pl">Polski</option>
+            <option value="fr">Français</option>
+            <option value="es">Español</option>
+          </select>
+        </label>
+        <div class="connection" id="connection" data-state="loading">
+          <span class="pulse" aria-hidden="true"></span>
+          <span id="connection-label" data-i18n="Checking connection">Checking connection</span>
+        </div>
       </div>
     </header>
 
-    <nav class="workspace-tabs" role="tablist" aria-label="OpenR4d10 Bereiche">
-      <button type="button" role="tab" aria-selected="true" data-tab="radio">Radio</button>
-      <button type="button" role="tab" aria-selected="false" data-tab="weather">Wetter</button>
-      <button type="button" role="tab" aria-selected="false" data-tab="media">Medien &amp; News</button>
-      <button type="button" role="tab" aria-selected="false" data-tab="device">Gerät</button>
-      <button type="button" role="tab" aria-selected="false" data-tab="system">System</button>
-      <button type="button" role="tab" aria-selected="false" data-tab="services">Dienste</button>
+    <nav class="workspace-tabs" role="tablist" aria-label="OpenR4d10 sections" data-i18n-aria-label="OpenR4d10 sections">
+      <button type="button" role="tab" aria-selected="true" data-tab="radio" data-i18n="Radio">Radio</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="weather" data-i18n="Weather">Weather</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="media" data-i18n="Media &amp; News">Media &amp; News</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="device" data-i18n="Device">Device</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="system" data-i18n="System">System</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="services" data-i18n="Services">Services</button>
     </nav>
 
     <div class="workspace-layout">
@@ -39,26 +51,26 @@
         <section class="tab-panel" role="tabpanel" data-tab-panel="radio">
           <section class="panel services-panel" aria-labelledby="radio-presets-title">
             <div class="panel-heading">
-              <div><p class="eyebrow">WEBRADIO</p><h1 id="radio-presets-title">Sender &amp; Wiedergabe</h1></div>
-              <span class="version">Live</span>
+              <div><p class="eyebrow" data-i18n="WEB RADIO">WEB RADIO</p><h1 id="radio-presets-title" data-i18n="Stations &amp; playback">Stations &amp; playback</h1></div>
+              <span class="version" data-i18n="Live">Live</span>
             </div>
             <div class="radio-preset-grid" id="radio-preset-grid"></div>
             <form class="media-control" id="media-control">
-              <label for="media-source">Direkte Audioquelle</label>
+              <label for="media-source" data-i18n="Direct audio source">Direct audio source</label>
               <div class="media-source-row">
                 <input id="media-source" name="source" type="url" inputmode="url" placeholder="https://…" autocomplete="off" required>
-                <button type="submit">Abspielen</button>
+                <button type="submit" data-i18n="Play">Play</button>
               </div>
-              <div class="media-actions" aria-label="Wiedergabesteuerung">
-                <button type="button" data-action="pause">Play / Pause</button><button type="button" data-action="stop">Stopp</button>
-                <button type="button" data-action="record_start">Aufnahme starten</button><button type="button" data-action="record_stop">Aufnahme stoppen</button>
+              <div class="media-actions" aria-label="Playback controls" data-i18n-aria-label="Playback controls">
+                <button type="button" data-action="pause" data-i18n="Play / Pause">Play / Pause</button><button type="button" data-action="stop" data-i18n="Stop">Stop</button>
+                <button type="button" data-action="record_start" data-i18n="Start recording">Start recording</button><button type="button" data-action="record_stop" data-i18n="Stop recording">Stop recording</button>
               </div>
-              <output id="control-result" aria-live="polite">Keine Quelle aktiv.</output>
+              <output id="control-result" aria-live="polite" data-i18n="No source active.">No source active.</output>
             </form>
             <form class="content-control station-control" id="station-control">
-              <label for="station-name">Radiosender hinzufügen und sortieren</label>
-              <input id="station-name" type="text" maxlength="160" placeholder="Sendername" autocomplete="off" required>
-              <div class="media-source-row"><input id="station-url" type="url" placeholder="https://…/stream" autocomplete="off" required><button type="submit">Speichern</button></div>
+              <label for="station-name" data-i18n="Add and sort radio stations">Add and sort radio stations</label>
+              <input id="station-name" type="text" maxlength="160" placeholder="Station name" data-i18n-placeholder="Station name" autocomplete="off" required>
+              <div class="media-source-row"><input id="station-url" type="url" placeholder="https://…/stream" autocomplete="off" required><button type="submit" data-i18n="Save">Save</button></div>
               <ul id="station-list" class="library-list station-list"></ul>
             </form>
           </section>
@@ -66,30 +78,30 @@
 
         <section class="tab-panel" role="tabpanel" data-tab-panel="weather" hidden>
           <section class="panel weather-panel" aria-labelledby="weather-title">
-            <div class="panel-heading"><div><p class="eyebrow">DWD SATELLITENWETTER</p><h1 id="weather-title">Deutschland &amp; Europa</h1></div><span class="version">DWD / EUMETSAT</span></div>
+            <div class="panel-heading"><div><p class="eyebrow" data-i18n="DWD SATELLITE WEATHER">DWD SATELLITE WEATHER</p><h1 id="weather-title" data-i18n="Germany &amp; Europe">Germany &amp; Europe</h1></div><span class="version">DWD / EUMETSAT</span></div>
             <div class="weather-layout">
               <figure class="weather-viewer">
-                <img id="weather-image" alt="Aktuelles DWD-Satellitenbild" hidden>
-                <div id="weather-empty">Kanal auswählen und Bilder laden.</div>
-                <figcaption><strong id="weather-channel-name">–</strong><span id="weather-frame-time">Noch keine Frames im lokalen Cache</span></figcaption>
+                <img id="weather-image" alt="Current DWD satellite image" data-i18n-alt="Current DWD satellite image" hidden>
+                <div id="weather-empty" data-i18n="Select a channel and load images.">Select a channel and load images.</div>
+                <figcaption><strong id="weather-channel-name">–</strong><span id="weather-frame-time" data-i18n="No frames in the local cache yet">No frames in the local cache yet</span></figcaption>
               </figure>
               <div>
-                <p class="services-note">Die jüngsten verfügbaren METEOSAT-Bilder laufen lokal in einer Endlosschleife. Neue DWD-Daten werden höchstens alle fünf Minuten geprüft.</p>
-                <button type="button" id="weather-refresh">Ausgewählten Kanal aktualisieren</button>
-                <output id="weather-status" aria-live="polite">Bereit.</output>
+                <p class="services-note" data-i18n="The latest available METEOSAT images run locally in a continuous loop. New DWD data is checked at most every five minutes.">The latest available METEOSAT images run locally in a continuous loop. New DWD data is checked at most every five minutes.</p>
+                <button type="button" id="weather-refresh" data-i18n="Refresh selected channel">Refresh selected channel</button>
+                <output id="weather-status" aria-live="polite" data-i18n="Ready.">Ready.</output>
                 <ul id="weather-channel-list" class="library-list weather-channel-list"></ul>
               </div>
             </div>
             <form class="content-control weather-channel-form" id="weather-channel-form">
-              <label for="weather-channel-name-input">DWD-Satellitenausschnitt konfigurieren</label>
+              <label for="weather-channel-name-input" data-i18n="Configure DWD satellite region">Configure DWD satellite region</label>
               <input id="weather-channel-id" type="hidden">
               <div class="weather-channel-fields">
-                <input id="weather-channel-name-input" type="text" maxlength="160" placeholder="Name" required>
-                <input id="weather-south" type="number" min="23" max="77" step="0.1" placeholder="Süd" required>
-                <input id="weather-west" type="number" min="-54" max="54" step="0.1" placeholder="West" required>
-                <input id="weather-north" type="number" min="23" max="77" step="0.1" placeholder="Nord" required>
-                <input id="weather-east" type="number" min="-54" max="54" step="0.1" placeholder="Ost" required>
-                <button type="submit">Speichern</button><button type="button" id="weather-channel-cancel">Neu</button>
+                <input id="weather-channel-name-input" type="text" maxlength="160" placeholder="Name" data-i18n-placeholder="Name" required>
+                <input id="weather-south" type="number" min="23" max="77" step="0.1" placeholder="South" data-i18n-placeholder="South" required>
+                <input id="weather-west" type="number" min="-54" max="54" step="0.1" placeholder="West" data-i18n-placeholder="West" required>
+                <input id="weather-north" type="number" min="23" max="77" step="0.1" placeholder="North" data-i18n-placeholder="North" required>
+                <input id="weather-east" type="number" min="-54" max="54" step="0.1" placeholder="East" data-i18n-placeholder="East" required>
+                <button type="submit" data-i18n="Save">Save</button><button type="button" id="weather-channel-cancel" data-i18n="New">New</button>
               </div>
             </form>
           </section>
@@ -97,23 +109,23 @@
 
         <section class="tab-panel" role="tabpanel" data-tab-panel="media" hidden>
           <section class="panel">
-            <div class="panel-heading"><div><p class="eyebrow">MEDIEN &amp; NEWS</p><h1>Bibliothek, Feeds und Kamera</h1></div></div>
+            <div class="panel-heading"><div><p class="eyebrow" data-i18n="MEDIA &amp; NEWS">MEDIA &amp; NEWS</p><h1 data-i18n="Library, feeds and camera">Library, feeds and camera</h1></div></div>
             <section class="content-control" aria-labelledby="media-library-title">
-              <div class="library-heading"><label id="media-library-title">Lokale Medienbibliothek</label><button type="button" id="media-scan">Neu einlesen</button></div>
-              <p class="services-note">Dateien aus dem geschützten Medienordner des Geräts.</p><ul id="media-list" class="library-list"></ul>
+              <div class="library-heading"><label id="media-library-title" data-i18n="Local media library">Local media library</label><button type="button" id="media-scan" data-i18n="Rescan">Rescan</button></div>
+              <p class="services-note" data-i18n="Files from the device's protected media folder.">Files from the device's protected media folder.</p><ul id="media-list" class="library-list"></ul>
             </section>
             <div class="content-controls">
               <form class="content-control" id="feed-control">
-                <label for="feed-url">RSS/Atom-Feed</label>
-                <div class="feed-preset-row"><select id="feed-preset" aria-label="Nachrichtenquelle auswählen"><option value="">Nachrichtenquelle auswählen …</option></select><button type="button" id="feed-preset-load">Auswahl laden</button></div>
-                <p class="services-note">Oder eine eigene, öffentliche Feed-Adresse eingeben:</p>
-                <div class="media-source-row"><input id="feed-url" type="url" placeholder="https://…/feed.xml" autocomplete="off" required><button type="submit">Feed laden</button></div>
+                <label for="feed-url" data-i18n="RSS/Atom feed">RSS/Atom feed</label>
+                <div class="feed-preset-row"><select id="feed-preset" aria-label="Select news source" data-i18n-aria-label="Select news source"><option value="" data-i18n="Select news source …">Select news source …</option></select><button type="button" id="feed-preset-load" data-i18n="Load selection">Load selection</button></div>
+                <p class="services-note" data-i18n="Or enter your own public feed address:">Or enter your own public feed address:</p>
+                <div class="media-source-row"><input id="feed-url" type="url" placeholder="https://…/feed.xml" autocomplete="off" required><button type="submit" data-i18n="Load feed">Load feed</button></div>
                 <p id="feed-credit" class="feed-credit" hidden></p><ol id="feed-results" class="feed-results"></ol>
               </form>
               <form class="content-control" id="camera-control">
-                <label for="camera-url">Kamera-Standbild</label>
-                <div class="media-source-row"><input id="camera-url" type="url" placeholder="https://…/snapshot.jpg" autocomplete="off" required><button type="submit">Bild laden</button></div>
-                <img id="camera-preview" class="camera-preview" alt="Kamerabild" hidden>
+                <label for="camera-url" data-i18n="Camera snapshot">Camera snapshot</label>
+                <div class="media-source-row"><input id="camera-url" type="url" placeholder="https://…/snapshot.jpg" autocomplete="off" required><button type="submit" data-i18n="Load image">Load image</button></div>
+                <img id="camera-preview" class="camera-preview" alt="Camera image" data-i18n-alt="Camera image" hidden>
               </form>
             </div>
           </section>
@@ -121,56 +133,56 @@
 
         <section class="tab-panel" role="tabpanel" data-tab-panel="device" hidden>
           <section class="panel settings-panel" aria-labelledby="settings-title">
-            <div class="panel-heading"><div><p class="eyebrow">EINSTELLUNGEN</p><h2 id="settings-title">Display</h2></div><span class="version">persistent</span></div>
+            <div class="panel-heading"><div><p class="eyebrow" data-i18n="SETTINGS">SETTINGS</p><h2 id="settings-title" data-i18n="Display">Display</h2></div><span class="version" data-i18n="persistent">persistent</span></div>
             <div class="display-brightness-setting">
-              <label for="display-brightness"><strong>Displayhelligkeit</strong><span>Wird sofort am Whisplay angewendet und dauerhaft gespeichert.</span></label>
-              <output id="display-brightness-value" for="display-brightness">100%</output><input id="display-brightness" type="range" min="0" max="100" step="5" value="100"><output id="display-brightness-status" aria-live="polite">Gespeicherte Einstellung wird geladen.</output>
+              <label for="display-brightness"><strong data-i18n="Display brightness">Display brightness</strong><span data-i18n="Applied immediately to the Whisplay and saved permanently.">Applied immediately to the Whisplay and saved permanently.</span></label>
+              <output id="display-brightness-value" for="display-brightness">100%</output><input id="display-brightness" type="range" min="0" max="100" step="5" value="100"><output id="display-brightness-status" aria-live="polite" data-i18n="Loading saved setting.">Loading saved setting.</output>
             </div>
           </section>
           <section class="panel device-control-panel" aria-labelledby="device-control-title">
-            <div class="panel-heading"><div><p class="eyebrow">VIRTUELLE ENCODER</p><h2 id="device-control-title">Gerät ohne Hardware bedienen</h2></div><span class="version">direkt aufs LCD</span></div>
-            <p class="keyboard-help"><kbd>W</kbd><kbd>S</kbd> Lautstärke · <kbd>A</kbd><kbd>D</kbd> Squelch · <kbd>↑</kbd><kbd>↓</kbd> Kanal/Eintrag · <kbd>←</kbd><kbd>→</kbd> Dienst · <kbd>Leertaste</kbd> Menü · <kbd>Enter</kbd> Auswahl</p>
+            <div class="panel-heading"><div><p class="eyebrow" data-i18n="VIRTUAL ENCODERS">VIRTUAL ENCODERS</p><h2 id="device-control-title" data-i18n="Control the device without hardware">Control the device without hardware</h2></div><span class="version" data-i18n="directly on the LCD">directly on the LCD</span></div>
+            <p class="keyboard-help"><kbd>W</kbd><kbd>S</kbd> <span data-i18n="Volume">Volume</span> · <kbd>A</kbd><kbd>D</kbd> <span data-i18n="Squelch">Squelch</span> · <kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="Channel/item">Channel/item</span> · <kbd>←</kbd><kbd>→</kbd> <span data-i18n="Service">Service</span> · <kbd data-i18n="Space">Space</kbd> <span data-i18n="Menu">Menu</span> · <kbd>Enter</kbd> <span data-i18n="Select">Select</span></p>
             <div class="encoder-grid">
-              <article class="encoder-control"><span>Links außen</span><strong>Lautstärke <output id="device-volume">–</output></strong><div class="encoder-buttons"><button type="button" data-device-control="left_outer" data-steps="-1">−10</button><button type="button" data-device-control="left_outer" data-steps="1">+10</button></div></article>
-              <article class="encoder-control"><span>Links innen</span><strong>Squelch <output id="device-squelch">–</output></strong><div class="encoder-buttons"><button type="button" data-device-control="left_inner" data-steps="-1">−</button><button type="button" data-device-control="left_inner" data-steps="1">+</button></div></article>
-              <article class="encoder-control"><span>Rechts außen</span><strong>Kanal/Eintrag <output id="device-channel">–</output></strong><div class="encoder-buttons"><button type="button" data-device-control="right_outer" data-steps="-1">−</button><button type="button" data-device-control="right_outer" data-steps="1">+</button></div></article>
-              <article class="encoder-control"><span>Rechts innen</span><strong>Dienst <output id="device-service">–</output></strong><div class="encoder-buttons"><button type="button" data-device-control="right_inner" data-steps="-1">−</button><button type="button" data-device-control="right_inner" data-steps="1">+</button></div></article>
+              <article class="encoder-control"><span data-i18n="Outer left">Outer left</span><strong><span data-i18n="Volume">Volume</span> <output id="device-volume">–</output></strong><div class="encoder-buttons"><button type="button" data-device-control="left_outer" data-steps="-1">−10</button><button type="button" data-device-control="left_outer" data-steps="1">+10</button></div></article>
+              <article class="encoder-control"><span data-i18n="Inner left">Inner left</span><strong><span data-i18n="Squelch">Squelch</span> <output id="device-squelch">–</output></strong><div class="encoder-buttons"><button type="button" data-device-control="left_inner" data-steps="-1">−</button><button type="button" data-device-control="left_inner" data-steps="1">+</button></div></article>
+              <article class="encoder-control"><span data-i18n="Outer right">Outer right</span><strong><span data-i18n="Channel/item">Channel/item</span> <output id="device-channel">–</output></strong><div class="encoder-buttons"><button type="button" data-device-control="right_outer" data-steps="-1">−</button><button type="button" data-device-control="right_outer" data-steps="1">+</button></div></article>
+              <article class="encoder-control"><span data-i18n="Inner right">Inner right</span><strong><span data-i18n="Service">Service</span> <output id="device-service">–</output></strong><div class="encoder-buttons"><button type="button" data-device-control="right_inner" data-steps="-1">−</button><button type="button" data-device-control="right_inner" data-steps="1">+</button></div></article>
             </div>
-            <div class="press-grid"><div><span>Linker Drucktaster</span><button type="button" data-device-control="left_press">Menü</button><button type="button" data-device-control="left_press" data-held="2">Dienst-Einstellungen</button></div><div><span>Rechter Drucktaster</span><button type="button" data-device-control="right_press">Auswahl / Play</button><button type="button" data-device-control="right_press" data-held="2">Quick-Menü</button></div></div>
-            <div class="ptt-control"><button type="button" id="ptt-button" aria-pressed="false"><kbd>Q</kbd> halten · PTT / Zurück</button><span id="device-ptt">In Menüs: Zurück</span></div>
-            <output class="device-control-result" id="device-control-result" aria-live="polite">Bereit.</output>
+            <div class="press-grid"><div><span data-i18n="Left push button">Left push button</span><button type="button" data-device-control="left_press" data-i18n="Menu">Menu</button><button type="button" data-device-control="left_press" data-held="2" data-i18n="Service settings">Service settings</button></div><div><span data-i18n="Right push button">Right push button</span><button type="button" data-device-control="right_press" data-i18n="Select / Play">Select / Play</button><button type="button" data-device-control="right_press" data-held="2" data-i18n="Quick menu">Quick menu</button></div></div>
+            <div class="ptt-control"><button type="button" id="ptt-button" aria-pressed="false"><kbd>Q</kbd> <span data-i18n="hold · PTT / Back">hold · PTT / Back</span></button><span id="device-ptt" data-i18n="In menus: Back">In menus: Back</span></div>
+            <output class="device-control-result" id="device-control-result" aria-live="polite" data-i18n="Ready.">Ready.</output>
           </section>
         </section>
 
         <section class="tab-panel" role="tabpanel" data-tab-panel="system" hidden>
-          <section class="hero" aria-labelledby="hero-title"><div><p class="eyebrow">SYSTEMSTATUS</p><h1 id="hero-title">OpenR4d10 startet …</h1><p class="hero-copy" id="hero-copy">Die aktuellen Gerätedaten werden geladen.</p></div><div class="hero-meta"><span id="hostname">OpenR4d10</span><time id="updated">–</time></div></section>
-          <section class="metrics" aria-label="Systemübersicht">
-            <article class="metric-card feature-card"><div class="card-heading"><span class="card-icon radio-icon"></span><span class="tag">EMPFÄNGER</span></div><strong class="metric-main" id="receiver-state">Wird geladen</strong><span class="metric-detail" id="receiver-detail">Statusquelle wird geprüft</span></article>
-            <article class="metric-card"><div class="card-heading"><span class="card-icon power-icon"></span><span class="tag">ENERGIE</span></div><strong class="metric-main" id="power-state">–</strong><span class="metric-detail" id="power-detail">PiSugar-Adapter</span></article>
-            <article class="metric-card"><div class="card-heading"><span class="card-icon display-icon"></span><span class="tag">DISPLAY</span></div><strong class="metric-main" id="display-state">–</strong><span class="metric-detail" id="display-detail">Whisplay-Adapter</span></article>
-            <article class="metric-card"><div class="card-heading"><span class="card-icon load-icon"></span><span class="tag">SYSTEM</span></div><strong class="metric-main" id="uptime">–</strong><span class="metric-detail">Load 1 min: <span id="load">–</span></span></article>
+          <section class="hero" aria-labelledby="hero-title"><div><p class="eyebrow" data-i18n="SYSTEM STATUS">SYSTEM STATUS</p><h1 id="hero-title" data-i18n="OpenR4d10 is starting …">OpenR4d10 is starting …</h1><p class="hero-copy" id="hero-copy" data-i18n="Loading current device data.">Loading current device data.</p></div><div class="hero-meta"><span id="hostname">OpenR4d10</span><time id="updated">–</time></div></section>
+          <section class="metrics" aria-label="System overview" data-i18n-aria-label="System overview">
+            <article class="metric-card feature-card"><div class="card-heading"><span class="card-icon radio-icon"></span><span class="tag" data-i18n="RECEIVER">RECEIVER</span></div><strong class="metric-main" id="receiver-state" data-i18n="Loading">Loading</strong><span class="metric-detail" id="receiver-detail" data-i18n="Checking status source">Checking status source</span></article>
+            <article class="metric-card"><div class="card-heading"><span class="card-icon power-icon"></span><span class="tag" data-i18n="POWER">POWER</span></div><strong class="metric-main" id="power-state">–</strong><span class="metric-detail" id="power-detail" data-i18n="PiSugar adapter">PiSugar adapter</span></article>
+            <article class="metric-card"><div class="card-heading"><span class="card-icon display-icon"></span><span class="tag" data-i18n="DISPLAY">DISPLAY</span></div><strong class="metric-main" id="display-state">–</strong><span class="metric-detail" id="display-detail" data-i18n="Whisplay adapter">Whisplay adapter</span></article>
+            <article class="metric-card"><div class="card-heading"><span class="card-icon load-icon"></span><span class="tag" data-i18n="SYSTEM">SYSTEM</span></div><strong class="metric-main" id="uptime">–</strong><span class="metric-detail"><span data-i18n="Load 1 min:">Load 1 min:</span> <span id="load">–</span></span></article>
           </section>
           <section class="lower-grid">
-            <article class="panel status-panel"><div class="panel-heading"><div><p class="eyebrow">LAUFENDER DIENST</p><h2>Aktueller Zustand</h2></div><span class="version" id="version">v–</span></div><div class="status-line"><span class="status-orb" id="status-orb" data-severity="info"></span><div><strong id="screen-title">Dienst wird gestartet</strong><p id="screen-body">Bitte einen Moment warten.</p></div></div><div class="update-control"><div><strong>Systemupdate</strong><p>Installiert die aktuelle geprüfte Version und startet das Gerät anschließend neu.</p></div><button type="button" id="system-update">Update installieren</button><output id="update-status" aria-live="polite">Kein Update läuft.</output></div></article>
-            <article class="panel adapter-panel"><div class="panel-heading"><div><p class="eyebrow">HARDWARE</p><h2>Adapterbereitschaft</h2></div></div><ul class="adapter-list"><li><span>Empfängerquelle</span><strong id="receiver-adapter">–</strong></li><li><span>Displaytreiber</span><strong id="display-adapter">–</strong></li><li><span>Stromversorgung</span><strong id="power-adapter">–</strong></li></ul></article>
+            <article class="panel status-panel"><div class="panel-heading"><div><p class="eyebrow" data-i18n="RUNNING SERVICE">RUNNING SERVICE</p><h2 data-i18n="Current state">Current state</h2></div><span class="version" id="version">v–</span></div><div class="status-line"><span class="status-orb" id="status-orb" data-severity="info"></span><div><strong id="screen-title" data-i18n="Service is starting">Service is starting</strong><p id="screen-body" data-i18n="Please wait a moment.">Please wait a moment.</p></div></div><div class="update-control"><div><strong data-i18n="System update">System update</strong><p data-i18n="Installs the latest verified version and then restarts the device.">Installs the latest verified version and then restarts the device.</p></div><button type="button" id="system-update" data-i18n="Install update">Install update</button><output id="update-status" aria-live="polite" data-i18n="No update is running.">No update is running.</output></div></article>
+            <article class="panel adapter-panel"><div class="panel-heading"><div><p class="eyebrow" data-i18n="HARDWARE">HARDWARE</p><h2 data-i18n="Adapter readiness">Adapter readiness</h2></div></div><ul class="adapter-list"><li><span data-i18n="Receiver source">Receiver source</span><strong id="receiver-adapter">–</strong></li><li><span data-i18n="Display driver">Display driver</span><strong id="display-adapter">–</strong></li><li><span data-i18n="Power supply">Power supply</span><strong id="power-adapter">–</strong></li></ul></article>
           </section>
         </section>
 
         <section class="tab-panel" role="tabpanel" data-tab-panel="services" hidden>
-          <section class="panel services-panel" aria-labelledby="services-title"><div class="panel-heading"><div><p class="eyebrow">DIENSTMODULE</p><h1 id="services-title">Integrationen und Bereitschaft</h1></div><span class="version" id="service-count">–</span></div><p class="services-note">Zugangsdaten werden niemals aus dem Repository geladen oder in der Statusdatenbank gespeichert.</p><div class="service-grid" id="service-grid" aria-live="polite"></div></section>
+          <section class="panel services-panel" aria-labelledby="services-title"><div class="panel-heading"><div><p class="eyebrow" data-i18n="SERVICE MODULES">SERVICE MODULES</p><h1 id="services-title" data-i18n="Integrations and readiness">Integrations and readiness</h1></div><span class="version" id="service-count">–</span></div><p class="services-note" data-i18n="Credentials are never loaded from the repository or stored in the status database.">Credentials are never loaded from the repository or stored in the status database.</p><div class="service-grid" id="service-grid" aria-live="polite"></div></section>
         </section>
       </div>
 
-      <aside class="device-screen-dock" aria-labelledby="device-screen-title">
-        <div><p class="eyebrow">LIVE-DISPLAY</p><h2 id="device-screen-title">Geräteansicht</h2></div>
-        <img id="device-screen-preview" src="/api/device-screen.png" width="240" height="280" alt="Aktueller Inhalt des OpenR4d10-Displays">
-        <span id="device-screen-status">240 × 280 · live</span>
+      <aside class="device-screen-dock" aria-label="Live display" data-i18n-aria-label="Live display">
+        <div><p class="eyebrow" data-i18n="LIVE DISPLAY">LIVE DISPLAY</p></div>
+        <img id="device-screen-preview" src="/api/device-screen.png" width="240" height="280" alt="Current OpenR4d10 display content" data-i18n-alt="Current OpenR4d10 display content">
+        <span id="device-screen-status" data-i18n="240 × 280 · live">240 × 280 · live</span>
       </aside>
     </div>
 
     <footer>
-      <span>OpenR4d10 · lokale Geräteoberfläche</span>
-      <span id="footer-status">Warte auf Status …</span>
+      <span data-i18n="OpenR4d10 · local device interface">OpenR4d10 · local device interface</span>
+      <span id="footer-status" data-i18n="Waiting for status …">Waiting for status …</span>
     </footer>
   </main>
 </body>

@@ -41,11 +41,19 @@ disabled while the user edits a form field.
 
 The dashboard navigation is a client-side tab switch over the existing local
 application sections, not a set of new routes or a second application state.
+Browser localization is another client-side presentation boundary. The
+checked-in `web/i18n.json` catalog contains the same complete message-key set
+for English, German, Polish, French and Spanish. The selected locale is stored
+only in browser-local storage; unknown or missing values fall back to English.
+It does not mutate `DeviceUiState.language` or the physical panel. The static
+server exposes this one catalog as a fixed same-origin asset.
 Its fixed desktop device preview requests `/api/device-screen.png`; that image
 is encoded from the same `render_device_ui()` call and locked `DeviceUiState`
 used for SPI output. It therefore cannot drift into a separately maintained
 CSS approximation. The endpoint is same-origin, non-cacheable and unavailable
 when the configured display adapter has no native renderer.
+The preview card deliberately has only the localized `LIVE DISPLAY` eyebrow;
+there is no redundant device-view heading above the exact native image.
 
 Semantic actions are resolved by the application before the display reflects
 them. In particular, a short `right_press` routes through `ServiceCatalog` to

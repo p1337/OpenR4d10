@@ -53,6 +53,25 @@ body {
 }
 
 .topbar { justify-content: space-between; }
+.topbar-actions { display: flex; align-items: center; gap: 10px; }
+.language-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 700;
+}
+.language-picker select {
+  min-height: 38px;
+  padding: 0 30px 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  background: #0a1314;
+  font: inherit;
+  cursor: pointer;
+}
 
 .workspace-tabs {
   position: sticky;
@@ -107,7 +126,6 @@ body {
   box-shadow: 0 18px 50px rgba(0, 0, 0, .36);
 }
 .device-screen-dock > div { justify-self: stretch; }
-.device-screen-dock h2 { margin: 3px 0 0; font-size: 1rem; }
 .device-screen-dock img {
   display: block;
   width: 240px;
@@ -387,6 +405,9 @@ footer { justify-content: space-between; gap: 20px; padding: 32px 4px 0; color: 
 }
 
 @media (max-width: 620px) {
+  .topbar { align-items: flex-start; gap: 14px; }
+  .topbar-actions { align-items: flex-end; flex-direction: column; }
+  .language-picker > span { display: none; }
   .shell { width: min(100% - 24px, 1440px); padding-top: 18px; }
   .workspace-tabs { margin-top: 14px; }
   .workspace-tabs button { padding: 0 13px; }

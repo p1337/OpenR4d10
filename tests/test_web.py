@@ -1,5 +1,7 @@
 from pathlib import Path
+from html import unescape
 import json
+import re
 import tempfile
 import unittest
 from urllib.request import urlopen
@@ -14,6 +16,9 @@ class WebTests(unittest.TestCase):
         html = web_root.joinpath("index.html").read_text(encoding="utf-8")
         script = web_root.joinpath("app.js").read_text(encoding="utf-8")
         stylesheet = web_root.joinpath("app.css").read_text(encoding="utf-8")
+        translations = json.loads(
+            web_root.joinpath("i18n.json").read_text(encoding="utf-8")
+        )
         for control in (
             "left_outer",
             "left_inner",
@@ -48,15 +53,18 @@ class WebTests(unittest.TestCase):
         self.assertIn('Enter: { control: "right_press" }', script)
         self.assertIn('"station_move"', script)
         self.assertIn('"station_delete"', script)
-        self.assertIn("Wiedergabelautstärke", script)
+        self.assertIn("Playback volume {{volume}}%", script)
         self.assertIn("payload.selected_preset", script)
         self.assertIn('window.addEventListener("blur"', script)
         self.assertIn('document.addEventListener("visibilitychange"', script)
         self.assertIn('id="ptt-button"', html)
-        self.assertIn("System und Display online. Energieanzeige noch offen.", script)
-        self.assertIn("Nur die verifizierte PiSugar-Telemetrie fehlt noch.", script)
-        self.assertIn("PiSugar vorhanden", script)
-        self.assertIn("Akkubetrieb bestätigt · Messwerte noch offen", script)
+        self.assertIn(
+            "System and display online. Power telemetry is not configured yet.",
+            script,
+        )
+        self.assertIn("Only verified PiSugar telemetry is still missing.", script)
+        self.assertIn("PiSugar present", script)
+        self.assertIn("Battery operation confirmed · telemetry not configured", script)
         self.assertNotIn("PiSugar-Adapter fehlt", script)
         self.assertIn('id="system-update"', html)
         self.assertIn('action: "system_update", confirmed: true', script)
@@ -66,7 +74,7 @@ class WebTests(unittest.TestCase):
         self.assertIn('type="range" min="0" max="100"', html)
         self.assertIn('action: "display_brightness"', script)
         self.assertIn("display_brightness_percent", script)
-        self.assertIn("dauerhaft gespeichert", script)
+        self.assertIn("Display brightness {{brightness}}% saved permanently.", script)
         for tab in ("radio", "weather", "media", "device", "system", "services"):
             self.assertIn(f'data-tab="{tab}"', html)
             self.assertIn(f'data-tab-panel="{tab}"', html)
@@ -82,6 +90,36 @@ class WebTests(unittest.TestCase):
         self.assertIn('"weather_channel_move"', script)
         self.assertIn('"service_move"', script)
         self.assertIn("DWD / EUMETSAT", html)
+        self.assertIn('id="language-select"', html)
+        for locale in ("en", "de", "pl", "fr", "es"):
+            self.assertIn(f'<option value="{locale}">', html)
+        self.assertNotIn("Geräteansicht", html)
+        self.assertNotIn("device-screen-title", html)
+        self.assertIn('data-i18n="LIVE DISPLAY"', html)
+        self.assertEqual(translations["locales"], ["en", "de", "pl", "fr", "es"])
+        messages = translations["messages"]
+        html_keys = {
+            unescape(match.group(1))
+            for match in re.finditer(
+                r'data-i18n(?:-placeholder|-aria-label|-alt)?="([^"]+)"', html
+            )
+        }
+        script_keys = {
+            match.group(1)
+            for match in re.finditer(
+                r'(?<![A-Za-z])t\("((?:[^"\\]|\\.)*)"', script
+            )
+        }
+        self.assertFalse((html_keys | script_keys) - set(messages))
+        placeholder_pattern = re.compile(r"\{\{[a-z_]+\}\}")
+        for key, values in messages.items():
+            self.assertEqual(len(values), 5, key)
+            self.assertTrue(all(isinstance(value, str) and value for value in values), key)
+            placeholders = sorted(placeholder_pattern.findall(key))
+            for value in values:
+                self.assertEqual(
+                    sorted(placeholder_pattern.findall(value)), placeholders, key
+                )
         self.assertNotIn("`${station.name} · ${station.source}`", script)
 
     def test_dashboard_and_status_endpoint(self) -> None:
@@ -92,6 +130,9 @@ class WebTests(unittest.TestCase):
             )
             static.joinpath("app.css").write_text("", encoding="utf-8")
             static.joinpath("app.js").write_text("", encoding="utf-8")
+            static.joinpath("i18n.json").write_text(
+                '{"locales":["en"],"messages":{}}', encoding="utf-8"
+            )
             server = WebServer(
                 "127.0.0.1",
                 0,
@@ -119,6 +160,12 @@ class WebTests(unittest.TestCase):
                 ) as response:
                     payload = json.loads(response.read())
                     self.assertEqual(payload["service"], "online")
+                with urlopen(f"http://{host}:{port}/i18n.json", timeout=2) as response:
+                    self.assertEqual(
+                        response.headers["Content-Type"],
+                        "application/json; charset=utf-8",
+                    )
+                    self.assertEqual(json.loads(response.read())["locales"], ["en"])
                 request = Request(
                     f"http://{host}:{port}/api/control",
                     data=b'{"action":"pause"}',

@@ -65,6 +65,7 @@ secrets, WLAN data, media and recordings.
 The installed service listens on port 80 by default. It serves only the tracked
 files in `web/` plus the following endpoints:
 
+- `/i18n.json` — fixed same-origin catalog for the five curated browser locales
 - `/api/status` — current semantic frame and adapter state as JSON
 - `/healthz` — simple service health response
 - `POST /api/control` — bounded same-origin JSON media controls
@@ -82,6 +83,13 @@ station URLs containing query strings are rejected; temporary direct playback
 is not persisted. `service_set_enabled` persists module activation; `system`
 cannot be disabled and external modules still require their own adapter. Port,
 bind address and static directory live in `[web]` in `openr4d10.toml`.
+
+Browser localization tests extract every static `data-i18n*` reference and
+every literal runtime `t()` key, require it in the checked-in catalog, require
+all five non-empty translations, and compare placeholder sets. A new visible
+browser message therefore requires translations for English, German, Polish,
+French and Spanish in the same change. Locale switching persists in browser
+storage and must not write device or server settings.
 
 `display_brightness` accepts exactly one integer `brightness_percent` from 0
 through 100. The application applies it through the configured display adapter

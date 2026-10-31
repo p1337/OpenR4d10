@@ -654,6 +654,18 @@ Auf kleinen Bildschirmen darf sie zur kollisionsfreien responsiven Ansicht in
 den normalen Dokumentfluss wechseln. Die persönliche Senderverwaltung zeigt
 für bekannte kuratierte Sender wieder deren vorhandenes lokales Senderbild;
 eigene Sender erhalten ausschließlich den bestehenden Initialen-Platzhalter.
+Die Liveansicht trägt nur die knappe Bereichsmarke `LIVE DISPLAY`; eine
+zusätzliche Überschrift `Geräteansicht` beziehungsweise deren Übersetzung wird
+nicht angezeigt.
+
+Die Browseroberfläche besitzt eine direkt sichtbare Sprachumschaltung für die
+fünf kuratierten Startsprachen English, Deutsch, Polski, Français und Español.
+Die Auswahl gilt für statische und dynamisch erzeugte Browsertexte, wird lokal
+im Browser dauerhaft gespeichert und fällt bei fehlenden Schlüsseln sauber auf
+Englisch zurück. Ohne gespeicherte Auswahl darf eine unterstützte
+Browsersprache übernommen werden; andernfalls ist Englisch der Standard. Die
+Browserauswahl verändert nicht stillschweigend die Sprache des physischen
+Whisplay-Renderers.
 
 Systemupdates müssen direkt aus der lokalen Weboberfläche ausdrücklich
 bestätigt und gestartet werden können; eine SSH-Konsole darf dafür nicht
@@ -885,6 +897,17 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-31 – Browser-Sprachumschaltung und kompakter Live-Display-Kopf
+
+- Robert entfernt die redundante Überschrift `Geräteansicht` aus der festen
+  Live-Display-Karte; die kurze Bereichsmarke bleibt erhalten.
+- Die Browseroberfläche erhält eine lokal gespeicherte Sprachwahl für English,
+  Deutsch, Polski, Français und Español. Statische Beschriftungen sowie
+  dynamisch erzeugte Status-, Bedien- und Listenmeldungen verwenden denselben
+  kuratierten Übersetzungskatalog mit englischem Fallback.
+- Die Browsersprache bleibt eine Webpräferenz und ändert nicht ungefragt die
+  Sprache der physischen Geräteansicht.
 
 ### 2026-10-31 – Radioüberschrift auf halbe Größe reduziert
 

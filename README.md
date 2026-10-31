@@ -19,6 +19,8 @@ the installer report exactly which adapters still need configuration.
 - idempotent one-command online installer with no Git dependency
 - hardened `systemd` autostart service
 - responsive local web dashboard on `http://<raspberry-pi-ip>/`
+- persistent browser language switch for English, Deutsch, Polski, Français
+  and Español with an English fallback
 - explicitly confirmed system updates directly from the web dashboard
 - native Whisplay ST7789 boot animation installed and enabled automatically
 - safe display handoff both at boot and during an in-session installation
@@ -180,6 +182,10 @@ The dashboard separates radio, media/news, device, system and services into
 tabs instead of one long page. On desktop it keeps the exact native 240 × 280
 renderer output visible at the upper right; known stations reuse the same safe
 local artwork route in both playback cards and the sortable station editor.
+The language selector in the header translates static and generated browser
+controls, keeps its choice in local browser storage and does not silently
+change the independent physical-display language. The live-display card uses
+only its compact section label and has no redundant `Device view` heading.
 Local files copied below
 `/var/lib/openr4d10/media` appear after selecting **Neu einlesen**; their full
 paths never appear in the public status response.
