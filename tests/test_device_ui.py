@@ -206,12 +206,14 @@ class DeviceUiTests(unittest.TestCase):
             render_device_ui(state)
         self.assertIn("AUS", labels)
 
-    def test_dmr_view_uses_compact_activity_rows_instead_of_artwork(self) -> None:
+    def test_dmr_view_pins_active_call_above_scrollable_catalog_rows(self) -> None:
         state = DeviceUiState(
             service_index=SERVICES.index("DMR"),
             source="TG 262",
-            title="Germany",
+            title="DL1TEST",
             playing=True,
+            dmr_catalog_position=2,
+            dmr_catalog_count=1700,
             activity_rows=[
                 {
                     "talkgroup": 262,
@@ -221,21 +223,35 @@ class DeviceUiTests(unittest.TestCase):
                     "source": 2621234,
                     "alias": "DL1TEST",
                 },
+            ],
+            dmr_catalog_rows=[
                 {
                     "talkgroup": 91,
                     "name": "Worldwide",
                     "country_code": "",
-                    "active": False,
-                    "source": None,
-                    "alias": "",
+                    "enabled": True,
+                    "selected": False,
+                    "position": 1,
+                },
+                {
+                    "talkgroup": 3100,
+                    "name": "Inactive example",
+                    "country_code": "US",
+                    "enabled": False,
+                    "selected": True,
+                    "position": 2,
                 },
             ],
         )
         drawn = self._drawn_text(state)
-        self.assertIn("TG 262  Germany", drawn)
-        self.assertIn("DL1TEST", drawn)
+        self.assertIn("TG 262", drawn)
+        self.assertTrue(any("DL1TEST" in value for value in drawn))
         self.assertIn("TG 91  Worldwide", drawn)
-        self.assertIn("Bereit" if state.language == "de" else "Ready", drawn)
+        self.assertIn("TG 3100  Inactive example", drawn)
+        self.assertIn("2/1700", drawn)
+        self.assertIn("ON", drawn)
+        self.assertIn("OFF", drawn)
+        self.assertNotIn("PAUSE", drawn)
 
     def test_date_and_redundant_player_text_are_not_rendered(self) -> None:
         first = DeviceUiState(

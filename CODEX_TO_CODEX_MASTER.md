@@ -1144,12 +1144,23 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   In der DMR-Ansicht blättert die rechte äußere Achse einzeln durch den
   offiziellen Talkgroup-Katalog; die linke innere, dort nicht als Squelch
   benötigte Achse springt pro Rastung 25 Katalogeinträge vor oder zurück. Ein
-  kurzer rechter Druck aktiviert beziehungsweise deaktiviert die ausgewählte
-  Talkgroup in der persistenten Quickliste. Linke äußere Achse bleibt
-  Lautstärke, rechte innere Achse bleibt Dienstwahl. Der Funktionskopf muss
-  dienstabhängig stets die wirkliche Belegung aller vier Achsen anzeigen; in
-  BrandMeister sind deshalb eine lokalisierte Sprungfunktion und `TG` statt
-  eines sachlich falschen `SQL`/Kanal-Schemas sichtbar.
+  PTT-Druck aktiviert beziehungsweise deaktiviert die ausgewählte Talkgroup in
+  der persistenten Quickliste; nur die Druckflanke schaltet, die Loslassflanke
+  bleibt wirkungslos. Der bisherige kurze rechte Druck bleibt als kompatible
+  Zweitbedienung erhalten. Diese PTT-Belegung ist ausschließlich eine lokale
+  Listenaktion und sendet weder Sprache noch eine BrandMeister-PTT-Nachricht.
+  Linke äußere Achse bleibt Lautstärke, rechte innere Achse bleibt Dienstwahl.
+  Der Funktionskopf muss dienstabhängig stets die wirkliche Belegung aller vier
+  Achsen anzeigen; in BrandMeister sind deshalb eine lokalisierte
+  Sprungfunktion und `TG` statt eines sachlich falschen `SQL`/Kanal-Schemas
+  sichtbar.
+- Die BrandMeister-Geräteansicht ist keine einzelne TG-Karte und verwendet kein
+  dekoratives TG- oder Länderbild. Eine gerade sprechende abonnierte Talkgroup
+  steht mit tatsächlich empfangener Quell-ID beziehungsweise Alias immer in
+  einer eigenen kompakten Zeile oben. Darunter liegt ein virtuell scrollbares
+  Fenster des vollständigen offiziellen Talkgroup-Katalogs: aktivierte
+  Einträge zuerst, danach alle inaktiven Einträge. Markierung, An/Aus-Zustand
+  und Position im Gesamtkatalog müssen ohne Browser erkennbar bleiben.
 - Am 2026-10-31 bestätigt Robert während eines realen abonnierten HoseLine-Rufs
   hörbaren Ton aus dem montierten Whisplay-Lautsprecher. Damit ist der native
   WebSocket-/MessagePack-/G.711-µ-law-/PCM-/ALSA-Pfad bis zur realen Hardware
@@ -2756,3 +2767,18 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   kurzer Druck die ausgewählte TG aktiviert, und `AUS`, wenn er sie
   deaktiviert. Der Browser behält die Checkbox und schreibt zusätzlich den
   übersetzten Zustand An/Aus in dieselbe kompakte Zeile.
+
+### 2026-10-31 – Vollständige TG-Liste am Gerät und PTT-Umschaltung
+
+- Robert stellt klar, dass die DMR-Geräteansicht nicht nur eine einzelne
+  TG-Karte und auch nicht nur die bis zu fünf aktivierten Gruppen zeigen darf.
+  Eine aktuell sprechende abonnierte TG steht oben; darunter ist der gesamte
+  offizielle Katalog als begrenztes sichtbares Scrollfenster bedienbar.
+- Aktivierte TGs stehen im Geräte-Browsepfad zuerst, alle inaktiven folgen
+  darunter. Es werden trotzdem nur fünf Zeilen je Frame veröffentlicht und
+  gezeichnet; Drehen verschiebt dieses Fenster über den vollständigen lokalen
+  Katalog, damit Status und 240-x-280-Renderer begrenzt bleiben.
+- In der DMR-Ansicht schaltet die PTT-Druckflanke die markierte TG an oder aus.
+  Loslassen schaltet nicht erneut. Der bisherige rechte Kurzdruck bleibt als
+  kompatible Zweitbedienung. Beide Aktionen ändern nur die lokale Empfangsliste
+  und erzeugen ausdrücklich keine Sendung oder BrandMeister-PTT-Nachricht.

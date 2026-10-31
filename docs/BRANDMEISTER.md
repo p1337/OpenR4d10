@@ -34,13 +34,21 @@ and doesn't manage repeaters, hotspots or static account subscriptions.
 On the physical device, the right outer channel axis browses the complete
 official catalog one entry at a time. Because Squelch has no meaning for this
 IP-based DMR receiver, the left inner axis jumps 25 catalog entries per detent.
-The right short press adds and enables the selected talkgroup in the persistent
-quick list or disables an already saved entry. The header changes with the
-service and shows the real DMR assignments instead of `SQL` and a generic
-channel label. Up to five checked talkgroups are subscribed at once. The active
-call takes display priority and shows its destination, source ID, available
-alias and a conservative country flag cue. No transmit or PTT message exists
-in this adapter.
+The device renders a bounded scrolling window over that complete catalog, with
+enabled entries first and inactive entries below them. The selected row, its
+on/off state and its position in the full catalog stay visible. A currently
+speaking subscribed talkgroup is pinned above the scrolling rows and shows its
+destination, source ID and available alias. The device no longer renders a
+single decorative TG or country tile.
+
+Pressing the logical PTT button while the BrandMeister view is open adds and
+enables the selected talkgroup in the persistent quick list or disables an
+already saved entry. Only the press edge toggles it; release is inert. The
+right short press remains a compatibility shortcut for the same action. The
+header changes with the service and shows the real DMR assignments instead of
+`SQL` and a generic channel label. Up to five checked talkgroups are subscribed
+at once. This PTT use is only a local list action: no transmit or BrandMeister
+PTT message exists in this adapter.
 
 The native receiver keeps one bounded current/last-heard row for each of the
 up to five subscribed talkgroups. A row contains only data actually observed
@@ -53,9 +61,10 @@ callsign enrichment through third-party subscriber databases is deliberately
 not performed without a separately reviewed data-use contract.
 
 The selected talkgroup's device action is explicit: `ON`/localized `AN` means
-the next short right press enables it; `OFF`/localized `AUS` means the press
-disables it. Browser rows combine the normal checkbox with the same translated
-written state. No separate save step is required.
+the next PTT press or compatible short right press enables it;
+`OFF`/localized `AUS` means the same action disables it. Browser rows combine
+the normal checkbox with the same translated written state. No separate save
+step is required.
 
 On 2026-10-31 the user heard a real subscribed HoseLine call through the fitted
 Whisplay speaker. This confirms the complete native WebSocket, MessagePack,

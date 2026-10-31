@@ -572,7 +572,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(opened["weather_channel_id"], 2)
         self.assertEqual(stepped["weather_channel_id"], 2)
 
-    def test_dmr_axes_browse_one_or_twenty_five_and_enter_toggles(self) -> None:
+    def test_dmr_axes_browse_and_ptt_or_enter_toggle_selected_talkgroup(self) -> None:
         class InputDisplay:
             def render(self, _frame) -> None:
                 pass
@@ -619,6 +619,8 @@ class AppTests(unittest.TestCase):
             )
             app.control({"action": "device_input", "control": "right_outer", "steps": 1})
             app.control({"action": "device_input", "control": "left_inner", "steps": -1})
+            app.control({"action": "device_input", "control": "ptt", "active": True})
+            app.control({"action": "device_input", "control": "ptt", "active": False})
             app.control({"action": "device_input", "control": "right_press"})
 
         self.assertEqual(
@@ -626,6 +628,7 @@ class AppTests(unittest.TestCase):
             [
                 {"action": "brandmeister_step", "steps": 1},
                 {"action": "brandmeister_step", "steps": -25},
+                {"action": "brandmeister_toggle_selected"},
                 {"action": "brandmeister_toggle_selected"},
             ],
         )

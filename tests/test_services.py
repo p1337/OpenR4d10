@@ -645,6 +645,21 @@ class ServiceCatalogTests(unittest.TestCase):
                 snapshot = catalog.snapshot()["brandmeister"]
                 self.assertEqual(snapshot["selected_talkgroup"], 117)
                 self.assertIn(117, snapshot["talkgroups"])
+                frame = catalog.receiver_overlay("DMR")
+                self.assertEqual(frame["catalog_position"], 2)
+                self.assertEqual(frame["catalog_count"], 60)
+                self.assertEqual(
+                    [item["talkgroup"] for item in frame["catalog_rows"][:2]],
+                    [91, 117],
+                )
+                self.assertTrue(frame["catalog_rows"][1]["selected"])
+                self.assertTrue(frame["catalog_rows"][1]["enabled"])
+                self.assertTrue(
+                    all(
+                        item["enabled"] is False
+                        for item in catalog._brandmeister_device_entries(allow_network=False)[2:]
+                    )
+                )
             finally:
                 catalog.close()
 

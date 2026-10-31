@@ -346,6 +346,16 @@ class OpenR4d10App:
             and event.control == Control.PTT
             and event.active is True
             and not menu_open
+            and selected_service == "DMR"
+        ):
+            media_result = self.services.control(
+                {"action": "brandmeister_toggle_selected"}
+            )
+        elif (
+            self.services is not None
+            and event.control == Control.PTT
+            and event.active is True
+            and not menu_open
             and selected_service == "RADIO"
         ):
             media_result = self.services.control({"action": "radio_keep_current"})

@@ -301,6 +301,9 @@ class DeviceUiState:
     image_file: str | None = None
     flag_code: str | None = None
     activity_rows: list[dict[str, object]] = field(default_factory=list)
+    dmr_catalog_rows: list[dict[str, object]] = field(default_factory=list)
+    dmr_catalog_position: int = 0
+    dmr_catalog_count: int = 0
     dmr_selected_enabled: bool = False
     title: str = "System online"
     subtitle: str = "Receiver ready"
@@ -350,6 +353,9 @@ class DeviceUiState:
             "image_file": self.image_file,
             "flag_code": self.flag_code,
             "activity_rows": [dict(item) for item in self.activity_rows],
+            "dmr_catalog_rows": [dict(item) for item in self.dmr_catalog_rows],
+            "dmr_catalog_position": self.dmr_catalog_position,
+            "dmr_catalog_count": self.dmr_catalog_count,
             "dmr_selected_enabled": self.dmr_selected_enabled,
             "accent_color": "#{:02X}{:02X}{:02X}".format(*self.accent),
         }
@@ -482,6 +488,7 @@ class DeviceUiState:
             else None
         )
         activity_rows = receiver.get("activity_rows")
+        catalog_rows = receiver.get("catalog_rows")
         self.dmr_selected_enabled = receiver.get("selected_enabled") is True
         self.activity_rows = []
         if isinstance(activity_rows, list):
@@ -502,6 +509,39 @@ class DeviceUiState:
                         "alias": str(item.get("alias") or "")[:40],
                     }
                 )
+        self.dmr_catalog_rows = []
+        if isinstance(catalog_rows, list):
+            for item in catalog_rows[:5]:
+                if not isinstance(item, Mapping):
+                    continue
+                talkgroup = item.get("talkgroup")
+                if not isinstance(talkgroup, int) or isinstance(talkgroup, bool):
+                    continue
+                self.dmr_catalog_rows.append(
+                    {
+                        "talkgroup": talkgroup,
+                        "name": str(item.get("name") or "")[:40],
+                        "country_code": str(item.get("country_code") or "")[:2].upper(),
+                        "enabled": item.get("enabled") is True,
+                        "selected": item.get("selected") is True,
+                        "position": item.get("position")
+                        if isinstance(item.get("position"), int)
+                        and not isinstance(item.get("position"), bool)
+                        else None,
+                    }
+                )
+        catalog_position = receiver.get("catalog_position")
+        catalog_count = receiver.get("catalog_count")
+        self.dmr_catalog_position = (
+            catalog_position
+            if isinstance(catalog_position, int) and not isinstance(catalog_position, bool)
+            else 0
+        )
+        self.dmr_catalog_count = (
+            catalog_count
+            if isinstance(catalog_count, int) and not isinstance(catalog_count, bool)
+            else 0
+        )
         if not self.menu_open:
             self.title = str(receiver.get("title") or frame.title)[:48]
             self.subtitle = str(receiver.get("subtitle") or frame.body)[:72]
@@ -1125,59 +1165,98 @@ def render_device_ui(
     _draw_player_edge_glow(image, content_top, accent)
     draw = ImageDraw.Draw(image)
 
-    station_font = _font(18, bold=True)
-    station = _fit_text(draw, state.source, station_font, 164)
-    draw.text((14, content_top + 4), station, font=station_font, fill=(245, 248, 249))
-
     if state.service == "DMR":
+        active_row = next(
+            (item for item in state.activity_rows if item.get("active") is True),
+            None,
+        )
+        if active_row is not None:
+            draw.rounded_rectangle(
+                (9, content_top + 2, 230, content_top + 40),
+                radius=8,
+                fill=(28, 38, 34),
+                outline=accent,
+                width=2,
+            )
+        station_font = _font(16, bold=True)
+        station = _fit_text(draw, state.source, station_font, 153)
+        draw.text((14, content_top + 4), station, font=station_font, fill=(245, 248, 249))
         detail_font = _font(9, bold=True)
-        detail = state.title if state.title.casefold() != state.source.casefold() else state.subtitle
+        if active_row is not None:
+            active_name = str(active_row.get("name") or "")
+            active_alias = str(active_row.get("alias") or "")
+            active_source = active_row.get("source")
+            active_identity = active_alias or (
+                f"DMR {active_source}" if isinstance(active_source, int) else ""
+            )
+            detail = " · ".join(
+                value for value in (active_name, active_identity) if value
+            )
+        else:
+            detail = state.title if state.title.casefold() != state.source.casefold() else state.subtitle
         draw.text(
             (14, content_top + 27),
-            _fit_text(draw, _localized_device_text(detail, text), detail_font, 164),
+            _fit_text(draw, _localized_device_text(detail, text), detail_font, 153),
             font=detail_font,
             fill=(196, 207, 209),
         )
-        draw.ellipse(
-            (200, content_top + 5, 234, content_top + 39),
-            fill=(12, 23, 27),
-            outline=accent,
-            width=2,
+        position = (
+            f"{state.dmr_catalog_position}/{state.dmr_catalog_count}"
+            if state.dmr_catalog_count
+            else "--"
         )
-        if state.playing:
-            draw.rectangle((211, content_top + 15, 214, content_top + 29), fill=accent)
-            draw.rectangle((220, content_top + 15, 223, content_top + 29), fill=accent)
-        else:
-            draw.polygon(
-                ((211, content_top + 13), (211, content_top + 31), (225, content_top + 22)),
-                fill=accent,
-            )
+        position_font = _font(9, bold=True)
+        position_width = draw.textbbox((0, 0), position, font=position_font)[2]
+        draw.text(
+            (226 - position_width, content_top + 15),
+            position,
+            font=position_font,
+            fill=accent,
+        )
         list_top = content_top + 45
-        if not state.activity_rows:
+        if not state.dmr_catalog_rows:
             empty_font = _font(12, bold=True)
             empty = _localized_device_text("Select talkgroups and press play", text)
             draw.text((14, list_top + 22), _fit_text(draw, empty, empty_font, 208), font=empty_font, fill=(178, 187, 189))
-        for index, item in enumerate(state.activity_rows[:5]):
-            top = list_top + index * 33
-            active = item.get("active") is True
-            if active:
-                draw.rounded_rectangle((9, top, 230, top + 29), radius=7, fill=(28, 38, 34), outline=accent, width=2)
+        for index, item in enumerate(state.dmr_catalog_rows[:5]):
+            top = list_top + index * 31
+            selected = item.get("selected") is True
+            enabled = item.get("enabled") is True
+            draw.rounded_rectangle(
+                (9, top, 230, top + 27),
+                radius=7,
+                fill=(23, 33, 30) if enabled else (11, 22, 25),
+                outline=accent if selected else (45, 61, 65),
+                width=2 if selected else 1,
+            )
+            if enabled:
+                draw.ellipse((15, top + 8, 26, top + 19), fill=accent)
             else:
-                draw.rounded_rectangle((9, top, 230, top + 29), radius=7, fill=(11, 22, 25), outline=(45, 61, 65), width=1)
-            icon_fill = accent if active else (77, 94, 98)
-            draw.ellipse((15, top + 8, 26, top + 19), fill=icon_fill)
+                draw.ellipse((15, top + 8, 26, top + 19), outline=(91, 108, 112), width=2)
             code = str(item.get("country_code") or "TG")[:2]
             code_font = _font(7, bold=True)
-            draw.text((31, top + 2), code, font=code_font, fill=accent if active else (151, 164, 167))
+            draw.text((31, top + 2), code, font=code_font, fill=accent if enabled else (151, 164, 167))
             primary_font = _font(10, bold=True)
             primary = f"TG {item['talkgroup']}  {item.get('name') or ''}".strip()
-            draw.text((49, top + 1), _fit_text(draw, primary, primary_font, 173), font=primary_font, fill=(240, 245, 246))
-            alias = str(item.get("alias") or "")
-            source = item.get("source")
-            secondary = alias or (f"DMR {source}" if isinstance(source, int) else str(text["ready"]))
+            draw.text((49, top + 1), _fit_text(draw, primary, primary_font, 140), font=primary_font, fill=(240, 245, 246))
             secondary_font = _font(8)
-            draw.text((49, top + 16), _fit_text(draw, secondary, secondary_font, 173), font=secondary_font, fill=(171, 184, 187))
+            row_position = item.get("position")
+            secondary = f"#{row_position}" if isinstance(row_position, int) else ""
+            draw.text((49, top + 15), secondary, font=secondary_font, fill=(171, 184, 187))
+            state_label = str(text["dmr_on"] if enabled else text["dmr_off"])
+            state_font = _font(8, bold=True)
+            state_width = draw.textbbox((0, 0), state_label, font=state_font)[2]
+            draw.text(
+                (222 - state_width, top + 9),
+                state_label,
+                font=state_font,
+                fill=accent if selected else (151, 164, 167),
+            )
         return image.convert("RGB")
+
+    station_font = _font(18, bold=True)
+    station = _fit_text(draw, state.source, station_font, 164)
+    draw.text((14, content_top + 4), station, font=station_font, fill=(245, 248, 249))
 
     if state.service == "WEATHER":
         credit_font = _font(8, bold=True)

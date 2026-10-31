@@ -370,6 +370,102 @@ class ServiceCatalog:
         with self._brandmeister_catalog_guard:
             return list(self._brandmeister_catalog_entries_cache)
 
+    def _brandmeister_device_entries(self, *, allow_network: bool) -> list[dict[str, object]]:
+        """Return the complete device browsing order without exposing it publicly.
+
+        Enabled saved groups come first, followed by disabled saved groups and
+        then the remaining official catalog.  The renderer receives only a
+        small window around the selected entry, so even the full official
+        catalog stays bounded in status frames.
+        """
+
+        official = self._brandmeister_catalog_entries(allow_network=allow_network)
+        official_by_talkgroup = {
+            int(item["talkgroup"]): item
+            for item in official
+            if isinstance(item.get("talkgroup"), int)
+            and not isinstance(item.get("talkgroup"), bool)
+        }
+        saved: list[dict[str, object]] = []
+        for channel in self.store.channels("brandmeister"):
+            metadata = channel.get("metadata")
+            metadata = metadata if isinstance(metadata, dict) else {}
+            talkgroup = metadata.get("talkgroup")
+            if not isinstance(talkgroup, int) or isinstance(talkgroup, bool):
+                continue
+            official_entry = official_by_talkgroup.get(talkgroup, {})
+            saved.append(
+                {
+                    "talkgroup": talkgroup,
+                    "name": str(official_entry.get("name") or channel["name"]),
+                    "country_code": str(
+                        official_entry.get("country_code")
+                        or country_code(talkgroup)
+                        or ""
+                    )[:2].upper(),
+                    "enabled": metadata.get("enabled") is True,
+                    "channel_id": int(channel["id"]),
+                }
+            )
+
+        ordered: list[dict[str, object]] = []
+        seen: set[int] = set()
+        for enabled in (True, False):
+            for item in saved:
+                talkgroup = int(item["talkgroup"])
+                if item["enabled"] is enabled and talkgroup not in seen:
+                    ordered.append(item)
+                    seen.add(talkgroup)
+        for item in official:
+            talkgroup = item.get("talkgroup")
+            if (
+                not isinstance(talkgroup, int)
+                or isinstance(talkgroup, bool)
+                or talkgroup in seen
+            ):
+                continue
+            ordered.append(
+                {
+                    "talkgroup": talkgroup,
+                    "name": str(item.get("name") or f"TG {talkgroup}"),
+                    "country_code": str(
+                        item.get("country_code") or country_code(talkgroup) or ""
+                    )[:2].upper(),
+                    "enabled": False,
+                    "channel_id": None,
+                }
+            )
+            seen.add(talkgroup)
+        return ordered
+
+    def _brandmeister_device_window(
+        self, entries: list[dict[str, object]], *, size: int = 5
+    ) -> tuple[list[dict[str, object]], int, int]:
+        """Return a bounded, scrollable catalog window for the 240x280 UI."""
+
+        total = len(entries)
+        if total == 0:
+            return [], 0, 0
+        talkgroups = [int(item["talkgroup"]) for item in entries]
+        selected_index = (
+            talkgroups.index(self.selected_brandmeister_talkgroup)
+            if self.selected_brandmeister_talkgroup in talkgroups
+            else 0
+        )
+        if self.selected_brandmeister_talkgroup not in talkgroups:
+            self.selected_brandmeister_talkgroup = talkgroups[selected_index]
+        window_size = max(1, min(size, total))
+        start = max(0, min(selected_index - window_size // 2, total - window_size))
+        rows = []
+        for absolute_index, item in enumerate(
+            entries[start : start + window_size], start=start
+        ):
+            row = dict(item)
+            row["selected"] = absolute_index == selected_index
+            row["position"] = absolute_index + 1
+            rows.append(row)
+        return rows, selected_index + 1, total
+
     def _saved_brandmeister_channel_for_talkgroup(
         self, talkgroup: int | None
     ) -> dict[str, object] | None:
@@ -1383,18 +1479,7 @@ class ServiceCatalog:
             steps = request.get("steps")
             if isinstance(steps, bool) or not isinstance(steps, int) or steps == 0 or abs(steps) > 250:
                 raise ValueError("BrandMeister steps must be between -250 and 250")
-            entries = self._brandmeister_catalog_entries(allow_network=True)
-            if not entries:
-                entries = [
-                    {
-                        "talkgroup": metadata.get("talkgroup"),
-                        "name": str(channel["name"]),
-                    }
-                    for channel in self.store.channels("brandmeister")
-                    for metadata in [channel.get("metadata")]
-                    if isinstance(metadata, dict)
-                    and isinstance(metadata.get("talkgroup"), int)
-                ]
+            entries = self._brandmeister_device_entries(allow_network=True)
             if not entries:
                 raise ValueError("the BrandMeister talkgroup catalog is empty")
             talkgroups = [int(entry["talkgroup"]) for entry in entries]
@@ -2452,10 +2537,13 @@ class ServiceCatalog:
             source = state.get("source")
             alias = state.get("alias")
             status = str(state.get("status") or "stopped")
-            catalog_entries = self._brandmeister_catalog_entries(allow_network=False)
+            catalog_entries = self._brandmeister_device_entries(allow_network=False)
             catalog_talkgroups = [int(item["talkgroup"]) for item in catalog_entries]
             listening = status in {"connecting", "listening", "call", "reconnecting"}
             activity_rows = self._brandmeister_activity_rows(state)
+            catalog_rows, catalog_position, catalog_count = self._brandmeister_device_window(
+                catalog_entries
+            )
             return {
                 "service": "DMR",
                 "station": f"TG {active_talkgroup}" if isinstance(active_talkgroup, int) else "BrandMeister",
@@ -2477,6 +2565,9 @@ class ServiceCatalog:
                 "channel_label": str(selected_talkgroup) if selected_talkgroup is not None else "--",
                 "flag_code": country_code(active_talkgroup) if isinstance(active_talkgroup, int) else None,
                 "activity_rows": activity_rows,
+                "catalog_rows": catalog_rows,
+                "catalog_position": catalog_position,
+                "catalog_count": catalog_count,
                 "selected_enabled": selected_enabled,
             }
         service_label = {
