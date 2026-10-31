@@ -18,6 +18,7 @@ HEIGHT = 280
 DISPLAY_CORNER_RADIUS = 43
 MEDIA_TOP_RADIUS = 12
 MEDIA_MARGIN = 7
+PLAYER_GLOW_STRENGTH = 1.3
 DEFAULT_ACCENT = (253, 184, 19)
 SERVICES = ("SYSTEM", "RADIO", "WEATHER", "DMR", "PLAYER", "REC")
 MAIN_MENU_ITEMS = (
@@ -563,6 +564,8 @@ def _control_value(
     label: str,
     value: str,
     accent: tuple[int, int, int],
+    *,
+    mirrored: bool = False,
 ) -> None:
     # The physical 240 px panel needs the reviewed 1.2x larger header controls.
     small = _font(12, bold=True)
@@ -570,14 +573,20 @@ def _control_value(
     glyph_top = y + 3
     label_box = draw.textbbox((0, 0), label, font=small)
     value_box = draw.textbbox((0, 0), value, font=large)
+    if mirrored:
+        value_x = x + 6
+        label_x = x + 90 - label_box[2]
+    else:
+        label_x = x
+        value_x = x + 34
     draw.text(
-        (x, glyph_top - label_box[1]),
+        (label_x, glyph_top - label_box[1]),
         label,
         font=small,
         fill=(128, 140, 145),
     )
     draw.text(
-        (x + 34, glyph_top - value_box[1]),
+        (value_x, glyph_top - value_box[1]),
         value,
         font=large,
         fill=accent,
@@ -727,6 +736,9 @@ def _draw_player_edge_glow(
     corner_draw.rectangle((WIDTH - 62, HEIGHT - 62, WIDTH - 1, HEIGHT - 1), fill=135)
     corner_balance = corner_balance.filter(ImageFilter.GaussianBlur(radius=10))
     alpha = ImageChops.multiply(visible.getchannel("A"), panel_mask)
+    alpha = alpha.point(
+        [min(248, round(level * PLAYER_GLOW_STRENGTH)) for level in range(256)]
+    )
     visible.putalpha(ImageChops.multiply(alpha, corner_balance))
     image.alpha_composite(visible)
 
@@ -889,9 +901,25 @@ def render_device_ui(
     _vertical_label(image, right_action, 221, clockwise=False, header_height=header_height)
     _control_value(draw, 19, 1, str(controls[0]), f"{state.volume}%", accent)
     _control_value(draw, 19, 20, str(controls[1]), str(state.squelch), accent)
-    _control_value(draw, 122, 1, str(controls[2]), f"{state.channel:03d}", accent)
+    _control_value(
+        draw,
+        122,
+        1,
+        str(controls[2]),
+        f"{state.channel:03d}",
+        accent,
+        mirrored=True,
+    )
     service_label = str(text["weather_service"]) if state.service == "WEATHER" else state.service
-    _control_value(draw, 122, 20, str(controls[3]), service_label, accent)
+    _control_value(
+        draw,
+        122,
+        20,
+        str(controls[3]),
+        service_label,
+        accent,
+        mirrored=True,
+    )
 
     draw.rectangle((0, 40, WIDTH - 1, 62), fill=(12, 20, 23))
     _wifi_icon(draw, 5, 45, accent)

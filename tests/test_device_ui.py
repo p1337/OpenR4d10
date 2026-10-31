@@ -165,6 +165,13 @@ class DeviceUiTests(unittest.TestCase):
             label_top = measure.textbbox(label_xy, label, font=label_font)[1]
             value_top = measure.textbbox(value_xy, value, font=value_font)[1]
             self.assertEqual(label_top, value_top)
+        self.assertLess(positions["LAU"][0][0], positions["30%"][0][0])
+        self.assertLess(positions["001"][0][0], positions["KAN"][0][0])
+        self.assertLess(positions["SYSTEM"][0][0], positions["DST"][0][0])
+        for label in ("KAN", "DST"):
+            label_xy, label_font = positions[label]
+            label_right = measure.textbbox(label_xy, label, font=label_font)[2]
+            self.assertEqual(label_right, 212)
 
     def test_date_and_redundant_player_text_are_not_rendered(self) -> None:
         first = DeviceUiState(
@@ -295,7 +302,7 @@ class DeviceUiTests(unittest.TestCase):
             self.assertNotEqual(pixel, DEFAULT_ACCENT)
             self.assertGreaterEqual(
                 sum(abs(channel - base) for channel, base in zip(pixel, background)),
-                70,
+                90,
             )
         for clipped_corner in ((0, HEIGHT - 1), (WIDTH - 1, HEIGHT - 1)):
             self.assertEqual(image.getpixel(clipped_corner), background)

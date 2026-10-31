@@ -52,7 +52,8 @@ for an explicit ready PTT context. The five curated languages
 use the same renderer and fall back to English for unknown language codes.
 Header tests additionally compare the visible bounding-box top of every
 localized control label with its associated value; a fixed origin offset is
-insufficient because the two font sizes have different metrics.
+insufficient because the two font sizes have different metrics. They also
+require the mirrored right-side order and one common right label edge.
 
 The normal `run` command also creates a migrated non-secret state database in
 the configured state directory. Tests must always point this at a temporary
@@ -160,6 +161,8 @@ the player edge glow; `screen_border_enabled` is no longer a public or active
 setting. Tests cover persistence, malformed colors, the straight top glow below
 the status row, the R5 curve, a clearly visible minimum glow intensity and the
 absence of any pixel in the glow samples that exactly equals the accent color.
+The permanent glow strength is explicitly `1.3`; do not replace it with an
+unmeasured color or line-width change.
 That last assertion prevents a crisp line from returning. Device media use the
 shared asymmetric mask: 12-pixel top corners, 43-pixel panel-matched lower
 corners and equal minimal side/bottom margins. New device text must use at

@@ -1076,6 +1076,19 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-31 – Symmetrischer Funktionskopf und Glow-Faktor 1,3
+
+- Der zweizeilige Funktionskopf wird als gespiegeltes Raster aufgeräumt. Links
+  stehen weiterhin Bezeichnung und Wert (`LAU 30%`, `SQL 5`). Rechts stehen
+  Wert und Bezeichnung (`001 KAN`, `RADIO DST`), sodass alle Werte zur
+  Displaymitte und alle Bezeichnungen zu den äußeren Bedienseiten orientiert
+  sind.
+- Zeilenhöhe, sichtbare Glyphenoberkante, Innenabstand zum Mittelsteg und
+  Außenabstand werden aus gemeinsamen Layoutkonstanten erzeugt und getestet.
+- Die Alpha-Intensität des vorhandenen permanenten Player-Glows wird mit Faktor
+  `1,3` verstärkt. Form, weicher Verlauf, fehlende harte Linie und die gezielte
+  Abschwächung der unteren Eckbereiche bleiben erhalten.
+
 ### 2026-10-31 – Kopfzeilenkürzel und Werte exakt ausgerichtet
 
 - Die lokalisierten Kürzel `LAU`, `SQL`, `KAN`, `DST` beziehungsweise ihre

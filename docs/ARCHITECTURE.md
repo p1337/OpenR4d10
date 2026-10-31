@@ -102,7 +102,9 @@ visible through the button icon and actual media state. The old bottom status/
 brand strip is removed and its space belongs to the larger station artwork.
 Each localized control label and its larger value are positioned from their
 actual font bounding boxes so their visible glyph tops align exactly in both
-header rows.
+header rows. The two halves are mirrored: labels precede values on the left,
+while values precede right-aligned labels on the right. This keeps all values
+toward the center divider and all control names toward the physical controls.
 When `DeviceUiState.menu_open` identifies the main menu, the renderer exits the
 player branch entirely and paints the localized heading plus the documented
 ten-item settings list. The right outer encoder moves only the bounded menu
