@@ -200,6 +200,6 @@ def load_hardware_config(path: Path) -> HardwareConfig:
         display=_adapter(
             data, "display", {"unconfigured", "file", "command", "whisplay"}
         ),
-        power=_adapter(data, "power", {"unconfigured", "command"}),
+        power=_adapter(data, "power", {"unconfigured", "command", "pisugar3"}),
         receiver=_adapter(data, "receiver", {"system", "command"}),
     )

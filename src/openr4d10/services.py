@@ -43,6 +43,9 @@ DEFAULT_ENABLED_SERVICES = {
 }
 DISPLAY_BRIGHTNESS_KEY = "display.brightness_percent"
 DEFAULT_DISPLAY_BRIGHTNESS = 100
+UI_ACCENT_COLOR_KEY = "ui.accent_color"
+DEFAULT_UI_ACCENT_COLOR = "#FDB813"
+SCREEN_BORDER_ENABLED_KEY = "ui.screen_border_enabled"
 RADAR_DEFAULT_MIGRATION_KEY = "weather.radar_default_v1"
 GERMANY_SATELLITE_MIGRATION_KEY = "weather.germany_satellite_v1"
 RADIO_DEFAULTS_V2_MIGRATION_KEY = "radio.defaults_seeded_v2"
@@ -287,6 +290,39 @@ class ServiceCatalog:
         self.store.set_setting(DISPLAY_BRIGHTNESS_KEY, brightness_percent)
         return brightness_percent
 
+    def display_appearance(self) -> dict[str, object]:
+        accent = self.store.get_setting(UI_ACCENT_COLOR_KEY, DEFAULT_UI_ACCENT_COLOR)
+        if not isinstance(accent, str) or re.fullmatch(r"#[0-9A-Fa-f]{6}", accent) is None:
+            LOG.warning("Ignoring invalid persisted UI accent color: %r", accent)
+            accent = DEFAULT_UI_ACCENT_COLOR
+        enabled = self.store.get_setting(SCREEN_BORDER_ENABLED_KEY, True)
+        if not isinstance(enabled, bool):
+            LOG.warning("Ignoring invalid persisted screen-border setting: %r", enabled)
+            enabled = True
+        return {
+            "accent_color": accent.upper(),
+            "screen_border_enabled": enabled,
+        }
+
+    def set_display_appearance(
+        self,
+        accent_color: str,
+        screen_border_enabled: bool,
+    ) -> dict[str, object]:
+        if not isinstance(accent_color, str) or re.fullmatch(
+            r"#[0-9A-Fa-f]{6}", accent_color
+        ) is None:
+            raise ValueError("accent color must use #RRGGBB")
+        if not isinstance(screen_border_enabled, bool):
+            raise ValueError("screen border setting must be true or false")
+        normalized = accent_color.upper()
+        self.store.set_setting(UI_ACCENT_COLOR_KEY, normalized)
+        self.store.set_setting(SCREEN_BORDER_ENABLED_KEY, screen_border_enabled)
+        return {
+            "accent_color": normalized,
+            "screen_border_enabled": screen_border_enabled,
+        }
+
     @staticmethod
     def _track_part(value: str, fallback: str, limit: int) -> str:
         cleaned = unicodedata.normalize("NFKC", value or "")
@@ -507,6 +543,7 @@ class ServiceCatalog:
             "schema_version": SCHEMA_VERSION,
             "settings": {
                 "display_brightness_percent": self.display_brightness(),
+                **self.display_appearance(),
             },
             "total": len(services),
             "ready": sum(item["readiness"] == "ready" for item in services),

@@ -51,7 +51,7 @@ readonly SOURCE_ROOT
 required=(
     VERSION README.md
     src/openr4d10/__main__.py src/openr4d10/radio_capture.py
-    config/openr4d10.toml config/hardware.toml
+    config/openr4d10.toml config/hardware.toml config/openr4d10-i2c.conf
     assets/boot/text-sequence.toml
     web/index.html web/app.css web/app.js web/i18n.json
     systemd/openr4d10.service systemd/openr4d10-update.service
@@ -156,7 +156,7 @@ kernel_build_root="/lib/modules/$kernel_release/build"
 [[ -x "$kernel_build_root/scripts/basic/fixdep" ]] \
     || die "Matching kernel headers are incomplete: $kernel_build_root/scripts/basic/fixdep is missing"
 
-for system_group in openr4d10 gpio spi audio; do
+for system_group in openr4d10 gpio spi audio i2c; do
     if ! getent group "$system_group" >/dev/null; then
         groupadd --system "$system_group"
     fi
@@ -165,7 +165,14 @@ if ! id -u openr4d10 >/dev/null 2>&1; then
     useradd --system --gid openr4d10 --home-dir /var/lib/openr4d10 \
         --shell /usr/sbin/nologin openr4d10
 fi
-usermod --append --groups gpio,spi,audio openr4d10
+usermod --append --groups gpio,spi,audio,i2c openr4d10
+
+# PiSugar 3 telemetry uses only the documented read-only I2C register path.
+# The character device module is loaded now and again automatically on boot.
+install -m 0644 -o root -g root \
+    "$SOURCE_ROOT/config/openr4d10-i2c.conf" \
+    /etc/modules-load.d/openr4d10-i2c.conf
+modprobe i2c-dev || die "Cannot load the i2c-dev module required for PiSugar 3 telemetry"
 
 release_root="$INSTALL_ROOT/releases/$version"
 
@@ -198,10 +205,10 @@ for config_name in openr4d10.toml hardware.toml; do
     fi
 done
 
-# Version 0.3 shipped the Whisplay boot player but kept the live application
-# display backend unconfigured. Migrate only that exact placeholder and leave
-# every other local hardware setting untouched. On a fresh installation the
-# new default already contains the Whisplay backend, so this is a no-op.
+# Earlier releases kept the verified Whisplay and PiSugar 3 target adapters as
+# exact unconfigured placeholders. Migrate only those placeholders and leave
+# every command/file adapter and all local arguments untouched. On a fresh
+# installation the current defaults already make this a no-op.
 python3 - "$CONFIG_ROOT/hardware.toml" <<'PY'
 from pathlib import Path
 import sys
@@ -218,7 +225,10 @@ for index, line in enumerate(lines):
         newline = "\n" if line.endswith("\n") else ""
         lines[index] = 'backend = "whisplay"' + newline
         changed = True
-        break
+    elif section == "power" and stripped == 'backend = "unconfigured"':
+        newline = "\n" if line.endswith("\n") else ""
+        lines[index] = 'backend = "pisugar3"' + newline
+        changed = True
 if changed:
     path.write_text("".join(lines), encoding="utf-8")
 PY

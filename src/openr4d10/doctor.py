@@ -10,6 +10,7 @@ import platform
 
 from .boot import load_boot_sequence
 from .config import AppConfig, HardwareConfig
+from .adapters import AdapterError, PiSugar3Telemetry
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,6 +167,13 @@ def run_checks(
             checks.append(_command_check(component, adapter.command))
         elif component == "display" and adapter.backend == "whisplay":
             checks.extend(_whisplay_checks())
+        elif component == "power" and adapter.backend == "pisugar3":
+            try:
+                battery = PiSugar3Telemetry().read()["battery_percent"]
+            except (AdapterError, OSError, ValueError) as exc:
+                checks.append(Check("WARN", f"PiSugar 3 telemetry is unavailable: {exc}"))
+            else:
+                checks.append(Check("OK", f"PiSugar 3 battery telemetry is available: {battery}%"))
         else:
             checks.append(Check("OK", f"{component} backend is {adapter.backend}"))
     return checks

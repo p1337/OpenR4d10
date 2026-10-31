@@ -1,5 +1,5 @@
-# Whisplay uses the verified ST7789 profile documented in docs/HARDWARE.md.
-# PiSugar telemetry deliberately remains unconfigured until its API is verified.
+# Whisplay and the read-only PiSugar 3 percentage adapter use the verified
+# profiles documented in docs/HARDWARE.md.
 
 [display]
 backend = "whisplay"
@@ -9,8 +9,8 @@ backend = "whisplay"
 # timeout_seconds = 2.0
 
 [power]
-backend = "unconfigured"
-# Generic choice: "command".
+backend = "pisugar3"
+# Generic alternatives: "command" or "unconfigured".
 # command = ["/absolute/path/to/pisugar-helper", "status-json"]
 # timeout_seconds = 2.0
 

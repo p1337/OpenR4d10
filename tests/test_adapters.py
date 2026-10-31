@@ -1,11 +1,13 @@
 from pathlib import Path
 import json
 import subprocess
+import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
-from openr4d10.adapters import FileDisplay, SystemTelemetry
+from openr4d10.adapters import AdapterError, FileDisplay, PiSugar3Telemetry, SystemTelemetry
 from openr4d10.models import Frame
 
 
@@ -46,6 +48,35 @@ class AdapterTests(unittest.TestCase):
             telemetry = SystemTelemetry().read()
         self.assertEqual(telemetry["wifi"], "OFFLINE")
         self.assertEqual(telemetry["wifi_mode"], "disconnected")
+
+    def test_pisugar3_reads_only_identity_mode_and_capacity(self) -> None:
+        ioctl = Mock()
+        with (
+            patch.dict(sys.modules, {"fcntl": SimpleNamespace(ioctl=ioctl)}),
+            patch("openr4d10.adapters.os.open", return_value=17),
+            patch("openr4d10.adapters.os.write", return_value=1) as write,
+            patch("openr4d10.adapters.os.read", side_effect=[b"\x03", b"\x0f", b"\x51"]),
+            patch("openr4d10.adapters.os.close") as close,
+        ):
+            value = PiSugar3Telemetry().read()
+        self.assertEqual(value, {"state": "ready", "model": "PiSugar 3", "battery_percent": 81})
+        ioctl.assert_called_once_with(17, PiSugar3Telemetry.I2C_SLAVE, 0x57)
+        self.assertEqual(
+            [call.args[1] for call in write.call_args_list],
+            [b"\x00", b"\x01", b"\x2a"],
+        )
+        close.assert_called_once_with(17)
+
+    def test_pisugar3_rejects_an_unverified_device_identity(self) -> None:
+        with (
+            patch.dict(sys.modules, {"fcntl": SimpleNamespace(ioctl=Mock())}),
+            patch("openr4d10.adapters.os.open", return_value=17),
+            patch("openr4d10.adapters.os.write", return_value=1),
+            patch("openr4d10.adapters.os.read", side_effect=[b"\x02", b"\x0f"]),
+            patch("openr4d10.adapters.os.close"),
+            self.assertRaisesRegex(AdapterError, "did not identify a PiSugar 3"),
+        ):
+            PiSugar3Telemetry().read()
 
 
 if __name__ == "__main__":

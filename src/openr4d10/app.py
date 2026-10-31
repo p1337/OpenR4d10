@@ -60,6 +60,14 @@ class OpenR4d10App:
         brightness_setter = getattr(self.display, "set_brightness", None)
         if callable(brightness_reader) and callable(brightness_setter):
             brightness_setter(brightness_reader())
+        appearance_reader = getattr(self.services, "display_appearance", None)
+        appearance_setter = getattr(self.display, "set_appearance", None)
+        if callable(appearance_reader) and callable(appearance_setter):
+            appearance = appearance_reader()
+            appearance_setter(
+                appearance["accent_color"],
+                appearance["screen_border_enabled"],
+            )
 
     def request_stop(self, signum: int | None = None, _frame: object = None) -> None:
         if signum is not None:
@@ -130,6 +138,37 @@ class OpenR4d10App:
                 raise
             return {
                 "settings": {"display_brightness_percent": brightness},
+                "device_ui": (
+                    self.display.snapshot()
+                    if callable(getattr(self.display, "snapshot", None))
+                    else {}
+                ),
+            }
+        if request.get("action") == "display_appearance":
+            if self.services is None:
+                raise RuntimeError("settings control is unavailable")
+            accent_color = request.get("accent_color")
+            border_enabled = request.get("screen_border_enabled")
+            display_setter = getattr(self.display, "set_appearance", None)
+            persist = getattr(self.services, "set_display_appearance", None)
+            current = getattr(self.services, "display_appearance", None)
+            if not callable(display_setter):
+                raise RuntimeError("the configured display does not support appearance settings")
+            if not callable(persist) or not callable(current):
+                raise RuntimeError("persistent settings are unavailable")
+            previous = current()
+            display_setter(accent_color, border_enabled, redraw=True)
+            try:
+                settings = persist(accent_color, border_enabled)
+            except Exception:
+                display_setter(
+                    previous["accent_color"],
+                    previous["screen_border_enabled"],
+                    redraw=True,
+                )
+                raise
+            return {
+                "settings": settings,
                 "device_ui": (
                     self.display.snapshot()
                     if callable(getattr(self.display, "snapshot", None))

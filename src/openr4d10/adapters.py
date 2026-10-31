@@ -256,6 +256,27 @@ class WhisplayDisplay:
                 raise AdapterError(f"Whisplay brightness failed: {exc}") from exc
             self.brightness_percent = brightness_percent
 
+    def set_appearance(
+        self,
+        accent_color: str,
+        screen_border_enabled: bool,
+        *,
+        redraw: bool = False,
+    ) -> None:
+        if not isinstance(accent_color, str) or re.fullmatch(
+            r"#[0-9A-Fa-f]{6}", accent_color
+        ) is None:
+            raise ValueError("accent color must use #RRGGBB")
+        if not isinstance(screen_border_enabled, bool):
+            raise ValueError("screen border setting must be true or false")
+        with self._lock:
+            self.state.accent = tuple(
+                int(accent_color[index : index + 2], 16) for index in (1, 3, 5)
+            )
+            self.state.screen_border_enabled = screen_border_enabled
+            if redraw:
+                self._show_state()
+
     def _public_state(self) -> dict[str, object]:
         state = self.state.public_state()
         state["brightness_percent"] = self.brightness_percent
@@ -284,6 +305,70 @@ class UnconfiguredTelemetry:
 
     def read(self) -> Mapping[str, Any]:
         return {"state": "unconfigured", "component": self.component}
+
+
+class PiSugar3Telemetry:
+    """Read the documented PiSugar 3 battery percentage over I2C.
+
+    The adapter deliberately reads only the identity/mode registers and the
+    calculated battery percentage. It never changes charging, RTC, shutdown or
+    any other controller state.
+    """
+
+    I2C_SLAVE = 0x0703
+    ADDRESS = 0x57
+    VERSION_REGISTER = 0x00
+    MODE_REGISTER = 0x01
+    CAPACITY_REGISTER = 0x2A
+    VERSION_PISUGAR3 = 0x03
+    MODE_APPLICATION = 0x0F
+
+    def __init__(self, device: Path = Path("/dev/i2c-1")) -> None:
+        self.device = device
+        self._lock = threading.Lock()
+
+    @staticmethod
+    def _register(fd: int, register: int) -> int:
+        if os.write(fd, bytes((register,))) != 1:
+            raise AdapterError("PiSugar 3 register selection failed")
+        value = os.read(fd, 1)
+        if len(value) != 1:
+            raise AdapterError("PiSugar 3 returned an incomplete register value")
+        return value[0]
+
+    def read(self) -> Mapping[str, Any]:
+        try:
+            import fcntl
+        except ImportError as exc:  # pragma: no cover - Linux target boundary
+            raise AdapterError("PiSugar 3 I2C access is available only on Linux") from exc
+
+        flags = os.O_RDWR | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+        with self._lock:
+            try:
+                fd = os.open(self.device, flags)
+            except OSError as exc:
+                raise AdapterError(f"PiSugar 3 I2C device is unavailable: {self.device}") from exc
+            try:
+                fcntl.ioctl(fd, self.I2C_SLAVE, self.ADDRESS)
+                version = self._register(fd, self.VERSION_REGISTER)
+                mode = self._register(fd, self.MODE_REGISTER)
+                if version != self.VERSION_PISUGAR3 or mode != self.MODE_APPLICATION:
+                    raise AdapterError(
+                        "I2C address 0x57 did not identify a PiSugar 3 in application mode"
+                    )
+                capacity = self._register(fd, self.CAPACITY_REGISTER)
+            except OSError as exc:
+                raise AdapterError("PiSugar 3 I2C read failed") from exc
+            finally:
+                os.close(fd)
+
+        if not 0 <= capacity <= 100:
+            raise AdapterError("PiSugar 3 returned an invalid battery percentage")
+        return {
+            "state": "ready",
+            "model": "PiSugar 3",
+            "battery_percent": capacity,
+        }
 
 
 class SystemTelemetry:
@@ -402,6 +487,8 @@ def build_adapters(
     power: Telemetry
     if config.power.backend == "command":
         power = CommandTelemetry(config.power)
+    elif config.power.backend == "pisugar3":
+        power = PiSugar3Telemetry()
     else:
         power = UnconfiguredTelemetry("power")
 

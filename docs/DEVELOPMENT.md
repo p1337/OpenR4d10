@@ -142,6 +142,18 @@ started PWM on that claimed output. Raspberry Pi OS package 0.2.2 returns
 `bad PWM micros` for an idle stop. Tests must cover a steady endpoint before
 the first intermediate PWM value and cleanup in both active and idle states.
 
+`display_appearance` accepts one `#RRGGBB` accent string and one real boolean
+`screen_border_enabled`. Both values live in SQLite and are applied by the same
+Whisplay renderer used for the physical panel and PNG preview. Tests cover
+persistence, malformed colors/non-boolean flags, the enabled left/bottom/right
+border, its open top and the absent decorative player border when disabled.
+
+The `pisugar3` backend must verify registers `0x00 == 3` and `0x01 == 0x0F`
+before accepting register `0x2A` as a percentage. Tests mock the I2C boundary
+and require exactly those three register selections; no write-capable control
+register may appear. The installed unit may access only `/dev/i2c-1`, and the
+installer must load `i2c-dev` without installing a PiSugar web account.
+
 The `device_input` action is the hardware-free input source for the native
 display. It accepts only the checked-in logical control names, rotary steps
 from -10 through 10 excluding zero, press hold durations from 0 through 5

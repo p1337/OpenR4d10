@@ -311,7 +311,8 @@ Statuszeile:
 - links WLAN-Symbol mit drei Bögen,
 - direkt daneben WLAN-Modus/SSID und IP-Adresse,
 - Uhrzeit deutlich größer; das Datum wird nicht angezeigt,
-- Batteriestand rechts.
+- Batteriestand rechts; sobald die verifizierte PiSugar-3-Telemetrie aktiv ist,
+  steht der ganzzahlige Prozentwert unmittelbar links neben dem Batteriesymbol.
 
 Medien-/Dienstbereich:
 
@@ -383,6 +384,12 @@ Die Geräteeinstellungen enthalten genau diese Hauptbereiche:
    - Live-Vorschau der Akzentfarbe.
    - Standard ist das festgelegte warme Orange `#FDB813`; ein Marken- oder
      Quellenname erscheint weder in der Geräte- noch in der Weboberfläche.
+   - Die persistente Option **Bildschirmumrandung aktivieren** schaltet die
+     Akzentumrandung des normalen Players. Aktiv bedeutet: linke, untere und
+     rechte Playerkante werden in der gewählten Akzentfarbe gezeichnet; die
+     obere Kante bleibt wegen Funktionskopf und Statuszeile offen. Deaktiviert
+     bedeutet: keine dekorative Playerumrandung. Menümarkierung, PTT-Hinweis
+     und funktionale Statusfarben bleiben davon unberührt.
 3. **WLAN**
    - vollständige Standalone-Einrichtung am Gerät,
    - Netzsuche, SSID, Kennwort, DHCP/feste IP, gespeicherte Netze und Priorität.
@@ -1054,6 +1061,25 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-31 – Optionale Playerumrandung und echte PiSugar-3-Anzeige
+
+- Robert ordnet den bisherigen gelben Balken als Player-Akzent ein und verlangt
+  dafür bei den Farbeinstellungen eine dauerhafte Option
+  `Bildschirmumrandung aktivieren`. Bei aktivierter Option wird aus der
+  einzelnen linken Linie eine zusammenhängende, oben offene Umrandung an der
+  linken, unteren und rechten Playerkante in der aktuell gewählten
+  Akzentfarbe. Bei deaktivierter Option entfällt diese dekorative Umrandung.
+- Der PiSugar 3 mit 1200-mAh-Akku ist bereits als reale Hardware bestätigt.
+  Die Batterietelemetrie wird nun gegen die offizielle PiSugar-3-I2C-
+  Dokumentation und das reale Zielgerät geprüft und danach ohne geratenes
+  Register aktiviert. Der Ladestand erscheint als Prozentzahl unmittelbar
+  links neben dem Batteriesymbol; ungültige oder nicht eindeutig als
+  PiSugar 3 erkannte Werte werden nicht angezeigt.
+- Die Telemetrieintegration darf ausschließlich lesend auf den dokumentierten
+  PiSugar-3-Pfad zugreifen. Sie darf weder Ladeparameter, RTC, Abschaltung noch
+  andere Register verändern und keinen fremden Webserver mit
+  Standardzugangsdaten installieren.
 
 ### 2026-10-31 – Intelligente Radioaufnahme und einfacher Musikplayer
 

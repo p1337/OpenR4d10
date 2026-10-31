@@ -11,8 +11,8 @@
 - complete 2 x 20 header soldered at all 40 Pi contacts
 - Whisplay HAT fitted on the front
 - PiSugar 3 battery pack fitted on the rear
-- the PiSugar supplies the running Pi successfully from its battery; only its
-  software telemetry integration remains open
+- the PiSugar supplies the running Pi successfully from its battery; the
+  software now has a bounded, read-only PiSugar 3 percentage adapter
 - Raspberry Pi and `openr4d10.service` boot successfully
 - Whisplay RGB LED illuminates
 - the original native boot animation has since been recorded visibly on the
@@ -252,16 +252,34 @@ exists with range 0 through 100 and was initialized to 80. These checks confirm
 driver, overlay and mixer activation, but not yet audible output from the
 speaker; the listening test remains separate.
 
+## PiSugar 3 percentage telemetry
+
+The physically reported pack is the 1200-mAh PiSugar 3 for the Pi Zero family.
+The official
+[PiSugar 3 documentation](https://docs.pisugar.com/docs/product-wiki/battery/pisugar3/pisugar-3-series)
+identifies controller address `0x57`, register `0x00` value `3`,
+application-mode register `0x01` value `0x0F` and the calculated battery
+percentage in register `0x2A`. The manufacturer's
+[reference battery module](https://github.com/PiSugar/pisugar-power-manager-rs/blob/master/pisugar-module/pisugar-3/pisugar_3_battery.c)
+uses the same identity checks and register mapping.
+
+`PiSugar3Telemetry` opens only `/dev/i2c-1`, selects address `0x57`, verifies
+the identity and application mode, and reads the single percentage byte. A
+value outside 0 through 100 or an identity mismatch becomes an adapter error;
+it is never drawn as a plausible battery level. The adapter does not write
+charging, RTC, watchdog, shutdown or configuration registers. The installer
+loads `i2c-dev`, grants the service only its existing I2C group plus
+`/dev/i2c-1`, and does not install the optional PiSugar HTTP server or create
+an account.
+
 ## Still deliberately unknown
 
-The exact PiSugar model/API has not yet been identified on the physical
-device. The Whisplay audio driver has identified the installed HAT as WM8960,
-and capture/playback devices plus `mic`/`speaker` controls are present; an
-actual microphone recording and audible speaker test remain separate physical
-checks. The PiSugar's physical presence and battery-powered operation are confirmed;
-`power.backend` remains `unconfigured` only because battery percentage and
-other telemetry are not yet integrated. The Whisplay display backend is
-implemented and physically verified on the real stack.
+The Whisplay audio driver has identified the installed HAT as WM8960, and
+capture/playback devices plus `mic`/`speaker` controls are present; an actual
+microphone recording and audible speaker test remain separate physical checks.
+PiSugar charging control, RTC, watchdog and shutdown integration remain outside
+the percentage adapter until individually requested and verified. The Whisplay
+display backend is implemented and physically verified on the real stack.
 
 ## Generic adapter contract
 

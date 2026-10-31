@@ -30,6 +30,11 @@ the installer report exactly which adapters still need configuration.
 - safe display handoff both at boot and during an in-session installation
 - real-device-confirmed Whisplay SPI transport, colour order and orientation
 - persistent, C-timed 0–100% Whisplay brightness control in the web settings
+- persistent accent color plus optional open-top player border around the
+  left, bottom and right display edges
+- read-only PiSugar 3 battery percentage over the manufacturer-documented I2C
+  identity and capacity registers; no separate PiSugar web service or default
+  account is installed
 - native 240 x 280 physical UI with the agreed four-axis encoder layout
 - browser controls for all four virtual encoder axes and both press actions
 - semantic UI frame model and configurable text boot sequence
@@ -61,7 +66,6 @@ the installer report exactly which adapters still need configuration.
 
 Hardware-specific integration still pending:
 
-- PiSugar API details
 - acoustic verification of actual Whisplay speaker output
 - encoder GPIO input
 - credentials, WLAN settings, tokens or secrets
@@ -164,10 +168,11 @@ generated only on the device and is excluded from Git, status JSON, SQLite,
 logs and backups.
 
 The dashboard shows live service, system and adapter status. The real Whisplay
-display and sound card are verified. The physically present PiSugar currently
-appears specifically as **PiSugar telemetry is not configured** because its
-battery percentage/charging API is still unknown; the UI no longer calls the
-complete hardware stack unconfigured.
+display and sound card are verified. The PiSugar 3 adapter checks the official
+device identity and application mode at I2C address `0x57`, then reads only the
+calculated 0–100% capacity register. The percentage appears immediately left
+of the physical battery icon and in the web energy card. It never changes
+charging, RTC, shutdown or controller configuration.
 
 The **Einstellungen → Display** panel changes the physical Whisplay backlight
 immediately from 0 through 100 percent. The value is stored in the existing
@@ -179,6 +184,11 @@ Raspberry Pi OS `lgpio` C-timed PWM facility on the manufacturer-verified
 active-low BCM22 backlight line; Python no longer schedules the pulses. Its
 private notification pipe stays inside `/run/openr4d10`, the already protected
 runtime directory, without weakening the service's read-only system boundary.
+The same settings area stores the selected accent color and the option
+**Enable screen border**. When enabled, the normal player is outlined on its
+left, bottom and right edges in that accent color; the top remains open below
+the status row. Menu selection and PTT indicators stay functional regardless
+of this decorative option.
 
 Until the physical encoders are delivered, the **Virtuelle Encoder** panel in
 the same dashboard controls the real Whisplay immediately. Its volume, squelch,
@@ -271,9 +281,8 @@ For an inspect-first installation, download `bootstrap.sh`, review it, and run
 it with `sudo bash bootstrap.sh`. Regardless of how the bootstrap is started,
 it downloads and validates the complete project archive before installation.
 
-PiSugar telemetry remains software-unconfigured even though the battery board
-is physically present and powers the Pi. The Whisplay display backend
-and unified audio driver are installed automatically. With `--no-reboot`, the
+PiSugar 3 percentage telemetry, the Whisplay display backend and the unified
+audio driver are installed automatically. With `--no-reboot`, the
 diagnostic deliberately reports the audio driver as installed but not yet
 active until the administrator reboots manually. The early-boot display log is available with
 `journalctl -u openr4d10-boot -b --no-pager`.
@@ -286,8 +295,10 @@ The installer creates these files only if they do not already exist:
 - `/etc/openr4d10/hardware.toml`
 
 It also refreshes `.dist` copies on every install so local changes can be
-compared with the current defaults. An existing display placeholder is migrated
-to `backend = "whisplay"`; all other local settings are preserved. Edit
+compared with the current defaults. Exact existing `unconfigured` placeholders
+are migrated to `display.backend = "whisplay"` and
+`power.backend = "pisugar3"`; command/file adapters and their local arguments
+remain untouched. Edit
 `hardware.toml`, then run:
 
 ```bash

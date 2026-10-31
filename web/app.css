@@ -260,13 +260,20 @@ h2 { margin-bottom: 0; font-size: 1.15rem; letter-spacing: -0.02em; }
 .settings-panel { margin-top: 14px; }
 .device-control-panel { margin-top: 14px; }
 .display-brightness-setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 20px; align-items: center; margin-top: 22px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(5, 12, 14, .58); }
+.display-appearance-setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 20px; align-items: center; margin-top: 12px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(5, 12, 14, .58); }
 .display-brightness-setting label strong, .display-brightness-setting label span { display: block; }
+.display-appearance-setting > label:first-child strong, .display-appearance-setting > label:first-child span { display: block; }
 .display-brightness-setting label strong { margin-bottom: 5px; font-size: .86rem; }
-.display-brightness-setting label span, #display-brightness-status { color: var(--muted); font-size: .7rem; line-height: 1.45; }
+.display-appearance-setting > label:first-child strong { margin-bottom: 5px; font-size: .86rem; }
+.display-brightness-setting label span, #display-brightness-status, .display-appearance-setting label span, #display-appearance-status { color: var(--muted); font-size: .7rem; line-height: 1.45; }
 #display-brightness-value { min-width: 54px; color: var(--cyan); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .9rem; font-weight: 750; text-align: right; }
 #display-brightness { grid-column: 1 / -1; width: 100%; accent-color: var(--cyan); cursor: pointer; }
 #display-brightness:disabled { cursor: wait; opacity: .55; }
 #display-brightness-status { grid-column: 1 / -1; }
+#display-accent-color { width: 58px; height: 38px; padding: 2px; border: 1px solid var(--line-strong); border-radius: 9px; background: #071011; cursor: pointer; }
+.appearance-check { grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; }
+.appearance-check input { accent-color: var(--cyan); }
+#display-appearance-status { grid-column: 1 / -1; }
 .wifi-repair-form { display: grid; gap: 12px; margin-top: 20px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(5, 12, 14, .58); }
 .wifi-repair-form > label:not(.wifi-check) { display: grid; gap: 7px; color: var(--muted); font-size: .72rem; }
 .wifi-repair-form input[type="text"], .wifi-repair-form input[type="password"] { width: 100%; padding: 11px 12px; border: 1px solid var(--line-strong); border-radius: 9px; color: var(--text); background: #071011; }

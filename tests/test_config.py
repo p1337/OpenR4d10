@@ -64,7 +64,7 @@ backend = "system"
         root = Path(__file__).resolve().parents[1]
         config = load_hardware_config(root / "config" / "hardware.toml")
         self.assertEqual(config.display.backend, "whisplay")
-        self.assertEqual(config.power.backend, "unconfigured")
+        self.assertEqual(config.power.backend, "pisugar3")
         self.assertEqual(config.receiver.backend, "system")
 
 

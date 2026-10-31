@@ -103,8 +103,9 @@ selection, and a short right press opens the selected page instead of reaching
 media controls. Menu history stays inside `DeviceUiState`; an active PTT press
 returns one level unless the current semantic frame explicitly declares a
 ready PTT-owning context. The back/PTT affordance is one edge-aligned silhouette
-with a left-rounded, right-open frame and a filled mini arrow; the normal player
-alone adds a soft glow to its accent rail. Vertical header labels are offset
+with a left-rounded, right-open frame and a filled mini arrow. The normal player
+optionally adds a soft-glowing, top-open accent border along its left, bottom
+and right edges. Vertical header labels are offset
 below the rounded top corners and the right label is rotated for reading from
 the right/bottom edge. This remains one Pillow renderer and one logical input
 path, not a second menu surface or a fabricated PTT adapter.
@@ -161,6 +162,18 @@ The packaged 0.2.2 binding rejects an idle `tx_pwm(..., 0, 0)` stop request
 with `bad PWM micros` despite its API text. `_LgpioPwm` therefore tracks
 whether it has successfully started PWM and sends the stop request only in
 that state. Steady endpoint writes never issue a speculative stop.
+
+The non-secret settings `ui.accent_color` (`#RRGGBB`) and
+`ui.screen_border_enabled` share the same `StateStore` owner and are restored
+into the one `WhisplayDisplay` renderer. The browser may change them only
+through the bounded `display_appearance` action; there is no CSS-only device
+preview or second appearance store.
+
+The built-in `pisugar3` power backend is a narrow read-only I2C boundary. It
+opens `/dev/i2c-1`, selects the documented `0x57` controller, verifies version
+`3` and application mode `0x0F`, and then reads calculated capacity register
+`0x2A`. It exposes only model, ready state and bounded percentage. Controller
+writes and an additional PiSugar network service are intentionally absent.
 
 ## Service catalog
 
@@ -415,9 +428,10 @@ into a shell command.
 
 Hardware device access is not granted globally. The early boot service's closed
 device policy permits only `/dev/spidev0.0` and `/dev/gpiochip0`. The
-application runs as `openr4d10`, receives only the `gpio`, `spi` and standard
-`audio` supplementary groups. Its closed policy permits the same LCD devices
-plus the standard `char-alsa` device class for media playback/recording; it
-still has no direct access to I2C, homes or unrelated hardware. Codec control
+application runs as `openr4d10`, receives only the `gpio`, `spi`, `audio` and
+`i2c` supplementary groups. Its closed policy permits the same LCD devices,
+the single `/dev/i2c-1` node for the verified PiSugar 3 address, plus the
+standard `char-alsa` device class for media playback/recording; it still has no
+access to homes or unrelated hardware. Codec control
 and detection stay inside the kernel/ALSA driver installed by the privileged
 installer; the application itself never selects or guesses a codec revision.

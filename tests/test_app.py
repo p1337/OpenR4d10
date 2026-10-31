@@ -74,6 +74,69 @@ class AppTests(unittest.TestCase):
                         }
                     )
 
+    def test_display_appearance_restores_and_persists_through_app_control(self) -> None:
+        class AppearanceDisplay:
+            def __init__(self) -> None:
+                self.values = []
+
+            def render(self, _frame) -> None:
+                pass
+
+            def set_appearance(self, accent, border, *, redraw=False):
+                self.values.append((accent, border, redraw))
+
+            def snapshot(self):
+                accent, border, _redraw = self.values[-1]
+                return {"accent_color": accent, "screen_border_enabled": border}
+
+        class Services:
+            active_service = "system"
+
+            def __init__(self) -> None:
+                self.value = {"accent_color": "#FDB813", "screen_border_enabled": True}
+
+            def display_appearance(self):
+                return dict(self.value)
+
+            def set_display_appearance(self, accent, border):
+                if not isinstance(accent, str) or not isinstance(border, bool):
+                    raise ValueError("invalid appearance")
+                self.value = {"accent_color": accent.upper(), "screen_border_enabled": border}
+                return dict(self.value)
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            display = AppearanceDisplay()
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=display,
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,  # type: ignore[arg-type]
+            )
+            self.assertEqual(display.values, [("#FDB813", True, False)])
+            result = app.control(
+                {
+                    "action": "display_appearance",
+                    "accent_color": "#12abef",
+                    "screen_border_enabled": False,
+                }
+            )
+            self.assertEqual(display.values[-1], ("#12abef", False, True))
+            self.assertEqual(
+                result["settings"],
+                {"accent_color": "#12ABEF", "screen_border_enabled": False},
+            )
+
     def test_confirmed_system_update_uses_the_fixed_runtime_request(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)

@@ -238,11 +238,21 @@ class DeviceUiTests(unittest.TestCase):
         self.assertNotEqual(player.getpixel((7, 180)), (6, 12, 15))
         self.assertEqual(menu.getpixel((7, 180)), (6, 12, 15))
 
+    def test_optional_player_border_uses_left_bottom_and_right_edges(self) -> None:
+        enabled = render_device_ui(DeviceUiState(service_index=1))
+        disabled = render_device_ui(
+            DeviceUiState(service_index=1, screen_border_enabled=False)
+        )
+        for point in ((0, 180), (120, HEIGHT - 1), (WIDTH - 1, 180)):
+            self.assertEqual(enabled.getpixel(point), DEFAULT_ACCENT)
+            self.assertNotEqual(disabled.getpixel(point), DEFAULT_ACCENT)
+        self.assertNotEqual(enabled.getpixel((120, 71)), DEFAULT_ACCENT)
+
     def test_play_control_is_below_battery_and_footer_is_empty(self) -> None:
         state = DeviceUiState(playing=True, service_index=1)
         image = render_device_ui(state)
         self.assertEqual(image.getpixel((207, 76)), state.accent)
-        self.assertEqual(image.getpixel((220, 270)), (6, 12, 15))
+        self.assertNotEqual(image.getpixel((220, 270)), state.accent)
 
     def test_clock_is_centered_on_the_full_display_width(self) -> None:
         positions: dict[str, tuple[float, float]] = {}

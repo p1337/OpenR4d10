@@ -588,7 +588,14 @@ function render(data) {
   setText("receiver-detail", receiver.hostname
     ? t("Source: {{hostname}}", { hostname: receiver.hostname })
     : t("Status source active"));
-  setText("power-state", power.state === "unconfigured" ? t("PiSugar present") : t(power.state));
+  setText(
+    "power-state",
+    Number.isInteger(power.battery_percent)
+      ? `${power.battery_percent}%`
+      : power.state === "unconfigured"
+        ? t("PiSugar present")
+        : t(power.state)
+  );
   setText(
     "power-detail",
     adapters.power === "unconfigured"
@@ -619,10 +626,20 @@ function render(data) {
 
 function renderSettings(settings) {
   const brightness = settings.display_brightness_percent;
-  if (!Number.isInteger(brightness) || brightness < 0 || brightness > 100) return;
-  const input = byId("display-brightness");
-  if (document.activeElement !== input) input.value = String(brightness);
-  setText("display-brightness-value", `${input.value}%`);
+  if (Number.isInteger(brightness) && brightness >= 0 && brightness <= 100) {
+    const input = byId("display-brightness");
+    if (document.activeElement !== input) input.value = String(brightness);
+    setText("display-brightness-value", `${input.value}%`);
+  }
+  const accent = settings.accent_color;
+  if (typeof accent === "string" && /^#[0-9a-f]{6}$/i.test(accent)) {
+    const color = byId("display-accent-color");
+    if (document.activeElement !== color) color.value = accent;
+    document.documentElement.style.setProperty("--cyan", accent);
+  }
+  if (typeof settings.screen_border_enabled === "boolean") {
+    byId("display-screen-border").checked = settings.screen_border_enabled;
+  }
 }
 
 function renderUpdate(update) {
@@ -759,6 +776,39 @@ displayBrightness.addEventListener("change", async () => {
     displayBrightness.disabled = false;
   }
 });
+
+async function saveDisplayAppearance() {
+  const color = byId("display-accent-color");
+  const border = byId("display-screen-border");
+  const status = byId("display-appearance-status");
+  color.disabled = true;
+  border.disabled = true;
+  status.textContent = t("Saving appearance …");
+  try {
+    const response = await fetch("/api/control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "display_appearance",
+        accent_color: color.value,
+        screen_border_enabled: border.checked,
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    renderSettings(payload.settings || {});
+    status.textContent = t("Appearance saved permanently.");
+  } catch (error) {
+    status.textContent = t("Error: {{message}}", { message: error.message });
+    await refresh();
+  } finally {
+    color.disabled = false;
+    border.disabled = false;
+  }
+}
+
+byId("display-accent-color").addEventListener("change", saveDisplayAppearance);
+byId("display-screen-border").addEventListener("change", saveDisplayAppearance);
 
 byId("system-update").addEventListener("click", async () => {
   if (!window.confirm(t("Install the latest OpenR4d10 version? The device will restart automatically afterwards."))) return;

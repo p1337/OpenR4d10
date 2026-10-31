@@ -192,6 +192,7 @@ class DeviceUiState:
     hotspot_url: str = ""
     language: str = "en"
     accent: tuple[int, int, int] = DEFAULT_ACCENT
+    screen_border_enabled: bool = True
     timestamp: datetime = field(default_factory=datetime.now)
 
     @property
@@ -219,6 +220,8 @@ class DeviceUiState:
             "subtitle": self.subtitle,
             "preset_id": self.preset_id,
             "image_file": self.image_file,
+            "accent_color": "#{:02X}{:02X}{:02X}".format(*self.accent),
+            "screen_border_enabled": self.screen_border_enabled,
         }
 
     @property
@@ -363,6 +366,8 @@ class DeviceUiState:
         battery = power.get("battery_percent")
         if isinstance(battery, (int, float)) and not isinstance(battery, bool):
             self.battery_percent = max(0, min(100, round(battery)))
+        else:
+            self.battery_percent = None
 
         for key, low, high in (
             ("volume", 0, 100),
@@ -454,7 +459,7 @@ def _control_value(
     value: str,
     accent: tuple[int, int, int],
 ) -> None:
-    # 0.10.25: the physical 240 px panel needs 1.2x larger header controls.
+    # The physical 240 px panel needs the reviewed 1.2x larger header controls.
     small = _font(12, bold=True)
     large = _font(14, bold=True)
     draw.text((x, y), label, font=small, fill=(128, 140, 145))
@@ -527,16 +532,24 @@ def _draw_back_or_ptt(
     )
 
 
-def _draw_player_accent_rail(
+def _draw_player_accent_border(
     image: Image.Image,
     top: int,
     accent: tuple[int, int, int],
 ) -> None:
+    """Draw the requested open-top player border with a restrained glow."""
     glow = Image.new("RGBA", image.size, (0, 0, 0, 0))
     glow_draw = ImageDraw.Draw(glow)
-    glow_draw.rectangle((0, top, 5, HEIGHT - 1), fill=(*accent, 185))
+    glow_draw.line(
+        ((2, top), (2, HEIGHT - 2), (WIDTH - 3, HEIGHT - 2), (WIDTH - 3, top)),
+        fill=(*accent, 185),
+        width=5,
+    )
     image.alpha_composite(glow.filter(ImageFilter.GaussianBlur(radius=5)))
-    ImageDraw.Draw(image).rectangle((0, top, 2, HEIGHT - 1), fill=accent)
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((0, top, 2, HEIGHT - 1), fill=accent)
+    draw.rectangle((0, HEIGHT - 3, WIDTH - 1, HEIGHT - 1), fill=accent)
+    draw.rectangle((WIDTH - 3, top, WIDTH - 1, HEIGHT - 1), fill=accent)
 
 
 def _draw_main_menu_items(
@@ -711,7 +724,8 @@ def render_device_ui(
         )
         return image.convert("RGB")
 
-    _draw_player_accent_rail(image, content_top, accent)
+    if state.screen_border_enabled:
+        _draw_player_accent_border(image, content_top, accent)
     draw = ImageDraw.Draw(image)
 
     station_font = _font(18, bold=True)

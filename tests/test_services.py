@@ -199,6 +199,34 @@ class ServiceCatalogTests(unittest.TestCase):
             finally:
                 reopened.close()
 
+    def test_display_appearance_is_persistent_and_validated(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            state_root = Path(raw).resolve()
+            catalog = ServiceCatalog(state_root)
+            try:
+                self.assertEqual(
+                    catalog.display_appearance(),
+                    {"accent_color": "#FDB813", "screen_border_enabled": True},
+                )
+                self.assertEqual(
+                    catalog.set_display_appearance("#12abef", False),
+                    {"accent_color": "#12ABEF", "screen_border_enabled": False},
+                )
+                with self.assertRaises(ValueError):
+                    catalog.set_display_appearance("orange", True)
+                with self.assertRaises(ValueError):
+                    catalog.set_display_appearance("#123456", 1)  # type: ignore[arg-type]
+            finally:
+                catalog.close()
+            reopened = ServiceCatalog(state_root)
+            try:
+                self.assertEqual(
+                    reopened.display_appearance(),
+                    {"accent_color": "#12ABEF", "screen_border_enabled": False},
+                )
+            finally:
+                reopened.close()
+
     def test_last_sensible_view_is_restored_without_changing_audio(self) -> None:
         class State:
             state = "stopped"

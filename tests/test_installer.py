@@ -45,6 +45,10 @@ class InstallerContractTests(unittest.TestCase):
         )
         self.assertIn("WorkingDirectory=/run/openr4d10", application_service)
         self.assertIn("ProtectSystem=strict", application_service)
+        self.assertIn("SupplementaryGroups=gpio spi audio i2c", application_service)
+        self.assertIn("DeviceAllow=/dev/i2c-1 rw", application_service)
+        self.assertIn("modprobe i2c-dev", installer)
+        self.assertIn('backend = "pisugar3"', (repository / "config" / "hardware.toml").read_text(encoding="utf-8"))
         self.assertIn(
             "ReadWritePaths=/run/openr4d10 /var/lib/openr4d10",
             application_service,
