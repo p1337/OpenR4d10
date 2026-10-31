@@ -74,7 +74,8 @@ files in `web/` plus the following endpoints:
 - `/api/status` — current semantic frame and adapter state as JSON
 - `/healthz` — simple service health response
 - `POST /api/control` — bounded same-origin JSON media controls
-- `/api/camera/1` and `/api/camera/2` — locally re-encoded camera snapshots
+- `/api/camera/<camera-id>` — locally re-encoded frame from a persistent
+  Snapshot, MJPEG or RTSP camera entry
 - `/api/radio-art/<preset-id>` — bounded, locally re-encoded preset artwork
 - `/api/device-screen.png` — exact current native 240 × 280 renderer output
 - `/api/weather-frame/<validated-cache-name>` — locally decoded and re-encoded
@@ -85,7 +86,8 @@ browser origins. With the sole exception of the transient `wifi_repair`
 handoff described below, it never accepts credentials; no credential is stored
 in SQLite, status, backups or logs. It supports explicit
 playback, pause, stop, volume and stream-recording actions plus bounded feed and
-camera retrieval, saved station management and local media rescans. Saved
+camera retrieval, persistent camera add/update/delete/reorder/refresh actions,
+saved station management and local media rescans. Saved
 station URLs containing query strings are rejected; temporary direct playback
 is not persisted. `service_set_enabled` persists module activation; `system`
 cannot be disabled and external modules still require their own adapter. Port,

@@ -58,8 +58,9 @@ the installer report exactly which adapters still need configuration.
 - checksummed, secret-free SQLite backup and guarded offline restore
 - direct web-radio/local-media playback through private mpv JSON IPC and
   stream recording through shell-free ffmpeg/Opus
-- bounded RSS/Atom reader and two-slot camera snapshots with image validation
-  and safe JPEG re-encoding
+- bounded RSS/Atom reader and a persistent sortable camera library for
+  credential-free Snapshot, MJPEG and RTSP sources with frame limits, image
+  validation and safe local JPEG re-encoding
 - persistent, ordered web-radio library and bounded local-media library scanning
 - ICY-aware radio pre-buffer: PTT retains the current song including its
   buffered beginning; optional continuous capture splits on title metadata,
@@ -281,6 +282,14 @@ the real speaker is verified after reboot.
 RSS/Atom URLs and camera snapshot URLs can be loaded in the same local panel.
 Feed downloads are size-limited; camera responses are decoded, dimension-
 checked, resized and re-encoded before the browser can retrieve them.
+The camera library stores up to 100 non-secret sources and preserves user
+order and deletion across updates. MJPEG reads only the first complete bounded
+JPEG frame instead of proxying an endless foreign stream. RTSP uses one
+argument-only `ffmpeg` frame extraction with a hard timeout. Persistent URLs
+may not contain credentials or query strings. Authenticated private RTSP and
+ONVIF discovery therefore remain an isolated-adapter task; no camera password
+is written to Git, SQLite, public status, logs or backups. See
+[`docs/CAMERAS.md`](docs/CAMERAS.md).
 Saved radio stations can be managed in the same dashboard. On first use the ten
 curated stations are copied once into this persistent library. All entries can
 then be reordered, deleted or extended; an intentionally deleted default is not

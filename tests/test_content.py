@@ -132,6 +132,45 @@ class ContentTests(unittest.TestCase):
                 self.assertLessEqual(image.width, 640)
                 self.assertLessEqual(image.height, 480)
 
+    def test_mjpeg_and_rtsp_camera_frames_are_bounded_and_reencoded(self) -> None:
+        raw = BytesIO()
+        Image.new("RGB", (320, 240), (30, 50, 70)).save(raw, format="JPEG")
+        jpeg = raw.getvalue()
+        mjpeg = b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n"
+        fetcher = BoundedFetcher(
+            lambda *_args, **_kwargs: FakeResponse(
+                mjpeg, "multipart/x-mixed-replace; boundary=frame"
+            )
+        )
+
+        class Result:
+            returncode = 0
+            stdout = jpeg
+            stderr = b""
+
+        commands = []
+
+        def runner(command, **_kwargs):
+            commands.append(command)
+            return Result()
+
+        with tempfile.TemporaryDirectory() as directory:
+            camera = CameraSnapshot(Path(directory).resolve(), fetcher, runner)
+            mjpeg_result = camera.fetch(
+                "https://camera.example/live.mjpg", 7, kind="mjpeg"
+            )
+            rtsp_result = camera.fetch(
+                "rtsp://camera.example/live", 8, kind="rtsp"
+            )
+            self.assertEqual(mjpeg_result["kind"], "mjpeg")
+            self.assertEqual(rtsp_result["kind"], "rtsp")
+            self.assertEqual(commands[0][0], "/usr/bin/ffmpeg")
+            self.assertNotIn("shell", commands[0])
+            self.assertTrue((Path(directory) / "camera-7.jpg").is_file())
+            self.assertTrue((Path(directory) / "camera-8.jpg").is_file())
+            with self.assertRaises(ValueError):
+                camera.fetch("rtsp://user:secret@camera.example/live", 9, kind="rtsp")
+
     def test_preset_artwork_is_bounded_reencoded_and_cached(self) -> None:
         raw = BytesIO()
         Image.new("RGBA", (500, 300), (20, 120, 180, 180)).save(raw, format="PNG")

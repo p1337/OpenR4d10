@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 import threading
 import time
 from typing import Any, Callable
@@ -374,20 +375,125 @@ class PodcastReader:
 
 
 class CameraSnapshot:
-    def __init__(self, cache_root: Path, fetcher: BoundedFetcher | None = None) -> None:
+    MAX_BYTES = 5 * 1024 * 1024
+
+    def __init__(
+        self,
+        cache_root: Path,
+        fetcher: BoundedFetcher | None = None,
+        runner: Callable[..., subprocess.CompletedProcess[bytes]] = subprocess.run,
+    ) -> None:
         if not cache_root.is_absolute():
             raise ValueError("camera cache path must be absolute")
         self.cache_root = cache_root
         self.fetcher = fetcher or BoundedFetcher()
+        self.runner = runner
 
-    def fetch(self, url: str, slot: int = 1) -> dict[str, object]:
-        if slot not in {1, 2}:
-            raise ValueError("camera slot must be 1 or 2")
-        payload, content_type = self.fetcher.fetch(
-            url,
-            max_bytes=5 * 1024 * 1024,
-            accepted_types=("image/*",),
+    def fetch(
+        self,
+        url: str,
+        slot: int = 1,
+        *,
+        kind: str = "snapshot",
+    ) -> dict[str, object]:
+        if isinstance(slot, bool) or not isinstance(slot, int) or not 1 <= slot <= 1_000_000:
+            raise ValueError("camera slot must be an integer from 1 through 1000000")
+        if kind == "snapshot":
+            payload, content_type = self.fetcher.fetch(
+                url,
+                max_bytes=self.MAX_BYTES,
+                accepted_types=("image/*",),
+            )
+        elif kind == "mjpeg":
+            payload, content_type = self._fetch_mjpeg(url)
+        elif kind == "rtsp":
+            payload, content_type = self._fetch_rtsp(url)
+        else:
+            raise ValueError("camera kind must be snapshot, mjpeg or rtsp")
+        return self._store(payload, content_type, slot, kind)
+
+    def _fetch_mjpeg(self, url: str) -> tuple[bytes, str]:
+        approved = validate_content_url(url)
+        request = Request(
+            approved,
+            headers={
+                "User-Agent": "OpenR4d10 (+https://github.com/p1337/OpenR4d10)",
+                "Accept": "multipart/x-mixed-replace, image/jpeg",
+            },
         )
+        try:
+            with self.fetcher.opener(request, timeout=10) as response:
+                content_type = response.headers.get_content_type().lower()
+                if content_type not in {"multipart/x-mixed-replace", "image/jpeg"}:
+                    raise ContentError(f"unexpected MJPEG content type: {content_type}")
+                buffer = bytearray()
+                while len(buffer) <= self.MAX_BYTES:
+                    chunk = response.read(min(65_536, self.MAX_BYTES + 1 - len(buffer)))
+                    if not chunk:
+                        break
+                    buffer.extend(chunk)
+                    start = buffer.find(b"\xff\xd8")
+                    end = buffer.find(b"\xff\xd9", start + 2) if start >= 0 else -1
+                    if start >= 0 and end >= 0:
+                        return bytes(buffer[start : end + 2]), content_type
+        except ContentError:
+            raise
+        except (OSError, ValueError) as exc:
+            raise ContentError(f"MJPEG request failed: {exc}") from exc
+        raise ContentError("MJPEG stream did not yield a bounded JPEG frame")
+
+    def _fetch_rtsp(self, url: str) -> tuple[bytes, str]:
+        if not isinstance(url, str) or not url or len(url) > 4096:
+            raise ValueError("RTSP URL must be a non-empty string")
+        parsed = urlsplit(url)
+        if parsed.scheme not in {"rtsp", "rtsps"} or not parsed.hostname:
+            raise ValueError("RTSP URL must use rtsp or rtsps")
+        if parsed.username is not None or parsed.password is not None:
+            raise ValueError("camera credentials must not be embedded in an RTSP URL")
+        command = [
+            "/usr/bin/ffmpeg",
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-rtsp_transport",
+            "tcp",
+            "-i",
+            url,
+            "-frames:v",
+            "1",
+            "-fs",
+            str(self.MAX_BYTES + 1),
+            "-f",
+            "image2pipe",
+            "-vcodec",
+            "mjpeg",
+            "pipe:1",
+        ]
+        try:
+            result = self.runner(
+                command,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=15,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise ContentError(f"RTSP frame request failed: {exc}") from exc
+        if result.returncode != 0 or not result.stdout:
+            raise ContentError("RTSP camera did not return an image")
+        if len(result.stdout) > self.MAX_BYTES:
+            raise ContentError("RTSP camera frame exceeds the size limit")
+        return bytes(result.stdout), "image/jpeg"
+
+    def _store(
+        self,
+        payload: bytes,
+        content_type: str,
+        slot: int,
+        kind: str,
+    ) -> dict[str, object]:
         try:
             with Image.open(BytesIO(payload)) as source:
                 if source.width * source.height > 40_000_000:
@@ -411,6 +517,7 @@ class CameraSnapshot:
             "width": image.width,
             "height": image.height,
             "source_type": content_type,
+            "kind": kind,
             "updated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         }
 

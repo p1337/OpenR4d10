@@ -39,6 +39,7 @@ from .content import (
     PodcastReader,
     PresetArtwork,
     TrackArtwork,
+    validate_content_url,
 )
 from .media import MpvEngine, StreamRecorder, public_source_label, validate_media_source
 from .presets import FEED_BY_ID, FEED_PRESETS, RADIO_BY_ID, RADIO_PRESETS
@@ -114,7 +115,7 @@ BUILTIN_SERVICES = (
     ServiceManifest("telegram", "Telegram", "messages", "Messages and voice notes through a local TDLib adapter", ("messages", "voice_notes", "tts"), "external", requires_credentials=True, credential_hint="Complete Telegram login locally through TDLib."),
     ServiceManifest("rss", "Feeds", "information", "RSS and Atom subscriptions with optional read-aloud", ("feeds", "tts"), "native"),
     ServiceManifest("podcasts", "Podcasts", "audio", "Podcast subscriptions and episode playback", ("subscriptions", "episodes", "playback"), "process", ("mpv",)),
-    ServiceManifest("webcam", "Webcams", "video", "Up to two configured still-image or live views", ("images", "video"), "process", ("ffmpeg",)),
+    ServiceManifest("webcam", "Webcams", "video", "Persistent snapshot, MJPEG and RTSP camera library", ("images", "video", "channels"), "process", ("ffmpeg",)),
     ServiceManifest("youtube_audio", "YouTube Audio", "media", "Audio access only where technically and legally permitted", ("playback", "library"), "external"),
     ServiceManifest("spotify", "Spotify", "media", "Spotify Connect through a user-configured compatible client", ("playback",), "external", requires_credentials=True, credential_hint="Use the user's own eligible Spotify account locally."),
     ServiceManifest("ard_mediathek", "ARD Mediathek", "media", "Officially accessible ARD audio and media", ("catalog", "playback"), "external"),
@@ -206,6 +207,7 @@ class ServiceCatalog:
         self.active_ambient_scene_id: int | None = None
         self.selected_brandmeister_channel_id: int | None = None
         self.selected_brandmeister_talkgroup: int | None = None
+        self.selected_camera_id: int | None = None
         self._brandmeister_catalog_entries_cache: list[dict[str, object]] = []
         self._brandmeister_catalog_guard = threading.Lock()
         self.store.ensure_services(
@@ -310,6 +312,9 @@ class ServiceCatalog:
             talkgroup = metadata.get("talkgroup") if isinstance(metadata, dict) else None
             if isinstance(talkgroup, int) and not isinstance(talkgroup, bool):
                 self.selected_brandmeister_talkgroup = talkgroup
+        camera_channels = self.store.channels("webcam")
+        if camera_channels:
+            self.selected_camera_id = int(camera_channels[0]["id"])
         if self.radio_buffer is not None:
             self.radio_buffer.set_continuous(
                 self.store.get_setting(RADIO_CONTINUOUS_KEY, False) is True
@@ -935,6 +940,37 @@ class ServiceCatalog:
                     "selected": talkgroup == self.selected_brandmeister_talkgroup,
                 }
             )
+        webcam_channels = []
+        cached_cameras = self.content_state.get("cameras")
+        cached_cameras = cached_cameras if isinstance(cached_cameras, dict) else {}
+        for channel, item in enumerate(self.store.channels("webcam"), start=1):
+            metadata = item.get("metadata")
+            metadata = metadata if isinstance(metadata, dict) else {}
+            source_url = metadata.get("source_url")
+            kind = str(metadata.get("kind") or "snapshot")
+            camera_id = int(item["id"])
+            webcam_channels.append(
+                {
+                    "id": camera_id,
+                    "name": str(item["name"]),
+                    "kind": kind,
+                    "enabled": metadata.get("enabled") is not False,
+                    "source": (
+                        urlsplit(source_url).hostname or ""
+                        if isinstance(source_url, str)
+                        else ""
+                    ),
+                    "position": channel - 1,
+                    "channel": channel,
+                    "selected": camera_id == self.selected_camera_id,
+                    "frame": cached_cameras.get(str(camera_id)),
+                    "image": (
+                        f"/api/camera/{camera_id}"
+                        if (self.camera.cache_root / f"camera-{camera_id}.jpg").is_file()
+                        else None
+                    ),
+                }
+            )
         return {
             "schema_version": SCHEMA_VERSION,
             "settings": {
@@ -980,6 +1016,11 @@ class ServiceCatalog:
                 "selected_scene_id": self.selected_ambient_scene_id,
                 "active_scene_id": self.active_ambient_scene_id,
                 "scenes": ambient_scenes,
+            },
+            "webcams": {
+                "selected_camera_id": self.selected_camera_id,
+                "channels": webcam_channels,
+                "limits": {"saved": 100, "frame_bytes": CameraSnapshot.MAX_BYTES},
             },
             "brandmeister": {
                 **self.brandmeister.snapshot(),
@@ -1687,6 +1728,78 @@ class ServiceCatalog:
                 "credit": preset.credit,
                 "homepage": preset.homepage,
             }
+        elif action == "camera_add":
+            self._require_enabled("webcam")
+            name = request.get("name")
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("camera name is required")
+            url, kind = self._camera_source(request.get("url"), request.get("kind"))
+            enabled = request.get("enabled", True)
+            if not isinstance(enabled, bool):
+                raise ValueError("camera enabled state must be boolean")
+            if len(self.store.channels("webcam")) >= 100:
+                raise ValueError("at most 100 cameras can be saved")
+            camera_id = self.store.add_channel(
+                "webcam",
+                uuid.uuid4().hex,
+                name.strip()[:160],
+                {"source_url": url, "kind": kind, "enabled": enabled},
+            )
+            self.selected_camera_id = camera_id
+            return {"camera_id": camera_id}
+        elif action == "camera_update":
+            self._require_enabled("webcam")
+            channel = self._camera_channel(request.get("camera_id"))
+            name = request.get("name")
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("camera name is required")
+            url, kind = self._camera_source(request.get("url"), request.get("kind"))
+            enabled = request.get("enabled", True)
+            if not isinstance(enabled, bool):
+                raise ValueError("camera enabled state must be boolean")
+            self.store.update_channel(
+                int(channel["id"]),
+                name.strip()[:160],
+                {"source_url": url, "kind": kind, "enabled": enabled},
+            )
+            self.selected_camera_id = int(channel["id"])
+            return {"camera_id": int(channel["id"])}
+        elif action == "camera_delete":
+            self._require_enabled("webcam")
+            channel = self._camera_channel(request.get("camera_id"))
+            camera_id = int(channel["id"])
+            deleted = self.store.delete_channel(camera_id)
+            (self.camera.cache_root / f"camera-{camera_id}.jpg").unlink(missing_ok=True)
+            cameras = self.content_state.get("cameras")
+            if isinstance(cameras, dict):
+                cameras.pop(str(camera_id), None)
+            remaining = self.store.channels("webcam")
+            remaining_ids = [int(item["id"]) for item in remaining]
+            if self.selected_camera_id == camera_id:
+                self.selected_camera_id = remaining_ids[0] if remaining_ids else None
+            return {"deleted": deleted}
+        elif action == "camera_move":
+            self._require_enabled("webcam")
+            channel = self._camera_channel(request.get("camera_id"))
+            direction = request.get("direction")
+            if isinstance(direction, bool) or direction not in {-1, 1}:
+                raise ValueError("camera direction must be -1 or 1")
+            return {"moved": self.store.move_channel(int(channel["id"]), int(direction))}
+        elif action == "camera_refresh":
+            self._require_enabled("webcam")
+            channel = self._camera_channel(request.get("camera_id"))
+            metadata = channel.get("metadata")
+            metadata = metadata if isinstance(metadata, dict) else {}
+            url, kind = self._camera_source(
+                metadata.get("source_url"), metadata.get("kind", "snapshot")
+            )
+            camera_id = int(channel["id"])
+            camera = self.camera.fetch(url, camera_id, kind=kind)
+            cameras = self.content_state["cameras"]
+            assert isinstance(cameras, dict)
+            cameras[str(camera_id)] = camera
+            self.selected_camera_id = camera_id
+            return {"camera_id": camera_id, "camera": camera}
         elif action == "camera_snapshot":
             self._require_enabled("webcam")
             url = request.get("url")
@@ -1695,7 +1808,7 @@ class ServiceCatalog:
                 raise ValueError("camera_snapshot requires a URL")
             if isinstance(slot, bool) or not isinstance(slot, int):
                 raise ValueError("camera slot must be an integer")
-            camera = self.camera.fetch(url, slot)
+            camera = self.camera.fetch(url, slot, kind="snapshot")
             cameras = self.content_state["cameras"]
             assert isinstance(cameras, dict)
             cameras[str(slot)] = camera
@@ -2022,6 +2135,37 @@ class ServiceCatalog:
             )
         return feed
 
+    @staticmethod
+    def _camera_source(url: object, kind: object) -> tuple[str, str]:
+        if not isinstance(kind, str) or kind not in {"snapshot", "mjpeg", "rtsp"}:
+            raise ValueError("camera kind must be snapshot, mjpeg or rtsp")
+        if not isinstance(url, str):
+            raise ValueError("camera URL is required")
+        if kind in {"snapshot", "mjpeg"}:
+            approved = validate_content_url(url)
+        else:
+            parsed = urlsplit(url)
+            if (
+                len(url) > 4096
+                or parsed.scheme not in {"rtsp", "rtsps"}
+                or not parsed.hostname
+                or parsed.username is not None
+                or parsed.password is not None
+            ):
+                raise ValueError("RTSP URL must be credential-free and use rtsp or rtsps")
+            approved = url
+        if urlsplit(approved).query:
+            raise ValueError("persistent camera URLs must not contain a query string")
+        return approved, kind
+
+    def _camera_channel(self, camera_id: object) -> dict[str, object]:
+        if isinstance(camera_id, bool) or not isinstance(camera_id, int):
+            raise ValueError("camera id must be an integer")
+        channel = self.store.channel(camera_id)
+        if channel is None or channel.get("service_id") != "webcam":
+            raise ValueError("camera was not found")
+        return channel
+
     def _require_enabled(self, service_id: str) -> None:
         if not self.store.service_enabled(service_id):
             raise ValueError(f"service is disabled: {service_id}")
@@ -2128,7 +2272,7 @@ class ServiceCatalog:
             except OSError as exc:
                 LOG.warning("BrandMeister talkgroup catalog unavailable: %s", exc)
                 return None
-        if path in {"camera-1.jpg", "camera-2.jpg"}:
+        if re.fullmatch(r"camera-\d{1,7}\.jpg", path):
             target = self.camera.cache_root / path
         elif path.startswith("ambient-art/"):
             preset_id = path.removeprefix("ambient-art/")

@@ -208,7 +208,7 @@ socket and exchanges bounded JSON. A successful status handshake is required
 before an external catalog entry becomes ready.
 
 Service activation is persistent. Core modules (`system`, web radio, local
-media, recorder, feeds and camera snapshots) start enabled; external modules
+media, recorder, feeds and the camera library) start enabled; external modules
 start disabled. Disabled modules are not probed or reported as ready. Enabling
 an external module still requires its manifest and successful handshake, and
 disabling an active media module stops its current playback or recording.
@@ -270,12 +270,18 @@ and sizes, never local filesystem paths or raw stored stream URLs. SQLite
 access is serialized because the application loop and threaded HTTP server
 share one `StateStore` connection.
 
-`BoundedFetcher` supplies the native feed, podcast and camera modules. It accepts only
-HTTP(S) URLs without embedded credentials and enforces response-type, size and
-timeout limits. The feed reader parses at most 50 RSS/Atom entries and converts
-markup to bounded text. Camera slots accept at most 5 MiB, reject excessive
-pixel dimensions and always decode, resize and atomically re-encode JPEG rather
-than serving untrusted remote bytes.
+`BoundedFetcher` supplies the native feed, podcast and HTTP camera modules. It
+accepts only HTTP(S) URLs without embedded credentials and enforces response-
+type, size and timeout limits. The feed reader parses at most 50 RSS/Atom
+entries and converts markup to bounded text. The persistent camera library
+stores at most 100 ordered Snapshot, MJPEG or RTSP sources as `webcam` channels.
+MJPEG consumes only the first complete JPEG frame; RTSP invokes the fixed
+`/usr/bin/ffmpeg` binary with an argument array, TCP transport, one-frame output
+and a hard timeout. Every path accepts at most 5 MiB, rejects excessive pixel
+dimensions and always decodes, resizes and atomically re-encodes JPEG rather
+than serving untrusted remote bytes. Persistent camera URLs reject credentials
+and query strings. Authenticated cameras and ONVIF therefore belong in a
+separate secret-bearing adapter and are not falsely reported as native support.
 
 `PodcastReader` accepts at most 3 MiB of RSS/Atom XML and at most 50 entries
 with HTTP(S) audio enclosures. A subscription is stored as a `podcasts` channel

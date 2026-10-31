@@ -1282,6 +1282,73 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   trennt technische Eignung und Voraussetzungen von tatsächlicher
   Implementierung und nennt eine konkrete empfohlene Reihenfolge.
 
+### 2026-10-31 – Verbindliches großes Dienst-Ausbaupaket
+
+- Robert beauftragt die tatsächliche schrittweise Implementierung folgender
+  Dienstfamilien: Anker SOLIX, MQTT, privates OpenR4d10-PTT, Mumble,
+  SIP-Intercom, Meshtastic über einen vorhandenen LAN-/Bluetooth-/USB-Knoten,
+  TeamSpeak, Discord, Telegram/TDLib, ntfy und Gotify; eigene Snapshot-,
+  MJPEG-, RTSP- und ONVIF-Kameras einschließlich Windy- und kuratierten
+  öffentlichen Welt-/Verkehrs-/Hafen-/Bahnsteigkameras; ISS, NASA EPIC, NOAA
+  Space Weather, zulässige Blitzdaten und lokale/Immich-Fotodiashows;
+  WireGuard, OpenVPN, Tailscale, ZeroTier und Tor-Clientstatus; DNS-Filter-,
+  Uptime-, Metrik-, Wake-on-LAN- und NAS-Status; lokale Ortsprofile und nur
+  ausdrücklich bestätigte externe WLAN-Geolokalisierung; amtliche Warnungen;
+  OpenSubsonic/Navidrome, Jellyfin Audio, Audiobookshelf, MPD, Snapcast, Music
+  Assistant, DLNA/OpenHome, AirPlay, Internet Archive Audio, CalDAV/ICS,
+  Nextcloud und eine kleine Offline-Sprachsteuerung.
+- Bereits vorhandene Katalogeinträge oder Adapterverträge sind nicht mit einer
+  fertigen Integration gleichzusetzen. Zum Zeitpunkt der Beauftragung besitzen
+  SOLIX, Private PTT, Mumble, Discord, Telegram und TeamSpeak nur ehrliche
+  isolierte Dienstverträge; sie dürfen erst nach realem Adapter-Handshake und
+  End-to-End-Test als funktionsfähig erscheinen.
+- Meshtastic benötigt weiterhin einen echten Meshtastic-LoRa-Knoten. Der Pi
+  Zero 2 W kann diesen offiziell per TCP im LAN (Port 4403), Bluetooth oder USB
+  bedienen, wird ohne zusätzliche Funkhardware aber nicht selbst zum
+  LoRa-Empfänger.
+- Jami ist ein dezentrales verschlüsseltes Kommunikationssystem; ein geeigneter
+  headless ARM64-Client ist vor Integration zu verifizieren. Ein
+  Jitsi-Audioraum ist eine WebRTC-Konferenz; dessen Audio-/AEC-Last ist auf dem
+  Zero 2 W voraussichtlich hoch und bleibt bis zu einem realen Lasttest Klasse
+  C. Weder Dienst darf als bloßer Weblink als implementiert gelten.
+- ntfy und Gotify sind Push-Nachrichtendienste. ntfy kann per HTTP/SSE/JSON auf
+  öffentlichen oder eigenen Topics arbeiten; Gotify benötigt einen eigenen
+  Server und einen isoliert gespeicherten Client-/App-Token. Topics, Tokens und
+  Serverzugänge bleiben außerhalb von Core-SQLite, Status, Logs und Backups.
+- NASA EPIC liefert aktuelle Vollscheibenbilder der Erde von DSCOVR; NOAA Space
+  Weather liefert Sonnenwind-, Kp-/Geomagnetik-, Aurora- und Warnprodukte.
+  Beide verwenden ausschließlich feste offizielle, begrenzte und gecachte
+  Datenquellen. Blitzortung wird nur über eine ausdrücklich erlaubte API oder
+  Lizenz umgesetzt; HTML-Scraping ist verboten.
+- Tailscale ist ein koordiniertes WireGuard-basiertes Mesh-VPN, ZeroTier ein
+  virtuelles Layer-2/Layer-3-Netz. Tor wird höchstens als lokaler Client/SOCKS-
+  Status beziehungsweise expliziter Proxy einzelner kompatibler Dienste
+  unterstützt; OpenR4d10 wird weder Exit-Relay noch ungefragt vollständig über
+  Tor umgeroutet. Schlüssel und Identitäten bleiben in den jeweiligen
+  root-eigenen Backends.
+- Pi-hole/AdGuard Home, Uptime Kuma, Prometheus und Netdata werden primär als
+  Statusquellen vorhandener Instanzen integriert. Prometheus und Netdata sind
+  keine Netzwerkscanner. Ein eigener begrenzter LAN-Gerätestatus und
+  Wake-on-LAN verwenden feste gespeicherte Ziele statt frei eingebbarer
+  Paketziele oder Scans.
+- Lokale SSID-Ortsprofile ordnen ausschließlich auf dem Gerät bekannte
+  WLAN-Fingerprints Namen wie Zuhause oder Werkstatt zu. Externe
+  WLAN-Geolokalisierung überträgt BSSIDs an Dritte, ist deshalb strikt opt-in
+  und benötigt eine vom Benutzer gewählte Quelle. Geofencing bedeutet hier
+  feste Aktionen beim Betreten/Verlassen eines solchen lokalen Profils; keine
+  Position wird erfunden.
+- OpenSubsonic/Navidrome, Jellyfin und Audiobookshelf sind Clients für eigene
+  Medienserver; MPD steuert einen Music Player Daemon, Snapcast verteilt Audio
+  synchron in mehrere Räume, Music Assistant bündelt Musikquellen/Player und
+  DLNA/OpenHome entdeckt beziehungsweise steuert LAN-Renderer. Internet
+  Archive Audio erschließt frei zugängliche Sammlungen unter Beachtung der
+  Objektlizenzen. Immich dient als eigener Fotoarchiv-/Fotorahmen-Server.
+- Die Umsetzung erfolgt in überprüfbaren Releases. Ein Modul gilt nur dann als
+  fertig, wenn Backend, persistente nicht geheime Konfiguration, isolierter
+  Secret-Pfad soweit nötig, Web- und Gerätebedienung, Fehlerzustand,
+  Tests, Dokumentation, Installation und Deinstallation zusammen vorhanden
+  sind. Bloße Schalter, Links und erfundene Demo-Daten sind verboten.
+
 ### 2026-10-31 – Lastabhängiges Restflackern ausschließlich im Akkubetrieb
 
 - Robert korrigiert die bisherige Einstufung des seltenen Restflackerns: Bei
@@ -2648,3 +2715,21 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Achsenfunktionen (`SPR`/`TG` auf Deutsch) sowie den Sprungwert `25` und die
   wirkliche Talkgroup-Nummer. Das fachlich falsche `SQL`/`KAN` erscheint in
   dieser Ansicht nicht mehr.
+
+### 2026-10-31 – Persistente Kamera-Bibliothek als erstes Dienstpaket
+
+- Der bisherige flüchtige Zwei-Slot-Kameratest wird durch eine updatefeste,
+  sortierbare SQLite-Bibliothek mit bis zu 100 Kameras ersetzt. Name, Typ,
+  Reihenfolge, Aktivierung und credential-freie Quelle bleiben erhalten;
+  löschen entfernt auch den lokal erzeugten Cacheframe.
+- `snapshot` lädt ein begrenztes Einzelbild. `mjpeg` liest höchstens fünf MiB
+  bis zum ersten vollständigen JPEG und beendet die Fremdverbindung danach.
+  `rtsp` ruft über einen festen argument-only-`ffmpeg`-Pfad genau einen Frame
+  mit 15-Sekunden-Zeitgrenze und Ausgabelimit ab. Alle Varianten werden
+  dekodiert, dimensionsgeprüft, auf höchstens 640 × 480 verkleinert und als
+  lokales JPEG neu codiert; Remote-Bytes werden nie blind an den Browser
+  weitergereicht.
+- Persistente Kamera-URLs mit Benutzer/Passwort oder Querystring sind verboten.
+  Authentifizierte private RTSP-/ONVIF-Kameras benötigen den nachfolgenden
+  isolierten Adapter mit eigener 0600-Secret-Datei. Diese Grenze ist sichtbar
+  dokumentiert und darf nicht durch Zugangsdaten in SQLite umgangen werden.

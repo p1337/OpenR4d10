@@ -702,6 +702,74 @@ class ServiceCatalogTests(unittest.TestCase):
             },
         )
 
+    def test_camera_library_persists_orders_and_refreshes_multiple_protocols(self) -> None:
+        class Camera:
+            def __init__(self, root):
+                self.cache_root = root
+                self.calls = []
+
+            def fetch(self, url, slot, *, kind="snapshot"):
+                self.calls.append((url, slot, kind))
+                self.cache_root.mkdir(parents=True, exist_ok=True)
+                self.cache_root.joinpath(f"camera-{slot}.jpg").write_bytes(b"jpeg")
+                return {
+                    "slot": slot, "file": f"camera-{slot}.jpg", "kind": kind,
+                    "width": 320, "height": 240,
+                }
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            camera = Camera(root / "cache")
+            catalog = ServiceCatalog(root, camera=camera)  # type: ignore[arg-type]
+            try:
+                first = catalog.control(
+                    {
+                        "action": "camera_add", "name": "Town square",
+                        "kind": "snapshot", "url": "https://cam.example/image.jpg",
+                    }
+                )
+                second = catalog.control(
+                    {
+                        "action": "camera_add", "name": "Harbour",
+                        "kind": "rtsp", "url": "rtsp://cam.example/live",
+                    }
+                )
+                refreshed = catalog.control(
+                    {"action": "camera_refresh", "camera_id": second["camera_id"]}
+                )
+                self.assertEqual(refreshed["camera"]["kind"], "rtsp")
+                self.assertEqual(camera.calls[-1][2], "rtsp")
+                self.assertTrue(
+                    catalog.control(
+                        {
+                            "action": "camera_move",
+                            "camera_id": second["camera_id"],
+                            "direction": -1,
+                        }
+                    )["moved"]
+                )
+                public = catalog.snapshot()["webcams"]["channels"]
+                self.assertEqual([item["name"] for item in public], ["Harbour", "Town square"])
+                self.assertNotIn("source_url", public[0])
+                with self.assertRaises(ValueError):
+                    catalog.control(
+                        {
+                            "action": "camera_add", "name": "Secret",
+                            "kind": "snapshot",
+                            "url": "https://cam.example/image.jpg?token=secret",
+                        }
+                    )
+            finally:
+                catalog.close()
+
+            reopened = ServiceCatalog(root, camera=Camera(root / "cache"))  # type: ignore[arg-type]
+            try:
+                persisted = reopened.snapshot()["webcams"]["channels"]
+                self.assertEqual([item["name"] for item in persisted], ["Harbour", "Town square"])
+                self.assertEqual(reopened.selected_camera_id, second["camera_id"])
+            finally:
+                reopened.close()
+
     def test_missing_process_dependency_is_visible(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             catalog = ServiceCatalog(

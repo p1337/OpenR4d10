@@ -133,8 +133,8 @@ class _DashboardHandler(BaseHTTPRequestHandler):
             self._serve_content("brandmeister-talkgroups.json")
         elif path == "/api/device-screen.png":
             self._serve_screen()
-        elif path in {"/api/camera/1", "/api/camera/2"}:
-            self._serve_content(f"camera-{path[-1]}.jpg")
+        elif re.fullmatch(r"/api/camera/\d{1,7}", path):
+            self._serve_content(f"camera-{path.rsplit('/', 1)[-1]}.jpg")
         elif re.fullmatch(r"/api/radio-art/[a-z][a-z0-9_]{1,63}", path):
             self._serve_content(f"radio-art/{path.rsplit('/', 1)[-1]}")
         elif re.fullmatch(r"/api/ambient-art/[a-z][a-z0-9_]{1,63}", path):

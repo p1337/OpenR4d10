@@ -295,6 +295,7 @@ function renderServices(catalog) {
   renderPresets(catalog);
   renderLibrary(catalog);
   renderAmbient(catalog);
+  renderWebcams(catalog);
   renderBrandmeisterTalkgroups(catalog.brandmeister || {});
   renderPodcasts(catalog);
   renderWeather(catalog);
@@ -1625,27 +1626,92 @@ byId("feed-preset-load").addEventListener("click", () => {
   loadFeed({ action: "feed_fetch_preset", preset_id: presetId });
 });
 
-byId("camera-control").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const image = byId("camera-preview");
+async function cameraCommand(action, extra = {}) {
+  const status = byId("camera-status");
+  status.textContent = t("Working …");
   try {
     const response = await fetch("/api/control", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "camera_snapshot", url: byId("camera-url").value, slot: 1 }),
+      body: JSON.stringify({ action, ...extra }),
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
-    image.src = `/api/camera/1?t=${Date.now()}`;
-    image.hidden = false;
-    image.alt = t("Camera image {{width}} × {{height}}", {
-      width: payload.camera.width,
-      height: payload.camera.height,
-    });
+    if (payload.camera && payload.camera_id) {
+      const image = byId("camera-preview");
+      image.src = `/api/camera/${payload.camera_id}?t=${Date.now()}`;
+      image.hidden = false;
+      image.alt = t("Camera image {{width}} × {{height}}", {
+        width: payload.camera.width,
+        height: payload.camera.height,
+      });
+    }
+    status.textContent = action === "camera_delete"
+      ? t("Camera deleted.")
+      : action === "camera_refresh"
+        ? t("Camera image updated.")
+        : t("Camera change saved.");
+    await refresh();
+    return payload;
   } catch (error) {
-    image.hidden = true;
-    byId("control-result").textContent = t("Camera error: {{message}}", { message: error.message });
+    status.textContent = t("Camera error: {{message}}", { message: error.message });
+    return null;
   }
+}
+
+function renderWebcams(catalog) {
+  const cameras = Array.isArray(catalog?.webcams?.channels) ? catalog.webcams.channels : [];
+  const list = byId("camera-list");
+  list.replaceChildren();
+  cameras.forEach((camera, index) => {
+    const row = document.createElement("li");
+    const copy = document.createElement("span");
+    copy.className = "station-row-copy";
+    const name = document.createElement("strong");
+    name.textContent = camera.name;
+    const detail = document.createElement("small");
+    detail.textContent = `${camera.kind.toUpperCase()} · ${camera.source || t("Local source")}`;
+    copy.append(name, detail);
+    const actions = document.createElement("span");
+    actions.className = "library-actions";
+    const refreshButton = document.createElement("button");
+    refreshButton.type = "button";
+    refreshButton.className = "library-play";
+    refreshButton.textContent = t("Show");
+    refreshButton.addEventListener("click", () => cameraCommand("camera_refresh", { camera_id: camera.id }));
+    const up = document.createElement("button");
+    up.type = "button";
+    up.textContent = "↑";
+    up.disabled = index === 0;
+    up.addEventListener("click", () => cameraCommand("camera_move", { camera_id: camera.id, direction: -1 }));
+    const down = document.createElement("button");
+    down.type = "button";
+    down.textContent = "↓";
+    down.disabled = index === cameras.length - 1;
+    down.addEventListener("click", () => cameraCommand("camera_move", { camera_id: camera.id, direction: 1 }));
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = t("Delete");
+    remove.addEventListener("click", () => cameraCommand("camera_delete", { camera_id: camera.id }));
+    actions.append(refreshButton, up, down, remove);
+    row.append(copy, actions);
+    list.append(row);
+  });
+  if (!cameras.length) {
+    const empty = document.createElement("li");
+    empty.textContent = t("No cameras configured.");
+    list.append(empty);
+  }
+}
+
+byId("camera-control").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const payload = await cameraCommand("camera_add", {
+    name: byId("camera-name").value,
+    kind: byId("camera-kind").value,
+    url: byId("camera-url").value,
+  });
+  if (payload) event.currentTarget.reset();
 });
 
 byId("weather-refresh").addEventListener("click", () => {

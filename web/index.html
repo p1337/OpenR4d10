@@ -202,8 +202,11 @@
                 <p id="feed-credit" class="feed-credit" hidden></p><ol id="feed-results" class="feed-results"></ol>
               </form>
               <form class="content-control" id="camera-control">
-                <label for="camera-url" data-i18n="Camera snapshot">Camera snapshot</label>
-                <div class="media-source-row"><input id="camera-url" type="url" placeholder="https://…/snapshot.jpg" autocomplete="off" required><button type="submit" data-i18n="Load image">Load image</button></div>
+                <label for="camera-name" data-i18n="Camera library">Camera library</label>
+                <div class="media-source-row"><input id="camera-name" type="text" maxlength="160" placeholder="Camera name" data-i18n-placeholder="Camera name" autocomplete="off" required><select id="camera-kind" aria-label="Camera type" data-i18n-aria-label="Camera type"><option value="snapshot">Snapshot</option><option value="mjpeg">MJPEG</option><option value="rtsp">RTSP</option></select></div>
+                <div class="media-source-row"><input id="camera-url" type="text" maxlength="4096" placeholder="https://…/snapshot.jpg" autocomplete="off" required><button type="submit" data-i18n="Save camera">Save camera</button></div>
+                <p id="camera-status" class="services-note" data-i18n="Add credential-free Snapshot, MJPEG or RTSP sources. Private camera credentials require an isolated adapter.">Add credential-free Snapshot, MJPEG or RTSP sources. Private camera credentials require an isolated adapter.</p>
+                <ul id="camera-list" class="library-list"></ul>
                 <img id="camera-preview" class="camera-preview" alt="Camera image" data-i18n-alt="Camera image" hidden>
               </form>
             </div>
