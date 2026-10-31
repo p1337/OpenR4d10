@@ -43,9 +43,11 @@ The panel has four visibly rounded corners. The
 [R5-mm geometry documented for this matching 1.69-inch panel family](https://www.waveshare.com/wiki/1.69inch_LCD_Module)
 corresponds to
 approximately 43 pixels at the documented pitch. UI decoration must therefore
-stay inside that contour. The optional player border uses a five-pixel inset
-and a 38-pixel inner bottom radius; drawing it at pixel 0/239/279 is known to
-make its bottom corners disappear on the actual glass.
+follow that contour. The permanent player effect is a blurred, line-free glow
+whose source follows the outer R5 boundary and closes with a straight light
+source immediately below the status row. The physical panel, the content mask
+and the matching browser mask clip its outside half, leaving only a soft inward
+glow without a corner line that can disappear below the glass.
 
 ### User-facing peripherals
 
@@ -166,12 +168,14 @@ for the early player to release the display lock, keeps that lock, requests
 only BCM4 reset, BCM27 data/command and BCM22 active-low backlight, and writes
 240 x 280 big-endian RGB565 frames through SPI0/CS0 at a conservative 32 MHz.
 
-The UI implements the documented four compact control fields, vertical
-`MENU`/`PLAY` click labels, actual Wi-Fi SSID/IP, a larger time without a date, the battery
-status and the service-dependent media area. The control header is shorter and
-uses larger labels/values. In radio mode the service caption, written player
-state and lower status/brand strip are omitted; the station artwork is 138 ×
-138 pixels and the play/pause icon sits at the upper right below the battery.
+The UI implements the documented four compact control fields, inward-offset
+vertical `MENU`/`PLAY` click labels, actual Wi-Fi SSID/IP, a larger time without
+a date, readable battery percentage and the service-dependent media area. The
+control header is shorter and uses larger labels/values. No device information
+text may be smaller than the SSID text. In radio mode the service caption,
+written player state and lower status/brand strip are omitted; station,
+weather and camera artwork use the full media width and the panel's 43-pixel
+corner radius. The play/pause icon sits at the upper right below the battery.
 The main-menu body contains its large localized heading followed immediately by
 the documented vertical settings list and no player. The right outer encoder
 scrolls that list, the right press selects, and PTT returns one menu level unless

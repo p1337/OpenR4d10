@@ -286,6 +286,12 @@ die Höhe der einzelnen Felder gleichzeitig etwas kleiner. In Untermenüs dürfe
 die Achsen kontextabhängig anders belegt werden; die Felder müssen dies sofort
 anzeigen.
 
+Auf dem physischen 240-x-280-Display gilt für neu eingeführte Beschriftungen
+eine harte Lesbarkeitsgrenze: keine reguläre Information wird kleiner als der
+SSID-/WLAN-Text gezeichnet. Wichtige Werte wie der Batterie-Prozentwert werden
+mindestens in dieser Größe und fett gesetzt. Mikroschrift nur zum Unterbringen
+zusätzlicher Daten ist ausdrücklich unzulässig.
+
 Die Uhr bleibt geometrisch auf der gesamten 240-Pixel-Breite zentriert und
 darf nicht von der Breite der WLAN- oder Batterieanzeige verschoben werden.
 Funktionskopf und Statuszeile werden so flach wie lesbar ausgeführt; auch der
@@ -384,15 +390,15 @@ Die Geräteeinstellungen enthalten genau diese Hauptbereiche:
    - Live-Vorschau der Akzentfarbe.
    - Standard ist das festgelegte warme Orange `#FDB813`; ein Marken- oder
      Quellenname erscheint weder in der Geräte- noch in der Weboberfläche.
-   - Die persistente Option **Bildschirmumrandung aktivieren** schaltet die
-     Akzentumrandung des normalen Players. Aktiv bedeutet: linke, untere und
-     rechte Playerkante werden in der gewählten Akzentfarbe gezeichnet. Die
-     Linie liegt innerhalb der sichtbaren Fläche und folgt unten den
-     abgerundeten Displayecken; sie darf niemals bis in die abgeschnittenen
-     Eckpixel laufen. Die obere Kante bleibt wegen Funktionskopf und
-     Statuszeile offen. Deaktiviert bedeutet: keine dekorative
-     Playerumrandung. Menümarkierung, PTT-Hinweis und funktionale Statusfarben
-     bleiben davon unberührt.
+   - Der normale Player hat dauerhaft einen weichen Akzent-Glow entlang der
+     Displaykontur. Es gibt
+     dafür keinen Schalter und keine feste Linie. Der Glow entsteht an der
+     äußeren realen R5-Kontur und leuchtet nur weich nach innen; dadurch folgt
+     er den abgerundeten Ecken, ohne dort abgeschnitten zu wirken. Unter der
+     Uhr-/Statusleiste schließt eine gerade, ebenfalls ausschließlich weich
+     leuchtende obere Kante den Playerbereich.
+     Menümarkierung, PTT-Hinweis und funktionale Statusfarben bleiben davon
+     unberührt.
 3. **WLAN**
    - vollständige Standalone-Einrichtung am Gerät,
    - Netzsuche, SSID, Kennwort, DHCP/feste IP, gespeicherte Netze und Priorität.
@@ -1065,6 +1071,39 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-31 – Flacher Kopf, lesbare Mindestschrift und geschlossener Glow
+
+- Die beiden Zeilen der Knob-Statusanzeige werden in der Höhe weiter reduziert;
+  Statusleiste und Inhalt rücken entsprechend nach oben, damit der
+  Medienbereich mehr nutzbare Höhe erhält und unten kein unnötiger Leerraum
+  verbleibt.
+- Der permanente Player-Glow erhält direkt unter der Uhr-/Statusleiste eine
+  gerade obere Lichtkante. Auch dort darf ausschließlich weiches Streulicht,
+  niemals eine feste Linie sichtbar sein.
+- Medienbilder, Senderlogos, Webcam- und Wetterinhalte verwenden denselben
+  43-Pixel-Radius wie die reale Displaykontur.
+- Neue Displaytexte dürfen nicht kleiner als der SSID-/WLAN-Text sein. Der
+  Batterie-Prozentwert wird von der unlesbaren 6-Pixel-Schrift auf mindestens
+  diese Größe angehoben und fett gezeichnet.
+- Die beiden gedrehten Randbeschriftungen für Menü und Play werden zusätzlich
+  horizontal nach innen versetzt, damit die reale Rundung der oberen
+  Displayecken keinen Buchstaben abschneidet.
+
+### 2026-10-31 – Keine Rahmenlinie und kein Abschalter, nur permanenter Rand-Glow
+
+- Robert verwirft die gerade Linie und die Abschaltmöglichkeit ausdrücklich.
+  Diese Entscheidung ersetzt die zuvor festgelegte optionale innenliegende
+  U-Rahmenlinie.
+- Der normale Player zeigt immer einen weichen Glow in der gewählten
+  Akzentfarbe. Der Ursprung verläuft an der äußeren, real abgerundeten
+  Displaykontur; die zunächst offene obere Kante wurde mit der nachfolgenden
+  Festlegung durch einen geraden Glow unter der Statusleiste geschlossen. Es
+  darf kein scharf gezeichneter Linienkern sichtbar sein.
+- In den Webeinstellungen bleibt nur die Akzentfarbe. Der Schalter
+  `Bildschirmumrandung aktivieren`, das öffentliche Feld
+  `screen_border_enabled` und dessen aktiver Persistenzpfad entfallen. Ein aus
+  älteren Versionen eventuell noch vorhandener SQLite-Wert wird ignoriert.
+
 ### 2026-10-31 – Playerumrandung folgt den realen Displayrundungen
 
 - Robert weist anhand der Live-Anzeige darauf hin, dass die bisher bis an die
@@ -1074,21 +1113,16 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   `ZJY169TP-IF95` mit 0,11655 mm Pixelabstand; die dokumentierte Geometrie
   dieser 1,69-Zoll-Panelfamilie hat vier R5-mm-Ecken, entsprechend rund
   43 Pixeln Radius.
-- Die optionale Umrandung wird deshalb als innenliegende, oben offene U-Form
-  gezeichnet: 5 Pixel Abstand zur Außenkante, ungefähr 38 Pixel Innenradius,
-  abgerundete Übergänge unten links und unten rechts. Die Browser-Livevorschau
-  bildet denselben 43-Pixel-Panelausschnitt ab. Eckpixel außerhalb der realen
-  Sichtfläche dürfen nicht mehr als Teil der Umrandung getestet oder genutzt
-  werden.
+- Der damals daraus abgeleitete innenliegende U-Rahmen wurde unmittelbar
+  danach wieder verworfen. Verbindlich bleibt nur die 43-Pixel-Panelausschnitt-
+  Geometrie für die Browser-Livevorschau und den permanenten weichen Glow.
 
 ### 2026-10-31 – Optionale Playerumrandung und echte PiSugar-3-Anzeige
 
 - Robert ordnet den bisherigen gelben Balken als Player-Akzent ein und verlangt
-  dafür bei den Farbeinstellungen eine dauerhafte Option
-  `Bildschirmumrandung aktivieren`. Bei aktivierter Option wird aus der
-  einzelnen linken Linie eine zusammenhängende, oben offene Umrandung an der
-  linken, unteren und rechten Playerkante in der aktuell gewählten
-  Akzentfarbe. Bei deaktivierter Option entfällt diese dekorative Umrandung.
+  zunächst eine dauerhafte Option für eine Umrandung. Diese Zwischenforderung
+  ist durch die spätere Festlegung „permanenter Glow ohne Linie und ohne
+  Abschalter“ aufgehoben.
 - Der PiSugar 3 mit 1200-mAh-Akku ist bereits als reale Hardware bestätigt.
   Die Batterietelemetrie wird nun gegen die offizielle PiSugar-3-I2C-
   Dokumentation und das reale Zielgerät geprüft und danach ohne geratenes

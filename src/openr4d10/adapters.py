@@ -260,7 +260,6 @@ class WhisplayDisplay:
     def set_appearance(
         self,
         accent_color: str,
-        screen_border_enabled: bool,
         *,
         redraw: bool = False,
     ) -> None:
@@ -268,13 +267,10 @@ class WhisplayDisplay:
             r"#[0-9A-Fa-f]{6}", accent_color
         ) is None:
             raise ValueError("accent color must use #RRGGBB")
-        if not isinstance(screen_border_enabled, bool):
-            raise ValueError("screen border setting must be true or false")
         with self._lock:
             self.state.accent = tuple(
                 int(accent_color[index : index + 2], 16) for index in (1, 3, 5)
             )
-            self.state.screen_border_enabled = screen_border_enabled
             if redraw:
                 self._show_state()
 

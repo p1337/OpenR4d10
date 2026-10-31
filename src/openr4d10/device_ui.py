@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Mapping
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 from .input_events import Control, InputEvent
 from .models import Frame
@@ -16,8 +16,6 @@ from .models import Frame
 WIDTH = 240
 HEIGHT = 280
 DISPLAY_CORNER_RADIUS = 43
-PLAYER_BORDER_INSET = 5
-PLAYER_BORDER_RADIUS = DISPLAY_CORNER_RADIUS - PLAYER_BORDER_INSET
 DEFAULT_ACCENT = (253, 184, 19)
 SERVICES = ("SYSTEM", "RADIO", "WEATHER", "DMR", "PLAYER", "REC")
 MAIN_MENU_ITEMS = (
@@ -195,7 +193,6 @@ class DeviceUiState:
     hotspot_url: str = ""
     language: str = "en"
     accent: tuple[int, int, int] = DEFAULT_ACCENT
-    screen_border_enabled: bool = True
     timestamp: datetime = field(default_factory=datetime.now)
 
     @property
@@ -224,7 +221,6 @@ class DeviceUiState:
             "preset_id": self.preset_id,
             "image_file": self.image_file,
             "accent_color": "#{:02X}{:02X}{:02X}".format(*self.accent),
-            "screen_border_enabled": self.screen_border_enabled,
         }
 
     @property
@@ -484,11 +480,12 @@ def _draw_back_or_ptt(
     draw: ImageDraw.ImageDraw,
     accent: tuple[int, int, int],
     ptt_active: bool,
+    content_top: int,
 ) -> None:
     badge_left = 188
-    badge_top = 76
+    badge_top = content_top + 5
     badge_right = WIDTH + 8
-    badge_bottom = 106
+    badge_bottom = badge_top + 30
     if ptt_active:
         draw.rounded_rectangle(
             (badge_left, badge_top, badge_right, badge_bottom),
@@ -499,7 +496,7 @@ def _draw_back_or_ptt(
         font = _font(12, bold=True)
         bounds = draw.textbbox((0, 0), "PTT", font=font)
         draw.text(
-            (213 - (bounds[2] - bounds[0]) / 2, 83),
+            (213 - (bounds[2] - bounds[0]) / 2, badge_top + 7),
             "PTT",
             font=font,
             fill=(255, 255, 255),
@@ -523,28 +520,30 @@ def _draw_back_or_ptt(
     )
     draw.polygon(
         (
-            (202, 91),
-            (209, 84),
-            (209, 88),
-            (219, 88),
-            (219, 94),
-            (209, 94),
-            (209, 98),
+            (202, badge_top + 15),
+            (209, badge_top + 8),
+            (209, badge_top + 12),
+            (219, badge_top + 12),
+            (219, badge_top + 18),
+            (209, badge_top + 18),
+            (209, badge_top + 22),
         ),
         fill=accent,
     )
 
 
-def _draw_player_accent_border(
+def _draw_player_edge_glow(
     image: Image.Image,
     top: int,
     accent: tuple[int, int, int],
 ) -> None:
-    """Draw an inset open-top U that follows the physical rounded panel."""
-    left = PLAYER_BORDER_INSET
-    right = WIDTH - 1 - PLAYER_BORDER_INSET
-    bottom = HEIGHT - 1 - PLAYER_BORDER_INSET
-    radius = PLAYER_BORDER_RADIUS
+    """Glow inward from the physical player contour without a crisp line."""
+    padding = 24
+    outside_offset = 8
+    left = padding - outside_offset
+    right = padding + WIDTH - 1 + outside_offset
+    bottom = padding + HEIGHT - 1 + outside_offset
+    radius = DISPLAY_CORNER_RADIUS + outside_offset
     tangent_y = bottom - radius
 
     def draw_path(
@@ -552,7 +551,9 @@ def _draw_player_accent_border(
         color: tuple[int, ...],
         width: int,
     ) -> None:
-        target.line((left, top, left, tangent_y), fill=color, width=width)
+        glow_top = padding + top - outside_offset
+        target.line((left, glow_top, right, glow_top), fill=color, width=width)
+        target.line((left, glow_top, left, tangent_y), fill=color, width=width)
         target.arc(
             (left, bottom - 2 * radius, left + 2 * radius, bottom),
             90,
@@ -572,18 +573,36 @@ def _draw_player_accent_border(
             fill=color,
             width=width,
         )
-        target.line((right, tangent_y, right, top), fill=color, width=width)
+        target.line((right, tangent_y, right, glow_top), fill=color, width=width)
 
-    glow = Image.new("RGBA", image.size, (0, 0, 0, 0))
-    draw_path(ImageDraw.Draw(glow), (*accent, 185), 5)
-    image.alpha_composite(glow.filter(ImageFilter.GaussianBlur(radius=5)))
-    draw_path(ImageDraw.Draw(image), accent, 3)
+    # Render the light source outside the physical viewport. Only its blurred
+    # spill is cropped back into the panel, so no solid border can remain.
+    glow = Image.new(
+        "RGBA",
+        (WIDTH + 2 * padding, HEIGHT + 2 * padding),
+        (0, 0, 0, 0),
+    )
+    draw_path(ImageDraw.Draw(glow), (*accent, 255), 13)
+    blurred = glow.filter(ImageFilter.GaussianBlur(radius=9))
+    visible = blurred.crop((padding, padding, padding + WIDTH, padding + HEIGHT))
+    panel_mask = Image.new("L", (WIDTH, HEIGHT), 0)
+    ImageDraw.Draw(panel_mask).rounded_rectangle(
+        (0, 0, WIDTH - 1, HEIGHT - 1),
+        radius=DISPLAY_CORNER_RADIUS,
+        fill=255,
+    )
+    content_mask = Image.new("L", (WIDTH, HEIGHT), 0)
+    ImageDraw.Draw(content_mask).rectangle((0, top, WIDTH - 1, HEIGHT - 1), fill=255)
+    panel_mask = ImageChops.multiply(panel_mask, content_mask)
+    visible.putalpha(ImageChops.multiply(visible.getchannel("A"), panel_mask))
+    image.alpha_composite(visible)
 
 
 def _draw_main_menu_items(
     draw: ImageDraw.ImageDraw,
     state: DeviceUiState,
     text: Mapping[str, object],
+    content_top: int,
 ) -> None:
     visible_rows = 5
     start = max(
@@ -594,7 +613,7 @@ def _draw_main_menu_items(
         ),
     )
     font = _font(14, bold=True)
-    row_top = 104
+    row_top = content_top + 33
     for row, key in enumerate(MAIN_MENU_ITEMS[start : start + visible_rows]):
         index = start + row
         y = row_top + row * 31
@@ -628,21 +647,22 @@ def _draw_hotspot_setup(
     draw: ImageDraw.ImageDraw,
     state: DeviceUiState,
     text: Mapping[str, object],
+    content_top: int,
 ) -> None:
     heading_font = _font(18, bold=True)
     label_font = _font(8, bold=True)
     value_font = _font(12, bold=True)
     url_font = _font(11, bold=True)
     draw.text(
-        (14, 78),
+        (14, content_top + 7),
         _fit_text(draw, str(text["wifi_setup"]), heading_font, 212),
         font=heading_font,
         fill=state.accent,
     )
     rows = (
-        (108, str(text["wifi_name"]), state.hotspot_ssid, value_font),
-        (157, str(text["wifi_password"]), state.hotspot_passphrase, value_font),
-        (206, str(text["wifi_open"]), state.hotspot_url, url_font),
+        (content_top + 37, str(text["wifi_name"]), state.hotspot_ssid, value_font),
+        (content_top + 86, str(text["wifi_password"]), state.hotspot_passphrase, value_font),
+        (content_top + 135, str(text["wifi_open"]), state.hotspot_url, url_font),
     )
     for top, label, value, font in rows:
         draw.text((15, top), label, font=label_font, fill=(128, 140, 145))
@@ -679,49 +699,49 @@ def render_device_ui(
     else:
         right_action = str(text["info"])
 
-    header_height = 45
-    draw.rectangle((0, 0, WIDTH - 1, 44), fill=(2, 5, 7), outline=(35, 47, 51))
-    draw.line((17, 22, 222, 22), fill=(25, 35, 39), width=1)
-    draw.line((119, 2, 119, 42), fill=(25, 35, 39), width=1)
-    _vertical_label(image, left_action, 1, clockwise=False, header_height=header_height)
-    _vertical_label(image, right_action, 227, clockwise=False, header_height=header_height)
-    _control_value(draw, 19, 4, str(controls[0]), f"{state.volume}%", accent)
-    _control_value(draw, 19, 26, str(controls[1]), str(state.squelch), accent)
-    _control_value(draw, 122, 4, str(controls[2]), f"{state.channel:03d}", accent)
+    header_height = 40
+    draw.rectangle((0, 0, WIDTH - 1, 39), fill=(2, 5, 7), outline=(35, 47, 51))
+    draw.line((17, 19, 222, 19), fill=(25, 35, 39), width=1)
+    draw.line((119, 2, 119, 37), fill=(25, 35, 39), width=1)
+    _vertical_label(image, left_action, 5, clockwise=False, header_height=header_height)
+    _vertical_label(image, right_action, 224, clockwise=False, header_height=header_height)
+    _control_value(draw, 19, 1, str(controls[0]), f"{state.volume}%", accent)
+    _control_value(draw, 19, 20, str(controls[1]), str(state.squelch), accent)
+    _control_value(draw, 122, 1, str(controls[2]), f"{state.channel:03d}", accent)
     service_label = str(text["weather_service"]) if state.service == "WEATHER" else state.service
-    _control_value(draw, 122, 26, str(controls[3]), service_label, accent)
+    _control_value(draw, 122, 20, str(controls[3]), service_label, accent)
 
-    draw.rectangle((0, 45, WIDTH - 1, 70), fill=(12, 20, 23))
-    _wifi_icon(draw, 5, 52, accent)
+    draw.rectangle((0, 40, WIDTH - 1, 62), fill=(12, 20, 23))
+    _wifi_icon(draw, 5, 45, accent)
     # SSID and IP use the same requested 1.2x scale while keeping the clock fixed.
     status_font = _font(8)
-    draw.text((22, 48), _fit_text(draw, state.wifi_label, status_font, 67), font=status_font, fill=(213, 222, 224))
-    draw.text((22, 59), _fit_text(draw, state.ip_address, status_font, 73), font=status_font, fill=(112, 130, 134))
+    draw.text((22, 41), _fit_text(draw, state.wifi_label, status_font, 67), font=status_font, fill=(213, 222, 224))
+    draw.text((22, 51), _fit_text(draw, state.ip_address, status_font, 73), font=status_font, fill=(112, 130, 134))
     clock = state.timestamp.strftime("%H:%M")
     clock_font = _font(15, bold=True)
     clock_width = draw.textbbox((0, 0), clock, font=clock_font)[2]
-    draw.text(((WIDTH - clock_width) / 2, 48), clock, font=clock_font, fill=(235, 240, 241))
-    _battery(draw, 207, 53, state.battery_percent, accent)
+    draw.text(((WIDTH - clock_width) / 2, 41), clock, font=clock_font, fill=(235, 240, 241))
+    _battery(draw, 207, 47, state.battery_percent, accent)
     if state.battery_percent is not None:
         pct = f"{state.battery_percent}%"
-        pct_font = _font(6, bold=True)
+        pct_font = _font(9, bold=True)
         width = draw.textbbox((0, 0), pct, font=pct_font)[2]
-        draw.text((205 - width, 56), pct, font=pct_font, fill=(180, 190, 192))
+        draw.text((203 - width, 47), pct, font=pct_font, fill=(213, 222, 224))
 
-    content_top = 71
+    content_top = 63
     draw.rectangle((0, content_top, WIDTH - 1, HEIGHT - 1), fill=(6, 12, 15))
     if state.hotspot_active:
         draw.rectangle((0, content_top, 3, HEIGHT - 1), fill=accent)
-        _draw_hotspot_setup(draw, state, text)
+        _draw_hotspot_setup(draw, state, text, content_top)
         return image.convert("RGB")
     if state.menu_open:
         draw.rectangle((0, content_top, 3, HEIGHT - 1), fill=accent)
         menu_key = state.menu_kind or "main_menu"
         menu_title = str(text.get(menu_key, text["main_menu"]))
         _draw_menu_heading(draw, menu_title, content_top, accent)
-        _draw_back_or_ptt(draw, accent, state.ptt_active)
+        _draw_back_or_ptt(draw, accent, state.ptt_active, content_top)
         if menu_key == "main_menu":
-            _draw_main_menu_items(draw, state, text)
+            _draw_main_menu_items(draw, state, text, content_top)
         return image.convert("RGB")
 
     if state.service in {"SYSTEM", "REC"}:
@@ -730,21 +750,21 @@ def render_device_ui(
         body_font = _font(13, bold=True)
         small_font = _font(10)
         draw.text(
-            (14, 80),
+            (14, content_top + 9),
             _fit_text(draw, state.source, heading_font, 212),
             font=heading_font,
             fill=(245, 248, 249),
         )
-        draw.line((14, 111, 226, 111), fill=(52, 67, 71), width=1)
+        draw.line((14, content_top + 40, 226, content_top + 40), fill=(52, 67, 71), width=1)
         draw.multiline_text(
-            (14, 127),
+            (14, content_top + 56),
             _fit_text(draw, state.title, body_font, 208),
             font=body_font,
             fill=accent,
             spacing=4,
         )
         draw.multiline_text(
-            (14, 171),
+            (14, content_top + 100),
             _fit_text(draw, state.subtitle, small_font, 208),
             font=small_font,
             fill=(178, 187, 189),
@@ -752,32 +772,37 @@ def render_device_ui(
         )
         return image.convert("RGB")
 
-    if state.screen_border_enabled:
-        _draw_player_accent_border(image, content_top, accent)
+    _draw_player_edge_glow(image, content_top, accent)
     draw = ImageDraw.Draw(image)
 
     station_font = _font(18, bold=True)
     station = _fit_text(draw, state.source, station_font, 164)
-    draw.text((14, 75), station, font=station_font, fill=(245, 248, 249))
+    draw.text((14, content_top + 4), station, font=station_font, fill=(245, 248, 249))
 
     if state.service == "WEATHER":
         credit_font = _font(8, bold=True)
         credit = _fit_text(draw, state.title, credit_font, 128)
         credit_width = draw.textbbox((0, 0), credit, font=credit_font)[2]
-        draw.text((226 - credit_width, 96), credit, font=credit_font, fill=accent)
+        draw.text((226 - credit_width, content_top + 25), credit, font=credit_font, fill=accent)
         if artwork is not None:
             weather = ImageOps.contain(
                 artwork.convert("RGB"),
-                (212, 154),
+                (212, 167),
                 method=Image.Resampling.LANCZOS,
             )
             weather_x = 14 + (212 - weather.width) // 2
-            weather_y = 112 + (154 - weather.height) // 2
-            image.paste(weather, (weather_x, weather_y))
+            weather_y = content_top + 41 + (167 - weather.height) // 2
+            weather_mask = Image.new("L", weather.size, 0)
+            ImageDraw.Draw(weather_mask).rounded_rectangle(
+                (0, 0, weather.width - 1, weather.height - 1),
+                radius=DISPLAY_CORNER_RADIUS,
+                fill=255,
+            )
+            image.paste(weather, (weather_x, weather_y), weather_mask)
         else:
             draw.rounded_rectangle(
-                (14, 112, 225, 266),
-                radius=10,
+                (14, content_top + 41, 225, 270),
+                radius=DISPLAY_CORNER_RADIUS,
                 fill=(13, 31, 35),
                 outline=accent,
                 width=2,
@@ -786,18 +811,23 @@ def render_device_ui(
             loading = _fit_text(draw, state.subtitle, loading_font, 180)
             bounds = draw.textbbox((0, 0), loading, font=loading_font)
             draw.text(
-                (120 - (bounds[2] - bounds[0]) / 2, 178),
+                (120 - (bounds[2] - bounds[0]) / 2, content_top + 107),
                 loading,
                 font=loading_font,
                 fill=(196, 207, 209),
             )
-        draw.rounded_rectangle((13, 111, 226, 267), radius=10, outline=(75, 92, 96), width=1)
+        draw.rounded_rectangle(
+            (13, content_top + 40, 226, 271),
+            radius=DISPLAY_CORNER_RADIUS,
+            outline=(75, 92, 96),
+            width=1,
+        )
         return image.convert("RGB")
 
     # Radio/player artwork spans the content width. ImageOps.fit deliberately
     # crops the lower edge instead of squeezing a square logo into a side tile.
-    tile_size = (212, 148)
-    tile_xy = (14, 114)
+    tile_size = (212, 164)
+    tile_xy = (14, content_top + 43)
     if artwork is not None:
         tile = ImageOps.fit(
             artwork.convert("RGB"),
@@ -808,14 +838,14 @@ def render_device_ui(
         mask = Image.new("L", tile_size, 0)
         ImageDraw.Draw(mask).rounded_rectangle(
             (0, 0, tile_size[0] - 1, tile_size[1] - 1),
-            radius=12,
+            radius=DISPLAY_CORNER_RADIUS,
             fill=255,
         )
         image.paste(tile, tile_xy, mask)
     else:
         draw.rounded_rectangle(
-            (14, 114, 225, 261),
-            radius=12,
+            (14, content_top + 43, 225, 269),
+            radius=DISPLAY_CORNER_RADIUS,
             fill=(13, 31, 35),
             outline=accent,
             width=2,
@@ -824,34 +854,39 @@ def render_device_ui(
         initials_font = _font(34, bold=True)
         bounds = draw.textbbox((0, 0), initials, font=initials_font)
         draw.text(
-            (120 - (bounds[2] - bounds[0]) / 2, 188 - (bounds[3] - bounds[1]) / 2),
+            (120 - (bounds[2] - bounds[0]) / 2, content_top + 125 - (bounds[3] - bounds[1]) / 2),
             initials,
             font=initials_font,
             fill=accent,
         )
-    draw.rounded_rectangle((13, 113, 226, 263), radius=12, outline=(75, 92, 96), width=1)
+    draw.rounded_rectangle(
+        (13, content_top + 42, 226, 271),
+        radius=DISPLAY_CORNER_RADIUS,
+        outline=(75, 92, 96),
+        width=1,
+    )
 
     title = state.title if state.title.casefold() != state.source.casefold() else state.subtitle
     detail_font = _font(9, bold=True)
     draw.text(
-        (14, 98),
+        (14, content_top + 27),
         _fit_text(draw, title, detail_font, 164),
         font=detail_font,
         fill=(196, 207, 209),
     )
 
     if state.ptt_active:
-        _draw_back_or_ptt(draw, accent, True)
+        _draw_back_or_ptt(draw, accent, True, content_top)
     else:
         # Exactly one compact metadata block high (station + track), never taller.
-        draw.ellipse((190, 76, 224, 110), fill=(12, 23, 27), outline=accent, width=2)
+        draw.ellipse((190, content_top + 5, 224, content_top + 39), fill=(12, 23, 27), outline=accent, width=2)
         if state.playing:
-            draw.rectangle((201, 86, 204, 100), fill=accent)
-            draw.rectangle((210, 86, 213, 100), fill=accent)
+            draw.rectangle((201, content_top + 15, 204, content_top + 29), fill=accent)
+            draw.rectangle((210, content_top + 15, 213, content_top + 29), fill=accent)
         else:
-            draw.polygon(((201, 84), (201, 102), (215, 93)), fill=accent)
+            draw.polygon(((201, content_top + 13), (201, content_top + 31), (215, content_top + 22)), fill=accent)
     if state.recording:
-        draw.ellipse((220, 75, 228, 83), fill=(255, 78, 78))
+        draw.ellipse((220, content_top + 4, 228, content_top + 12), fill=(255, 78, 78))
     return image.convert("RGB")
 
 

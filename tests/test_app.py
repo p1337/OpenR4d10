@@ -82,26 +82,26 @@ class AppTests(unittest.TestCase):
             def render(self, _frame) -> None:
                 pass
 
-            def set_appearance(self, accent, border, *, redraw=False):
-                self.values.append((accent, border, redraw))
+            def set_appearance(self, accent, *, redraw=False):
+                self.values.append((accent, redraw))
 
             def snapshot(self):
-                accent, border, _redraw = self.values[-1]
-                return {"accent_color": accent, "screen_border_enabled": border}
+                accent, _redraw = self.values[-1]
+                return {"accent_color": accent}
 
         class Services:
             active_service = "system"
 
             def __init__(self) -> None:
-                self.value = {"accent_color": "#FDB813", "screen_border_enabled": True}
+                self.value = {"accent_color": "#FDB813"}
 
             def display_appearance(self):
                 return dict(self.value)
 
-            def set_display_appearance(self, accent, border):
-                if not isinstance(accent, str) or not isinstance(border, bool):
+            def set_display_appearance(self, accent):
+                if not isinstance(accent, str):
                     raise ValueError("invalid appearance")
-                self.value = {"accent_color": accent.upper(), "screen_border_enabled": border}
+                self.value = {"accent_color": accent.upper()}
                 return dict(self.value)
 
         with tempfile.TemporaryDirectory() as raw:
@@ -123,18 +123,17 @@ class AppTests(unittest.TestCase):
                 receiver=SystemTelemetry(),
                 services=services,  # type: ignore[arg-type]
             )
-            self.assertEqual(display.values, [("#FDB813", True, False)])
+            self.assertEqual(display.values, [("#FDB813", False)])
             result = app.control(
                 {
                     "action": "display_appearance",
                     "accent_color": "#12abef",
-                    "screen_border_enabled": False,
                 }
             )
-            self.assertEqual(display.values[-1], ("#12abef", False, True))
+            self.assertEqual(display.values[-1], ("#12abef", True))
             self.assertEqual(
                 result["settings"],
-                {"accent_color": "#12ABEF", "screen_border_enabled": False},
+                {"accent_color": "#12ABEF"},
             )
 
     def test_confirmed_system_update_uses_the_fixed_runtime_request(self) -> None:

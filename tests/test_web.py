@@ -84,9 +84,9 @@ class WebTests(unittest.TestCase):
         self.assertIn("display_brightness_percent", script)
         self.assertIn("Display brightness {{brightness}}% saved permanently.", script)
         self.assertIn('id="display-accent-color" type="color"', html)
-        self.assertIn('id="display-screen-border" type="checkbox"', html)
         self.assertIn('action: "display_appearance"', script)
-        self.assertIn("screen_border_enabled", script)
+        self.assertNotIn("display-screen-border", html)
+        self.assertNotIn("screen_border_enabled", script)
         self.assertIn("border-radius: 43px", stylesheet)
         for tab in ("radio", "weather", "media", "device", "system", "services"):
             self.assertIn(f'data-tab="{tab}"', html)

@@ -142,16 +142,15 @@ started PWM on that claimed output. Raspberry Pi OS package 0.2.2 returns
 `bad PWM micros` for an idle stop. Tests must cover a steady endpoint before
 the first intermediate PWM value and cleanup in both active and idle states.
 
-`display_appearance` accepts one `#RRGGBB` accent string and one real boolean
-`screen_border_enabled`. Both values live in SQLite and are applied by the same
-Whisplay renderer used for the physical panel and PNG preview. Tests cover
-persistence, malformed colors/non-boolean flags, the enabled left/bottom/right
-border, its open top and the absent decorative player border when disabled.
-The enabled-border contract uses the checked-in display geometry: five-pixel
-inset and 38-pixel inner radius derived from the approximately 43-pixel R5
-physical corner. Tests must assert both curved bottom corners and must reject
-the former rectangular edge pixels `(0, 279)` and `(239, 279)` as border
-locations. The web preview uses the same 43-pixel corner radius.
+`display_appearance` accepts and persists only one `#RRGGBB` accent string.
+The Whisplay renderer used for the physical panel and PNG preview always draws
+the player edge glow; `screen_border_enabled` is no longer a public or active
+setting. Tests cover persistence, malformed colors, the straight top glow below
+the status row, the R5 curve and the absence of any pixel in the glow samples
+that exactly equals the accent color. That last assertion prevents a crisp line
+from returning. The web preview and all device media masks use the same
+43-pixel corner radius and contain no enable switch. New device text must use at
+least the SSID font size; tests enforce this for the battery percentage.
 
 The `pisugar3` backend must verify registers `0x00 == 3` and `0x01 == 0x0F`
 before accepting register `0x2A` as a percentage. Tests mock the I2C boundary

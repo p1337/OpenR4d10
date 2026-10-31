@@ -64,10 +64,7 @@ class OpenR4d10App:
         appearance_setter = getattr(self.display, "set_appearance", None)
         if callable(appearance_reader) and callable(appearance_setter):
             appearance = appearance_reader()
-            appearance_setter(
-                appearance["accent_color"],
-                appearance["screen_border_enabled"],
-            )
+            appearance_setter(appearance["accent_color"])
 
     def request_stop(self, signum: int | None = None, _frame: object = None) -> None:
         if signum is not None:
@@ -148,7 +145,6 @@ class OpenR4d10App:
             if self.services is None:
                 raise RuntimeError("settings control is unavailable")
             accent_color = request.get("accent_color")
-            border_enabled = request.get("screen_border_enabled")
             display_setter = getattr(self.display, "set_appearance", None)
             persist = getattr(self.services, "set_display_appearance", None)
             current = getattr(self.services, "display_appearance", None)
@@ -157,15 +153,11 @@ class OpenR4d10App:
             if not callable(persist) or not callable(current):
                 raise RuntimeError("persistent settings are unavailable")
             previous = current()
-            display_setter(accent_color, border_enabled, redraw=True)
+            display_setter(accent_color, redraw=True)
             try:
-                settings = persist(accent_color, border_enabled)
+                settings = persist(accent_color)
             except Exception:
-                display_setter(
-                    previous["accent_color"],
-                    previous["screen_border_enabled"],
-                    redraw=True,
-                )
+                display_setter(previous["accent_color"], redraw=True)
                 raise
             return {
                 "settings": settings,

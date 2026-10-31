@@ -206,23 +206,21 @@ class ServiceCatalogTests(unittest.TestCase):
             try:
                 self.assertEqual(
                     catalog.display_appearance(),
-                    {"accent_color": "#FDB813", "screen_border_enabled": True},
+                    {"accent_color": "#FDB813"},
                 )
                 self.assertEqual(
-                    catalog.set_display_appearance("#12abef", False),
-                    {"accent_color": "#12ABEF", "screen_border_enabled": False},
+                    catalog.set_display_appearance("#12abef"),
+                    {"accent_color": "#12ABEF"},
                 )
                 with self.assertRaises(ValueError):
-                    catalog.set_display_appearance("orange", True)
-                with self.assertRaises(ValueError):
-                    catalog.set_display_appearance("#123456", 1)  # type: ignore[arg-type]
+                    catalog.set_display_appearance("orange")
             finally:
                 catalog.close()
             reopened = ServiceCatalog(state_root)
             try:
                 self.assertEqual(
                     reopened.display_appearance(),
-                    {"accent_color": "#12ABEF", "screen_border_enabled": False},
+                    {"accent_color": "#12ABEF"},
                 )
             finally:
                 reopened.close()

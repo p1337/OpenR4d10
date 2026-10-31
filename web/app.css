@@ -271,8 +271,6 @@ h2 { margin-bottom: 0; font-size: 1.15rem; letter-spacing: -0.02em; }
 #display-brightness:disabled { cursor: wait; opacity: .55; }
 #display-brightness-status { grid-column: 1 / -1; }
 #display-accent-color { width: 58px; height: 38px; padding: 2px; border: 1px solid var(--line-strong); border-radius: 9px; background: #071011; cursor: pointer; }
-.appearance-check { grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; }
-.appearance-check input { accent-color: var(--cyan); }
 #display-appearance-status { grid-column: 1 / -1; }
 .wifi-repair-form { display: grid; gap: 12px; margin-top: 20px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(5, 12, 14, .58); }
 .wifi-repair-form > label:not(.wifi-check) { display: grid; gap: 7px; color: var(--muted); font-size: .72rem; }

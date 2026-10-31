@@ -78,12 +78,15 @@ class DeviceUiTests(unittest.TestCase):
         frame = Image.new("RGB", (480, 360), (40, 90, 130))
         image = render_device_ui(state, frame)
         self.assertEqual(image.getpixel((120, 180)), (40, 90, 130))
-        self.assertEqual(image.getpixel((5, 180)), DEFAULT_ACCENT)
+        self.assertNotEqual(image.getpixel((5, 180)), (6, 12, 15))
+        self.assertNotEqual(image.getpixel((5, 180)), DEFAULT_ACCENT)
 
     def test_radio_artwork_replaces_the_local_initials_tile(self) -> None:
         state = DeviceUiState(source="SWR3", service_index=1, playing=True)
         artwork = Image.new("RGB", (32, 32), (220, 20, 40))
         image = render_device_ui(state, artwork)
+        self.assertNotEqual(image.getpixel((14, 106)), (220, 20, 40))
+        self.assertEqual(image.getpixel((120, 106)), (220, 20, 40))
         self.assertEqual(image.getpixel((50, 180)), (220, 20, 40))
         self.assertEqual(image.getpixel((140, 240)), (220, 20, 40))
         self.assertEqual(image.getpixel((220, 240)), (220, 20, 40))
@@ -98,7 +101,7 @@ class DeviceUiTests(unittest.TestCase):
         image = render_device_ui(DeviceUiState())
         # Sample below the font bounding boxes so this remains independent of
         # platform-specific DejaVu glyph rasterisation.
-        self.assertEqual(image.getpixel((100, 69)), (12, 20, 23))
+        self.assertEqual(image.getpixel((100, 61)), (12, 20, 23))
         for corner in ((0, 0, 13, 6), (227, 0, 240, 6)):
             self.assertNotIn(
                 (135, 143, 148),
@@ -112,6 +115,10 @@ class DeviceUiTests(unittest.TestCase):
             [call.kwargs["clockwise"] for call in vertical_label.call_args_list],
             [False, False],
         )
+        self.assertEqual(
+            [call.args[2] for call in vertical_label.call_args_list],
+            [5, 224],
+        )
 
     def test_header_controls_and_network_text_use_requested_larger_fonts(self) -> None:
         sizes = {}
@@ -122,13 +129,18 @@ class DeviceUiTests(unittest.TestCase):
             sizes.setdefault(str(text), getattr(font, "size", None))
             return original_text(draw, xy, text, *args, **kwargs)
 
-        state = DeviceUiState(wifi_label="p1337", ip_address="192.168.1.64")
+        state = DeviceUiState(
+            wifi_label="p1337",
+            ip_address="192.168.1.64",
+            battery_percent=87,
+        )
         with patch.object(ImageDraw.ImageDraw, "text", new=capture_text):
             render_device_ui(state)
         self.assertEqual(sizes["VOL"], 12)
         self.assertEqual(sizes["30%"], 14)
         self.assertEqual(sizes["p1337"], 8)
         self.assertEqual(sizes["192.168.1.64"], 8)
+        self.assertGreaterEqual(sizes["87%"], sizes["p1337"])
 
     def test_date_and_redundant_player_text_are_not_rendered(self) -> None:
         first = DeviceUiState(
@@ -226,10 +238,10 @@ class DeviceUiTests(unittest.TestCase):
     def test_menu_back_arrow_uses_accent_below_battery(self) -> None:
         state = DeviceUiState(menu_open=True, menu_kind="main_menu")
         image = render_device_ui(state)
-        self.assertEqual(image.getpixel((188, 91)), state.accent)
-        self.assertEqual(image.getpixel((190, 91)), (6, 12, 15))
-        self.assertEqual(image.getpixel((203, 91)), state.accent)
-        self.assertEqual(image.getpixel((239, 91)), (6, 12, 15))
+        self.assertEqual(image.getpixel((188, 83)), state.accent)
+        self.assertEqual(image.getpixel((190, 83)), (6, 12, 15))
+        self.assertEqual(image.getpixel((203, 83)), state.accent)
+        self.assertEqual(image.getpixel((239, 83)), (6, 12, 15))
         self.assertEqual(len(MAIN_MENU_ITEMS), 10)
 
     def test_player_accent_rail_glows_but_menu_rail_stays_crisp(self) -> None:
@@ -238,22 +250,22 @@ class DeviceUiTests(unittest.TestCase):
         self.assertNotEqual(player.getpixel((7, 180)), (6, 12, 15))
         self.assertEqual(menu.getpixel((7, 180)), (6, 12, 15))
 
-    def test_optional_player_border_uses_left_bottom_and_right_edges(self) -> None:
-        enabled = render_device_ui(DeviceUiState(service_index=1))
-        disabled = render_device_ui(
-            DeviceUiState(service_index=1, screen_border_enabled=False)
-        )
-        for point in ((5, 180), (120, 274), (234, 180), (5, 236), (234, 236)):
-            self.assertEqual(enabled.getpixel(point), DEFAULT_ACCENT)
-            self.assertNotEqual(disabled.getpixel(point), DEFAULT_ACCENT)
+    def test_permanent_player_glow_has_no_crisp_line_and_follows_round_corners(self) -> None:
+        image = render_device_ui(DeviceUiState(service_index=1))
+        background = (6, 12, 15)
+        for point in ((0, 180), (4, 180), (120, 279), (239, 180), (235, 180)):
+            self.assertNotEqual(image.getpixel(point), background)
+            self.assertNotEqual(image.getpixel(point), DEFAULT_ACCENT)
         for clipped_corner in ((0, HEIGHT - 1), (WIDTH - 1, HEIGHT - 1)):
-            self.assertNotEqual(enabled.getpixel(clipped_corner), DEFAULT_ACCENT)
-        self.assertNotEqual(enabled.getpixel((120, 71)), DEFAULT_ACCENT)
+            self.assertEqual(image.getpixel(clipped_corner), background)
+        for top_point in ((120, 63), (120, 71)):
+            self.assertNotEqual(image.getpixel(top_point), background)
+            self.assertNotEqual(image.getpixel(top_point), DEFAULT_ACCENT)
 
     def test_play_control_is_below_battery_and_footer_is_empty(self) -> None:
         state = DeviceUiState(playing=True, service_index=1)
         image = render_device_ui(state)
-        self.assertEqual(image.getpixel((207, 76)), state.accent)
+        self.assertEqual(image.getpixel((207, 68)), state.accent)
         self.assertNotEqual(image.getpixel((220, 270)), state.accent)
 
     def test_clock_is_centered_on_the_full_display_width(self) -> None:

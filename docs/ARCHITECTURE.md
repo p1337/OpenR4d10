@@ -104,11 +104,11 @@ media controls. Menu history stays inside `DeviceUiState`; an active PTT press
 returns one level unless the current semantic frame explicitly declares a
 ready PTT-owning context. The back/PTT affordance is one edge-aligned silhouette
 with a left-rounded, right-open frame and a filled mini arrow. The normal player
-optionally adds a soft-glowing, top-open accent border along its left, bottom
-and right edges. Vertical header labels are offset
-below the rounded top corners and the right label is rotated for reading from
-the right/bottom edge. This remains one Pillow renderer and one logical input
-path, not a second menu surface or a fabricated PTT adapter.
+always adds a line-free soft glow around its physical rounded contour, with a
+straight upper glow immediately below the status row. Vertical header labels
+are offset down and inward from the rounded top corners and the right label is
+rotated for reading from the right/bottom edge. This remains one Pillow renderer
+and one logical input path, not a second menu surface or a fabricated PTT adapter.
 
 ## Configuration and storage
 
@@ -163,11 +163,12 @@ with `bad PWM micros` despite its API text. `_LgpioPwm` therefore tracks
 whether it has successfully started PWM and sends the stop request only in
 that state. Steady endpoint writes never issue a speculative stop.
 
-The non-secret settings `ui.accent_color` (`#RRGGBB`) and
-`ui.screen_border_enabled` share the same `StateStore` owner and are restored
-into the one `WhisplayDisplay` renderer. The browser may change them only
-through the bounded `display_appearance` action; there is no CSS-only device
-preview or second appearance store.
+The non-secret setting `ui.accent_color` (`#RRGGBB`) is restored into the one
+`WhisplayDisplay` renderer. The browser may change it only through the bounded
+`display_appearance` action; there is no CSS-only device preview or second
+appearance store. The closed player edge glow is a permanent part of that
+renderer, not a stored option. A stale `ui.screen_border_enabled` row from
+0.10.26 through 0.10.28 is ignored.
 
 The built-in `pisugar3` power backend is a narrow read-only I2C boundary. It
 opens `/dev/i2c-1`, selects the documented `0x57` controller, verifies version

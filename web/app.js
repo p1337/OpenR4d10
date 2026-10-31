@@ -637,9 +637,6 @@ function renderSettings(settings) {
     if (document.activeElement !== color) color.value = accent;
     document.documentElement.style.setProperty("--cyan", accent);
   }
-  if (typeof settings.screen_border_enabled === "boolean") {
-    byId("display-screen-border").checked = settings.screen_border_enabled;
-  }
 }
 
 function renderUpdate(update) {
@@ -779,10 +776,8 @@ displayBrightness.addEventListener("change", async () => {
 
 async function saveDisplayAppearance() {
   const color = byId("display-accent-color");
-  const border = byId("display-screen-border");
   const status = byId("display-appearance-status");
   color.disabled = true;
-  border.disabled = true;
   status.textContent = t("Saving appearance …");
   try {
     const response = await fetch("/api/control", {
@@ -791,7 +786,6 @@ async function saveDisplayAppearance() {
       body: JSON.stringify({
         action: "display_appearance",
         accent_color: color.value,
-        screen_border_enabled: border.checked,
       }),
     });
     const payload = await response.json();
@@ -803,12 +797,10 @@ async function saveDisplayAppearance() {
     await refresh();
   } finally {
     color.disabled = false;
-    border.disabled = false;
   }
 }
 
 byId("display-accent-color").addEventListener("change", saveDisplayAppearance);
-byId("display-screen-border").addEventListener("change", saveDisplayAppearance);
 
 byId("system-update").addEventListener("click", async () => {
   if (!window.confirm(t("Install the latest OpenR4d10 version? The device will restart automatically afterwards."))) return;
