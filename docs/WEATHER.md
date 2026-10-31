@@ -8,10 +8,12 @@ Initial products:
 
 - default channel 1: official DWD rain-radar animation for Germany at
   `https://www.wettergefahren.de/DWD/wetter/radar/Radarfilm_WEB_DL.gif`
-- default channel 2: Europe satellite crop from the WMS layer
+- default channel 2: Germany satellite crop from the WMS layer
+- default channel 3: Europe satellite crop from the same WMS layer
   `Satellite_meteosat_1km_euat_rgb_day_hrv_and_night_ir108_3h`
 - title reported by DWD: `Satellitenbild METEOSAT (RGB) Europa gesamt 3h`
 - update interval reported by DWD: three hours
+- Germany crop: `47,5,55.5,16`
 - Europe crop: `30,-25,72,45`
 - visible credit: `DWD` for radar and `DWD / EUMETSAT` for satellite
 
@@ -37,5 +39,7 @@ kind, source text, optional numeric bounding box and persistent position. They
 never contain credentials, tokens or arbitrary user-provided remote URLs. A
 guarded one-time upgrade changes an existing untouched Germany default to the
 fixed reviewed radar source without recreating a deleted default or changing
-user order. Custom satellite crops remain restricted to the published layer
-coverage: latitude 23–77 degrees and longitude -54–54 degrees.
+user order. A separate marker adds the retained Germany satellite channel once
+to older libraries; deletion is respected on every later restart. Custom
+satellite crops remain restricted to the published layer coverage: latitude
+23–77 degrees and longitude -54–54 degrees.

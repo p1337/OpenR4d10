@@ -208,15 +208,18 @@ is decoded and re-encoded to a maximum 256 x 256 JPEG in the private cache, and
 falls back to a browser-generated initials tile when retrieval fails. Current
 sources and their review references are recorded in `PRESETS.md`.
 
-The native weather module reuses the bounded-download boundary. Germany uses
-the official DWD radar-film GIF; its bounded animation frames are decoded and
-re-encoded as local JPEGs. Europe reads the official DWD WMS capabilities no
-more often than every five minutes and selects up to eight recent timestamps
-from `Satellite_meteosat_1km_euat_rgb_day_hrv_and_night_ir108_3h`. Missing or
-invalid frames are skipped; a DWD or network outage leaves the last valid cache
-usable. A one-time guarded metadata upgrade changes only the untouched seeded
-Germany channel to radar and never recreates a deleted channel or resets user
-order. Browser and physical display read only the local cache.
+The native weather module reuses the bounded-download boundary. The primary
+Germany channel uses the official DWD radar-film GIF; its bounded animation
+frames are decoded and re-encoded as local JPEGs. Separate Germany and Europe
+satellite channels read the official DWD WMS capabilities no more often than
+every five minutes and select up to eight recent timestamps from
+`Satellite_meteosat_1km_euat_rgb_day_hrv_and_night_ir108_3h`. Missing or invalid
+frames are skipped; a DWD or network outage leaves the last valid cache usable.
+A one-time guarded metadata upgrade changes only the untouched old Germany
+channel to radar. A separate one-time addition appends the retained Germany
+satellite channel to existing libraries without recreating it after deletion or
+resetting existing order. Browser and physical display read only the local
+cache.
 
 For a fresh machine, `bootstrap.sh` downloads a GitHub-generated source archive
 over HTTPS into a private temporary directory. It checks paths and archive

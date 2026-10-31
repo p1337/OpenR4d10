@@ -37,6 +37,7 @@ DEFAULT_ENABLED_SERVICES = {
 DISPLAY_BRIGHTNESS_KEY = "display.brightness_percent"
 DEFAULT_DISPLAY_BRIGHTNESS = 100
 RADAR_DEFAULT_MIGRATION_KEY = "weather.radar_default_v1"
+GERMANY_SATELLITE_MIGRATION_KEY = "weather.germany_satellite_v1"
 
 LOG = logging.getLogger(__name__)
 
@@ -154,6 +155,15 @@ class ServiceCatalog:
                     },
                 ),
                 (
+                    "dwd-deutschland-satellit",
+                    "Satellit Deutschland",
+                    {
+                        "bbox": [47.0, 5.0, 55.5, 16.0],
+                        "kind": "satellite_wms",
+                        "provider": "DWD / EUMETSAT",
+                    },
+                ),
+                (
                     "dwd-europa",
                     "Europa",
                     {
@@ -166,6 +176,7 @@ class ServiceCatalog:
             marker="weather.defaults_seeded_v1",
         )
         self._upgrade_germany_weather_default()
+        self._seed_germany_satellite_upgrade()
         weather_channels = self.store.channels("weather")
         if weather_channels:
             self.active_weather_channel_id = int(weather_channels[0]["id"])
@@ -201,6 +212,27 @@ class ServiceCatalog:
                     },
                 )
         self.store.set_setting(RADAR_DEFAULT_MIGRATION_KEY, True)
+
+    def _seed_germany_satellite_upgrade(self) -> None:
+        """Append the retained satellite view once without resetting user order."""
+        if self.store.get_setting(GERMANY_SATELLITE_MIGRATION_KEY, False) is True:
+            return
+        external_id = "dwd-deutschland-satellit"
+        if not any(
+            item["external_id"] == external_id
+            for item in self.store.channels("weather")
+        ):
+            self.store.add_channel(
+                "weather",
+                external_id,
+                "Satellit Deutschland",
+                {
+                    "bbox": [47.0, 5.0, 55.5, 16.0],
+                    "kind": "satellite_wms",
+                    "provider": "DWD / EUMETSAT",
+                },
+            )
+        self.store.set_setting(GERMANY_SATELLITE_MIGRATION_KEY, True)
 
     def display_brightness(self) -> int:
         value = self.store.get_setting(

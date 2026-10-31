@@ -168,8 +168,10 @@ unverified network logo URL to make a row look branded.
 
 Weather controls use `weather_open`, `weather_step`, `weather_refresh`,
 `weather_channel_save`, `weather_channel_move` and `weather_channel_delete`.
-The first two seeded channels are Germany radar and Europe satellite; tests must prove that
-their user order and edits survive a new `ServiceCatalog`. `service_move`
+The three defaults are Germany radar, Germany satellite and Europe satellite;
+tests must prove that their user order and edits survive a new `ServiceCatalog`.
+An upgrade from the earlier two-channel state must append Germany satellite
+once and must not recreate it after deletion. `service_move`
 similarly persists every service priority. The DWD WMS integration must keep
 the five-minute capability refresh floor, tolerate missing timestamps and
 retain the last safe cache. The official radar GIF uses the same refresh floor,

@@ -71,13 +71,22 @@ class ServiceCatalogTests(unittest.TestCase):
 
             catalog = ServiceCatalog(root, executable_lookup=lambda _name: "/bin/true")
             try:
-                channel = catalog.snapshot()["weather"]["channels"][0]
+                channels = catalog.snapshot()["weather"]["channels"]
+                channel = channels[0]
+                satellite = next(
+                    item
+                    for item in channels
+                    if item["external_id"] == "dwd-deutschland-satellit"
+                )
                 stored = catalog.store.channel(channel["id"])
                 self.assertEqual(channel["name"], "Mein Wetter")
                 self.assertEqual(channel["kind"], "radar_gif")
                 self.assertEqual(stored["metadata"]["bbox"], [48.0, 6.0, 54.0, 15.0])
                 self.assertEqual(stored["metadata"]["source_url"], DWD_RADAR_GIF_URL)
+                self.assertEqual(satellite["kind"], "satellite_wms")
+                self.assertEqual(satellite["provider"], "DWD / EUMETSAT")
                 catalog.store.delete_channel(channel["id"])
+                catalog.store.delete_channel(satellite["id"])
             finally:
                 catalog.close()
 
@@ -88,6 +97,7 @@ class ServiceCatalogTests(unittest.TestCase):
                     for item in reopened.snapshot()["weather"]["channels"]
                 }
                 self.assertNotIn("dwd-deutschland", ids)
+                self.assertNotIn("dwd-deutschland-satellit", ids)
             finally:
                 reopened.close()
 
@@ -122,9 +132,14 @@ class ServiceCatalogTests(unittest.TestCase):
             try:
                 snapshot = catalog.snapshot()
                 channels = snapshot["weather"]["channels"]
-                self.assertEqual([item["name"] for item in channels], ["Regenradar Deutschland", "Europa"])
+                self.assertEqual(
+                    [item["name"] for item in channels],
+                    ["Regenradar Deutschland", "Satellit Deutschland", "Europa"],
+                )
                 self.assertEqual(channels[0]["provider"], "DWD")
                 self.assertEqual(channels[0]["kind"], "radar_gif")
+                self.assertEqual(channels[1]["provider"], "DWD / EUMETSAT")
+                self.assertEqual(channels[1]["kind"], "satellite_wms")
                 with self.assertRaisesRegex(ValueError, "layer coverage"):
                     catalog.control(
                         {
@@ -153,7 +168,10 @@ class ServiceCatalogTests(unittest.TestCase):
             reopened = ServiceCatalog(root, weather=Weather(root))
             try:
                 persisted = reopened.snapshot()
-                self.assertEqual(persisted["weather"]["channels"][0]["name"], "Europa")
+                self.assertEqual(
+                    persisted["weather"]["channels"][0]["name"],
+                    "Satellit Deutschland",
+                )
                 service_ids = [item["service_id"] for item in persisted["items"]]
                 self.assertLess(service_ids.index("weather"), service_ids.index("webradio"))
             finally:

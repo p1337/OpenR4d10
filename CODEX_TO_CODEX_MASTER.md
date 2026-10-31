@@ -543,12 +543,13 @@ gelangen ausschließlich über geprüfte Pull/Merge Requests in den Katalog.
 
 - BrandMeister/DMR-Audio über IP zum Hören,
 - Webradio,
-- Wetter als nativer Informationsdienst. Die Grundausstattung besteht zunächst
-  aus genau zwei sortierbaren Kanälen: Deutschland zeigt primär den offiziellen
+- Wetter als nativer Informationsdienst. Die Grundausstattung besteht aus drei
+  sortierbaren Kanälen: Deutschland zeigt primär den offiziellen
   DWD-Regenradarfilm
-  `https://www.wettergefahren.de/DWD/wetter/radar/Radarfilm_WEB_DL.gif`, Europa
-  die jüngsten verfügbaren METEOSAT-Satellitenbilder als endlose lokale
-  Bildfolge. Der Europa-Kanal verwendet den offiziellen DWD-WMS-Layer
+  `https://www.wettergefahren.de/DWD/wetter/radar/Radarfilm_WEB_DL.gif` und
+  zusätzlich weiterhin die METEOSAT-Satellitenbilder für Deutschland; der
+  dritte Kanal zeigt METEOSAT für Europa. Beide Satellitenkanäle verwenden den
+  offiziellen DWD-WMS-Layer
   `Satellite_meteosat_1km_euat_rgb_day_hrv_and_night_ir108_3h`. Die
   Quellenangabe nennt beim Radar DWD und beim Satellitenbild DWD / EUMETSAT.
   Beide Quellen werden höchstens alle fünf Minuten abgerufen. GIF- und
@@ -668,10 +669,10 @@ beschriftete Tabs beziehungsweise gleichwertige getrennte Ansichten gegliedert,
 insbesondere Radio, Medien/Feeds, Gerät, System und Dienste. Ein Tabwechsel
 verändert keine Wiedergabe und lädt die Anwendung nicht neu.
 
-Der Wetterdienst besitzt einen eigenen Tab. Er spielt den ausgewählten
-Satellitenkanal als Endlosschleife aus lokal begrenzt geladenen und neu
-codierten Einzelbildern ab. Die beiden Standardkanäle werden nur beim ersten
-Lauf angelegt; ihre Reihenfolge und spätere Benutzeränderungen liegen wie die
+Der Wetterdienst besitzt einen eigenen Tab. Er spielt den ausgewählten Radar-
+oder Satellitenkanal als Endlosschleife aus lokal begrenzt geladenen und neu
+codierten Einzelbildern ab. Die drei Standardkanäle werden jeweils nur durch
+eine einmalige, markierte Migration angelegt; ihre Reihenfolge und spätere Benutzeränderungen liegen wie die
 Radiosender dauerhaft in SQLite und werden durch Updates nicht zurückgesetzt.
 Im Dienst-Tab lassen sich alle Dienste aktivieren, deaktivieren und in ihrer
 Priorität nach oben oder unten verschieben. Die Reihenfolge ist damit keine
@@ -955,6 +956,16 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-31 – EUMETSAT bleibt zusätzlich zum Regenradar erhalten
+
+- Robert entscheidet ausdrücklich, die EUMETSAT-Satellitenbilder trotz des
+  neuen DWD-Regenradars zu behalten. Wetter enthält deshalb drei eigenständige
+  Kanäle: Regenradar Deutschland, Satellit Deutschland und Satellit Europa.
+- Bestehende Europa-Satellitenkanäle bleiben unverändert. Der neue
+  Deutschland-Satellitenkanal wird über eine eigene einmalige Markierung
+  ergänzt; nach einer späteren absichtlichen Löschung wird er nicht erneut
+  angelegt und vorhandene Benutzerreihenfolgen werden nicht zurückgesetzt.
 
 ### 2026-10-31 – Web-Updater schreibt Status vor dem Neustart
 

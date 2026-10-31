@@ -35,8 +35,9 @@ the installer report exactly which adapters still need configuration.
 - runtime data in `/run/openr4d10` and state in `/var/lib/openr4d10`
 - versioned SQLite state for non-secret settings, services, stations, channels,
   media and recordings
-- native DWD rain-radar loop for Germany plus METEOSAT for Europe, with bounded
-  local frame caching and persistent channel/service priority
+- native DWD rain-radar loop plus retained METEOSAT satellite loops for Germany
+  and Europe, with bounded local frame caching and persistent channel/service
+  priority
 - central catalog covering all specified service modules with honest dependency,
   adapter and local-login readiness
 - persistent enable/disable lifecycle for native and external service modules
