@@ -127,6 +127,12 @@ both bounds, invalid booleans/non-integers, restart persistence and delivery to
 the Whisplay adapter. Do not add a second configuration file or a direct web
 GPIO path. The early native boot player intentionally has no SQLite dependency;
 brightness restoration begins at application display handoff.
+The target implementation keeps BCM22 active-low but delegates intermediate
+PWM timing to the installed `python3-lgpio` C runtime. Do not implement pulse
+timing with `threading`, `sleep`, or `Event.wait`: that earlier path visibly
+flickered on the real Pi Zero 2 W. Unit tests must cover the active-low mapping,
+steady 0/100-percent endpoints and the `lgpio.tx_pwm` call for intermediate
+values.
 
 The `device_input` action is the hardware-free input source for the native
 display. It accepts only the checked-in logical control names, rotary steps

@@ -35,6 +35,25 @@ document the following:
 - audio codec revision: WM8960 or ES8389
 - physical orientation: Whisplay button side faces the Pi USB-port side
 
+### User-facing peripherals
+
+The manufacturer documents these user-facing resources on the Whisplay HAT:
+
+- two onboard microphones;
+- one onboard 8 ohm / 1 W speaker;
+- one PH2.0 connector for a single-channel external mono speaker;
+- one three-channel RGB LED;
+- one programmable physical button;
+- the LCD and its controllable backlight listed above.
+
+The real OpenR4d10 stack reports `whisplaysound` as a WM8960 sound card for
+both ALSA capture and playback, with stable `mic` and `speaker` mixer controls.
+The manufacturer also ships ES8389 variants, so application code continues to
+use the stable ALSA card name rather than assuming a codec revision. No
+manufacturer documentation currently establishes a touchscreen, camera, IMU,
+rotary encoder, or additional physical buttons on this HAT; none of those may
+be exposed as present without later hardware evidence.
+
 The [Raspberry Pi Zero 2 W documentation](https://www.raspberrypi.com/documentation/computers/zero.html)
 specifies one complete `2 x 20`, 2.54 mm male GPIO header soldered into all 40
 through-holes for boards without a factory header. Do not
@@ -165,13 +184,18 @@ The official PiSugar Whisplay
 for Raspberry Pi Zero 2 W implements `set_backlight(0..100)` as 1000 Hz
 software PWM on the same physical pin 15 / BCM22 output. Because the backlight
 is active-low, its GPIO duty is
-`100 - brightness`. OpenR4d10 uses that verified method inside the existing
-exclusive `WhisplayPanel` owner; it does not start `whisplay-daemon`, claim a
-second GPIO or invent another control interface. The web display setting is
-stored in SQLite and applied before the first application frame. The native C
-boot player precedes SQLite startup and therefore retains its fixed boot
-brightness until the application takes ownership. Actual perceived brightness
-at intermediate values still requires a short visual check on the real stack.
+`100 - brightness`. The real stack has now disproved the Python thread as a
+usable timing implementation: 100 percent is steady, while every intermediate
+setting visibly alternates between bright and dark. OpenR4d10 must retain the
+verified BCM22 mapping and active-low polarity but move the timing out of
+Python to a target-available stable PWM implementation. The real target
+already includes Raspberry Pi OS package `python3-lgpio` 0.2.2; OpenR4d10 now
+uses its C-timed `lgpio.tx_pwm` in the same `WhisplayPanel` process. The
+BCM22 mapping and active-low duty remain unchanged, while 0 and 100 percent use
+steady levels without PWM. This does not claim that BCM22 has native hardware
+PWM. The web display setting remains persistent in
+SQLite. The native C boot player precedes SQLite startup and therefore retains
+its fixed boot brightness until the application takes ownership.
 
 The application media boundary uses generic ALSA through Debian's mpv and
 ffmpeg packages. Its systemd unit allows the standard `char-alsa` device class
@@ -222,11 +246,11 @@ speaker; the listening test remains separate.
 
 ## Still deliberately unknown
 
-The installed Whisplay audio codec revision and PiSugar model/API have not yet
-been identified on the physical device. The unified official audio driver makes
-manual codec identification unnecessary for installation, but its detection
-result and speaker output remain to be verified after reboot. The PiSugar's
-physical presence and battery-powered operation are confirmed;
+The exact PiSugar model/API has not yet been identified on the physical
+device. The Whisplay audio driver has identified the installed HAT as WM8960,
+and capture/playback devices plus `mic`/`speaker` controls are present; an
+actual microphone recording and audible speaker test remain separate physical
+checks. The PiSugar's physical presence and battery-powered operation are confirmed;
 `power.backend` remains `unconfigured` only because battery percentage and
 other telemetry are not yet integrated. The Whisplay display backend is
 implemented and physically verified on the real stack.

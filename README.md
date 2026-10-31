@@ -29,7 +29,7 @@ the installer report exactly which adapters still need configuration.
 - native Whisplay ST7789 boot animation installed and enabled automatically
 - safe display handoff both at boot and during an in-session installation
 - real-device-confirmed Whisplay SPI transport, colour order and orientation
-- persistent 0–100% Whisplay brightness control in the web settings
+- persistent, C-timed 0–100% Whisplay brightness control in the web settings
 - native 240 x 280 physical UI with the agreed four-axis encoder layout
 - browser controls for all four virtual encoder axes and both press actions
 - semantic UI frame model and configurable text boot sequence
@@ -88,7 +88,7 @@ starts the local installer, which requests root access when required.
 The installer verifies the operating system, CPU architecture and Raspberry Pi
 model, installs files below `/opt/openr4d10`, preserves existing configuration,
 compiles the Whisplay boot player locally for the Pi, installs the Debian
-Pillow/libgpiod/spidev/mpv/ffmpeg packages, enables SPI, builds the pinned
+Pillow/libgpiod/lgpio/spidev/mpv/ffmpeg packages, enables SPI, builds the pinned
 official unified Whisplay sound-card driver for the running kernel, enables
 I²C/I²S, installs its overlay and ALSA configuration, installs and enables
 the systemd services, and runs a final diagnostic. The official driver supports
@@ -158,16 +158,20 @@ replaces the hotspot with the new client connection. The hotspot password is
 generated only on the device and is excluded from Git, status JSON, SQLite,
 logs and backups.
 
-The dashboard shows live service, system and adapter status. Until verified
-Whisplay and PiSugar adapters are configured, it labels those components as
-open instead of displaying invented measurements.
+The dashboard shows live service, system and adapter status. The real Whisplay
+display and sound card are verified. The physically present PiSugar currently
+appears specifically as **PiSugar telemetry is not configured** because its
+battery percentage/charging API is still unknown; the UI no longer calls the
+complete hardware stack unconfigured.
 
 The **Einstellungen → Display** panel changes the physical Whisplay backlight
 immediately from 0 through 100 percent. The value is stored in the existing
 non-secret SQLite state, included in the normal pre-update backup and restored
 automatically when the application starts. The early native boot animation
 runs before that database is available; the saved value takes effect when the
-normal OpenR4d10 device UI takes over the panel.
+normal OpenR4d10 device UI takes over the panel. Intermediate values use the
+Raspberry Pi OS `lgpio` C-timed PWM facility on the manufacturer-verified
+active-low BCM22 backlight line; Python no longer schedules the pulses.
 
 Until the physical encoders are delivered, the **Virtuelle Encoder** panel in
 the same dashboard controls the real Whisplay immediately. Its volume, squelch,
@@ -198,7 +202,7 @@ current source.
 The physical 240 × 280 layout uses the compact, localized control labels
 `VOL`, `SQL`, `CH` and `SRV` in its English fallback. Its shorter control head
 uses larger type, the status row shows a larger clock without a date, and the
-radio view reserves the freed space for a 138 × 138 station image and a larger
+radio view reserves the freed space for a 151 × 151 station image and a larger
 station heading. The redundant service caption, written playback state and
 bottom `READY`/`OpenR4d10` strip are not rendered. Opening the main menu hides
 the complete player and shows the localized heading plus the ten documented
@@ -255,7 +259,8 @@ For an inspect-first installation, download `bootstrap.sh`, review it, and run
 it with `sudo bash bootstrap.sh`. Regardless of how the bootstrap is started,
 it downloads and validates the complete project archive before installation.
 
-PiSugar telemetry remains configuration-required. The Whisplay display backend
+PiSugar telemetry remains software-unconfigured even though the battery board
+is physically present and powers the Pi. The Whisplay display backend
 and unified audio driver are installed automatically. With `--no-reboot`, the
 diagnostic deliberately reports the audio driver as installed but not yet
 active until the administrator reboots manually. The early-boot display log is available with

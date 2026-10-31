@@ -106,6 +106,7 @@ def _whisplay_checks() -> list[Check]:
     for module, package in (
         ("PIL", "python3-pil"),
         ("gpiod", "python3-libgpiod"),
+        ("lgpio", "python3-lgpio"),
         ("spidev", "python3-spidev"),
     ):
         if importlib.util.find_spec(module) is not None:

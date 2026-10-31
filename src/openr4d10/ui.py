@@ -20,7 +20,7 @@ def dashboard_frame(
         "power": dict(power),
         "adapter_errors": errors,
     }
-    body = "Hardwarekonfiguration erforderlich"
+    body = "PiSugar telemetry is not configured."
     severity = "warning"
     if power.get("state") != "unconfigured" and not errors:
         body = "Empfänger bereit"

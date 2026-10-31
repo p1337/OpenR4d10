@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager
 from pathlib import Path
-import threading
 import time
 from typing import Any
 
@@ -27,53 +26,70 @@ class WhisplayError(RuntimeError):
     pass
 
 
-class _SoftPwm:
-    """Small software PWM matching the official Whisplay Zero 2 W runtime."""
+class _LgpioPwm:
+    """C-timed PWM on an arbitrary gpiochip line.
+
+    BCM22 has no native PWM function on the Zero 2 W.  ``lgpio.tx_pwm`` keeps
+    the software timing in the packaged C library instead of a Python thread,
+    avoiding the scheduler jitter visible on the real Whisplay backlight.
+    """
 
     def __init__(
         self,
-        set_high: Any,
-        duty_percent: int,
+        lgpio: Any,
+        chip_number: int,
+        line_offset: int,
+        *,
+        initial_high: bool,
         frequency_hz: int = 1_000,
     ) -> None:
-        self._set_high = set_high
-        self._period = 1.0 / frequency_hz
-        self._duty_percent = duty_percent
-        self._lock = threading.Lock()
-        self._stop = threading.Event()
-        self._thread = threading.Thread(
-            target=self._run,
-            name="openr4d10-backlight-pwm",
-            daemon=True,
-        )
-        self._thread.start()
+        self._lgpio = lgpio
+        self._line_offset = line_offset
+        self._frequency_hz = frequency_hz
+        self._handle = lgpio.gpiochip_open(chip_number)
+        try:
+            lgpio.gpio_claim_output(
+                self._handle,
+                line_offset,
+                1 if initial_high else 0,
+            )
+        except Exception:
+            lgpio.gpiochip_close(self._handle)
+            self._handle = None
+            raise
 
     def set_duty_cycle(self, duty_percent: int) -> None:
-        with self._lock:
-            self._duty_percent = duty_percent
+        if self._handle is None:
+            return
+        if duty_percent <= 0 or duty_percent >= 100:
+            self._lgpio.tx_pwm(self._handle, self._line_offset, 0, 0)
+            self._lgpio.gpio_write(
+                self._handle,
+                self._line_offset,
+                1 if duty_percent >= 100 else 0,
+            )
+            return
+        self._lgpio.tx_pwm(
+            self._handle,
+            self._line_offset,
+            self._frequency_hz,
+            duty_percent,
+        )
 
-    def _run(self) -> None:
-        while not self._stop.is_set():
-            with self._lock:
-                duty = self._duty_percent
-            if duty <= 0:
-                self._set_high(False)
-                self._stop.wait(self._period)
-                continue
-            if duty >= 100:
-                self._set_high(True)
-                self._stop.wait(self._period)
-                continue
-            high_seconds = self._period * duty / 100
-            self._set_high(True)
-            if self._stop.wait(high_seconds):
-                break
-            self._set_high(False)
-            self._stop.wait(self._period - high_seconds)
-
-    def close(self) -> None:
-        self._stop.set()
-        self._thread.join(timeout=0.1)
+    def close(self, *, final_high: bool) -> None:
+        if self._handle is None:
+            return
+        try:
+            self._lgpio.tx_pwm(self._handle, self._line_offset, 0, 0)
+            self._lgpio.gpio_write(
+                self._handle,
+                self._line_offset,
+                1 if final_high else 0,
+            )
+            self._lgpio.gpio_free(self._handle, self._line_offset)
+        finally:
+            self._lgpio.gpiochip_close(self._handle)
+            self._handle = None
 
 
 class WhisplayPanel:
@@ -91,12 +107,11 @@ class WhisplayPanel:
         self._chip: Any = None
         self._reset: Any = None
         self._dc: Any = None
-        self._backlight: Any = None
         self._spi: Any = None
         self._value_active: Any = None
         self._value_inactive: Any = None
         self._brightness_percent = 100
-        self._backlight_pwm: _SoftPwm | None = None
+        self._backlight_pwm: _LgpioPwm | None = None
 
     def open(self) -> None:
         if self._spi is not None:
@@ -112,11 +127,13 @@ class WhisplayPanel:
     def _open_hardware(self) -> None:
         try:
             import gpiod
+            import lgpio
             import spidev
             from gpiod.line import Direction, Value
         except (ImportError, AttributeError) as exc:
             raise WhisplayError(
-                "Whisplay requires Debian packages python3-libgpiod and python3-spidev"
+                "Whisplay requires Debian packages python3-libgpiod, "
+                "python3-lgpio and python3-spidev"
             ) from exc
 
         if not hasattr(gpiod, "LineSettings"):
@@ -145,8 +162,11 @@ class WhisplayPanel:
                 gpiod, Direction, self.RESET_BCM, high=True
             )
             self._dc = self._request_output(gpiod, Direction, self.DC_BCM, high=True)
-            self._backlight = self._request_output(
-                gpiod, Direction, self.BACKLIGHT_BCM, high=not initialized
+            self._backlight_pwm = _LgpioPwm(
+                lgpio,
+                0,
+                self.BACKLIGHT_BCM,
+                initial_high=initialized,
             )
             self._spi = spidev.SpiDev()
             self._spi.open(0, 0)
@@ -189,24 +209,16 @@ class WhisplayPanel:
         ):
             raise ValueError("display brightness must be an integer from 0 to 100")
         self._brightness_percent = brightness_percent
-        if self._backlight is not None:
+        if self._backlight_pwm is not None:
             self._apply_brightness()
 
     def _apply_brightness(self) -> None:
-        duty_percent = 100 - self._brightness_percent
         if self._backlight_pwm is None:
-            self._backlight_pwm = _SoftPwm(
-                lambda high: self._set(
-                    self._backlight,
-                    self.BACKLIGHT_BCM,
-                    high,
-                ),
-                duty_percent,
-            )
-        else:
-            # The Whisplay backlight is active-low, so the vendor PWM duty is
-            # the inverse of the user-visible brightness percentage.
-            self._backlight_pwm.set_duty_cycle(duty_percent)
+            return
+        duty_percent = 100 - self._brightness_percent
+        # The Whisplay backlight is active-low, so the GPIO high-time is the
+        # inverse of the user-visible brightness percentage.
+        self._backlight_pwm.set_duty_cycle(duty_percent)
 
     def _write(self, data: bytes) -> None:
         if hasattr(self._spi, "writebytes2"):
@@ -262,18 +274,9 @@ class WhisplayPanel:
 
     def close(self) -> None:
         if self._backlight_pwm is not None:
-            self._backlight_pwm.close()
+            self._backlight_pwm.close(final_high=self._brightness_percent == 0)
             self._backlight_pwm = None
-        if self._backlight is not None:
-            try:
-                self._set(
-                    self._backlight,
-                    self.BACKLIGHT_BCM,
-                    self._brightness_percent == 0,
-                )
-            except Exception:
-                pass
-        for request_name in ("_backlight", "_dc", "_reset"):
+        for request_name in ("_dc", "_reset"):
             request = getattr(self, request_name)
             if request is not None:
                 try:

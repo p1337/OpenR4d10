@@ -217,6 +217,7 @@
     "Create a weather channel first.": ["Create a weather channel first.", "Zuerst einen Wetterkanal anlegen.", "Najpierw utwórz kanał pogodowy.", "Créez d’abord un canal météo.", "Crea primero un canal meteorológico."],
     "A new region can now be created.": ["A new region can now be created.", "Neuer Ausschnitt kann angelegt werden.", "Można teraz utworzyć nowy obszar.", "Une nouvelle zone peut maintenant être créée.", "Ahora se puede crear una nueva región."],
     "Hardwarekonfiguration erforderlich": ["Hardware configuration required", "Hardwarekonfiguration erforderlich", "Wymagana konfiguracja sprzętu", "Configuration matérielle requise", "Se requiere configuración de hardware"],
+    "PiSugar telemetry is not configured.": ["PiSugar telemetry is not configured.", "PiSugar-Telemetrie ist nicht konfiguriert.", "Telemetria PiSugar nie jest skonfigurowana.", "La télémétrie PiSugar n’est pas configurée.", "La telemetría de PiSugar no está configurada."],
     "Empfänger bereit": ["Receiver ready", "Empfänger bereit", "Odbiornik gotowy", "Récepteur prêt", "Receptor listo"],
     "Adapterfehler": ["Adapter error", "Adapterfehler", "Błąd adaptera", "Erreur d’adaptateur", "Error del adaptador"],
     "Dienst wird gestartet": ["Service is starting", "Dienst wird gestartet", "Usługa jest uruchamiana", "Le service démarre", "El servicio se está iniciando"],

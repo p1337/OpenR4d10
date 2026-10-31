@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from PIL import Image, ImageDraw
 
@@ -16,12 +16,13 @@ from openr4d10.device_ui import (
     MAIN_MENU_ITEMS,
     WIDTH,
     _display_text,
+    _font,
     image_to_rgb565,
     render_device_ui,
 )
 from openr4d10.input_events import Control, InputEvent
 from openr4d10.models import Frame
-from openr4d10.whisplay import WhisplayPanel
+from openr4d10.whisplay import WhisplayPanel, _LgpioPwm
 
 
 class DeviceUiTests(unittest.TestCase):
@@ -197,7 +198,7 @@ class DeviceUiTests(unittest.TestCase):
         self.assertTrue(state.ptt_active)
         self.assertEqual(state.menu_kind, "main_menu")
         image = render_device_ui(state)
-        self.assertEqual(image.getpixel((239, 100)), (207, 38, 49))
+        self.assertEqual(image.getpixel((239, 87)), (207, 38, 49))
         state.apply(InputEvent(Control.PTT, active=False))
         self.assertFalse(state.ptt_active)
         self.assertTrue(state.menu_open)
@@ -205,10 +206,10 @@ class DeviceUiTests(unittest.TestCase):
     def test_menu_back_arrow_uses_accent_below_battery(self) -> None:
         state = DeviceUiState(menu_open=True, menu_kind="main_menu")
         image = render_device_ui(state)
-        self.assertEqual(image.getpixel((188, 104)), state.accent)
-        self.assertEqual(image.getpixel((190, 104)), (6, 12, 15))
-        self.assertEqual(image.getpixel((203, 104)), state.accent)
-        self.assertEqual(image.getpixel((239, 104)), (6, 12, 15))
+        self.assertEqual(image.getpixel((188, 91)), state.accent)
+        self.assertEqual(image.getpixel((190, 91)), (6, 12, 15))
+        self.assertEqual(image.getpixel((203, 91)), state.accent)
+        self.assertEqual(image.getpixel((239, 91)), (6, 12, 15))
         self.assertEqual(len(MAIN_MENU_ITEMS), 10)
 
     def test_player_accent_rail_glows_but_menu_rail_stays_crisp(self) -> None:
@@ -220,8 +221,25 @@ class DeviceUiTests(unittest.TestCase):
     def test_play_control_is_below_battery_and_footer_is_empty(self) -> None:
         state = DeviceUiState(playing=True)
         image = render_device_ui(state)
-        self.assertEqual(image.getpixel((206, 88)), state.accent)
+        self.assertEqual(image.getpixel((206, 76)), state.accent)
         self.assertEqual(image.getpixel((220, 247)), (6, 12, 15))
+
+    def test_clock_is_centered_on_the_full_display_width(self) -> None:
+        positions: dict[str, tuple[float, float]] = {}
+        original_text = ImageDraw.ImageDraw.text
+
+        def capture_text(draw, xy, text, *args, **kwargs):
+            positions[str(text)] = xy
+            return original_text(draw, xy, text, *args, **kwargs)
+
+        state = DeviceUiState(timestamp=datetime(2026, 10, 31, 14, 5))
+        with patch.object(ImageDraw.ImageDraw, "text", new=capture_text):
+            render_device_ui(state)
+        clock_font = positions["14:05"]
+        image = Image.new("RGB", (WIDTH, HEIGHT))
+        draw = ImageDraw.Draw(image)
+        width = draw.textbbox((0, 0), "14:05", font=_font(15, bold=True))[2]
+        self.assertAlmostEqual(clock_font[0] + width / 2, WIDTH / 2)
 
     def test_rgb565_uses_big_endian_wire_order(self) -> None:
         for color, expected in (
@@ -332,14 +350,34 @@ class WhisplayDisplayTests(unittest.TestCase):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 panel.set_brightness(invalid)  # type: ignore[arg-type]
 
-    def test_brightness_uses_active_low_vendor_pwm_mapping(self) -> None:
+    def test_brightness_uses_active_low_lgpio_pwm_mapping(self) -> None:
         panel = WhisplayPanel()
-        panel._backlight = object()  # Simulate the already requested GPIO line.
-        with patch("openr4d10.whisplay._SoftPwm") as pwm:
-            panel.set_brightness(35)
-            self.assertEqual(pwm.call_args.args[1], 65)
-            panel.set_brightness(80)
-            pwm.return_value.set_duty_cycle.assert_called_once_with(20)
+        pwm = Mock()
+        panel._backlight_pwm = pwm
+        panel.set_brightness(35)
+        pwm.set_duty_cycle.assert_called_once_with(65)
+        panel.set_brightness(80)
+        pwm.set_duty_cycle.assert_called_with(20)
+
+    def test_lgpio_pwm_keeps_timing_out_of_python(self) -> None:
+        lgpio = Mock()
+        lgpio.gpiochip_open.return_value = 17
+        pwm = _LgpioPwm(lgpio, 0, 22, initial_high=True)
+        lgpio.gpio_claim_output.assert_called_once_with(17, 22, 1)
+
+        pwm.set_duty_cycle(65)
+        lgpio.tx_pwm.assert_called_with(17, 22, 1_000, 65)
+
+        pwm.set_duty_cycle(0)
+        lgpio.tx_pwm.assert_called_with(17, 22, 0, 0)
+        lgpio.gpio_write.assert_called_with(17, 22, 0)
+
+        pwm.set_duty_cycle(100)
+        lgpio.gpio_write.assert_called_with(17, 22, 1)
+
+        pwm.close(final_high=False)
+        lgpio.gpio_free.assert_called_once_with(17, 22)
+        lgpio.gpiochip_close.assert_called_once_with(17)
 
     def test_boot_animation_is_not_replaced_by_text_fallback(self) -> None:
         panel = FakePanel()

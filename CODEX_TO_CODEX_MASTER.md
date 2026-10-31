@@ -277,6 +277,13 @@ die Höhe der einzelnen Felder gleichzeitig etwas kleiner. In Untermenüs dürfe
 die Achsen kontextabhängig anders belegt werden; die Felder müssen dies sofort
 anzeigen.
 
+Die Uhr bleibt geometrisch auf der gesamten 240-Pixel-Breite zentriert und
+darf nicht von der Breite der WLAN- oder Batterieanzeige verschoben werden.
+Funktionskopf und Statuszeile werden so flach wie lesbar ausgeführt; auch der
+Abstand zwischen Statuszeile und Diensttitel wird minimiert. Die dadurch
+gewonnene Höhe gehört vollständig dem eigentlichen Menü-, Wetter- oder
+Medieninhalt.
+
 ## 5. Verbindlicher Aufbau der Hauptanzeige
 
 Display: 240 × 280 Pixel, ohne Touchpflicht.
@@ -354,9 +361,11 @@ Die Geräteeinstellungen enthalten genau diese Hauptbereiche:
    - Änderungen werden sofort auf dem realen Whisplay sichtbar,
    - der Wert wird als nicht geheime UI-Einstellung dauerhaft in SQLite
      gespeichert und nach Dienst- oder Geräteneustart wieder angewendet,
-   - die Raspberry-Pi-Zero-2-W-Umsetzung verwendet den vom Hersteller
-     vorgesehenen Software-PWM-Pfad auf dem bereits verifizierten aktiven-low
-     Backlight BCM22; kein neuer Pin und kein paralleler Hardwareadapter.
+   - die Raspberry-Pi-Zero-2-W-Umsetzung behält das verifizierte aktive-low
+     Backlight BCM22, verlagert das Software-PWM-Timing aber in die bereits
+     installierte C-Laufzeit von `lgpio`; der auf dem realen Gerät flackernde
+     Python-PWM-Thread bleibt entfernt, und kein neuer Pin oder paralleler
+     Hardwareadapter wird erfunden.
 2. **Akzentfarbe**
    - normaler Menüeintrag wie alle anderen,
    - öffnet beim Anwählen eine eigene Farbauswahl,
@@ -988,6 +997,35 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-31 – Reale Displayhelligkeit, kompakter Kopf und präziser Status
+
+- Robert meldet auf dem realen Pi Zero 2 W: Bei 100 Prozent ist die
+  Whisplay-Beleuchtung stabil, jeder niedrigere Wert führt jedoch zu sichtbarem
+  Wechsel zwischen hell und dunkel. Ursache ist der bisherige 1-kHz-PWM-Thread
+  in Python auf dem verifizierten Backlight-Pin BCM22. Auch der Herstellerpfad
+  verwendet dort Software-PWM; dessen Existenz ist kein Nachweis für eine auf
+  diesem System flackerfreie Zeitsteuerung. Die dauerhafte Lösung muss deshalb
+  einen zeitstabilen vorhandenen Systempfad verwenden und darf weder eine neue
+  Pinbelegung noch angebliches Hardware-PWM auf BCM22 erfinden.
+- Die Zielinstallation bestätigt `python3-lgpio` 0.2.2 aus dem Raspberry-Pi-
+  Trixie-Repository. OpenR4d10 beansprucht BCM22 deshalb innerhalb desselben
+  `WhisplayPanel` über `lgpio` und verwendet dessen C-getaktetes `tx_pwm` für
+  Zwischenwerte; 0 und 100 Prozent sind feste Pegel. Der Python-Timingthread
+  entfällt vollständig.
+- Der Displaykopf wird flacher, die Uhr exakt auf der Gesamtbreite zentriert
+  und der Abstand zum Diensttitel verkleinert. Der frei werdende Platz wird dem
+  unteren Inhalt zugeschlagen.
+- Der allgemeine Text `Hardwarekonfiguration erforderlich` ist auf dem realen
+  Stack irreführend: Pi Zero 2 W, Whisplay und PiSugar sind physisch vorhanden.
+  Solange nur die Energiedaten fehlen, lautet der Status präzise
+  `PiSugar-Telemetrie ist nicht konfiguriert`.
+- Am realen Whisplay wurde die `whisplaysound`-Karte als WM8960 mit Aufnahme-
+  und Wiedergabepfad bestätigt. Herstellerseitig dokumentiert sind das
+  240×280-ST7789-Display mit regelbarer Beleuchtung, zwei Mikrofone, ein
+  8-Ohm-/1-Watt-Lautsprecher, ein PH2.0-Anschluss für einen externen
+  Mono-Lautsprecher, eine RGB-LED und eine programmierbare Taste. Touch,
+  Kamera, IMU, Encoder oder weitere Tasten werden nicht vorgetäuscht.
 
 ### 2026-10-31 – Sicherer WLAN-Fallback-Hotspot und echte SSID im Display
 

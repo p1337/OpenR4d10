@@ -146,6 +146,12 @@ construction the saved value is passed to the configured display adapter; a
 web change is first accepted by the existing `WhisplayDisplay` owner and then
 committed to SQLite. A failed database write attempts to restore the previous
 hardware value. No parallel settings file, daemon or GPIO owner exists.
+BCM22 is not a native PWM output on the verified Zero 2 W mapping. The same
+`WhisplayPanel` process therefore owns that line through the Raspberry Pi OS
+`python3-lgpio` binding and uses `lgpio.tx_pwm`, whose timing loop is in the
+packaged C library. Reset and data/command remain ordinary `libgpiod` lines.
+The replaced Python PWM thread must not be reintroduced; its scheduler jitter
+was visibly confirmed as brightness flicker on the real panel.
 
 ## Service catalog
 

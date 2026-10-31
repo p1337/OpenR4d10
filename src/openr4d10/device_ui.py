@@ -463,7 +463,7 @@ def _draw_menu_heading(
 ) -> None:
     font = _font(20, bold=True)
     fitted = _fit_text(draw, title, font, WIDTH - 76)
-    draw.text((14, top + 9), fitted, font=font, fill=accent)
+    draw.text((14, top + 4), fitted, font=font, fill=accent)
 
 
 def _draw_back_or_ptt(
@@ -472,9 +472,9 @@ def _draw_back_or_ptt(
     ptt_active: bool,
 ) -> None:
     badge_left = 188
-    badge_top = 89
+    badge_top = 76
     badge_right = WIDTH + 8
-    badge_bottom = 119
+    badge_bottom = 106
     if ptt_active:
         draw.rounded_rectangle(
             (badge_left, badge_top, badge_right, badge_bottom),
@@ -485,7 +485,7 @@ def _draw_back_or_ptt(
         font = _font(12, bold=True)
         bounds = draw.textbbox((0, 0), "PTT", font=font)
         draw.text(
-            (213 - (bounds[2] - bounds[0]) / 2, 96),
+            (213 - (bounds[2] - bounds[0]) / 2, 83),
             "PTT",
             font=font,
             fill=(255, 255, 255),
@@ -509,13 +509,13 @@ def _draw_back_or_ptt(
     )
     draw.polygon(
         (
-            (202, 104),
-            (209, 97),
-            (209, 101),
-            (219, 101),
-            (219, 107),
-            (209, 107),
-            (209, 111),
+            (202, 91),
+            (209, 84),
+            (209, 88),
+            (219, 88),
+            (219, 94),
+            (209, 94),
+            (209, 98),
         ),
         fill=accent,
     )
@@ -547,10 +547,10 @@ def _draw_main_menu_items(
         ),
     )
     font = _font(14, bold=True)
-    row_top = 121
+    row_top = 104
     for row, key in enumerate(MAIN_MENU_ITEMS[start : start + visible_rows]):
         index = start + row
-        y = row_top + row * 29
+        y = row_top + row * 31
         selected = index == state.menu_selection
         if selected:
             draw.rounded_rectangle(
@@ -587,15 +587,15 @@ def _draw_hotspot_setup(
     value_font = _font(12, bold=True)
     url_font = _font(11, bold=True)
     draw.text(
-        (14, 92),
+        (14, 78),
         _fit_text(draw, str(text["wifi_setup"]), heading_font, 212),
         font=heading_font,
         fill=state.accent,
     )
     rows = (
-        (127, str(text["wifi_name"]), state.hotspot_ssid, value_font),
-        (174, str(text["wifi_password"]), state.hotspot_passphrase, value_font),
-        (221, str(text["wifi_open"]), state.hotspot_url, url_font),
+        (108, str(text["wifi_name"]), state.hotspot_ssid, value_font),
+        (157, str(text["wifi_password"]), state.hotspot_passphrase, value_font),
+        (206, str(text["wifi_open"]), state.hotspot_url, url_font),
     )
     for top, label, value, font in rows:
         draw.text((15, top), label, font=label_font, fill=(128, 140, 145))
@@ -629,35 +629,35 @@ def render_device_ui(
         text["pause"] if state.playing else text["play"]
     )
 
-    header_height = 53
-    draw.rectangle((0, 0, WIDTH - 1, 52), fill=(2, 5, 7), outline=(35, 47, 51))
-    draw.line((17, 26, 222, 26), fill=(25, 35, 39), width=1)
-    draw.line((119, 3, 119, 49), fill=(25, 35, 39), width=1)
+    header_height = 45
+    draw.rectangle((0, 0, WIDTH - 1, 44), fill=(2, 5, 7), outline=(35, 47, 51))
+    draw.line((17, 22, 222, 22), fill=(25, 35, 39), width=1)
+    draw.line((119, 2, 119, 42), fill=(25, 35, 39), width=1)
     _vertical_label(image, left_action, 1, clockwise=False, header_height=header_height)
     _vertical_label(image, right_action, 227, clockwise=False, header_height=header_height)
-    _control_value(draw, 19, 7, str(controls[0]), f"{state.volume}%", accent)
-    _control_value(draw, 19, 32, str(controls[1]), str(state.squelch), accent)
-    _control_value(draw, 122, 7, str(controls[2]), f"{state.channel:03d}", accent)
+    _control_value(draw, 19, 4, str(controls[0]), f"{state.volume}%", accent)
+    _control_value(draw, 19, 26, str(controls[1]), str(state.squelch), accent)
+    _control_value(draw, 122, 4, str(controls[2]), f"{state.channel:03d}", accent)
     service_label = str(text["weather_service"]) if state.service == "WEATHER" else state.service
-    _control_value(draw, 122, 32, str(controls[3]), service_label, accent)
+    _control_value(draw, 122, 26, str(controls[3]), service_label, accent)
 
-    draw.rectangle((0, 53, WIDTH - 1, 81), fill=(12, 20, 23))
-    _wifi_icon(draw, 5, 61, accent)
+    draw.rectangle((0, 45, WIDTH - 1, 70), fill=(12, 20, 23))
+    _wifi_icon(draw, 5, 52, accent)
     status_font = _font(7)
-    draw.text((22, 57), _fit_text(draw, state.wifi_label, status_font, 67), font=status_font, fill=(213, 222, 224))
-    draw.text((22, 69), _fit_text(draw, state.ip_address, status_font, 73), font=status_font, fill=(112, 130, 134))
+    draw.text((22, 48), _fit_text(draw, state.wifi_label, status_font, 67), font=status_font, fill=(213, 222, 224))
+    draw.text((22, 59), _fit_text(draw, state.ip_address, status_font, 73), font=status_font, fill=(112, 130, 134))
     clock = state.timestamp.strftime("%H:%M")
     clock_font = _font(15, bold=True)
     clock_width = draw.textbbox((0, 0), clock, font=clock_font)[2]
-    draw.text((139 - clock_width / 2, 58), clock, font=clock_font, fill=(235, 240, 241))
-    _battery(draw, 207, 62, state.battery_percent, accent)
+    draw.text(((WIDTH - clock_width) / 2, 48), clock, font=clock_font, fill=(235, 240, 241))
+    _battery(draw, 207, 53, state.battery_percent, accent)
     if state.battery_percent is not None:
         pct = f"{state.battery_percent}%"
         pct_font = _font(6, bold=True)
         width = draw.textbbox((0, 0), pct, font=pct_font)[2]
-        draw.text((205 - width, 65), pct, font=pct_font, fill=(180, 190, 192))
+        draw.text((205 - width, 56), pct, font=pct_font, fill=(180, 190, 192))
 
-    content_top = 82
+    content_top = 71
     draw.rectangle((0, content_top, WIDTH - 1, HEIGHT - 1), fill=(6, 12, 15))
     if state.hotspot_active:
         draw.rectangle((0, content_top, 3, HEIGHT - 1), fill=accent)
@@ -678,21 +678,21 @@ def render_device_ui(
 
     station_font = _font(18, bold=True)
     station = _fit_text(draw, state.source, station_font, 164)
-    draw.text((14, 94), station, font=station_font, fill=(245, 248, 249))
+    draw.text((14, 77), station, font=station_font, fill=(245, 248, 249))
 
     if state.service == "WEATHER":
         if artwork is not None:
             weather = ImageOps.contain(
                 artwork.convert("RGB"),
-                (212, 148),
+                (212, 162),
                 method=Image.Resampling.LANCZOS,
             )
             weather_x = 14 + (212 - weather.width) // 2
-            weather_y = 119 + (148 - weather.height) // 2
+            weather_y = 104 + (162 - weather.height) // 2
             image.paste(weather, (weather_x, weather_y))
         else:
             draw.rounded_rectangle(
-                (14, 119, 225, 266),
+                (14, 104, 225, 266),
                 radius=10,
                 fill=(13, 31, 35),
                 outline=accent,
@@ -702,20 +702,20 @@ def render_device_ui(
             loading = _fit_text(draw, state.subtitle, loading_font, 180)
             bounds = draw.textbbox((0, 0), loading, font=loading_font)
             draw.text(
-                (120 - (bounds[2] - bounds[0]) / 2, 185),
+                (120 - (bounds[2] - bounds[0]) / 2, 178),
                 loading,
                 font=loading_font,
                 fill=(196, 207, 209),
             )
-        draw.rounded_rectangle((13, 118, 226, 267), radius=10, outline=(75, 92, 96), width=1)
+        draw.rounded_rectangle((13, 103, 226, 267), radius=10, outline=(75, 92, 96), width=1)
         credit_font = _font(8, bold=True)
         credit = _fit_text(draw, state.title, credit_font, 122)
         draw.rounded_rectangle((18, 241, 148, 262), radius=5, fill=(2, 5, 7, 220))
         draw.text((23, 247), credit, font=credit_font, fill=accent)
         return image.convert("RGB")
 
-    tile_size = 138
-    tile_xy = (14, 126)
+    tile_size = 151
+    tile_xy = (14, 111)
     if artwork is not None:
         tile = ImageOps.fit(
             artwork.convert("RGB"),
@@ -731,7 +731,7 @@ def render_device_ui(
         image.paste(tile, tile_xy, mask)
     else:
         draw.rounded_rectangle(
-            (14, 126, 151, 263),
+            (14, 111, 164, 261),
             radius=12,
             fill=(13, 31, 35),
             outline=accent,
@@ -741,18 +741,18 @@ def render_device_ui(
         initials_font = _font(34, bold=True)
         bounds = draw.textbbox((0, 0), initials, font=initials_font)
         draw.text(
-            (83 - (bounds[2] - bounds[0]) / 2, 195 - (bounds[3] - bounds[1]) / 2),
+            (89 - (bounds[2] - bounds[0]) / 2, 186 - (bounds[3] - bounds[1]) / 2),
             initials,
             font=initials_font,
             fill=accent,
         )
-    draw.rounded_rectangle((13, 125, 152, 264), radius=12, outline=(75, 92, 96), width=1)
+    draw.rounded_rectangle((13, 110, 165, 263), radius=12, outline=(75, 92, 96), width=1)
 
     title = state.title if state.title.casefold() != state.source.casefold() else state.subtitle
     detail_font = _font(10, bold=True)
     draw.multiline_text(
-        (161, 144),
-        _fit_text(draw, title, detail_font, 66),
+        (173, 127),
+        _fit_text(draw, title, detail_font, 54),
         font=detail_font,
         fill=(196, 207, 209),
         spacing=3,
@@ -761,14 +761,14 @@ def render_device_ui(
     if state.ptt_active:
         _draw_back_or_ptt(draw, accent, True)
     else:
-        draw.ellipse((184, 88, 228, 132), fill=(12, 23, 27), outline=accent, width=2)
+        draw.ellipse((184, 76, 228, 120), fill=(12, 23, 27), outline=accent, width=2)
         if state.playing:
-            draw.rectangle((200, 101, 204, 119), fill=accent)
-            draw.rectangle((209, 101, 213, 119), fill=accent)
+            draw.rectangle((200, 89, 204, 107), fill=accent)
+            draw.rectangle((209, 89, 213, 107), fill=accent)
         else:
-            draw.polygon(((200, 99), (200, 121), (216, 110)), fill=accent)
+            draw.polygon(((200, 87), (200, 109), (216, 98)), fill=accent)
     if state.recording:
-        draw.ellipse((220, 87, 228, 95), fill=(255, 78, 78))
+        draw.ellipse((220, 75, 228, 83), fill=(255, 78, 78))
     return image.convert("RGB")
 
 
