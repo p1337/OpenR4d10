@@ -51,6 +51,11 @@ the installer report exactly which adapters still need configuration.
 - bounded RSS/Atom reader and two-slot camera snapshots with image validation
   and safe JPEG re-encoding
 - persistent, ordered web-radio library and bounded local-media library scanning
+- ICY-aware radio pre-buffer: PTT retains the current song including its
+  buffered beginning; optional continuous capture splits on title metadata,
+  suppresses duplicates and stores `Artist – Song` by artist
+- simple recorded-music player with favorites, `My Soundmix`, shuffle,
+  previous/next, optional cover cache and confirmed deletion
 - curated one-click radio and news-feed presets with locally re-encoded artwork
 - standard-library-only test suite and GitHub Actions CI
 
@@ -221,7 +226,7 @@ the real speaker is verified after reboot.
 RSS/Atom URLs and camera snapshot URLs can be loaded in the same local panel.
 Feed downloads are size-limited; camera responses are decoded, dimension-
 checked, resized and re-encoded before the browser can retrieve them.
-Saved radio stations can be managed in the same dashboard. On first use the six
+Saved radio stations can be managed in the same dashboard. On first use the ten
 curated stations are copied once into this persistent library. All entries can
 then be reordered, deleted or extended; an intentionally deleted default is not
 recreated by a restart or update. Station URLs with a query are intentionally
@@ -243,8 +248,13 @@ Local files copied below
 `/var/lib/openr4d10/media` appear after selecting **Neu einlesen**; their full
 paths never appear in the public status response.
 
+The navigation tree is maintained only as an internal debugging overview in
+[`docs/MENU_TREE.md`](docs/MENU_TREE.md). It is not a product page or a visible
+menu entry.
+
 The built-in selection currently includes SWR3, sunshine live,
-Deutschlandfunk, RMF FM, Radio ZET and BBC World Service. News presets include
+Deutschlandfunk, RMF FM, Radio ZET, BBC World Service, DIE NEUE 107.7,
+AFN The Eagle, ROCK ANTENNE and ROCK FM. News presets include
 tagesschau, Deutschlandfunk Nachrichten, RMF24 and BBC News World. The source
 addresses and their review references are documented in
 [`docs/PRESETS.md`](docs/PRESETS.md). Station artwork is fetched only from the

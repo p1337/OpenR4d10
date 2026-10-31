@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import hashlib
 import logging
+import os
 from pathlib import Path
+import random
 import re
 import shutil
+import subprocess
 import threading
 import time
 from typing import Callable
+import unicodedata
 import uuid
 from urllib.parse import urlsplit
 
@@ -20,9 +25,11 @@ from .content import (
     DwdSatelliteFrames,
     FeedReader,
     PresetArtwork,
+    TrackArtwork,
 )
 from .media import MpvEngine, StreamRecorder, public_source_label, validate_media_source
 from .presets import FEED_BY_ID, FEED_PRESETS, RADIO_BY_ID, RADIO_PRESETS
+from .radio_capture import BufferedTrack, IcyRadioBuffer
 from .service_adapters import ServiceAdapterError, ServiceAdapterRegistry
 from .storage import SCHEMA_VERSION, StateStore
 
@@ -38,6 +45,10 @@ DISPLAY_BRIGHTNESS_KEY = "display.brightness_percent"
 DEFAULT_DISPLAY_BRIGHTNESS = 100
 RADAR_DEFAULT_MIGRATION_KEY = "weather.radar_default_v1"
 GERMANY_SATELLITE_MIGRATION_KEY = "weather.germany_satellite_v1"
+RADIO_DEFAULTS_V2_MIGRATION_KEY = "radio.defaults_seeded_v2"
+RADIO_CONTINUOUS_KEY = "radio.continuous_recording"
+LAST_VIEW_KEY = "ui.last_view_service"
+RADIO_V2_PRESET_IDS = {"die_neue_1077", "afn_eagle", "rock_antenne", "rock_fm"}
 
 LOG = logging.getLogger(__name__)
 
@@ -92,13 +103,16 @@ class ServiceCatalog:
         feed_reader: FeedReader | None = None,
         camera: CameraSnapshot | None = None,
         artwork: PresetArtwork | None = None,
+        track_artwork: TrackArtwork | None = None,
         weather: DwdSatelliteFrames | None = None,
+        radio_buffer: IcyRadioBuffer | None = None,
         adapter_directory: Path | None = None,
         adapter_registry: ServiceAdapterRegistry | None = None,
     ) -> None:
         self.store = StateStore(state_directory / "openr4d10.sqlite3")
         self.executable_lookup = executable_lookup
         self.media_root = state_directory / "media"
+        self.cover_root = state_directory / "cache" / "track-covers"
         self.player = player or MpvEngine(media_roots=(self.media_root,))
         self.recorder = recorder or StreamRecorder(
             state_directory / "recordings",
@@ -107,7 +121,11 @@ class ServiceCatalog:
         self.feed_reader = feed_reader or FeedReader()
         self.camera = camera or CameraSnapshot(state_directory / "cache")
         self.artwork = artwork or PresetArtwork(state_directory / "cache")
+        self.track_artwork = track_artwork or TrackArtwork(self.cover_root)
         self.weather = weather or DwdSatelliteFrames(state_directory / "cache")
+        self.radio_buffer = radio_buffer or (
+            IcyRadioBuffer(self._store_buffered_track) if player is None else None
+        )
         self._artwork_pending: set[str] = set()
         self._artwork_guard = threading.Lock()
         self._weather_pending: set[str] = set()
@@ -140,6 +158,16 @@ class ServiceCatalog:
             "webradio",
             tuple((item.name, item.stream_url) for item in RADIO_PRESETS),
             marker="radio.defaults_seeded_v1",
+        )
+        self.store.seed_stations_once(
+            "webradio",
+            tuple(
+                (item.name, item.stream_url)
+                for item in RADIO_PRESETS
+                if item.preset_id in RADIO_V2_PRESET_IDS
+            ),
+            marker=RADIO_DEFAULTS_V2_MIGRATION_KEY,
+            append=True,
         )
         self.store.seed_channels_once(
             "weather",
@@ -180,6 +208,11 @@ class ServiceCatalog:
         weather_channels = self.store.channels("weather")
         if weather_channels:
             self.active_weather_channel_id = int(weather_channels[0]["id"])
+        if self.radio_buffer is not None:
+            self.radio_buffer.set_continuous(
+                self.store.get_setting(RADIO_CONTINUOUS_KEY, False) is True
+            )
+        self._initial_view_resolved = False
 
     def _upgrade_germany_weather_default(self) -> None:
         """Change only the untouched seeded Germany channel; never recreate it."""
@@ -254,6 +287,103 @@ class ServiceCatalog:
         self.store.set_setting(DISPLAY_BRIGHTNESS_KEY, brightness_percent)
         return brightness_percent
 
+    @staticmethod
+    def _track_part(value: str, fallback: str, limit: int) -> str:
+        cleaned = unicodedata.normalize("NFKC", value or "")
+        cleaned = re.sub(r"[<>:\"/\\|?*\x00-\x1f]", " ", cleaned)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip(" .-")
+        return (cleaned or fallback)[:limit].rstrip(" .")
+
+    @staticmethod
+    def _track_key(artist: str | None, title: str | None) -> str | None:
+        if not artist or not title:
+            return None
+        value = unicodedata.normalize("NFKD", f"{artist}\0{title}").casefold()
+        return "".join(character for character in value if character.isalnum())[:500]
+
+    def _fingerprint(self, path: Path) -> str | None:
+        executable = self.executable_lookup("fpcalc")
+        if executable is None:
+            return None
+        try:
+            result = subprocess.run(
+                [executable, "-raw", "-length", "120", str(path)],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                check=False,
+                timeout=30,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        if result.returncode != 0:
+            return None
+        fingerprint = next(
+            (
+                line.removeprefix(b"FINGERPRINT=")
+                for line in result.stdout.splitlines()
+                if line.startswith(b"FINGERPRINT=")
+            ),
+            b"",
+        )
+        return hashlib.sha256(fingerprint).hexdigest() if fingerprint else None
+
+    def _store_buffered_track(self, track: BufferedTrack) -> bool:
+        checksum = hashlib.sha256(track.payload).hexdigest()
+        artist = self._track_part(track.artist or "", "Unbekannt", 120)
+        title_fallback = "Aufnahme " + track.started_at.replace(":", "-")
+        title = self._track_part(track.title or "", title_fallback, 180)
+        normalized_key = self._track_key(track.artist, track.title)
+        if self.store.media_duplicate(normalized_key, None, checksum) is not None:
+            return False
+        artist_root = (self.media_root / "recorded" / artist).resolve()
+        media_root = self.media_root.resolve()
+        if not artist_root.is_relative_to(media_root):
+            raise ValueError("recorded track path escaped the media root")
+        artist_root.mkdir(parents=True, exist_ok=True, mode=0o750)
+        suffix = ".mp3" if "mpeg" in track.content_type else ".aac"
+        basename = self._track_part(f"{artist} – {title}", "Unbekannt – Aufnahme", 220)
+        output = artist_root / f"{basename}{suffix}"
+        if output.exists():
+            output = artist_root / f"{basename} – {checksum[:8]}{suffix}"
+        temporary = output.with_name(output.stem + ".part" + output.suffix)
+        temporary.write_bytes(track.payload)
+        try:
+            fingerprint = self._fingerprint(temporary)
+            if self.store.media_duplicate(normalized_key, fingerprint, checksum) is not None:
+                temporary.unlink(missing_ok=True)
+                return False
+            os.replace(temporary, output)
+            media_id = self.store.add_recorded_media(
+                output,
+                artist=track.artist and artist,
+                title=title,
+                size_bytes=output.stat().st_size,
+                checksum=checksum,
+                normalized_key=normalized_key,
+                fingerprint=fingerprint,
+                review_required=(
+                    track.artist is None or track.title is None or track.truncated
+                ),
+            )
+        except Exception:
+            temporary.unlink(missing_ok=True)
+            output.unlink(missing_ok=True)
+            raise
+        if track.artist and track.title:
+            self._cache_track_artwork(media_id, artist, title)
+        return True
+
+    def _cache_track_artwork(self, media_id: int, artist: str, title: str) -> None:
+        def cache() -> None:
+            try:
+                path = self.track_artwork.ensure(media_id, artist, title)
+                self.store.set_media_cover(media_id, path.name)
+            except (ContentError, OSError, ValueError) as exc:
+                LOG.info("Track cover unavailable for %s – %s: %s", artist, title, exc)
+
+        self._start_worker(f"openr4d10-track-cover-{media_id}", cache)
+
     def snapshot(self) -> dict[str, object]:
         states = self.store.service_states()
         services: list[dict[str, object]] = []
@@ -324,8 +454,17 @@ class ServiceCatalog:
         media = [
             {
                 "id": item["id"],
+                "artist": item["artist"],
                 "title": item["title"],
                 "size_bytes": item["size_bytes"],
+                "favorite": bool(item["favorite"]),
+                "review_required": bool(item["review_required"]),
+                "source_kind": item["source_kind"],
+                "cover": (
+                    f"/api/media-cover/{item['id']}"
+                    if item["cover_file"]
+                    else None
+                ),
             }
             for item in self.store.media_items()
         ]
@@ -375,6 +514,15 @@ class ServiceCatalog:
             "selected_preset": self._selected_preset(),
             "playback": self.player.state.as_dict(),
             "recording": self.recorder.state.as_dict(),
+            "radio_buffer": (
+                self.radio_buffer.snapshot()
+                if self.radio_buffer is not None
+                else {
+                    "state": "unavailable",
+                    "continuous": False,
+                    "error": "radio pre-buffer is unavailable",
+                }
+            ),
             "content": self.content_state,
             "presets": {
                 "stations": [item.public() for item in RADIO_PRESETS],
@@ -408,6 +556,8 @@ class ServiceCatalog:
             if not enabled:
                 if self.active_service == service_id:
                     self.player.stop()
+                    if service_id == "webradio" and self.radio_buffer is not None:
+                        self.radio_buffer.stop(flush=True)
                     self.active_service = "system"
                     self.active_preset_id = None
                     self.active_station_id = None
@@ -438,6 +588,8 @@ class ServiceCatalog:
             if not isinstance(source, str):
                 raise ValueError("play action requires a media source")
             self.player.load(source)
+            if service_id == "webradio" and self.radio_buffer is not None:
+                self.radio_buffer.tune(source, "Direkte Radioquelle")
             self.active_service = service_id
             self.active_preset_id = None
             self.active_station_id = None
@@ -447,6 +599,8 @@ class ServiceCatalog:
             self.player.toggle_pause()
         elif action == "stop":
             self.player.stop()
+            if self.radio_buffer is not None:
+                self.radio_buffer.stop(flush=True)
             self.active_service = "system"
             self.active_preset_id = None
             self.active_station_id = None
@@ -471,6 +625,20 @@ class ServiceCatalog:
             self.recorder.start(source)
         elif action == "record_stop":
             self.recorder.stop()
+        elif action == "radio_keep_current":
+            self._require_enabled("recorder")
+            if self.radio_buffer is None:
+                raise RuntimeError("radio pre-buffer is unavailable")
+            return {"radio_buffer": self.radio_buffer.keep_current()}
+        elif action == "radio_capture_mode":
+            self._require_enabled("recorder")
+            enabled = request.get("enabled")
+            if not isinstance(enabled, bool):
+                raise ValueError("radio_capture_mode requires boolean enabled")
+            if self.radio_buffer is None:
+                raise RuntimeError("radio pre-buffer is unavailable")
+            self.store.set_setting(RADIO_CONTINUOUS_KEY, enabled)
+            return {"radio_buffer": self.radio_buffer.set_continuous(enabled)}
         elif action == "station_add":
             name = request.get("name")
             source = request.get("source")
@@ -490,6 +658,8 @@ class ServiceCatalog:
             deleted = self.store.delete_station(station_id)
             if deleted and self.active_station_id == station_id:
                 self.player.stop()
+                if self.radio_buffer is not None:
+                    self.radio_buffer.stop(flush=True)
                 self.active_service = "system"
                 self.active_station_id = None
                 self.active_preset_id = None
@@ -573,6 +743,71 @@ class ServiceCatalog:
             self.active_service = "local_media"
             self.active_preset_id = None
             self.active_station_id = None
+        elif action == "media_favorite":
+            self._require_enabled("local_media")
+            media_id = request.get("media_id")
+            favorite = request.get("favorite")
+            if isinstance(media_id, bool) or not isinstance(media_id, int):
+                raise ValueError("media_favorite requires an integer media_id")
+            if not isinstance(favorite, bool):
+                raise ValueError("media_favorite requires boolean favorite")
+            return {"updated": self.store.set_media_favorite(media_id, favorite)}
+        elif action == "media_delete":
+            self._require_enabled("local_media")
+            media_id = request.get("media_id")
+            confirmed = request.get("confirmed")
+            if isinstance(media_id, bool) or not isinstance(media_id, int):
+                raise ValueError("media_delete requires an integer media_id")
+            if confirmed is not True:
+                raise ValueError("media deletion requires explicit confirmation")
+            media = self.store.media_item(media_id)
+            if media is None:
+                return {"deleted": False}
+            path = Path(str(media["path"])).resolve()
+            root = self.media_root.resolve()
+            if not path.is_relative_to(root):
+                raise ValueError("media file is outside the approved media directory")
+            deleted = self.store.delete_media(media_id)
+            if deleted is None:
+                return {"deleted": False}
+            path.unlink(missing_ok=True)
+            cover_file = deleted.get("cover_file")
+            if isinstance(cover_file, str) and re.fullmatch(
+                r"track-\d{1,10}\.jpg", cover_file
+            ):
+                (self.cover_root / cover_file).unlink(missing_ok=True)
+            return {"deleted": True}
+        elif action in {"media_shuffle", "media_soundmix"}:
+            self._require_enabled("local_media")
+            favorites_only = action == "media_soundmix"
+            media = [
+                item
+                for item in self.store.media_items()
+                if item["source_kind"] == "radio"
+                and (not favorites_only or bool(item["favorite"]))
+            ]
+            if not media:
+                raise ValueError(
+                    "no favorite recordings are available"
+                    if favorites_only
+                    else "no recorded tracks are available"
+                )
+            paths = [str(item["path"]) for item in media]
+            random.shuffle(paths)
+            self.player.load_playlist(
+                paths,
+                shuffle=False,
+                loop=favorites_only,
+            )
+            self.active_service = "local_media"
+            self.active_preset_id = None
+            self.active_station_id = None
+        elif action == "media_next":
+            self._require_enabled("local_media")
+            self.player.next()
+        elif action == "media_previous":
+            self._require_enabled("local_media")
+            self.player.previous()
         elif action == "adapter_call":
             service_id = request.get("service_id")
             operation = request.get("operation")
@@ -718,6 +953,9 @@ class ServiceCatalog:
             "active_service": self.active_service,
             "playback": self.player.state.as_dict(),
             "recording": self.recorder.state.as_dict(),
+            "radio_buffer": (
+                self.radio_buffer.snapshot() if self.radio_buffer is not None else None
+            ),
             "selected_preset": self._selected_preset(),
         }
 
@@ -736,6 +974,11 @@ class ServiceCatalog:
 
     def _play_station(self, station: dict[str, object]) -> None:
         self.player.load(str(station["stream_url"]))
+        if self.radio_buffer is not None:
+            self.radio_buffer.tune(
+                str(station["stream_url"]),
+                str(station["name"]),
+            )
         self.active_service = "webradio"
         self.active_station_id = int(station["id"])
         preset = self._preset_for_station(station)
@@ -901,6 +1144,15 @@ class ServiceCatalog:
             except (ContentError, OSError, ValueError) as exc:
                 LOG.warning("Station artwork unavailable for %s: %s", preset_id, exc)
                 return None
+        elif re.fullmatch(r"media-cover/\d{1,10}", path):
+            media_id = int(path.rsplit("/", 1)[-1])
+            media = self.store.media_item(media_id)
+            if media is None or not isinstance(media.get("cover_file"), str):
+                return None
+            cover_file = str(media["cover_file"])
+            if not re.fullmatch(r"track-\d{1,10}\.jpg", cover_file):
+                return None
+            target = self.cover_root / cover_file
         elif re.fullmatch(r"weather-[a-z][a-z0-9_-]{1,63}-\d{8}T\d{6}Z\.jpg", path):
             target = self.weather.cache_root / path
         else:
@@ -913,6 +1165,15 @@ class ServiceCatalog:
     def receiver_overlay(self, view_service: str | None = None) -> dict[str, object]:
         """Return metadata for the selected view without changing audio ownership."""
         requested = str(view_service or "").upper()
+        valid_views = {"SYSTEM", "RADIO", "WEATHER", "DMR", "PLAYER", "REC"}
+        if not self._initial_view_resolved:
+            if requested not in valid_views:
+                remembered = str(self.store.get_setting(LAST_VIEW_KEY, "RADIO")).upper()
+                requested = remembered if remembered in valid_views else "RADIO"
+            self._initial_view_resolved = True
+        elif requested in valid_views:
+            if self.store.get_setting(LAST_VIEW_KEY, None) != requested:
+                self.store.set_setting(LAST_VIEW_KEY, requested)
         if requested == "WEATHER" and self.active_weather_channel_id is not None:
             channel = self.store.channel(self.active_weather_channel_id)
             if channel is not None:
@@ -1000,13 +1261,30 @@ class ServiceCatalog:
             if selected is not None
             else playback.source or self.active_service
         )
+        track_line = "Paused" if playback.paused else "Audio stream active"
+        buffered_recording = False
+        if self.active_service == "webradio" and self.radio_buffer is not None:
+            buffered = self.radio_buffer.snapshot()
+            buffered_recording = (
+                buffered.get("keep_current") is True
+                or buffered.get("continuous") is True
+            )
+            artist = buffered.get("artist")
+            title = buffered.get("title")
+            stream_title = buffered.get("stream_title")
+            if isinstance(artist, str) and isinstance(title, str):
+                track_line = f"{artist} – {title}"
+            elif isinstance(stream_title, str) and stream_title.strip():
+                track_line = stream_title.strip()[:500]
         return {
             "service": service_label,
             "station": station,
-            "title": station,
-            "subtitle": "Paused" if playback.paused else "Audio stream active",
+            "title": track_line,
+            "subtitle": track_line,
             "playing": not playback.paused,
-            "recording": self.recorder.state.state == "recording",
+            "recording": (
+                self.recorder.state.state == "recording" or buffered_recording
+            ),
             "volume": playback.volume,
             "preset_id": selected["preset_id"] if selected is not None else None,
             "channel": selected["channel"] if selected is not None else None,
@@ -1025,5 +1303,7 @@ class ServiceCatalog:
             for worker in workers:
                 worker.join(timeout=max(0.0, remaining / len(workers)))
         self.recorder.close()
+        if self.radio_buffer is not None:
+            self.radio_buffer.close()
         self.player.close()
         self.store.close()

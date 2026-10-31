@@ -50,10 +50,10 @@ readonly SOURCE_ROOT
 
 required=(
     VERSION README.md
-    src/openr4d10/__main__.py
+    src/openr4d10/__main__.py src/openr4d10/radio_capture.py
     config/openr4d10.toml config/hardware.toml
     assets/boot/text-sequence.toml
-    web/index.html web/app.css web/app.js
+    web/index.html web/app.css web/app.js web/i18n.json
     systemd/openr4d10.service systemd/openr4d10-update.service
     systemd/openr4d10-update.path systemd/openr4d10-update-recover.service
     systemd/openr4d10-wifi-repair.service systemd/openr4d10-wifi-repair.path
@@ -146,7 +146,7 @@ kernel_release="$(uname -r)"
 apt-get update
 apt-get install -y --no-install-recommends \
     python3 python3-pil python3-libgpiod python3-lgpio python3-spidev fonts-dejavu-core \
-    mpv ffmpeg ca-certificates gcc make kmod libc6-dev zlib1g-dev \
+    mpv ffmpeg libchromaprint-tools ca-certificates gcc make kmod libc6-dev zlib1g-dev \
     "linux-headers-$kernel_release" device-tree-compiler alsa-utils \
     libasound2-plugins sox network-manager dnsmasq-base
 

@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from html import unescape
 from io import BytesIO
+import json
 import os
 from pathlib import Path
 import re
@@ -245,6 +246,131 @@ class PresetArtwork:
             temporary.write_bytes(encoded.getvalue())
             os.replace(temporary, output)
             return output
+
+
+class TrackArtwork:
+    """Resolve optional track covers through MusicBrainz and Cover Art Archive."""
+
+    def __init__(self, cache_root: Path, fetcher: BoundedFetcher | None = None) -> None:
+        if not cache_root.is_absolute():
+            raise ValueError("track artwork cache path must be absolute")
+        self.cache_root = cache_root
+        self.fetcher = fetcher or BoundedFetcher()
+        self._request_guard = threading.Lock()
+        self._last_request = 0.0
+
+    def _json(self, url: str) -> dict[str, object]:
+        with self._request_guard:
+            remaining = 1.05 - (time.monotonic() - self._last_request)
+            if remaining > 0:
+                time.sleep(remaining)
+            payload, _content_type = self.fetcher.fetch(
+                url,
+                max_bytes=1024 * 1024,
+                accepted_types=("application/json",),
+                timeout=10,
+            )
+            self._last_request = time.monotonic()
+        try:
+            value = json.loads(payload)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ContentError(f"invalid cover metadata: {exc}") from exc
+        if not isinstance(value, dict):
+            raise ContentError("cover metadata response is not an object")
+        return value
+
+    def ensure(self, media_id: int, artist: str, title: str) -> Path:
+        if (
+            isinstance(media_id, bool)
+            or not isinstance(media_id, int)
+            or media_id < 1
+            or not artist.strip()
+            or not title.strip()
+        ):
+            raise ValueError("track cover requires media id, artist and title")
+        output = self.cache_root / f"track-{media_id}.jpg"
+        if output.is_file():
+            return output
+        query = urlencode(
+            {
+                "query": f'recording:"{title[:200]}" AND artist:"{artist[:160]}"',
+                "fmt": "json",
+                "limit": "5",
+            }
+        )
+        search = self._json(f"https://musicbrainz.org/ws/2/recording?{query}")
+        releases: list[object] = []
+        recordings = search.get("recordings")
+        if isinstance(recordings, list):
+            for recording in recordings:
+                if not isinstance(recording, dict):
+                    continue
+                score = recording.get("score", 0)
+                if not isinstance(score, int) or score < 85:
+                    continue
+                candidate = recording.get("releases")
+                if isinstance(candidate, list):
+                    releases.extend(candidate)
+        image_url: str | None = None
+        for release in releases[:5]:
+            if not isinstance(release, dict):
+                continue
+            release_id = release.get("id")
+            if not isinstance(release_id, str) or not re.fullmatch(
+                r"[0-9a-fA-F-]{36}", release_id
+            ):
+                continue
+            try:
+                listing = self._json(
+                    f"https://coverartarchive.org/release/{release_id}/"
+                )
+            except ContentError:
+                continue
+            images = listing.get("images")
+            if not isinstance(images, list):
+                continue
+            front = next(
+                (
+                    item
+                    for item in images
+                    if isinstance(item, dict)
+                    and item.get("front") is True
+                    and item.get("approved", True) is True
+                ),
+                None,
+            )
+            if isinstance(front, dict):
+                thumbnails = front.get("thumbnails")
+                if isinstance(thumbnails, dict):
+                    candidate = thumbnails.get("250") or thumbnails.get("small")
+                    if isinstance(candidate, str):
+                        image_url = candidate.replace("http://", "https://", 1)
+                        break
+        if image_url is None:
+            raise ContentError("no verified front cover was found")
+        payload, _content_type = self.fetcher.fetch(
+            image_url,
+            max_bytes=2 * 1024 * 1024,
+            accepted_types=("image/*",),
+            timeout=10,
+        )
+        try:
+            with Image.open(BytesIO(payload)) as source:
+                if source.width * source.height > 20_000_000:
+                    raise ContentError("track cover dimensions exceed the safety limit")
+                source.verify()
+            with Image.open(BytesIO(payload)) as source:
+                image = ImageOps.exif_transpose(source).convert("RGB")
+                image.thumbnail((512, 512), Image.Resampling.LANCZOS)
+        except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
+            raise ContentError(f"invalid track cover: {exc}") from exc
+        self.cache_root.mkdir(parents=True, exist_ok=True, mode=0o750)
+        encoded = BytesIO()
+        image.save(encoded, format="JPEG", quality=88, optimize=True)
+        temporary = output.with_suffix(".jpg.tmp")
+        temporary.write_bytes(encoded.getvalue())
+        os.replace(temporary, output)
+        return output
 
 
 DWD_WMS_URL = "https://maps.dwd.de/geoserver/dwd/wms"

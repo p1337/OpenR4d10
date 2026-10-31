@@ -431,6 +431,24 @@ function libraryButton(label, action, extra) {
   return button;
 }
 
+function renderRadioBuffer(buffer) {
+  const state = buffer || {};
+  const continuous = byId("radio-continuous");
+  if (document.activeElement !== continuous) continuous.checked = state.continuous === true;
+  let message = t("Waiting for a radio stream.");
+  if (state.state === "connecting") message = t("Connecting the song buffer …");
+  if (state.state === "buffering") {
+    const track = state.artist && state.title
+      ? `${state.artist} – ${state.title}`
+      : state.stream_title || t("Title metadata is not available yet.");
+    message = state.keep_current
+      ? t("This song will be saved: {{track}}", { track })
+      : t("Song buffer active: {{track}}", { track });
+  }
+  if (state.state === "error") message = t("Song buffer error: {{message}}", { message: state.error || "–" });
+  setText("radio-buffer-status", message);
+}
+
 function renderLibrary(catalog) {
   const stations = Array.isArray(catalog?.stations) ? catalog.stations : [];
   const stationList = byId("station-list");
@@ -483,12 +501,48 @@ function renderLibrary(catalog) {
   mediaList.replaceChildren();
   for (const item of media) {
     const row = document.createElement("li");
+    row.className = "media-library-row";
+    const artwork = document.createElement("div");
+    artwork.className = "media-row-artwork";
+    artwork.dataset.initials = initials(item.artist || item.title);
+    if (item.cover) {
+      const image = document.createElement("img");
+      image.src = item.cover;
+      image.alt = t("Cover for {{track}}", { track: item.title });
+      image.loading = "lazy";
+      image.addEventListener("error", () => image.remove());
+      artwork.append(image);
+    }
     const label = document.createElement("span");
+    label.className = "media-row-copy";
     const size = Number.isFinite(item.size_bytes)
       ? `${(item.size_bytes / 1024 / 1024).toFixed(1)} MB`
       : t("Size unknown");
-    label.textContent = `${item.title} · ${size}`;
-    row.append(label, libraryButton(t("Play"), "media_play", { media_id: item.id }));
+    const title = document.createElement("strong");
+    title.textContent = item.artist ? `${item.artist} – ${item.title}` : item.title;
+    const detail = document.createElement("small");
+    detail.textContent = item.review_required ? `${size} · ${t("Check title")}` : size;
+    label.append(title, detail);
+    const actions = document.createElement("span");
+    actions.className = "library-actions";
+    const favorite = libraryButton(item.favorite ? "★" : "☆", "media_favorite", {
+      media_id: item.id,
+      favorite: !item.favorite,
+    });
+    favorite.classList.add("favorite-button");
+    favorite.setAttribute("aria-label", item.favorite ? t("Remove favorite") : t("Add favorite"));
+    const play = libraryButton(t("Play"), "media_play", { media_id: item.id });
+    play.classList.add("library-play");
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = t("Delete");
+    remove.addEventListener("click", () => {
+      if (window.confirm(t("Delete {{track}} permanently?", { track: title.textContent }))) {
+        sendControl("media_delete", { media_id: item.id, confirmed: true });
+      }
+    });
+    actions.append(favorite, play, remove);
+    row.append(artwork, label, actions);
     mediaList.append(row);
   }
   if (!media.length) {
@@ -560,6 +614,7 @@ function render(data) {
   renderDeviceState(data.device_ui);
   renderServices(data.services || {});
   renderSettings(data.services?.settings || {});
+  renderRadioBuffer(data.services?.radio_buffer || {});
 }
 
 function renderSettings(settings) {
@@ -660,6 +715,10 @@ async function sendControl(action, extra = {}) {
       output.textContent = payload.deleted ? t("Entry deleted.") : t("Entry not found.");
     } else if (typeof payload.moved === "boolean") {
       output.textContent = payload.moved ? t("Order saved.") : t("Entry is already at the edge of the list.");
+    } else if (payload.radio_buffer) {
+      output.textContent = payload.radio_buffer.keep_current
+        ? t("The current song will be saved at its next title boundary.")
+        : t("Recording mode saved.");
     } else {
       output.textContent = `${payload.playback?.state || "stopped"} · ${payload.recording?.state || "stopped"}`;
     }
@@ -896,6 +955,14 @@ byId("station-control").addEventListener("submit", async (event) => {
 });
 
 byId("media-scan").addEventListener("click", () => sendControl("media_scan"));
+
+byId("radio-continuous").addEventListener("change", (event) => {
+  sendControl("radio_capture_mode", { enabled: event.currentTarget.checked });
+});
+
+for (const button of document.querySelectorAll("[data-music-action]")) {
+  button.addEventListener("click", () => sendControl(button.dataset.musicAction));
+}
 
 for (const button of document.querySelectorAll("[data-action]")) {
   button.addEventListener("click", () => {

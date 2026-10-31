@@ -193,6 +193,22 @@ Network URLs are limited to HTTP(S), reject embedded credentials and are
 redacted before appearing in status. Local media must resolve below the
 approved media directory.
 
+`IcyRadioBuffer` opens a second bounded, credential-free HTTP(S) read of the
+selected radio stream and requests ICY metadata. At most 32 MiB of the current
+track is retained in memory. A radio-context PTT press marks that buffer for
+storage; the next metadata title boundary atomically writes the complete
+available track beginning. Continuous mode marks every delimited track. Missing
+or malformed metadata is never guessed: the bounded material remains a review
+item. The library normalizes `Artist – Song`, stores by artist, checks metadata,
+checksum and Chromaprint fingerprint duplicates, and never exposes local paths.
+Optional covers use rate-limited MusicBrainz search and Cover Art Archive data,
+then pass through the existing bounded decode/re-encode boundary.
+
+Recorded-media playback reuses the one private mpv instance. `My Soundmix`
+loads favorite recordings in random order with an endless playlist; the all-
+recordings action shuffles once. Previous, next, favorite and confirmed-delete
+operations use stable database IDs. Start volume is always 30 percent.
+
 The web dashboard persists named radio stations without query strings and can
 rescan the private media directory for a bounded set of supported extensions.
 It renders that persistent station collection once, in the compact sortable
@@ -227,6 +243,9 @@ core. Preset artwork uses the same bounded-download boundary as camera images,
 is decoded and re-encoded to a maximum 256 x 256 JPEG in the private cache, and
 falls back to a browser-generated initials tile when retrieval fails. Current
 sources and their review references are recorded in `PRESETS.md`.
+
+The debug navigation overview is versioned in `MENU_TREE.md`. It is not served
+by the web application and is not a visible device-menu item.
 
 The native weather module reuses the bounded-download boundary. The primary
 Germany channel uses the official DWD radar-film GIF; its bounded animation

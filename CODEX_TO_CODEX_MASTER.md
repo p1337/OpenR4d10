@@ -234,6 +234,15 @@ ersetzt die bisherige Audioquelle. Informations- und Bilddienste wie Wetter
 besitzen den Player nicht und verändern laufende Musik weder beim Öffnen noch
 beim Kanalwechsel oder Aktualisieren.
 
+Nach einem Kaltstart beginnt die lokale Wiedergabelautstärke verbindlich bei
+30 Prozent. Ein zufälliger, aus einer früheren Sitzung stammender oder technisch
+abgeleiteter Wert wie 36 Prozent darf nicht als Startwert erscheinen. Die
+zuletzt geöffnete sinnvolle Dienstansicht darf wiederhergestellt werden, sofern
+der Dienst weiterhin aktiviert und verfügbar ist. Andernfalls wird die erste
+aktivierte nutzbare Dienstansicht gewählt; `SYSTEM` ist kein automatischer
+Medien-Fallback. System-, Einstellungs- und Diagnoseansichten sind keine
+Audioquellen und zeigen daher weder Senderbild noch Play-/Pause-Schaltfläche.
+
 Bis die Encoder verfügbar sind, bildet die Weboberfläche dieselben logischen
 Eingaben zusätzlich auf eine PC-Tastatur ab:
 
@@ -665,6 +674,49 @@ Große Audio- und Videodateien bleiben im Dateisystem. Die Datenbank enthält
 Pfad, Quelle, Zeit, Dauer, Codec, Größe und Prüfsumme. Keine unnötigen großen
 BLOBs in SQLite.
 
+### Intelligente Radioaufzeichnung und Musikbibliothek
+
+Die Radioaufnahme arbeitet mit einem begrenzten kontinuierlichen Ringspeicher.
+Ein PTT-Druck im aktiven Radiodienst bedeutet ausdrücklich „dieses Lied
+behalten“ und übernimmt auch den bereits im Ringspeicher vorhandenen
+Liedanfang. Diese Radiobelegung ist keine Sprachübertragung. Zusätzlich kann
+der Benutzer einen Daueraufnahmemodus aktivieren: Der Stream wird fortlaufend
+zwischengespeichert, in einzelne Lieder zerlegt und erst nach erfolgreicher
+Verarbeitung aus dem Rohpuffer entfernt.
+
+Titelgrenzen, Interpret und Titel werden zuerst aus vorhandenen ICY-/Stream-
+Metadaten abgeleitet. Senderansagen, Jingles oder kurze Einblendungen innerhalb
+einer Aufnahme sind akzeptabel. Fehlende oder widersprüchliche Metadaten dürfen
+nicht durch erfundene Angaben ersetzt werden; solche Stücke landen in einem
+sichtbaren Prüfbereich. Eine spätere optionale Musikerkennung darf nur über
+einen ausdrücklich konfigurierten Adapter erfolgen.
+
+Dauerhaft gespeicherte Musik wird ausschließlich als `Interpret – Lied` nach
+Interpret sortiert. Album und Radiosender gehören weder in den sichtbaren
+Namen noch in den Dateinamen. Dateisystemnamen werden gegen Pfadtraversierung
+und unzulässige Zeichen normalisiert. Dubletten werden vor dem dauerhaften
+Speichern anhand normalisierter Metadaten und, soweit lokal verfügbar, eines
+Audio-Fingerabdrucks beziehungsweise eines stabilen Inhaltsmerkmals erkannt.
+Ein bereits vorhandenes Lied wird nicht erneut in die Bibliothek übernommen.
+
+Der lokale Musikplayer ist bewusst sehr einfach und eigenständig bedienbar,
+ohne eine fremde Produktoberfläche nachzubauen. Er bietet mindestens:
+
+- Abspielen/Pause sowie vorheriges und nächstes Lied,
+- Favorit setzen und wieder entfernen,
+- `Mein Soundmix`: ausschließlich Favoriten, zufällige Reihenfolge und
+  Endlosschleife,
+- `Alle Aufnahmen`: normale Reihenfolge, Wiederholen und Shuffle,
+- Löschen am Gerät und im Browser mit eindeutiger Bestätigung,
+- Coveranzeige, wenn ein anhand von Interpret und Titel verifiziertes Bild
+  sicher lokal zwischengespeichert werden kann; andernfalls ein neutrales
+  lokales Ersatzbild.
+
+Cover sind Komfortmetadaten und dürfen Aufnahme, Sortierung oder Wiedergabe nie
+blockieren. Entfernte Cover werden wie andere fremde Bilder größenbegrenzt,
+dekodiert und lokal neu erzeugt; externe Bild-URLs erscheinen nicht im
+öffentlichen Status.
+
 Die Datenbank wird ausschließlich über die Weboberfläche editiert:
 
 - Tabellenansicht ähnlich phpMyAdmin,
@@ -719,10 +771,10 @@ Im Dienst-Tab lassen sich alle Dienste aktivieren, deaktivieren und in ihrer
 Priorität nach oben oder unten verschieben. Die Reihenfolge ist damit keine
 fest verdrahtete Browserdarstellung.
 
-Im Radio-Tab darf die Überschrift `Sender & Wiedergabe` nicht den verfügbaren
-Inhaltsraum dominieren. Ihre Schriftgröße beträgt ungefähr 50 Prozent der
-bisherigen globalen großen `h1`-Darstellung; diese gezielte Korrektur verändert
-keine anderen Seiten-, Wetter- oder Systemüberschriften.
+Die Überschriften aller gleichrangigen Web-Tabs dürfen den verfügbaren
+Inhaltsraum nicht dominieren. Radio, Wetter, Medien, Gerät, System und Dienste
+verwenden deshalb dieselbe kompakte Titelklasse; die frühere isolierte
+Verkleinerung nur von `Sender & Wiedergabe` ist aufgehoben.
 
 Die persönliche Radiosenderbibliothek wird im Radio-Tab genau einmal als
 platzsparende Liste dargestellt. Diese eine Liste ist gleichzeitig Schnellwahl
@@ -751,6 +803,11 @@ eigene Sender erhalten ausschließlich den bestehenden Initialen-Platzhalter.
 Die Liveansicht trägt nur die knappe Bereichsmarke `LIVE DISPLAY`; eine
 zusätzliche Überschrift `Geräteansicht` beziehungsweise deren Übersetzung wird
 nicht angezeigt.
+
+Im Wetterbild liegt die Quellenangabe nicht über den Bildpixeln. `DWD` beim
+Radar beziehungsweise `DWD / EUMETSAT` beim Satellitenkanal steht kompakt
+rechts oberhalb der Bildfläche, sodass keine meteorologische Information
+verdeckt wird.
 
 Die Browseroberfläche besitzt eine direkt sichtbare Sprachumschaltung für die
 fünf kuratierten Startsprachen English, Deutsch, Polski, Français und Español.
@@ -997,6 +1054,44 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-31 – Intelligente Radioaufnahme und einfacher Musikplayer
+
+- Robert verlangt einen kontinuierlichen, begrenzten Radio-Ringspeicher. PTT
+  bedeutet im Radiodienst „dieses Lied behalten“; auch ein bereits gespielter
+  Liedanfang wird aus dem Vorpuffer übernommen. Daneben gibt es einen
+  Daueraufnahmemodus, der den gesamten Stream zunächst aufnimmt und daraus
+  einzelne Lieder extrahiert.
+- ICY-/Stream-Metadaten liefern bevorzugt Titelgrenzen, Interpret und Titel.
+  Senderansagen und Jingles dürfen Bestandteil der Datei bleiben. Unklare
+  Stücke werden nicht erfunden benannt, sondern zur Prüfung abgelegt.
+- Dauerhafte Namen lauten ausschließlich `Interpret – Lied`; Album und
+  Radiosender werden weder angezeigt noch in Dateinamen übernommen. Dubletten
+  werden über normalisierte Metadaten und lokale Audio-/Inhaltsmerkmale
+  unterdrückt.
+- Der Musikplayer erhält Favoriten, `Mein Soundmix` als Favoriten-Shuffle im
+  Endlosloop, Shuffle für alle Aufnahmen, Löschen mit Bestätigung sowie sicher
+  lokal zwischengespeicherte Cover mit neutralem Fallback.
+- Vier weitere kuratierte Radios werden nach Quellenprüfung ergänzt: 107.7,
+  AFN The Eagle, Rock Antenne und Rock FM.
+- Alle gleichrangigen Browser-Tabs verwenden denselben kompakten Titel. Die
+  DWD-/EUMETSAT-Quellenzeile steht rechts oberhalb statt über dem Wetterbild.
+- Die Startlautstärke beträgt 30 Prozent. System- und Einstellungsansichten
+  zeigen keine Mediengrafik und keinen Play-Knopf. Die letzte sinnvolle
+  Dienstansicht darf wiederkehren, `SYSTEM` ist aber kein Medien-Fallback.
+- Der Menübaum ist ausschließlich eine interne Debug-/Entwicklerübersicht für
+  Robert und die Implementierung. Er darf weder als Produktseite noch als
+  sichtbarer Menüpunkt in Display oder Weboberfläche erscheinen. Navigation,
+  Unterseiten und Eingabeaktionen werden dennoch versioniert dokumentiert und
+  gegen die Implementierung getestet.
+- `VOL SQL CH SRV` und deren Werte sowie WLAN-AP-Name und IP-Adresse werden
+  gegenüber 0.10.24 mit Faktor 1,2 gezeichnet, ohne die zentrierte Uhr zu
+  verschieben.
+- Die Radioansicht verwendet das Senderbild über die verfügbare Inhaltsbreite
+  und beschneidet es unten kontrolliert. Unter dem Sendernamen steht, soweit
+  per Stream-Metadaten verfügbar, ausschließlich `Interpret – Lied`.
+- Der Play/Pause-Knopf ist höchstens so hoch wie Sendername und Liedzeile
+  zusammen und darf weder Bild noch Metadaten verdrängen.
 
 ### 2026-10-31 – Reale Displayhelligkeit, kompakter Kopf und präziser Status
 
@@ -1259,7 +1354,7 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   läuft noch kein Stream, startet ein kurzer rechter Klick beziehungsweise
   Enter immer den ersten Eintrag der aktuellen Senderliste. Bei laufendem oder
   pausiertem Stream bleibt dieselbe Taste echtes Play/Pause.
-- Die sechs kuratierten Standardsender werden einmalig in die dauerhafte
+- Die zehn kuratierten Standardsender werden einmalig in die dauerhafte
   SQLite-Senderbibliothek übernommen. Ab dann dürfen sie wie eigene Sender
   umsortiert und gelöscht werden; neue Sender werden über die Weboberfläche
   angelegt. Ein gelöschter Standardsender darf weder beim Neustart noch nach
@@ -1487,8 +1582,9 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   eingebettet werden. Zulässig sind begrenzt geladene, dekodierte und lokal neu
   erzeugte Bilder mit dokumentierter Quelle oder sichere lokale Ersatzkacheln.
   Ausfall eines Bildes darf Wiedergabe und Senderauswahl nicht blockieren.
-- Umgesetzt sind sechs Radios (SWR3, sunshine live, Deutschlandfunk, RMF FM,
-  Radio ZET und BBC World Service) sowie vier Nachrichtenfeeds (tagesschau,
+- Umgesetzt sind zehn Radios (SWR3, sunshine live, Deutschlandfunk, RMF FM,
+  Radio ZET, BBC World Service, DIE NEUE 107.7, AFN The Eagle, ROCK ANTENNE
+  und ROCK FM) sowie vier Nachrichtenfeeds (tagesschau,
   Deutschlandfunk Nachrichten, RMF24 und BBC News World). Die Auswahl kann
   direkt abgespielt beziehungsweise geladen und ein Radiosender idempotent in
   die Favoriten übernommen werden.

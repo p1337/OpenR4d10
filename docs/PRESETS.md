@@ -23,6 +23,10 @@ the actual player/parser, and committed together with this document.
 | RMF FM | `https://rs9-krk2.rmfstream.pl/rmf_fm` | [RMF FM radio page](https://www.rmf.fm/radio/) and RMF-owned stream host |
 | Radio ZET | `https://zt01.cdn.eurozet.pl/zet-old.mp3` | [Official Radio ZET player](https://player.radiozet.pl/) and Eurozet-owned delivery host |
 | BBC World Service | `https://stream.live.vc.bbcmedia.co.uk/bbc_world_service` | [BBC Sounds: World Service](https://www.bbc.co.uk/sounds/play/live:bbc_world_service) |
+| DIE NEUE 107.7 | `https://addrad.io/4454xcp` | [Offizielle Livestream-Seite](https://dieneue1077.de/radio/bester-rock-und-pop); die Adresse wird vom offiziellen Stream-Service des Senders geliefert |
+| AFN The Eagle (Kaiserslautern) | `https://playerservices.streamtheworld.com/api/livestream-redirect/AFNE_KTN.mp3` | [AFN Go Kaiserslautern](https://afngo.net/afneurope/Kaiserslautern/radio/Kaiserslautern); AFN richtet das Angebot an seine berechtigte Zielgruppe außerhalb der USA |
+| ROCK ANTENNE | `https://stream.rockantenne.de/rockantenne/stream/mp3` | [Offizielle Streamlinks](https://www.rockantenne.de/rockhoeren/empfang/streamlinks) |
+| ROCK FM | `https://stream.regenbogen2.de/dab/mp3-128/private` | [Offizielle Empfangsseite](https://www.rockfm.de/service/empfang) |
 
 The artwork sources are also explicit catalog data. The browser never receives
 their remote URLs. The service downloads at most 2 MiB, rejects non-images and

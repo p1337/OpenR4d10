@@ -86,6 +86,7 @@ class DeviceUiTests(unittest.TestCase):
         image = render_device_ui(state, artwork)
         self.assertEqual(image.getpixel((50, 180)), (220, 20, 40))
         self.assertEqual(image.getpixel((140, 240)), (220, 20, 40))
+        self.assertEqual(image.getpixel((220, 240)), (220, 20, 40))
 
     def test_compact_header_and_localized_labels(self) -> None:
         self.assertEqual(_display_text("en")["controls"], ("VOL", "SQL", "CH", "SRV"))
@@ -111,6 +112,23 @@ class DeviceUiTests(unittest.TestCase):
             [call.kwargs["clockwise"] for call in vertical_label.call_args_list],
             [False, False],
         )
+
+    def test_header_controls_and_network_text_use_requested_larger_fonts(self) -> None:
+        sizes = {}
+        original_text = ImageDraw.ImageDraw.text
+
+        def capture_text(draw, xy, text, *args, **kwargs):
+            font = kwargs.get("font")
+            sizes.setdefault(str(text), getattr(font, "size", None))
+            return original_text(draw, xy, text, *args, **kwargs)
+
+        state = DeviceUiState(wifi_label="p1337", ip_address="192.168.1.64")
+        with patch.object(ImageDraw.ImageDraw, "text", new=capture_text):
+            render_device_ui(state)
+        self.assertEqual(sizes["VOL"], 12)
+        self.assertEqual(sizes["30%"], 14)
+        self.assertEqual(sizes["p1337"], 8)
+        self.assertEqual(sizes["192.168.1.64"], 8)
 
     def test_date_and_redundant_player_text_are_not_rendered(self) -> None:
         first = DeviceUiState(
@@ -215,16 +233,16 @@ class DeviceUiTests(unittest.TestCase):
         self.assertEqual(len(MAIN_MENU_ITEMS), 10)
 
     def test_player_accent_rail_glows_but_menu_rail_stays_crisp(self) -> None:
-        player = render_device_ui(DeviceUiState())
+        player = render_device_ui(DeviceUiState(service_index=1))
         menu = render_device_ui(DeviceUiState(menu_open=True, menu_kind="main_menu"))
         self.assertNotEqual(player.getpixel((7, 180)), (6, 12, 15))
         self.assertEqual(menu.getpixel((7, 180)), (6, 12, 15))
 
     def test_play_control_is_below_battery_and_footer_is_empty(self) -> None:
-        state = DeviceUiState(playing=True)
+        state = DeviceUiState(playing=True, service_index=1)
         image = render_device_ui(state)
-        self.assertEqual(image.getpixel((206, 76)), state.accent)
-        self.assertEqual(image.getpixel((220, 247)), (6, 12, 15))
+        self.assertEqual(image.getpixel((207, 76)), state.accent)
+        self.assertEqual(image.getpixel((220, 270)), (6, 12, 15))
 
     def test_clock_is_centered_on_the_full_display_width(self) -> None:
         positions: dict[str, tuple[float, float]] = {}
@@ -428,8 +446,8 @@ class WhisplayDisplayTests(unittest.TestCase):
         display = WhisplayDisplay(panel=panel)  # type: ignore[arg-type]
         display.render(Frame(screen="dashboard", title="OpenR4d10"))
         state = display.apply_input(InputEvent(Control.LEFT_OUTER, steps=4))
-        self.assertEqual(state["volume"], 76)
-        self.assertEqual(display.snapshot()["volume"], 76)
+        self.assertEqual(state["volume"], 70)
+        self.assertEqual(display.snapshot()["volume"], 70)
         self.assertEqual(len(panel.frames), 2)
         display.close()
 

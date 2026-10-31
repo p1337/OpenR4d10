@@ -51,6 +51,7 @@ class OpenR4d10App:
         self.stop_event = threading.Event()
         self._device_input_lock = threading.Lock()
         self._status_lock = threading.Lock()
+        self._view_initialized = False
         self._latest_frame = Frame(
             screen="startup", title=config.title, body="Dienst wird gestartet"
         ).as_dict()
@@ -246,7 +247,16 @@ class OpenR4d10App:
                 action = None
             if action is not None:
                 media_result = self.services.control({"action": action})
+        elif (
+            self.services is not None
+            and event.control == Control.PTT
+            and event.active is True
+            and not menu_open
+            and selected_service == "RADIO"
+        ):
+            media_result = self.services.control({"action": "radio_keep_current"})
         device_state = handler(event)
+        self._view_initialized = True
         if media_result is not None:
             self.render_once()
             snapshot = getattr(self.display, "snapshot", None)
@@ -268,6 +278,8 @@ class OpenR4d10App:
                 response["selected_preset"] = media_result.get("selected_preset")
             if "channel_id" in media_result:
                 response["weather_channel_id"] = media_result["channel_id"]
+            if "radio_buffer" in media_result:
+                response["radio_buffer"] = media_result["radio_buffer"]
         return response
 
     def device_screen(self) -> bytes | None:
@@ -304,10 +316,13 @@ class OpenR4d10App:
             current_ui = snapshot() if callable(snapshot) else {}
             view_service = (
                 str(current_ui.get("service"))
-                if isinstance(current_ui, dict) and current_ui.get("service")
+                if self._view_initialized
+                and isinstance(current_ui, dict)
+                and current_ui.get("service")
                 else None
             )
             receiver.update(self.services.receiver_overlay(view_service))
+            self._view_initialized = True
         power, power_error = self._safe_read(self.power, "power")
         errors = [error for error in (receiver_error, power_error) if error]
         self._publish(dashboard_frame(self.config.title, receiver, power, errors))

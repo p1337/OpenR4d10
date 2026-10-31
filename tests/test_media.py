@@ -63,6 +63,26 @@ class ProcessBoundaryTests(unittest.TestCase):
         self.assertIn("--no-config", command)
         self.assertIn("--input-ipc-client=fd://17", command)
         self.assertNotIn("shell", " ".join(command))
+        self.assertIn("--volume=30", command)
+
+    def test_playlist_supports_shuffle_navigation_and_favorite_loop(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            first = root / "one.mp3"
+            second = root / "two.mp3"
+            first.write_bytes(b"one")
+            second.write_bytes(b"two")
+            commands = []
+            engine = MpvEngine(Path("/usr/bin/mpv"), media_roots=(root,))
+            engine._command = lambda command: commands.append(command) or {}
+            state = engine.load_playlist([str(first), str(second)], shuffle=True, loop=True)
+            engine.next()
+            engine.previous()
+            self.assertEqual(state["state"], "playing")
+            self.assertIn(["playlist-shuffle"], commands)
+            self.assertIn(["set_property", "loop-playlist", "inf"], commands)
+            self.assertIn(["playlist-next", "force"], commands)
+            self.assertIn(["playlist-prev", "force"], commands)
 
     def test_recorder_builds_argument_array_and_redacts_source_status(self) -> None:
         calls = []

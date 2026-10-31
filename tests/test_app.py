@@ -576,6 +576,58 @@ class AppTests(unittest.TestCase):
         self.assertEqual(services.requests, [{"action": "radio_toggle"}])
         self.assertEqual(result["selected_preset"]["name"], "SWR3")
 
+    def test_radio_ptt_requests_the_buffered_current_song_once_on_press(self) -> None:
+        class InputDisplay:
+            def render(self, _frame) -> None:
+                pass
+
+            def snapshot(self):
+                return {"service": "RADIO", "playing": True, "menu_open": False}
+
+            def apply_input(self, _event):
+                return self.snapshot()
+
+        class Services:
+            active_service = "webradio"
+
+            def __init__(self):
+                self.requests = []
+
+            def control(self, request):
+                self.requests.append(request)
+                return {"radio_buffer": {"keep_current": True}}
+
+            def receiver_overlay(self, _view_service=None):
+                return {"service": "RADIO", "station": "SWR3", "playing": True}
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=InputDisplay(),
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,
+            )
+            pressed = app.control(
+                {"action": "device_input", "control": "ptt", "active": True}
+            )
+            app.control(
+                {"action": "device_input", "control": "ptt", "active": False}
+            )
+
+        self.assertEqual(services.requests, [{"action": "radio_keep_current"}])
+        self.assertTrue(pressed["radio_buffer"]["keep_current"])
+
     def test_application_unit_provides_display_handoff_runtime(self) -> None:
         unit = (
             Path(__file__).resolve().parents[1]

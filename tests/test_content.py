@@ -16,6 +16,7 @@ from openr4d10.content import (
     DwdSatelliteFrames,
     FeedReader,
     PresetArtwork,
+    TrackArtwork,
     validate_content_url,
 )
 
@@ -38,6 +39,37 @@ class FakeResponse:
 
 
 class ContentTests(unittest.TestCase):
+    def test_track_artwork_uses_high_score_release_and_reencodes_cover(self) -> None:
+        raw = BytesIO()
+        Image.new("RGB", (600, 600), (80, 20, 120)).save(raw, format="PNG")
+        calls = []
+
+        class Fetcher:
+            def fetch(self, url, **_kwargs):
+                calls.append(url)
+                if "musicbrainz.org" in url:
+                    return (
+                        b'{"recordings":[{"score":98,"releases":[{"id":"12345678-1234-1234-1234-123456789abc"}]}]}',
+                        "application/json",
+                    )
+                if "coverartarchive.org/release" in url:
+                    return (
+                        b'{"images":[{"front":true,"approved":true,"thumbnails":{"250":"https://images.example/cover.png"}}]}',
+                        "application/json",
+                    )
+                return raw.getvalue(), "image/png"
+
+        with tempfile.TemporaryDirectory() as directory:
+            cache = Path(directory).resolve()
+            artwork = TrackArtwork(cache, Fetcher())
+            artwork._last_request = -100
+            result = artwork.ensure(7, "Artist", "Song")
+            self.assertEqual(result.name, "track-7.jpg")
+            with Image.open(result) as image:
+                self.assertEqual(image.format, "JPEG")
+                self.assertLessEqual(image.width, 512)
+            self.assertEqual(len(calls), 3)
+
     def test_feed_parser_supports_rss_and_removes_markup(self) -> None:
         payload = b"""<?xml version='1.0'?>
         <rss><channel><title>Open Feed</title><item>

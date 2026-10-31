@@ -37,6 +37,7 @@ DISPLAY_TEXT = {
         "menu": "MENU",
         "play": "PLAY",
         "pause": "PAUSE",
+        "info": "INFO",
         "weather_service": "WX",
         "main_menu": "MAIN MENU",
         "service_settings": "SERVICE SETTINGS",
@@ -61,6 +62,7 @@ DISPLAY_TEXT = {
         "menu": "MENÜ",
         "play": "PLAY",
         "pause": "PAUSE",
+        "info": "INFO",
         "weather_service": "WET",
         "main_menu": "HAUPTMENÜ",
         "service_settings": "DIENST-EINSTELLUNGEN",
@@ -85,6 +87,7 @@ DISPLAY_TEXT = {
         "menu": "MENU",
         "play": "GRAJ",
         "pause": "PAUZA",
+        "info": "INFO",
         "weather_service": "POG",
         "main_menu": "MENU GŁÓWNE",
         "service_settings": "USTAWIENIA USŁUGI",
@@ -109,6 +112,7 @@ DISPLAY_TEXT = {
         "menu": "MENU",
         "play": "LIRE",
         "pause": "PAUSE",
+        "info": "INFO",
         "weather_service": "MÉT",
         "main_menu": "MENU PRINCIPAL",
         "service_settings": "RÉGLAGES SERVICE",
@@ -133,6 +137,7 @@ DISPLAY_TEXT = {
         "menu": "MENÚ",
         "play": "PLAY",
         "pause": "PAUSA",
+        "info": "INFO",
         "weather_service": "MET",
         "main_menu": "MENÚ PRINCIPAL",
         "service_settings": "AJUSTES SERVICIO",
@@ -157,7 +162,7 @@ DISPLAY_TEXT = {
 
 @dataclass(slots=True)
 class DeviceUiState:
-    volume: int = 36
+    volume: int = 30
     squelch: int = 5
     channel: int = 1
     service_index: int = 0
@@ -449,10 +454,11 @@ def _control_value(
     value: str,
     accent: tuple[int, int, int],
 ) -> None:
-    small = _font(10, bold=True)
-    large = _font(12, bold=True)
+    # 0.10.25: the physical 240 px panel needs 1.2x larger header controls.
+    small = _font(12, bold=True)
+    large = _font(14, bold=True)
     draw.text((x, y), label, font=small, fill=(128, 140, 145))
-    draw.text((x + 36, y - 2), value, font=large, fill=accent)
+    draw.text((x + 34, y - 2), value, font=large, fill=accent)
 
 
 def _draw_menu_heading(
@@ -625,9 +631,12 @@ def render_device_ui(
     controls = text["controls"]
     assert isinstance(controls, tuple)
     left_action = str(text["menu"])
-    right_action = "OK" if state.menu_open else str(
-        text["pause"] if state.playing else text["play"]
-    )
+    if state.menu_open:
+        right_action = "OK"
+    elif state.service in {"RADIO", "DMR", "PLAYER"}:
+        right_action = str(text["pause"] if state.playing else text["play"])
+    else:
+        right_action = str(text["info"])
 
     header_height = 45
     draw.rectangle((0, 0, WIDTH - 1, 44), fill=(2, 5, 7), outline=(35, 47, 51))
@@ -643,7 +652,8 @@ def render_device_ui(
 
     draw.rectangle((0, 45, WIDTH - 1, 70), fill=(12, 20, 23))
     _wifi_icon(draw, 5, 52, accent)
-    status_font = _font(7)
+    # SSID and IP use the same requested 1.2x scale while keeping the clock fixed.
+    status_font = _font(8)
     draw.text((22, 48), _fit_text(draw, state.wifi_label, status_font, 67), font=status_font, fill=(213, 222, 224))
     draw.text((22, 59), _fit_text(draw, state.ip_address, status_font, 73), font=status_font, fill=(112, 130, 134))
     clock = state.timestamp.strftime("%H:%M")
@@ -673,26 +683,58 @@ def render_device_ui(
             _draw_main_menu_items(draw, state, text)
         return image.convert("RGB")
 
+    if state.service in {"SYSTEM", "REC"}:
+        draw.rectangle((0, content_top, 3, HEIGHT - 1), fill=accent)
+        heading_font = _font(19, bold=True)
+        body_font = _font(13, bold=True)
+        small_font = _font(10)
+        draw.text(
+            (14, 80),
+            _fit_text(draw, state.source, heading_font, 212),
+            font=heading_font,
+            fill=(245, 248, 249),
+        )
+        draw.line((14, 111, 226, 111), fill=(52, 67, 71), width=1)
+        draw.multiline_text(
+            (14, 127),
+            _fit_text(draw, state.title, body_font, 208),
+            font=body_font,
+            fill=accent,
+            spacing=4,
+        )
+        draw.multiline_text(
+            (14, 171),
+            _fit_text(draw, state.subtitle, small_font, 208),
+            font=small_font,
+            fill=(178, 187, 189),
+            spacing=4,
+        )
+        return image.convert("RGB")
+
     _draw_player_accent_rail(image, content_top, accent)
     draw = ImageDraw.Draw(image)
 
     station_font = _font(18, bold=True)
     station = _fit_text(draw, state.source, station_font, 164)
-    draw.text((14, 77), station, font=station_font, fill=(245, 248, 249))
+    draw.text((14, 75), station, font=station_font, fill=(245, 248, 249))
 
     if state.service == "WEATHER":
+        credit_font = _font(8, bold=True)
+        credit = _fit_text(draw, state.title, credit_font, 128)
+        credit_width = draw.textbbox((0, 0), credit, font=credit_font)[2]
+        draw.text((226 - credit_width, 96), credit, font=credit_font, fill=accent)
         if artwork is not None:
             weather = ImageOps.contain(
                 artwork.convert("RGB"),
-                (212, 162),
+                (212, 154),
                 method=Image.Resampling.LANCZOS,
             )
             weather_x = 14 + (212 - weather.width) // 2
-            weather_y = 104 + (162 - weather.height) // 2
+            weather_y = 112 + (154 - weather.height) // 2
             image.paste(weather, (weather_x, weather_y))
         else:
             draw.rounded_rectangle(
-                (14, 104, 225, 266),
+                (14, 112, 225, 266),
                 radius=10,
                 fill=(13, 31, 35),
                 outline=accent,
@@ -707,31 +749,30 @@ def render_device_ui(
                 font=loading_font,
                 fill=(196, 207, 209),
             )
-        draw.rounded_rectangle((13, 103, 226, 267), radius=10, outline=(75, 92, 96), width=1)
-        credit_font = _font(8, bold=True)
-        credit = _fit_text(draw, state.title, credit_font, 122)
-        draw.rounded_rectangle((18, 241, 148, 262), radius=5, fill=(2, 5, 7, 220))
-        draw.text((23, 247), credit, font=credit_font, fill=accent)
+        draw.rounded_rectangle((13, 111, 226, 267), radius=10, outline=(75, 92, 96), width=1)
         return image.convert("RGB")
 
-    tile_size = 151
-    tile_xy = (14, 111)
+    # Radio/player artwork spans the content width. ImageOps.fit deliberately
+    # crops the lower edge instead of squeezing a square logo into a side tile.
+    tile_size = (212, 148)
+    tile_xy = (14, 114)
     if artwork is not None:
         tile = ImageOps.fit(
             artwork.convert("RGB"),
-            (tile_size, tile_size),
+            tile_size,
             method=Image.Resampling.LANCZOS,
+            centering=(0.5, 0.35),
         )
-        mask = Image.new("L", (tile_size, tile_size), 0)
+        mask = Image.new("L", tile_size, 0)
         ImageDraw.Draw(mask).rounded_rectangle(
-            (0, 0, tile_size - 1, tile_size - 1),
+            (0, 0, tile_size[0] - 1, tile_size[1] - 1),
             radius=12,
             fill=255,
         )
         image.paste(tile, tile_xy, mask)
     else:
         draw.rounded_rectangle(
-            (14, 111, 164, 261),
+            (14, 114, 225, 261),
             radius=12,
             fill=(13, 31, 35),
             outline=accent,
@@ -741,32 +782,32 @@ def render_device_ui(
         initials_font = _font(34, bold=True)
         bounds = draw.textbbox((0, 0), initials, font=initials_font)
         draw.text(
-            (89 - (bounds[2] - bounds[0]) / 2, 186 - (bounds[3] - bounds[1]) / 2),
+            (120 - (bounds[2] - bounds[0]) / 2, 188 - (bounds[3] - bounds[1]) / 2),
             initials,
             font=initials_font,
             fill=accent,
         )
-    draw.rounded_rectangle((13, 110, 165, 263), radius=12, outline=(75, 92, 96), width=1)
+    draw.rounded_rectangle((13, 113, 226, 263), radius=12, outline=(75, 92, 96), width=1)
 
     title = state.title if state.title.casefold() != state.source.casefold() else state.subtitle
-    detail_font = _font(10, bold=True)
-    draw.multiline_text(
-        (173, 127),
-        _fit_text(draw, title, detail_font, 54),
+    detail_font = _font(9, bold=True)
+    draw.text(
+        (14, 98),
+        _fit_text(draw, title, detail_font, 164),
         font=detail_font,
         fill=(196, 207, 209),
-        spacing=3,
     )
 
     if state.ptt_active:
         _draw_back_or_ptt(draw, accent, True)
     else:
-        draw.ellipse((184, 76, 228, 120), fill=(12, 23, 27), outline=accent, width=2)
+        # Exactly one compact metadata block high (station + track), never taller.
+        draw.ellipse((190, 76, 224, 110), fill=(12, 23, 27), outline=accent, width=2)
         if state.playing:
-            draw.rectangle((200, 89, 204, 107), fill=accent)
-            draw.rectangle((209, 89, 213, 107), fill=accent)
+            draw.rectangle((201, 86, 204, 100), fill=accent)
+            draw.rectangle((210, 86, 213, 100), fill=accent)
         else:
-            draw.polygon(((200, 87), (200, 109), (216, 98)), fill=accent)
+            draw.polygon(((201, 84), (201, 102), (215, 93)), fill=accent)
     if state.recording:
         draw.ellipse((220, 75, 228, 83), fill=(255, 78, 78))
     return image.convert("RGB")

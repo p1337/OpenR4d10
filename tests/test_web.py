@@ -103,9 +103,10 @@ class WebTests(unittest.TestCase):
         self.assertIn('id="weather-image"', html)
         self.assertIn('id="weather-channel-list"', html)
         self.assertIn(
-            "#radio-presets-title { font-size: clamp(1.175rem, 3vw, 2.5rem);",
+            ".tab-title, #hero-title { font-size: clamp(1.175rem, 3vw, 2.5rem);",
             stylesheet,
         )
+        self.assertGreaterEqual(html.count('class="tab-title"'), 5)
         self.assertIn('"weather_channel_move"', script)
         self.assertIn('"service_move"', script)
         self.assertIn('id="weather-provider"', html)

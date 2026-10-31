@@ -51,7 +51,7 @@
         <section class="tab-panel" role="tabpanel" data-tab-panel="radio">
           <section class="panel services-panel" aria-labelledby="radio-presets-title">
             <div class="panel-heading">
-              <div><p class="eyebrow" data-i18n="WEB RADIO">WEB RADIO</p><h1 id="radio-presets-title" data-i18n="Stations &amp; playback">Stations &amp; playback</h1></div>
+              <div><p class="eyebrow" data-i18n="WEB RADIO">WEB RADIO</p><h1 class="tab-title" id="radio-presets-title" data-i18n="Stations &amp; playback">Stations &amp; playback</h1></div>
               <span class="version" data-i18n="Live">Live</span>
             </div>
             <form class="media-control" id="media-control">
@@ -62,8 +62,10 @@
               </div>
               <div class="media-actions" aria-label="Playback controls" data-i18n-aria-label="Playback controls">
                 <button type="button" data-action="pause" data-i18n="Play / Pause">Play / Pause</button><button type="button" data-action="stop" data-i18n="Stop">Stop</button>
-                <button type="button" data-action="record_start" data-i18n="Start recording">Start recording</button><button type="button" data-action="record_stop" data-i18n="Stop recording">Stop recording</button>
+                <button type="button" data-action="radio_keep_current" data-i18n="Keep this song">Keep this song</button>
+                <label class="capture-switch"><input id="radio-continuous" type="checkbox"><span data-i18n="Record and split continuously">Record and split continuously</span></label>
               </div>
+              <p class="radio-buffer-status" id="radio-buffer-status" data-i18n="Waiting for a radio stream.">Waiting for a radio stream.</p>
               <output id="control-result" aria-live="polite" data-i18n="No source active.">No source active.</output>
             </form>
             <form class="content-control station-control" id="station-control">
@@ -77,7 +79,7 @@
 
         <section class="tab-panel" role="tabpanel" data-tab-panel="weather" hidden>
           <section class="panel weather-panel" aria-labelledby="weather-title">
-            <div class="panel-heading"><div><p class="eyebrow" data-i18n="DWD WEATHER">DWD WEATHER</p><h1 id="weather-title" data-i18n="Germany &amp; Europe">Germany &amp; Europe</h1></div><span class="version" id="weather-provider">DWD</span></div>
+            <div class="panel-heading"><div><p class="eyebrow" data-i18n="DWD WEATHER">DWD WEATHER</p><h1 class="tab-title" id="weather-title" data-i18n="Germany &amp; Europe">Germany &amp; Europe</h1></div><span class="version" id="weather-provider">DWD</span></div>
             <div class="weather-layout">
               <figure class="weather-viewer">
                 <img id="weather-image" alt="Current DWD weather image" data-i18n-alt="Current DWD weather image" hidden>
@@ -108,10 +110,17 @@
 
         <section class="tab-panel" role="tabpanel" data-tab-panel="media" hidden>
           <section class="panel">
-            <div class="panel-heading"><div><p class="eyebrow" data-i18n="MEDIA &amp; NEWS">MEDIA &amp; NEWS</p><h1 data-i18n="Library, feeds and camera">Library, feeds and camera</h1></div></div>
+            <div class="panel-heading"><div><p class="eyebrow" data-i18n="MEDIA &amp; NEWS">MEDIA &amp; NEWS</p><h1 class="tab-title" data-i18n="Library, feeds and camera">Library, feeds and camera</h1></div></div>
             <section class="content-control" aria-labelledby="media-library-title">
               <div class="library-heading"><label id="media-library-title" data-i18n="Local media library">Local media library</label><button type="button" id="media-scan" data-i18n="Rescan">Rescan</button></div>
-              <p class="services-note" data-i18n="Files from the device's protected media folder.">Files from the device's protected media folder.</p><ul id="media-list" class="library-list"></ul>
+              <div class="music-toolbar" aria-label="Music player" data-i18n-aria-label="Music player">
+                <button type="button" data-music-action="media_previous" aria-label="Previous" data-i18n-aria-label="Previous">◀</button>
+                <button type="button" data-music-action="pause" data-i18n="Play / Pause">Play / Pause</button>
+                <button type="button" data-music-action="media_next" aria-label="Next" data-i18n-aria-label="Next">▶</button>
+                <button type="button" data-music-action="media_shuffle" data-i18n="Shuffle all recordings">Shuffle all recordings</button>
+                <button type="button" class="library-play" data-music-action="media_soundmix" data-i18n="My Soundmix">My Soundmix</button>
+              </div>
+              <p class="services-note" data-i18n="Recorded songs are named Artist – Song and stored by artist.">Recorded songs are named Artist – Song and stored by artist.</p><ul id="media-list" class="library-list media-library-list"></ul>
             </section>
             <div class="content-controls">
               <form class="content-control" id="feed-control">
@@ -132,7 +141,7 @@
 
         <section class="tab-panel" role="tabpanel" data-tab-panel="device" hidden>
           <section class="panel settings-panel" aria-labelledby="settings-title">
-            <div class="panel-heading"><div><p class="eyebrow" data-i18n="SETTINGS">SETTINGS</p><h2 id="settings-title" data-i18n="Display">Display</h2></div><span class="version" data-i18n="persistent">persistent</span></div>
+            <div class="panel-heading"><div><p class="eyebrow" data-i18n="SETTINGS">SETTINGS</p><h2 class="tab-title" id="settings-title" data-i18n="Display">Display</h2></div><span class="version" data-i18n="persistent">persistent</span></div>
             <div class="display-brightness-setting">
               <label for="display-brightness"><strong data-i18n="Display brightness">Display brightness</strong><span data-i18n="Applied immediately to the Whisplay and saved permanently.">Applied immediately to the Whisplay and saved permanently.</span></label>
               <output id="display-brightness-value" for="display-brightness">100%</output><input id="display-brightness" type="range" min="0" max="100" step="5" value="100"><output id="display-brightness-status" aria-live="polite" data-i18n="Loading saved setting.">Loading saved setting.</output>
@@ -180,7 +189,7 @@
         </section>
 
         <section class="tab-panel" role="tabpanel" data-tab-panel="services" hidden>
-          <section class="panel services-panel" aria-labelledby="services-title"><div class="panel-heading"><div><p class="eyebrow" data-i18n="SERVICE MODULES">SERVICE MODULES</p><h1 id="services-title" data-i18n="Integrations and readiness">Integrations and readiness</h1></div><span class="version" id="service-count">–</span></div><p class="services-note" data-i18n="Credentials are never loaded from the repository or stored in the status database.">Credentials are never loaded from the repository or stored in the status database.</p><label class="service-search" for="service-search"><span data-i18n="Search services and all metadata">Search services and all metadata</span><input id="service-search" type="search" placeholder="Search name, status, description, adapter …" data-i18n-placeholder="Search name, status, description, adapter …" autocomplete="off"></label><ul class="service-list" id="service-list" aria-live="polite"></ul></section>
+          <section class="panel services-panel" aria-labelledby="services-title"><div class="panel-heading"><div><p class="eyebrow" data-i18n="SERVICE MODULES">SERVICE MODULES</p><h1 class="tab-title" id="services-title" data-i18n="Integrations and readiness">Integrations and readiness</h1></div><span class="version" id="service-count">–</span></div><p class="services-note" data-i18n="Credentials are never loaded from the repository or stored in the status database.">Credentials are never loaded from the repository or stored in the status database.</p><label class="service-search" for="service-search"><span data-i18n="Search services and all metadata">Search services and all metadata</span><input id="service-search" type="search" placeholder="Search name, status, description, adapter …" data-i18n-placeholder="Search name, status, description, adapter …" autocomplete="off"></label><ul class="service-list" id="service-list" aria-live="polite"></ul></section>
         </section>
       </div>
 

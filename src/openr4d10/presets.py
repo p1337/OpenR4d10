@@ -82,6 +82,34 @@ RADIO_PRESETS = (
         "https://static.files.bbci.co.uk/bbcdotcom/web/20261027-121803-88dfe2b2c8-web-3.26.0-4/apple-touch-icon.png",
         "https://www.bbc.co.uk/sounds/play/live:bbc_world_service",
     ),
+    RadioPreset(
+        "die_neue_1077", "DIE NEUE 107.7", "Deutschland", "Rock & Pop",
+        "https://addrad.io/4454xcp",
+        "https://dieneue1077.de/radio/bester-rock-und-pop",
+        "https://images.dieneue1077.de/files/2025-01/stream_icons_radio_dn1077.png?width=360&height=360",
+        "https://dieneue1077.de/radio/bester-rock-und-pop",
+    ),
+    RadioPreset(
+        "afn_eagle", "AFN The Eagle", "Deutschland / US Forces", "Music & News",
+        "https://playerservices.streamtheworld.com/api/livestream-redirect/AFNE_KTN.mp3",
+        "https://afngo.net/afneurope/Kaiserslautern/radio/Kaiserslautern",
+        "https://www.afngo.net/favicon.ico",
+        "https://afngo.net/afneurope/Kaiserslautern/radio/Kaiserslautern",
+    ),
+    RadioPreset(
+        "rock_antenne", "ROCK ANTENNE", "Deutschland", "Rock",
+        "https://stream.rockantenne.de/rockantenne/stream/mp3",
+        "https://www.rockantenne.de/",
+        "https://www.rockantenne.de/media/cache/3/version/14/ra-v1.jpg/3928d70d548bddf5.jpg",
+        "https://www.rockantenne.de/rockhoeren/empfang/streamlinks",
+    ),
+    RadioPreset(
+        "rock_fm", "ROCK FM", "Deutschland", "Rock",
+        "https://stream.regenbogen2.de/dab/mp3-128/private",
+        "https://www.rockfm.de/",
+        "https://image.atsw.de/atsw/production/2025-08/rockfm_cover_livestream.jpg?width=360&height=360",
+        "https://www.rockfm.de/service/empfang",
+    ),
 )
 
 FEED_PRESETS = (

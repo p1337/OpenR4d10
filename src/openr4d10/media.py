@@ -64,7 +64,7 @@ def public_source_label(source: str) -> str:
 class PlaybackState:
     state: str = "stopped"
     source: str | None = None
-    volume: int = 36
+    volume: int = 30
     paused: bool = False
     error: str | None = None
 
@@ -177,6 +177,48 @@ class MpvEngine:
             self.state.source = public_source_label(approved)
             self.state.paused = False
             self.state.error = None
+            return self.state.as_dict()
+
+    def load_playlist(
+        self,
+        sources: list[str],
+        *,
+        shuffle: bool = False,
+        loop: bool = False,
+    ) -> dict[str, Any]:
+        if not sources:
+            raise ValueError("playlist requires at least one media source")
+        approved = [validate_media_source(item, self.media_roots) for item in sources]
+        with self._lock:
+            try:
+                self._command(["loadfile", approved[0], "replace"])
+                for source in approved[1:]:
+                    self._command(["loadfile", source, "append"])
+                if shuffle and len(approved) > 1:
+                    self._command(["playlist-shuffle"])
+                self._command(["set_property", "loop-playlist", "inf" if loop else "no"])
+            except (OSError, json.JSONDecodeError, MediaError) as exc:
+                self.state.state = "error"
+                self.state.error = str(exc)
+                raise MediaError(str(exc)) from exc
+            self.state.state = "playing"
+            self.state.source = public_source_label(approved[0])
+            self.state.paused = False
+            self.state.error = None
+            return self.state.as_dict()
+
+    def next(self) -> dict[str, Any]:
+        with self._lock:
+            self._command(["playlist-next", "force"])
+            self.state.state = "playing"
+            self.state.paused = False
+            return self.state.as_dict()
+
+    def previous(self) -> dict[str, Any]:
+        with self._lock:
+            self._command(["playlist-prev", "force"])
+            self.state.state = "playing"
+            self.state.paused = False
             return self.state.as_dict()
 
     def toggle_pause(self) -> dict[str, Any]:

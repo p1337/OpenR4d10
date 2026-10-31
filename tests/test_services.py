@@ -199,6 +199,49 @@ class ServiceCatalogTests(unittest.TestCase):
             finally:
                 reopened.close()
 
+    def test_last_sensible_view_is_restored_without_changing_audio(self) -> None:
+        class State:
+            state = "stopped"
+            source = None
+            paused = False
+            volume = 30
+
+            def as_dict(self):
+                return {
+                    "state": self.state,
+                    "source": self.source,
+                    "paused": self.paused,
+                    "volume": self.volume,
+                }
+
+        class Player:
+            def __init__(self):
+                self.state = State()
+
+            def close(self):
+                pass
+
+        class Recorder:
+            def __init__(self):
+                self.state = State()
+
+            def close(self):
+                pass
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            catalog = ServiceCatalog(root, player=Player(), recorder=Recorder())
+            try:
+                self.assertEqual(catalog.receiver_overlay()["service"], "RADIO")
+                self.assertEqual(catalog.receiver_overlay("WEATHER")["service"], "WEATHER")
+            finally:
+                catalog.close()
+            reopened = ServiceCatalog(root, player=Player(), recorder=Recorder())
+            try:
+                self.assertEqual(reopened.receiver_overlay()["service"], "WEATHER")
+            finally:
+                reopened.close()
+
     def test_curated_presets_are_public_without_remote_content_urls(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             catalog = ServiceCatalog(Path(raw).resolve())
@@ -435,7 +478,7 @@ class ServiceCatalogTests(unittest.TestCase):
         class Player:
             def __init__(self):
                 self.state = State(
-                    state="stopped", source=None, paused=False, volume=36
+                    state="stopped", source=None, paused=False, volume=30
                 )
 
             def load(self, source):
@@ -495,7 +538,7 @@ class ServiceCatalogTests(unittest.TestCase):
         self.assertEqual(overlay["service"], "RADIO")
         self.assertEqual(overlay["station"], "https://radio.example/live")
         self.assertTrue(overlay["playing"])
-        self.assertEqual(volume["playback"]["volume"], 76)
+        self.assertEqual(volume["playback"]["volume"], 70)
         self.assertFalse(paused_overlay["playing"])
 
     def test_station_library_is_persistent_and_never_exposes_query_values(self) -> None:

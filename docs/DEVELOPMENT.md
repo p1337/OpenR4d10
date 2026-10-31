@@ -202,6 +202,13 @@ internal stream or feed URL. Normal radio UI control uses `station_play`,
 Update source definitions and their evidence together in
 [`PRESETS.md`](PRESETS.md), then test the current addresses without adding
 cookies, tokens or signed URLs.
+Radio recording regressions must cover ICY parsing, title-boundary splitting,
+PTT retention of already buffered bytes, the production memory bound,
+continuous mode, storage deduplication and explicit deletion. `fpcalc` comes
+from Debian's `libchromaprint-tools`; a missing fingerprint tool may reduce
+duplicate detection quality but must never destroy a valid buffered recording.
+Cover tests use fake MusicBrainz/Cover Art Archive responses and may not depend
+on the public network.
 The radio tab must expose the persistent station rows only once through the
 compact sortable station list. Browser regression tests reject the removed
 `radio-preset-grid` and require the retained list's primary play-button class.

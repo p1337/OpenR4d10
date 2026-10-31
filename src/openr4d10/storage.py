@@ -13,7 +13,7 @@ import threading
 from typing import Any
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 _SECRET_KEY = re.compile(
     r"(^|[._-])(password|passwd|token|secret|api[_-]?key|private[_-]?key)($|[._-])",
     re.IGNORECASE,
@@ -94,6 +94,22 @@ ALTER TABLE service_state ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE channels ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
 """
 
+MIGRATION_4 = """
+ALTER TABLE media ADD COLUMN artist TEXT;
+ALTER TABLE media ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0
+    CHECK (favorite IN (0, 1));
+ALTER TABLE media ADD COLUMN normalized_key TEXT;
+ALTER TABLE media ADD COLUMN fingerprint TEXT;
+ALTER TABLE media ADD COLUMN cover_file TEXT;
+ALTER TABLE media ADD COLUMN review_required INTEGER NOT NULL DEFAULT 0
+    CHECK (review_required IN (0, 1));
+ALTER TABLE media ADD COLUMN source_kind TEXT NOT NULL DEFAULT 'local';
+CREATE UNIQUE INDEX IF NOT EXISTS media_normalized_track_unique
+    ON media(normalized_key) WHERE normalized_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS media_fingerprint_unique
+    ON media(fingerprint) WHERE fingerprint IS NOT NULL;
+"""
+
 
 def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
@@ -151,6 +167,15 @@ class StateStore:
                     (3, _now()),
                 )
                 self.connection.execute("PRAGMA user_version = 3")
+            current = 3
+        if current < 4:
+            with self.transaction():
+                self.connection.executescript(MIGRATION_4)
+                self.connection.execute(
+                    "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+                    (4, _now()),
+                )
+                self.connection.execute("PRAGMA user_version = 4")
 
     @contextmanager
     def transaction(self) -> Iterator[None]:
@@ -476,6 +501,7 @@ class StateStore:
         stations: tuple[tuple[str, str], ...],
         *,
         marker: str,
+        append: bool = False,
     ) -> bool:
         """Seed a persistent ordered station list once, never after deletion."""
         if not service_id or not marker or _SECRET_KEY.search(marker):
@@ -495,7 +521,9 @@ class StateStore:
                 (service_id,),
             ).fetchall()
             by_url = {str(row["stream_url"]): int(row["id"]) for row in existing}
-            ordered_ids: list[int] = []
+            ordered_ids: list[int] = (
+                [int(row["id"]) for row in existing] if append else []
+            )
             now = _now()
             for name, stream_url in stations:
                 station_id = by_url.get(stream_url)
@@ -509,7 +537,8 @@ class StateStore:
                         (service_id, name, stream_url, len(ordered_ids), now),
                     )
                     station_id = int(cursor.lastrowid)
-                ordered_ids.append(station_id)
+                if station_id not in ordered_ids:
+                    ordered_ids.append(station_id)
             ordered_ids.extend(
                 int(row["id"])
                 for row in existing
@@ -646,9 +675,12 @@ class StateStore:
         with self._lock:
             rows = self.connection.execute(
                 """
-                SELECT id, service_id, path, title, duration_seconds, size_bytes
+                SELECT id, service_id, path, artist, title, duration_seconds,
+                       size_bytes, checksum, favorite, normalized_key,
+                       fingerprint, cover_file, review_required, source_kind
                 FROM media WHERE service_id = ?
-                ORDER BY title COLLATE NOCASE LIMIT 2000
+                ORDER BY COALESCE(artist, '') COLLATE NOCASE,
+                         title COLLATE NOCASE LIMIT 2000
                 """,
                 (service_id,),
             ).fetchall()
@@ -658,12 +690,112 @@ class StateStore:
         with self._lock:
             row = self.connection.execute(
                 """
-                SELECT id, service_id, path, title, duration_seconds, size_bytes
+                SELECT id, service_id, path, artist, title, duration_seconds,
+                       size_bytes, checksum, favorite, normalized_key,
+                       fingerprint, cover_file, review_required, source_kind
                 FROM media WHERE id = ?
                 """,
                 (media_id,),
             ).fetchone()
         return dict(row) if row is not None else None
+
+    def media_duplicate(
+        self,
+        normalized_key: str | None,
+        fingerprint: str | None,
+        checksum: str | None,
+    ) -> dict[str, Any] | None:
+        clauses: list[str] = []
+        values: list[str] = []
+        for column, value in (
+            ("normalized_key", normalized_key),
+            ("fingerprint", fingerprint),
+            ("checksum", checksum),
+        ):
+            if value:
+                clauses.append(f"{column} = ?")
+                values.append(value)
+        if not clauses:
+            return None
+        with self._lock:
+            row = self.connection.execute(
+                "SELECT id, path, artist, title FROM media WHERE "
+                + " OR ".join(clauses)
+                + " LIMIT 1",
+                tuple(values),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def add_recorded_media(
+        self,
+        path: Path,
+        *,
+        artist: str | None,
+        title: str,
+        size_bytes: int,
+        checksum: str,
+        normalized_key: str | None,
+        fingerprint: str | None,
+        review_required: bool,
+    ) -> int:
+        if not path.is_absolute() or not title:
+            raise ValueError("recorded media requires an absolute path and title")
+        with self.transaction():
+            cursor = self.connection.execute(
+                """
+                INSERT INTO media(
+                    service_id, path, artist, title, size_bytes, checksum,
+                    normalized_key, fingerprint, review_required, source_kind,
+                    created_at
+                ) VALUES ('local_media', ?, ?, ?, ?, ?, ?, ?, ?, 'radio', ?)
+                """,
+                (
+                    str(path),
+                    artist,
+                    title[:240],
+                    size_bytes,
+                    checksum,
+                    normalized_key,
+                    fingerprint,
+                    int(review_required),
+                    _now(),
+                ),
+            )
+            return int(cursor.lastrowid)
+
+    def set_media_favorite(self, media_id: int, favorite: bool) -> bool:
+        if isinstance(media_id, bool) or not isinstance(media_id, int):
+            raise ValueError("media id must be an integer")
+        if not isinstance(favorite, bool):
+            raise ValueError("favorite state must be boolean")
+        with self.transaction():
+            cursor = self.connection.execute(
+                "UPDATE media SET favorite = ? WHERE id = ?",
+                (int(favorite), media_id),
+            )
+        return cursor.rowcount == 1
+
+    def set_media_cover(self, media_id: int, cover_file: str | None) -> bool:
+        if cover_file is not None and not re.fullmatch(r"track-\d+\.jpg", cover_file):
+            raise ValueError("invalid local cover filename")
+        with self.transaction():
+            cursor = self.connection.execute(
+                "UPDATE media SET cover_file = ? WHERE id = ?",
+                (cover_file, media_id),
+            )
+        return cursor.rowcount == 1
+
+    def delete_media(self, media_id: int) -> dict[str, Any] | None:
+        if isinstance(media_id, bool) or not isinstance(media_id, int):
+            raise ValueError("media id must be an integer")
+        with self.transaction():
+            row = self.connection.execute(
+                "SELECT id, path, cover_file FROM media WHERE id = ?", (media_id,)
+            ).fetchone()
+            if row is None:
+                return None
+            self.connection.execute("DELETE FROM media WHERE id = ?", (media_id,))
+        return dict(row)
 
     def remove_missing_media(self, service_id: str, present_paths: set[str]) -> int:
         """Remove stale library rows without constructing a dynamic SQL query."""
