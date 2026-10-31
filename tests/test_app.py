@@ -193,7 +193,7 @@ class AppTests(unittest.TestCase):
                     "selected_preset": None,
                 }
 
-            def receiver_overlay(self):
+            def receiver_overlay(self, _view_service=None):
                 return {
                     "service": "RADIO",
                     "station": "SWR3",
@@ -266,7 +266,7 @@ class AppTests(unittest.TestCase):
                     "selected_preset": selected,
                 }
 
-            def receiver_overlay(self):
+            def receiver_overlay(self, _view_service=None):
                 return {}
 
         with tempfile.TemporaryDirectory() as raw:
@@ -379,10 +379,9 @@ class AppTests(unittest.TestCase):
 
             def control(self, request):
                 self.requests.append(request)
-                self.active_service = "weather"
-                return {"active_service": "weather", "channel_id": 2}
+                return {"view_service": "weather", "channel_id": 2}
 
-            def receiver_overlay(self):
+            def receiver_overlay(self, _view_service=None):
                 return {"service": "WEATHER", "station": "Europa", "channel": 2}
 
         with tempfile.TemporaryDirectory() as raw:
@@ -415,6 +414,78 @@ class AppTests(unittest.TestCase):
         self.assertEqual(opened["weather_channel_id"], 2)
         self.assertEqual(stepped["weather_channel_id"], 2)
 
+    def test_service_navigation_survives_refresh_while_radio_keeps_playing(self) -> None:
+        class InputDisplay:
+            def __init__(self) -> None:
+                self.service = "RADIO"
+                self.playing = True
+
+            def render(self, frame) -> None:
+                receiver = frame.fields.get("receiver", {})
+                self.service = str(receiver.get("service") or self.service)
+                self.playing = bool(receiver.get("playing", self.playing))
+
+            def snapshot(self):
+                return {
+                    "service": self.service,
+                    "playing": self.playing,
+                    "menu_open": False,
+                }
+
+            def apply_input(self, event):
+                if event.control == Control.RIGHT_INNER:
+                    self.service = "WEATHER"
+                return self.snapshot()
+
+        class Services:
+            active_service = "webradio"
+
+            def __init__(self) -> None:
+                self.requests = []
+                self.overlay_views = []
+
+            def control(self, request):
+                self.requests.append(request)
+                raise AssertionError("view navigation reached the audio player")
+
+            def receiver_overlay(self, view_service=None):
+                self.overlay_views.append(view_service)
+                return {
+                    "service": view_service,
+                    "station": "Regenradar Deutschland",
+                    "title": "DWD",
+                    "playing": True,
+                }
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            display = InputDisplay()
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=display,
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,  # type: ignore[arg-type]
+            )
+            app.control(
+                {"action": "device_input", "control": "right_inner", "steps": 1}
+            )
+            app.render_once()
+
+        self.assertEqual(display.service, "WEATHER")
+        self.assertEqual(services.active_service, "webradio")
+        self.assertEqual(services.requests, [])
+        self.assertEqual(services.overlay_views, ["WEATHER"])
+
     def test_enter_starts_radio_when_radio_ui_is_selected_and_player_stopped(self) -> None:
         class InputDisplay:
             def render(self, _frame) -> None:
@@ -441,7 +512,7 @@ class AppTests(unittest.TestCase):
                     "selected_preset": {"name": "SWR3", "channel": 1},
                 }
 
-            def receiver_overlay(self):
+            def receiver_overlay(self, _view_service=None):
                 return {"service": "RADIO", "station": "SWR3", "playing": True}
 
         with tempfile.TemporaryDirectory() as raw:

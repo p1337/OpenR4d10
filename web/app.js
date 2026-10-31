@@ -4,12 +4,14 @@ const LOCALE_STORAGE_KEY = "openr4d10.web.language";
 let translations = {};
 let currentLocale = "en";
 let latestStatus = null;
+let latestDeviceState = null;
 let presetSignature = "";
 let weatherSignature = "";
 let weatherAnimationFrames = [];
 let weatherAnimationIndex = 0;
 let latestWeather = null;
 let weatherRefreshPending = false;
+let serviceSearchQuery = "";
 
 function t(key, variables = {}) {
   const template = translations[currentLocale]?.[key] ?? translations.en?.[key] ?? key;
@@ -160,20 +162,55 @@ function readinessLabel(value) {
   return labels[value] || value;
 }
 
+function normalizedSearchText(value) {
+  return String(value || "")
+    .normalize("NFKD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase(currentLocale);
+}
+
+function serviceMatchesSearch(service, detail) {
+  const query = normalizedSearchText(serviceSearchQuery.trim());
+  if (!query) return true;
+  const metadata = [
+    JSON.stringify(service),
+    t(service.name),
+    t(service.description),
+    readinessLabel(service.readiness),
+    detail,
+  ].join(" ");
+  return normalizedSearchText(metadata).includes(query);
+}
+
 function renderServices(catalog) {
-  const grid = byId("service-grid");
+  const list = byId("service-list");
   const items = Array.isArray(catalog?.items) ? catalog.items : [];
-  grid.replaceChildren();
+  list.replaceChildren();
   setText("service-count", items.length
     ? t("{{ready}}/{{total}} ready", { ready: catalog.ready, total: catalog.total })
     : t("No data"));
+  let visibleCount = 0;
   items.forEach((service, index) => {
-    const card = document.createElement("article");
-    card.className = "service-card";
-    card.dataset.readiness = service.readiness;
+    const detailText = service.missing_executables?.length
+      ? t("Missing: {{items}}", { items: service.missing_executables.join(", ") })
+      : service.implementation === "native"
+        ? t("OpenR4d10 Core")
+        : service.implementation === "official_api"
+          ? t("Official login required")
+          : t("Local adapter");
+    if (!serviceMatchesSearch(service, detailText)) return;
+    visibleCount += 1;
+
+    const row = document.createElement("li");
+    row.className = "service-row";
+    row.dataset.readiness = service.readiness;
+
+    const mark = document.createElement("span");
+    mark.className = "service-row-mark";
+    mark.textContent = initials(t(service.name));
 
     const heading = document.createElement("div");
-    heading.className = "service-card-heading";
+    heading.className = "service-row-heading";
     const name = document.createElement("strong");
     name.textContent = t(service.name);
     const state = document.createElement("span");
@@ -183,16 +220,12 @@ function renderServices(catalog) {
     const description = document.createElement("p");
     description.textContent = t(service.description);
     const detail = document.createElement("small");
-    detail.textContent = service.missing_executables?.length
-      ? t("Missing: {{items}}", { items: service.missing_executables.join(", ") })
-      : service.implementation === "native"
-        ? t("OpenR4d10 Core")
-        : service.implementation === "official_api"
-          ? t("Official login required")
-          : t("Local adapter");
-    card.append(heading, description, detail);
+    detail.textContent = detailText;
+    const copy = document.createElement("div");
+    copy.className = "service-row-copy";
+    copy.append(heading, description, detail);
     const actions = document.createElement("div");
-    actions.className = "service-card-actions";
+    actions.className = "service-row-actions";
     const up = libraryButton("↑", "service_move", { service_id: service.service_id, direction: -1 });
     const down = libraryButton("↓", "service_move", { service_id: service.service_id, direction: 1 });
     up.disabled = index === 0;
@@ -208,13 +241,24 @@ function renderServices(catalog) {
       }));
       actions.append(toggle);
     }
-    card.append(actions);
-    grid.append(card);
+    row.append(mark, copy, actions);
+    list.append(row);
   });
+  if (!visibleCount) {
+    const empty = document.createElement("li");
+    empty.className = "service-list-empty";
+    empty.textContent = t("No services match this search.");
+    list.append(empty);
+  }
   renderPresets(catalog);
   renderLibrary(catalog);
   renderWeather(catalog);
 }
+
+byId("service-search").addEventListener("input", (event) => {
+  serviceSearchQuery = event.target.value;
+  if (latestStatus?.services) renderServices(latestStatus.services);
+});
 
 function setWeatherAnimation(frames) {
   weatherAnimationFrames = Array.isArray(frames) ? frames : [];
@@ -251,6 +295,7 @@ function renderWeather(catalog) {
   if (signature !== weatherSignature) {
     weatherSignature = signature;
     setText("weather-channel-name", selected?.name, t("No weather channel"));
+    setText("weather-provider", selected?.provider, "DWD");
     setWeatherAnimation(selected?.frames || []);
   }
   const list = byId("weather-channel-list");
@@ -356,60 +401,10 @@ function initials(value) {
 
 function renderPresets(catalog) {
   const presets = catalog?.presets || {};
-  const stations = Array.isArray(catalog?.stations) ? catalog.stations : [];
   const feeds = Array.isArray(presets.feeds) ? presets.feeds : [];
-  const signature = JSON.stringify([stations, feeds]);
+  const signature = JSON.stringify(feeds);
   if (signature === presetSignature) return;
   presetSignature = signature;
-  const grid = byId("radio-preset-grid");
-  grid.replaceChildren();
-  stations.forEach((station, index) => {
-    const card = document.createElement("article");
-    card.className = "radio-preset-card";
-
-    const artwork = document.createElement("div");
-    artwork.className = "radio-artwork";
-    artwork.dataset.initials = initials(station.name);
-    if (station.artwork) {
-      const image = document.createElement("img");
-      image.src = station.artwork;
-      image.alt = t("Artwork for {{station}}", { station: station.name });
-      image.loading = "lazy";
-      image.addEventListener("load", () => artwork.classList.add("has-image"));
-      image.addEventListener("error", () => image.remove());
-      artwork.append(image);
-    }
-
-    const copy = document.createElement("div");
-    copy.className = "radio-preset-copy";
-    const name = document.createElement("strong");
-    name.textContent = station.name;
-    const detail = document.createElement("span");
-    detail.textContent = `${station.country} · ${station.genre}`;
-    copy.append(name, detail);
-
-    const actions = document.createElement("div");
-    actions.className = "radio-preset-actions";
-    const up = libraryButton("↑", "station_move", { station_id: station.id, direction: -1 });
-    const down = libraryButton("↓", "station_move", { station_id: station.id, direction: 1 });
-    up.disabled = index === 0;
-    down.disabled = index === stations.length - 1;
-    actions.append(
-      libraryButton(t("Play"), "station_play", { station_id: station.id }),
-      up,
-      down,
-      libraryButton(t("Delete"), "station_delete", { station_id: station.id }),
-    );
-    card.append(artwork, copy, actions);
-    grid.append(card);
-  });
-  if (!stations.length) {
-    const empty = document.createElement("p");
-    empty.className = "services-note";
-    empty.textContent = t("The station list is empty. Add a station below.");
-    grid.append(empty);
-  }
-
   const feedSelect = byId("feed-preset");
   const selected = feedSelect.value;
   feedSelect.replaceChildren(new Option(t("Select news source …"), ""));
@@ -464,10 +459,12 @@ function renderLibrary(catalog) {
     actions.className = "library-actions";
     const up = libraryButton("↑", "station_move", { station_id: station.id, direction: -1 });
     const down = libraryButton("↓", "station_move", { station_id: station.id, direction: 1 });
+    const play = libraryButton(t("Play"), "station_play", { station_id: station.id });
+    play.classList.add("library-play");
     up.disabled = index === 0;
     down.disabled = index === stations.length - 1;
     actions.append(
-      libraryButton(t("Play"), "station_play", { station_id: station.id }),
+      play,
       up,
       down,
       libraryButton(t("Delete"), "station_delete", { station_id: station.id }),
@@ -590,6 +587,7 @@ function renderUpdate(update) {
 
 function renderDeviceState(state) {
   if (!state) return;
+  latestDeviceState = state;
   setText("device-volume", Number.isInteger(state.volume) ? `${state.volume}%` : null);
   setText("device-squelch", state.squelch);
   setText("device-channel", Number.isInteger(state.channel) ? String(state.channel).padStart(3, "0") : null);
@@ -603,7 +601,7 @@ function renderDeviceState(state) {
       : state.ptt_context_active
         ? t("PTT service ready")
         : state.menu_open
-          ? t("PTT / Q = back one menu level")
+          ? t("Backspace = back one menu level")
           : t("No active PTT service")
   );
 }
@@ -737,7 +735,7 @@ async function postDeviceInput(request, button = null) {
         : t("Playback running");
     } else {
       output.textContent = request.control === "ptt"
-        ? (state.ptt_active ? t("PTT active") : state.menu_open ? t("PTT / Q = Back") : t("Input accepted"))
+        ? (state.ptt_active ? t("PTT active") : state.menu_open ? t("Backspace = Back") : t("Input accepted"))
         : `${state.service || t("Device")} · ${state.title || t("Input accepted")}`;
     }
   } catch (error) {
@@ -771,6 +769,15 @@ const keyboardDeviceInputs = {
   Enter: { control: "right_press" },
 };
 
+function keyboardDeviceRequest(code) {
+  const request = keyboardDeviceInputs[code];
+  if (!request) return null;
+  if (latestDeviceState?.menu_open && request.control === "right_outer") {
+    return { ...request, steps: -request.steps };
+  }
+  return request;
+}
+
 function isEditableTarget(target) {
   return target instanceof HTMLElement && (
     target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)
@@ -790,12 +797,12 @@ function setPttInput(active) {
 
 document.addEventListener("keydown", (event) => {
   if (event.altKey || event.ctrlKey || event.metaKey || isEditableTarget(event.target)) return;
-  if (event.code === "KeyQ") {
+  if (event.code === "Backspace") {
     event.preventDefault();
     if (!event.repeat) setPttInput(true);
     return;
   }
-  const request = keyboardDeviceInputs[event.code];
+  const request = keyboardDeviceRequest(event.code);
   if (!request) return;
   event.preventDefault();
   if (event.repeat && !Object.hasOwn(request, "steps")) return;
@@ -803,7 +810,8 @@ document.addEventListener("keydown", (event) => {
 });
 
 document.addEventListener("keyup", (event) => {
-  if (event.code !== "KeyQ") return;
+  if (event.code !== "Backspace") return;
+  if (isEditableTarget(event.target) && !pttKeyActive) return;
   event.preventDefault();
   setPttInput(false);
 });

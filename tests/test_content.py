@@ -12,6 +12,7 @@ from openr4d10.content import (
     BoundedFetcher,
     CameraSnapshot,
     ContentError,
+    DWD_RADAR_GIF_URL,
     DwdSatelliteFrames,
     FeedReader,
     PresetArtwork,
@@ -131,3 +132,37 @@ class ContentTests(unittest.TestCase):
             with Image.open(cache / str(first[0]["file"])) as image:
                 self.assertEqual(image.format, "JPEG")
                 self.assertLessEqual(image.width, 480)
+
+    def test_dwd_radar_gif_is_bounded_reencoded_and_rate_limited(self) -> None:
+        raw = BytesIO()
+        frames = [
+            Image.new("RGB", (680, 680), (index * 15, 40, 120))
+            for index in range(10)
+        ]
+        frames[0].save(
+            raw,
+            format="GIF",
+            save_all=True,
+            append_images=frames[1:],
+            duration=500,
+            loop=0,
+        )
+        calls = []
+
+        def opener(request, **_kwargs):
+            calls.append(request.full_url)
+            self.assertEqual(request.full_url, DWD_RADAR_GIF_URL)
+            return FakeResponse(raw.getvalue(), "image/gif")
+
+        with tempfile.TemporaryDirectory() as directory:
+            cache = Path(directory).resolve()
+            weather = DwdSatelliteFrames(cache, BoundedFetcher(opener))
+            first = weather.refresh_radar("dwd-deutschland")
+            second = weather.refresh_radar("dwd-deutschland")
+            self.assertEqual(first, second)
+            self.assertEqual(len(first), 8)
+            self.assertEqual(len(calls), 1)
+            with Image.open(cache / str(first[0]["file"])) as image:
+                self.assertEqual(image.format, "JPEG")
+                self.assertLessEqual(image.width, 480)
+                self.assertLessEqual(image.height, 480)

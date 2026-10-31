@@ -249,12 +249,13 @@ class PresetArtwork:
 
 DWD_WMS_URL = "https://maps.dwd.de/geoserver/dwd/wms"
 DWD_SATELLITE_LAYER = "Satellite_meteosat_1km_euat_rgb_day_hrv_and_night_ir108_3h"
+DWD_RADAR_GIF_URL = "https://www.wettergefahren.de/DWD/wetter/radar/Radarfilm_WEB_DL.gif"
 WEATHER_REFRESH_SECONDS = 300
 WEATHER_FRAME_COUNT = 8
 
 
 class DwdSatelliteFrames:
-    """Bounded, locally re-encoded frame cache for the official DWD WMS layer."""
+    """Bounded local JPEG cache for the official DWD WMS and radar-film sources."""
 
     def __init__(self, cache_root: Path, fetcher: BoundedFetcher | None = None) -> None:
         if not cache_root.is_absolute():
@@ -477,6 +478,80 @@ class DwdSatelliteFrames:
                     f"weather-{slug}-{self._timestamp_name(timestamp)}.jpg"
                     for timestamp in selected
                 }
+                for path in self.cache_root.glob(f"weather-{slug}-*.jpg"):
+                    if path.name not in keep:
+                        try:
+                            path.unlink()
+                        except OSError:
+                            pass
+                self._last_refresh[slug] = now
+            except (ContentError, OSError, ValueError):
+                if not cached:
+                    raise
+            return self.frames(slug)
+
+    def refresh_radar(
+        self,
+        channel_key: str,
+        source_url: str = DWD_RADAR_GIF_URL,
+    ) -> list[dict[str, object]]:
+        """Fetch the fixed reviewed DWD radar GIF and re-encode bounded frames."""
+        if source_url != DWD_RADAR_GIF_URL:
+            raise ValueError("unsupported DWD radar source")
+        slug = self._slug(channel_key)
+        with self._lock:
+            cached = self.frames(slug)
+            now = time.monotonic()
+            if cached:
+                newest_mtime = max(
+                    (
+                        (self.cache_root / str(item["file"])).stat().st_mtime
+                        for item in cached
+                    ),
+                    default=0.0,
+                )
+                if (
+                    now - self._last_refresh.get(slug, 0.0) < WEATHER_REFRESH_SECONDS
+                    or time.time() - newest_mtime < WEATHER_REFRESH_SECONDS
+                ):
+                    return cached
+            try:
+                payload, _content_type = self.fetcher.fetch(
+                    source_url,
+                    max_bytes=8 * 1024 * 1024,
+                    accepted_types=("image/gif",),
+                    timeout=12.0,
+                )
+                encoded_frames: list[bytes] = []
+                try:
+                    with Image.open(BytesIO(payload)) as source:
+                        frame_count = int(getattr(source, "n_frames", 1))
+                        if frame_count < 2 or frame_count > 60:
+                            raise ContentError("DWD radar animation has an invalid frame count")
+                        if source.width * source.height > 4_000_000:
+                            raise ContentError("DWD radar dimensions exceed the safety limit")
+                        first = max(0, frame_count - WEATHER_FRAME_COUNT)
+                        for index in range(first, frame_count):
+                            source.seek(index)
+                            frame = source.convert("RGB")
+                            frame.thumbnail((480, 480), Image.Resampling.LANCZOS)
+                            output = BytesIO()
+                            frame.save(output, format="JPEG", quality=88, optimize=True)
+                            encoded_frames.append(output.getvalue())
+                except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
+                    raise ContentError(f"invalid DWD radar animation: {exc}") from exc
+
+                self.cache_root.mkdir(parents=True, exist_ok=True, mode=0o750)
+                newest = datetime.now(UTC).replace(microsecond=0)
+                keep: set[str] = set()
+                for index, encoded in enumerate(encoded_frames):
+                    timestamp = newest - timedelta(seconds=len(encoded_frames) - index - 1)
+                    name = f"weather-{slug}-{self._timestamp_name(timestamp)}.jpg"
+                    target = self.cache_root / name
+                    temporary = target.with_suffix(".jpg.tmp")
+                    temporary.write_bytes(encoded)
+                    os.replace(temporary, target)
+                    keep.add(name)
                 for path in self.cache_root.glob(f"weather-{slug}-*.jpg"):
                     if path.name not in keep:
                         try:

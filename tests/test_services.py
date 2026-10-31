@@ -9,6 +9,7 @@ import unittest
 from urllib.parse import urlsplit
 
 from openr4d10.services import BUILTIN_SERVICES, ServiceCatalog
+from openr4d10.content import DWD_RADAR_GIF_URL
 from openr4d10.presets import FEED_BY_ID, RADIO_BY_ID
 from openr4d10.storage import MIGRATION_1, SCHEMA_VERSION, StateStore
 
@@ -54,6 +55,42 @@ class StateStoreTests(unittest.TestCase):
 
 
 class ServiceCatalogTests(unittest.TestCase):
+    def test_weather_radar_upgrade_preserves_customization_and_deletion(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            store = StateStore(root / "openr4d10.sqlite3")
+            try:
+                store.ensure_services(tuple(item.service_id for item in BUILTIN_SERVICES))
+                store.seed_channels_once(
+                    "weather",
+                    (("dwd-deutschland", "Mein Wetter", {"bbox": [48.0, 6.0, 54.0, 15.0]}),),
+                    marker="weather.defaults_seeded_v1",
+                )
+            finally:
+                store.close()
+
+            catalog = ServiceCatalog(root, executable_lookup=lambda _name: "/bin/true")
+            try:
+                channel = catalog.snapshot()["weather"]["channels"][0]
+                stored = catalog.store.channel(channel["id"])
+                self.assertEqual(channel["name"], "Mein Wetter")
+                self.assertEqual(channel["kind"], "radar_gif")
+                self.assertEqual(stored["metadata"]["bbox"], [48.0, 6.0, 54.0, 15.0])
+                self.assertEqual(stored["metadata"]["source_url"], DWD_RADAR_GIF_URL)
+                catalog.store.delete_channel(channel["id"])
+            finally:
+                catalog.close()
+
+            reopened = ServiceCatalog(root, executable_lookup=lambda _name: "/bin/true")
+            try:
+                ids = {
+                    item["external_id"]
+                    for item in reopened.snapshot()["weather"]["channels"]
+                }
+                self.assertNotIn("dwd-deutschland", ids)
+            finally:
+                reopened.close()
+
     def test_weather_defaults_channel_loop_and_service_priority_persist(self) -> None:
         class Weather:
             def __init__(self, root):
@@ -73,6 +110,11 @@ class ServiceCatalogTests(unittest.TestCase):
                 self.refreshed.set()
                 return self.frames(key)
 
+            def refresh_radar(self, key, source_url):
+                self.last = (key, source_url)
+                self.refreshed.set()
+                return self.frames(key)
+
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw).resolve()
             weather = Weather(root)
@@ -80,8 +122,9 @@ class ServiceCatalogTests(unittest.TestCase):
             try:
                 snapshot = catalog.snapshot()
                 channels = snapshot["weather"]["channels"]
-                self.assertEqual([item["name"] for item in channels], ["Deutschland", "Europa"])
-                self.assertEqual(channels[0]["provider"], "DWD / EUMETSAT")
+                self.assertEqual([item["name"] for item in channels], ["Regenradar Deutschland", "Europa"])
+                self.assertEqual(channels[0]["provider"], "DWD")
+                self.assertEqual(channels[0]["kind"], "radar_gif")
                 with self.assertRaisesRegex(ValueError, "layer coverage"):
                     catalog.control(
                         {
@@ -90,13 +133,18 @@ class ServiceCatalogTests(unittest.TestCase):
                             "bbox": [-90, -180, 90, 180],
                         }
                     )
+                catalog.active_service = "webradio"
+                playback_before = catalog.player.state.as_dict()
                 catalog.control({"action": "weather_open", "channel_id": channels[0]["id"]})
                 self.assertTrue(weather.refreshed.wait(1))
-                overlay = catalog.receiver_overlay()
+                self.assertEqual(catalog.active_service, "webradio")
+                self.assertEqual(catalog.player.state.as_dict(), playback_before)
+                overlay = catalog.receiver_overlay("WEATHER")
                 self.assertEqual(overlay["service"], "WEATHER")
                 self.assertTrue(str(overlay["image_file"]).startswith("weather-dwd-deutschland-"))
                 stepped = catalog.control({"action": "weather_step", "steps": 1})
                 self.assertEqual(stepped["channel_id"], channels[1]["id"])
+                self.assertEqual(catalog.active_service, "webradio")
                 catalog.control({"action": "weather_channel_move", "channel_id": channels[1]["id"], "direction": -1})
                 catalog.control({"action": "service_move", "service_id": "weather", "direction": -1})
             finally:

@@ -189,6 +189,17 @@ class OpenR4d10App:
         display_snapshot = getattr(self.display, "snapshot", None)
         current_ui = display_snapshot() if callable(display_snapshot) else {}
         menu_open = isinstance(current_ui, dict) and current_ui.get("menu_open") is True
+        selected_service = (
+            str(current_ui.get("service"))
+            if isinstance(current_ui, dict) and current_ui.get("service")
+            else {
+                "webradio": "RADIO",
+                "weather": "WEATHER",
+                "local_media": "PLAYER",
+                "brandmeister": "DMR",
+                "recorder": "REC",
+            }.get(getattr(self.services, "active_service", "system"), "SYSTEM")
+        )
         if self.services is not None and event.control == Control.LEFT_OUTER:
             media_result = self.services.control(
                 {"action": "volume_step", "steps": event.steps}
@@ -197,7 +208,7 @@ class OpenR4d10App:
             self.services is not None
             and event.control == Control.RIGHT_OUTER
             and not menu_open
-            and self.services.active_service == "webradio"
+            and selected_service == "RADIO"
         ):
             media_result = self.services.control(
                 {"action": "preset_step", "steps": event.steps}
@@ -206,7 +217,7 @@ class OpenR4d10App:
             self.services is not None
             and event.control == Control.RIGHT_OUTER
             and not menu_open
-            and self.services.active_service == "weather"
+            and selected_service == "WEATHER"
         ):
             media_result = self.services.control(
                 {"action": "weather_step", "steps": event.steps}
@@ -218,22 +229,14 @@ class OpenR4d10App:
         ):
             if self.services is None:
                 raise RuntimeError("media control is unavailable")
-            current_ui = display_snapshot() if callable(display_snapshot) else {}
-            radio_selected = (
-                isinstance(current_ui, dict)
-                and current_ui.get("service") == "RADIO"
-            )
-            weather_selected = (
-                isinstance(current_ui, dict)
-                and current_ui.get("service") == "WEATHER"
-            )
-            if weather_selected or self.services.active_service == "weather":
+            if selected_service == "WEATHER":
                 action = "weather_open"
-            elif radio_selected or self.services.active_service == "webradio":
+            elif selected_service == "RADIO":
                 action = "radio_toggle"
             else:
-                action = "pause"
-            media_result = self.services.control({"action": action})
+                action = None
+            if action is not None:
+                media_result = self.services.control({"action": action})
         device_state = handler(event)
         if media_result is not None:
             self.render_once()
@@ -288,7 +291,14 @@ class OpenR4d10App:
     def render_once(self) -> None:
         receiver, receiver_error = self._safe_read(self.receiver, "receiver")
         if self.services is not None:
-            receiver.update(self.services.receiver_overlay())
+            snapshot = getattr(self.display, "snapshot", None)
+            current_ui = snapshot() if callable(snapshot) else {}
+            view_service = (
+                str(current_ui.get("service"))
+                if isinstance(current_ui, dict) and current_ui.get("service")
+                else None
+            )
+            receiver.update(self.services.receiver_overlay(view_service))
         power, power_error = self._safe_read(self.power, "power")
         errors = [error for error in (receiver_error, power_error) if error]
         self._publish(dashboard_frame(self.config.title, receiver, power, errors))

@@ -40,14 +40,17 @@ class WebTests(unittest.TestCase):
             "ArrowRight",
             "Space",
             "Enter",
-            "KeyQ",
+            "Backspace",
         ):
             self.assertIn(key_code, script)
+        self.assertNotIn("KeyQ", script)
         self.assertIn('control: "ptt", active', script)
         self.assertIn("isEditableTarget", script)
         self.assertIn('KeyW: { control: "left_outer", steps: 1 }', script)
         self.assertIn('KeyA: { control: "left_inner", steps: -1 }', script)
         self.assertIn('ArrowUp: { control: "right_outer", steps: 1 }', script)
+        self.assertIn("keyboardDeviceRequest", script)
+        self.assertIn("steps: -request.steps", script)
         self.assertIn('ArrowLeft: { control: "right_inner", steps: -1 }', script)
         self.assertIn('Space: { control: "left_press" }', script)
         self.assertIn('Enter: { control: "right_press" }', script)
@@ -81,6 +84,17 @@ class WebTests(unittest.TestCase):
         self.assertIn('id="device-screen-preview"', html)
         self.assertIn("/api/device-screen.png", html)
         self.assertIn("station-row-artwork", script)
+        self.assertIn('play.classList.add("library-play")', script)
+        self.assertIn(".library-actions button.library-play", stylesheet)
+        self.assertNotIn("radio-preset-grid", html)
+        self.assertNotIn("radio-preset-grid", script)
+        self.assertNotIn("radio-preset-card", stylesheet)
+        self.assertIn('id="service-search" type="search"', html)
+        self.assertIn('id="service-list"', html)
+        self.assertIn("serviceMatchesSearch", script)
+        self.assertIn("JSON.stringify(service)", script)
+        self.assertNotIn('id="service-grid"', html)
+        self.assertNotIn("service-card", stylesheet)
         self.assertIn('id="weather-image"', html)
         self.assertIn('id="weather-channel-list"', html)
         self.assertIn(
@@ -89,7 +103,9 @@ class WebTests(unittest.TestCase):
         )
         self.assertIn('"weather_channel_move"', script)
         self.assertIn('"service_move"', script)
-        self.assertIn("DWD / EUMETSAT", html)
+        self.assertIn('id="weather-provider"', html)
+        self.assertIn('setText("weather-provider", selected?.provider, "DWD")', script)
+        self.assertIn('data-i18n="DWD WEATHER"', html)
         self.assertIn('id="language-select"', html)
         for locale in ("en", "de", "pl", "fr", "es"):
             self.assertIn(f'<option value="{locale}">', html)

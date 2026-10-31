@@ -54,7 +54,6 @@
               <div><p class="eyebrow" data-i18n="WEB RADIO">WEB RADIO</p><h1 id="radio-presets-title" data-i18n="Stations &amp; playback">Stations &amp; playback</h1></div>
               <span class="version" data-i18n="Live">Live</span>
             </div>
-            <div class="radio-preset-grid" id="radio-preset-grid"></div>
             <form class="media-control" id="media-control">
               <label for="media-source" data-i18n="Direct audio source">Direct audio source</label>
               <div class="media-source-row">
@@ -78,10 +77,10 @@
 
         <section class="tab-panel" role="tabpanel" data-tab-panel="weather" hidden>
           <section class="panel weather-panel" aria-labelledby="weather-title">
-            <div class="panel-heading"><div><p class="eyebrow" data-i18n="DWD SATELLITE WEATHER">DWD SATELLITE WEATHER</p><h1 id="weather-title" data-i18n="Germany &amp; Europe">Germany &amp; Europe</h1></div><span class="version">DWD / EUMETSAT</span></div>
+            <div class="panel-heading"><div><p class="eyebrow" data-i18n="DWD WEATHER">DWD WEATHER</p><h1 id="weather-title" data-i18n="Germany &amp; Europe">Germany &amp; Europe</h1></div><span class="version" id="weather-provider">DWD</span></div>
             <div class="weather-layout">
               <figure class="weather-viewer">
-                <img id="weather-image" alt="Current DWD satellite image" data-i18n-alt="Current DWD satellite image" hidden>
+                <img id="weather-image" alt="Current DWD weather image" data-i18n-alt="Current DWD weather image" hidden>
                 <div id="weather-empty" data-i18n="Select a channel and load images.">Select a channel and load images.</div>
                 <figcaption><strong id="weather-channel-name">–</strong><span id="weather-frame-time" data-i18n="No frames in the local cache yet">No frames in the local cache yet</span></figcaption>
               </figure>
@@ -149,7 +148,7 @@
               <article class="encoder-control"><span data-i18n="Inner right">Inner right</span><strong><span data-i18n="Service">Service</span> <output id="device-service">–</output></strong><div class="encoder-buttons"><button type="button" data-device-control="right_inner" data-steps="-1">−</button><button type="button" data-device-control="right_inner" data-steps="1">+</button></div></article>
             </div>
             <div class="press-grid"><div><span data-i18n="Left push button">Left push button</span><button type="button" data-device-control="left_press" data-i18n="Menu">Menu</button><button type="button" data-device-control="left_press" data-held="2" data-i18n="Service settings">Service settings</button></div><div><span data-i18n="Right push button">Right push button</span><button type="button" data-device-control="right_press" data-i18n="Select / Play">Select / Play</button><button type="button" data-device-control="right_press" data-held="2" data-i18n="Quick menu">Quick menu</button></div></div>
-            <div class="ptt-control"><button type="button" id="ptt-button" aria-pressed="false"><kbd>Q</kbd> <span data-i18n="hold · PTT / Back">hold · PTT / Back</span></button><span id="device-ptt" data-i18n="In menus: Back">In menus: Back</span></div>
+            <div class="ptt-control"><button type="button" id="ptt-button" aria-pressed="false"><kbd>Backspace</kbd> <span data-i18n="hold · PTT / Back">hold · PTT / Back</span></button><span id="device-ptt" data-i18n="In menus: Back">In menus: Back</span></div>
             <output class="device-control-result" id="device-control-result" aria-live="polite" data-i18n="Ready.">Ready.</output>
           </section>
         </section>
@@ -169,7 +168,7 @@
         </section>
 
         <section class="tab-panel" role="tabpanel" data-tab-panel="services" hidden>
-          <section class="panel services-panel" aria-labelledby="services-title"><div class="panel-heading"><div><p class="eyebrow" data-i18n="SERVICE MODULES">SERVICE MODULES</p><h1 id="services-title" data-i18n="Integrations and readiness">Integrations and readiness</h1></div><span class="version" id="service-count">–</span></div><p class="services-note" data-i18n="Credentials are never loaded from the repository or stored in the status database.">Credentials are never loaded from the repository or stored in the status database.</p><div class="service-grid" id="service-grid" aria-live="polite"></div></section>
+          <section class="panel services-panel" aria-labelledby="services-title"><div class="panel-heading"><div><p class="eyebrow" data-i18n="SERVICE MODULES">SERVICE MODULES</p><h1 id="services-title" data-i18n="Integrations and readiness">Integrations and readiness</h1></div><span class="version" id="service-count">–</span></div><p class="services-note" data-i18n="Credentials are never loaded from the repository or stored in the status database.">Credentials are never loaded from the repository or stored in the status database.</p><label class="service-search" for="service-search"><span data-i18n="Search services and all metadata">Search services and all metadata</span><input id="service-search" type="search" placeholder="Search name, status, description, adapter …" data-i18n-placeholder="Search name, status, description, adapter …" autocomplete="off"></label><ul class="service-list" id="service-list" aria-live="polite"></ul></section>
         </section>
       </div>
 

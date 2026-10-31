@@ -46,8 +46,9 @@ mapping, absence of date/footer/player-status text, enlarged artwork bounds,
 the play button position and that main-menu rendering contains neither artwork
 nor player title. They also verify the vertical ten-entry main-menu list,
 selection scrolling, Enter selection without media side effects, PTT back
-navigation, the normal accent-coloured back arrow and the red/white edge-aligned
-PTT indicator only for an explicit ready PTT context. The five curated languages
+navigation, the framed filled back icon, player-only accent glow, label clearance
+below the rounded top corners and the red/white edge-aligned PTT indicator only
+for an explicit ready PTT context. The five curated languages
 use the same renderer and fall back to English for unknown language codes.
 
 The normal `run` command also creates a migrated non-secret state database in
@@ -112,8 +113,10 @@ public playback state and the actual `mpv` pause state, not merely the display
 icon. If radio is selected while the player is stopped, the same event starts
 the first persistent station. A held right press opens the quick menu without
 touching playback. No
-GPIO number is accepted by this endpoint. Browser PTT must release on key-up,
-focus loss and tab hiding. It remains an input indication, not an audio claim,
+GPIO number is accepted by this endpoint. Browser PTT uses held Backspace only
+outside editable fields and must release on key-up, focus loss and tab hiding.
+While the device menu is open, browser Up/Down must follow the visible list
+direction without changing the physical `right_outer` semantics. It remains an input indication, not an audio claim,
 until a real authorized service adapter consumes it.
 
 Volume and radio-channel regression tests must make the same distinction:
@@ -125,6 +128,10 @@ stations must survive a new `ServiceCatalog` instance. Radio frames expose the
 optional preset ID, channel and display name,
 but no remote artwork URL, stream URL or local cache path. The physical
 renderer may read only `radio-<preset-id>.jpg` below the configured cache root.
+Tests must also keep view selection and audio ownership separate: switching to
+weather followed by normal frame refresh may not jump back to the audio service;
+weather open/step/refresh must leave mpv state and its audio-service owner
+unchanged. Only explicit Play in another audio service may replace the source.
 
 `system_update` requires the exact boolean field `confirmed: true`. It creates
 the fixed runtime request only; it accepts no URL, branch, version, command or
@@ -145,15 +152,23 @@ internal stream or feed URL. Normal radio UI control uses `station_play`,
 Update source definitions and their evidence together in
 [`PRESETS.md`](PRESETS.md), then test the current addresses without adding
 cookies, tokens or signed URLs.
+The radio tab must expose the persistent station rows only once through the
+compact sortable station list. Browser regression tests reject the removed
+`radio-preset-grid` and require the retained list's primary play-button class.
+Service-module regressions require semantic list markup and a type-search input,
+reject the removed card grid and verify that filtering includes the serialized
+public service metadata as well as translated visible labels. Do not add an
+unverified network logo URL to make a row look branded.
 
 Weather controls use `weather_open`, `weather_step`, `weather_refresh`,
 `weather_channel_save`, `weather_channel_move` and `weather_channel_delete`.
-The first two seeded channels are Germany and Europe; tests must prove that
+The first two seeded channels are Germany radar and Europe satellite; tests must prove that
 their user order and edits survive a new `ServiceCatalog`. `service_move`
 similarly persists every service priority. The DWD WMS integration must keep
 the five-minute capability refresh floor, tolerate missing timestamps and
-retain the last safe cache. Live network checks are diagnostic only; unit tests
-use bounded fake WMS responses.
+retain the last safe cache. The official radar GIF uses the same refresh floor,
+bounded fetch, frame-count/pixel limits and local JPEG re-encoding. Live network
+checks are diagnostic only; unit tests use bounded fake WMS/GIF responses.
 
 External account-based modules are never loaded into the web process. Their
 non-secret manifests live in `/etc/openr4d10/services.d`; see

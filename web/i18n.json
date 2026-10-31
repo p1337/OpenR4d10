@@ -27,9 +27,9 @@
     "Add and sort radio stations": ["Add and sort radio stations", "Radiosender hinzufügen und sortieren", "Dodawanie i sortowanie stacji radiowych", "Ajouter et trier les stations radio", "Añadir y ordenar emisoras de radio"],
     "Station name": ["Station name", "Sendername", "Nazwa stacji", "Nom de la station", "Nombre de la emisora"],
     "Save": ["Save", "Speichern", "Zapisz", "Enregistrer", "Guardar"],
-    "DWD SATELLITE WEATHER": ["DWD SATELLITE WEATHER", "DWD-SATELLITENWETTER", "POGODA SATELITARNA DWD", "MÉTÉO SATELLITE DWD", "TIEMPO POR SATÉLITE DWD"],
+    "DWD WEATHER": ["DWD WEATHER", "DWD-WETTER", "POGODA DWD", "MÉTÉO DWD", "TIEMPO DWD"],
     "Germany & Europe": ["Germany & Europe", "Deutschland & Europa", "Niemcy i Europa", "Allemagne et Europe", "Alemania y Europa"],
-    "Current DWD satellite image": ["Current DWD satellite image", "Aktuelles DWD-Satellitenbild", "Aktualny obraz satelitarny DWD", "Image satellite DWD actuelle", "Imagen de satélite DWD actual"],
+    "Current DWD weather image": ["Current DWD weather image", "Aktuelles DWD-Wetterbild", "Aktualny obraz pogodowy DWD", "Image météo DWD actuelle", "Imagen meteorológica DWD actual"],
     "Select a channel and load images.": ["Select a channel and load images.", "Kanal auswählen und Bilder laden.", "Wybierz kanał i wczytaj obrazy.", "Sélectionnez un canal et chargez les images.", "Selecciona un canal y carga las imágenes."],
     "No frames in the local cache yet": ["No frames in the local cache yet", "Noch keine Frames im lokalen Cache", "Brak klatek w lokalnej pamięci podręcznej", "Aucune image dans le cache local", "Aún no hay fotogramas en la caché local"],
     "The latest available METEOSAT images run locally in a continuous loop. New DWD data is checked at most every five minutes.": ["The latest available METEOSAT images run locally in a continuous loop. New DWD data is checked at most every five minutes.", "Die jüngsten verfügbaren METEOSAT-Bilder laufen lokal in einer Endlosschleife. Neue DWD-Daten werden höchstens alle fünf Minuten geprüft.", "Najnowsze dostępne obrazy METEOSAT są lokalnie odtwarzane w pętli. Nowe dane DWD są sprawdzane najwyżej co pięć minut.", "Les dernières images METEOSAT disponibles sont lues localement en boucle. Les nouvelles données DWD sont vérifiées au maximum toutes les cinq minutes.", "Las imágenes METEOSAT más recientes se reproducen localmente en bucle. Los nuevos datos de DWD se comprueban como máximo cada cinco minutos."],
@@ -184,7 +184,7 @@
     " · version {{version}}": [" · version {{version}}", " · Version {{version}}", " · wersja {{version}}", " · version {{version}}", " · versión {{version}}"],
     "PTT active": ["PTT active", "PTT aktiv", "PTT aktywne", "PTT actif", "PTT activo"],
     "PTT service ready": ["PTT service ready", "PTT-Dienst bereit", "Usługa PTT gotowa", "Service PTT prêt", "Servicio PTT listo"],
-    "PTT / Q = back one menu level": ["PTT / Q = back one menu level", "PTT / Q = eine Menüebene zurück", "PTT / Q = jeden poziom menu wstecz", "PTT / Q = retour d’un niveau", "PTT / Q = retroceder un nivel"],
+    "Backspace = back one menu level": ["Backspace = back one menu level", "Backspace = eine Menüebene zurück", "Backspace = jeden poziom menu wstecz", "Retour arrière = retour d’un niveau", "Retroceso = retroceder un nivel"],
     "No active PTT service": ["No active PTT service", "Kein aktiver PTT-Dienst", "Brak aktywnej usługi PTT", "Aucun service PTT actif", "No hay servicio PTT activo"],
     "Service unavailable": ["Service unavailable", "Dienst nicht erreichbar", "Usługa niedostępna", "Service indisponible", "Servicio no disponible"],
     "Connection interrupted": ["Connection interrupted", "Verbindung unterbrochen", "Połączenie przerwane", "Connexion interrompue", "Conexión interrumpida"],
@@ -208,7 +208,7 @@
     "Playback volume {{volume}}%": ["Playback volume {{volume}}%", "Wiedergabelautstärke {{volume}}%", "Głośność odtwarzania {{volume}}%", "Volume de lecture {{volume}} %", "Volumen de reproducción {{volume}}%"],
     "Playback paused": ["Playback paused", "Wiedergabe pausiert", "Odtwarzanie wstrzymane", "Lecture en pause", "Reproducción en pausa"],
     "Playback running": ["Playback running", "Wiedergabe läuft", "Odtwarzanie trwa", "Lecture en cours", "Reproducción en curso"],
-    "PTT / Q = Back": ["PTT / Q = Back", "PTT / Q = Zurück", "PTT / Q = Wstecz", "PTT / Q = Retour", "PTT / Q = Atrás"],
+    "Backspace = Back": ["Backspace = Back", "Backspace = Zurück", "Backspace = Wstecz", "Retour arrière = Retour", "Retroceso = Atrás"],
     "Input accepted": ["Input accepted", "Eingabe übernommen", "Wejście przyjęte", "Entrée prise en compte", "Entrada aceptada"],
     "Untitled": ["Untitled", "Ohne Titel", "Bez tytułu", "Sans titre", "Sin título"],
     "Please select a news source first.": ["Please select a news source first.", "Bitte zuerst eine Nachrichtenquelle auswählen.", "Najpierw wybierz źródło wiadomości.", "Veuillez d’abord sélectionner une source d’actualités.", "Selecciona primero una fuente de noticias."],
@@ -254,6 +254,9 @@
     "Speech": ["Speech", "Sprache", "Mowa", "Parole", "Voz"],
     "Bluetooth Audio": ["Bluetooth Audio", "Bluetooth-Audio", "Dźwięk Bluetooth", "Audio Bluetooth", "Audio Bluetooth"],
     "Codex Remote": ["Codex Remote", "Codex Remote", "Zdalny Codex", "Codex distant", "Codex remoto"],
-    "TeamSpeak": ["TeamSpeak", "TeamSpeak", "TeamSpeak", "TeamSpeak", "TeamSpeak"]
+    "TeamSpeak": ["TeamSpeak", "TeamSpeak", "TeamSpeak", "TeamSpeak", "TeamSpeak"],
+    "Search services and all metadata": ["Search services and all metadata", "Dienste und alle Metadaten durchsuchen", "Szukaj usług i wszystkich metadanych", "Rechercher dans les services et toutes les métadonnées", "Buscar servicios y todos los metadatos"],
+    "Search name, status, description, adapter …": ["Search name, status, description, adapter …", "Name, Status, Beschreibung, Adapter durchsuchen …", "Szukaj nazwy, stanu, opisu, adaptera …", "Rechercher nom, état, description, adaptateur …", "Buscar nombre, estado, descripción, adaptador …"],
+    "No services match this search.": ["No services match this search.", "Keine Dienste entsprechen dieser Suche.", "Żadne usługi nie pasują do tego wyszukiwania.", "Aucun service ne correspond à cette recherche.", "Ningún servicio coincide con esta búsqueda."]
   }
 }

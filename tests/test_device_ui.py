@@ -92,6 +92,19 @@ class DeviceUiTests(unittest.TestCase):
         self.assertEqual(DEFAULT_ACCENT, (253, 184, 19))
         image = render_device_ui(DeviceUiState())
         self.assertEqual(image.getpixel((100, 60)), (12, 20, 23))
+        for corner in ((0, 0, 13, 6), (227, 0, 240, 6)):
+            self.assertNotIn(
+                (135, 143, 148),
+                {color for _count, color in image.crop(corner).getcolors() or []},
+            )
+
+        with patch("openr4d10.device_ui._vertical_label") as vertical_label:
+            render_device_ui(DeviceUiState())
+        self.assertEqual(vertical_label.call_count, 2)
+        self.assertEqual(
+            [call.kwargs["clockwise"] for call in vertical_label.call_args_list],
+            [False, False],
+        )
 
     def test_date_and_redundant_player_text_are_not_rendered(self) -> None:
         first = DeviceUiState(
@@ -172,8 +185,17 @@ class DeviceUiTests(unittest.TestCase):
     def test_menu_back_arrow_uses_accent_below_battery(self) -> None:
         state = DeviceUiState(menu_open=True, menu_kind="main_menu")
         image = render_device_ui(state)
+        self.assertEqual(image.getpixel((188, 104)), state.accent)
+        self.assertEqual(image.getpixel((190, 104)), (6, 12, 15))
         self.assertEqual(image.getpixel((203, 104)), state.accent)
+        self.assertEqual(image.getpixel((239, 104)), (6, 12, 15))
         self.assertEqual(len(MAIN_MENU_ITEMS), 10)
+
+    def test_player_accent_rail_glows_but_menu_rail_stays_crisp(self) -> None:
+        player = render_device_ui(DeviceUiState())
+        menu = render_device_ui(DeviceUiState(menu_open=True, menu_kind="main_menu"))
+        self.assertNotEqual(player.getpixel((7, 180)), (6, 12, 15))
+        self.assertEqual(menu.getpixel((7, 180)), (6, 12, 15))
 
     def test_play_control_is_below_battery_and_footer_is_empty(self) -> None:
         state = DeviceUiState(playing=True)

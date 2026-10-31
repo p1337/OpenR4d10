@@ -36,8 +36,10 @@ normal render loop with one display lock, updates its existing `DeviceUiState`
 and repaints the physical panel immediately. This is the temporary hardware-
 free input source and remains useful for remote operation after GPIO input is
 added; it is not a second navigation model. Browser keyboard bindings translate
-WASD, arrow keys, Space, Enter and held Q into this same contract and are
-disabled while the user edits a form field.
+WASD, arrow keys, Space, Enter and held Backspace into this same contract and
+are disabled while the user edits a form field. In an open device menu only,
+the browser reverses its arrow-to-step mapping so visible Up and Down follow the
+list; the logical input path and physical encoder semantics do not change.
 
 The dashboard navigation is a client-side tab switch over the existing local
 application sections, not a set of new routes or a second application state.
@@ -62,6 +64,13 @@ successfully active or paused stream may be toggled. A held `right_press`
 remains display navigation for the quick menu. This prevents keyboard or future
 GPIO input from changing a presentation-only `playing` flag while audio keeps
 running.
+
+The selected `DeviceUiState.service` is navigation state, while
+`ServiceCatalog.active_service` identifies only the owner of the currently
+loaded audio source. Periodic rendering requests a view-specific overlay and
+must never copy the audio owner back into the service selector. Weather open,
+step and refresh operations update only weather selection/cache state. A new
+audio source replaces the old one only through an explicit play operation.
 
 The same router maps each `left_outer` detent to a bounded ten-percentage-point
 change of the real mpv volume and `right_outer` to cyclic selection in the
@@ -93,7 +102,11 @@ ten-item settings list. The right outer encoder moves only the bounded menu
 selection, and a short right press opens the selected page instead of reaching
 media controls. Menu history stays inside `DeviceUiState`; an active PTT press
 returns one level unless the current semantic frame explicitly declares a
-ready PTT-owning context. This remains one Pillow renderer and one logical input
+ready PTT-owning context. The back/PTT affordance is one edge-aligned silhouette
+with a left-rounded, right-open frame and a filled mini arrow; the normal player
+alone adds a soft glow to its accent rail. Vertical header labels are offset
+below the rounded top corners and the right label is rotated for reading from
+the right/bottom edge. This remains one Pillow renderer and one logical input
 path, not a second menu surface or a fabricated PTT adapter.
 
 ## Configuration and storage
@@ -162,6 +175,14 @@ approved media directory.
 
 The web dashboard persists named radio stations without query strings and can
 rescan the private media directory for a bounded set of supported extensions.
+It renders that persistent station collection once, in the compact sortable
+editor/list; there is no second preset-card copy of the same rows. The list's
+play action uses the normal yellow interface accent.
+The service catalog is likewise rendered as one compact list. Client-side
+search compares a normalized query with the complete already-public service
+object plus its localized visible labels; it neither sends queries nor exposes
+new server data. Service logos are optional checked-in presentation metadata,
+never guessed remote URLs.
 The scanner resolves every candidate, rejects paths outside the media root and
 removes stale database rows. Status output exposes stable IDs, display names
 and sizes, never local filesystem paths or raw stored stream URLs. SQLite
@@ -187,16 +208,15 @@ is decoded and re-encoded to a maximum 256 x 256 JPEG in the private cache, and
 falls back to a browser-generated initials tile when retrieval fails. Current
 sources and their review references are recorded in `PRESETS.md`.
 
-The native weather module reuses the bounded-download boundary. It reads the
-official DWD WMS capabilities document no more often than every five minutes,
-selects up to eight recent timestamps from
-`Satellite_meteosat_1km_euat_rgb_day_hrv_and_night_ir108_3h`, validates each
-returned image and re-encodes it as a local JPEG. Missing individual timestamps
-are skipped; a DWD or network outage leaves the last valid cache usable. The
-default Germany and Europe crops are seeded exactly once into the ordered
-`channels` table. Channel edits, deletions and order, as well as the priority of
-all services, therefore survive installs and updates. Both the browser loop and
-the physical display read these local files and show `DWD / EUMETSAT`.
+The native weather module reuses the bounded-download boundary. Germany uses
+the official DWD radar-film GIF; its bounded animation frames are decoded and
+re-encoded as local JPEGs. Europe reads the official DWD WMS capabilities no
+more often than every five minutes and selects up to eight recent timestamps
+from `Satellite_meteosat_1km_euat_rgb_day_hrv_and_night_ir108_3h`. Missing or
+invalid frames are skipped; a DWD or network outage leaves the last valid cache
+usable. A one-time guarded metadata upgrade changes only the untouched seeded
+Germany channel to radar and never recreates a deleted channel or resets user
+order. Browser and physical display read only the local cache.
 
 For a fresh machine, `bootstrap.sh` downloads a GitHub-generated source archive
 over HTTPS into a private temporary directory. It checks paths and archive

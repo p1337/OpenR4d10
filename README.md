@@ -35,8 +35,8 @@ the installer report exactly which adapters still need configuration.
 - runtime data in `/run/openr4d10` and state in `/var/lib/openr4d10`
 - versioned SQLite state for non-secret settings, services, stations, channels,
   media and recordings
-- native DWD METEOSAT weather loops for Germany and Europe with bounded local
-  frame caching plus persistent channel and service priority
+- native DWD rain-radar loop for Germany plus METEOSAT for Europe, with bounded
+  local frame caching and persistent channel/service priority
 - central catalog covering all specified service modules with honest dependency,
   adapter and local-login readiness
 - persistent enable/disable lifecycle for native and external service modules
@@ -141,7 +141,8 @@ input events as the future GPIO adapter; no provisional pin assignment is
 required. Keyboard control is available outside form fields: `W`/`S` control
 volume, `A`/`D` control squelch, the up/down arrows control the channel, the
 left/right arrows control the service, Space is the left click and Enter is the
-right click. Holding `Q` exposes the logical PTT input; until a verified PTT
+right click. Holding `Backspace` exposes the logical PTT input outside editable
+fields; until a verified PTT
 service adapter is configured it deliberately shows input state without
 claiming audio transmission.
 
@@ -152,6 +153,12 @@ radio is selected and playback is stopped, it starts the first station in that
 list. The native radio view uses the station name
 and locally cached safe artwork (or an initials fallback), not a raw stream URL
 or a decorative fake equalizer.
+
+Service navigation and audio ownership are independent. Moving to weather,
+system or another visual service never stops or replaces a playing stream and
+periodic status refreshes never force the display back to the audio source.
+Only an explicit Play action in another audio-capable service replaces the
+current source.
 
 The physical 240 × 280 layout uses the compact, localized control labels
 `VOL`, `SQL`, `CH` and `SRV` in its English fallback. Its shorter control head
@@ -180,8 +187,13 @@ recreated by a restart or update. Station URLs with a query are intentionally
 refused for persistent storage, while direct temporary playback remains possible.
 The dashboard separates radio, media/news, device, system and services into
 tabs instead of one long page. On desktop it keeps the exact native 240 × 280
-renderer output visible at the upper right; known stations reuse the same safe
-local artwork route in both playback cards and the sortable station editor.
+renderer output visible at the upper right. The radio tab renders the persistent
+station library exactly once as a compact sortable list with safe local artwork;
+its primary play controls use the yellow interface accent.
+Repeated collections such as services, stations, weather channels and media use
+compact lists instead of card grids. The service list has a local search field
+covering its full public metadata; only verified local logos may replace the
+neutral initials marker.
 The language selector in the header translates static and generated browser
 controls, keeps its choice in local browser storage and does not silently
 change the independent physical-display language. The live-display card uses

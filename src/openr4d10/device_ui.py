@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Mapping
 
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 from .input_events import Control, InputEvent
 from .models import Frame
@@ -264,7 +264,7 @@ class DeviceUiState:
                 self.subtitle = "Recording and playback actions"
             elif self.menu_open:
                 self._select_menu_item()
-            else:
+            elif self.service in {"RADIO", "DMR", "PLAYER"}:
                 self.playing = not self.playing
                 self.right_action = "PAUSE" if self.playing else "PLAY"
         elif event.control == Control.PTT:
@@ -391,7 +391,10 @@ def _vertical_label(
     label = Image.new("RGBA", (bbox[2] + 6, bbox[3] - bbox[1] + 6), (0, 0, 0, 0))
     ImageDraw.Draw(label).text((3, 2 - bbox[1]), text, font=font, fill=(135, 143, 148, 255))
     rotated = label.rotate(-90 if clockwise else 90, expand=True)
-    image.alpha_composite(rotated, (x, max(1, (header_height - rotated.height) // 2)))
+    image.alpha_composite(
+        rotated,
+        (x, max(6, (header_height - rotated.height) // 2 + 5)),
+    )
 
 
 def _wifi_icon(draw: ImageDraw.ImageDraw, x: int, y: int, color: tuple[int, int, int]) -> None:
@@ -444,9 +447,17 @@ def _draw_back_or_ptt(
     accent: tuple[int, int, int],
     ptt_active: bool,
 ) -> None:
+    badge_left = 188
+    badge_top = 89
+    badge_right = WIDTH + 8
+    badge_bottom = 119
     if ptt_active:
-        draw.rounded_rectangle((188, 89, 239, 119), radius=9, fill=(207, 38, 49))
-        draw.rectangle((230, 89, 239, 119), fill=(207, 38, 49))
+        draw.rounded_rectangle(
+            (badge_left, badge_top, badge_right, badge_bottom),
+            radius=9,
+            fill=(207, 38, 49),
+        )
+        draw.rectangle((198, badge_top, badge_right, badge_bottom), fill=(207, 38, 49))
         font = _font(12, bold=True)
         bounds = draw.textbbox((0, 0), "PTT", font=font)
         draw.text(
@@ -456,8 +467,46 @@ def _draw_back_or_ptt(
             fill=(255, 255, 255),
         )
         return
-    draw.line((224, 99, 202, 104, 224, 109), fill=accent, width=4, joint="curve")
-    draw.line((203, 104, 231, 104), fill=accent, width=4)
+    background = (6, 12, 15)
+    draw.rounded_rectangle(
+        (badge_left, badge_top, badge_right, badge_bottom),
+        radius=9,
+        fill=accent,
+    )
+    draw.rectangle((198, badge_top, badge_right, badge_bottom), fill=accent)
+    draw.rounded_rectangle(
+        (badge_left + 2, badge_top + 2, badge_right + 2, badge_bottom - 2),
+        radius=7,
+        fill=background,
+    )
+    draw.rectangle(
+        (198, badge_top + 2, badge_right + 2, badge_bottom - 2),
+        fill=background,
+    )
+    draw.polygon(
+        (
+            (202, 104),
+            (209, 97),
+            (209, 101),
+            (219, 101),
+            (219, 107),
+            (209, 107),
+            (209, 111),
+        ),
+        fill=accent,
+    )
+
+
+def _draw_player_accent_rail(
+    image: Image.Image,
+    top: int,
+    accent: tuple[int, int, int],
+) -> None:
+    glow = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    glow_draw = ImageDraw.Draw(glow)
+    glow_draw.rectangle((0, top, 5, HEIGHT - 1), fill=(*accent, 185))
+    image.alpha_composite(glow.filter(ImageFilter.GaussianBlur(radius=5)))
+    ImageDraw.Draw(image).rectangle((0, top, 2, HEIGHT - 1), fill=accent)
 
 
 def _draw_main_menu_items(
@@ -524,7 +573,7 @@ def render_device_ui(
     draw.line((17, 26, 222, 26), fill=(25, 35, 39), width=1)
     draw.line((119, 3, 119, 49), fill=(25, 35, 39), width=1)
     _vertical_label(image, left_action, 1, clockwise=False, header_height=header_height)
-    _vertical_label(image, right_action, 227, clockwise=True, header_height=header_height)
+    _vertical_label(image, right_action, 227, clockwise=False, header_height=header_height)
     _control_value(draw, 19, 7, str(controls[0]), f"{state.volume}%", accent)
     _control_value(draw, 19, 32, str(controls[1]), str(state.squelch), accent)
     _control_value(draw, 122, 7, str(controls[2]), f"{state.channel:03d}", accent)
@@ -549,8 +598,8 @@ def render_device_ui(
 
     content_top = 82
     draw.rectangle((0, content_top, WIDTH - 1, HEIGHT - 1), fill=(6, 12, 15))
-    draw.rectangle((0, content_top, 3, HEIGHT - 1), fill=accent)
     if state.menu_open:
+        draw.rectangle((0, content_top, 3, HEIGHT - 1), fill=accent)
         menu_key = state.menu_kind or "main_menu"
         menu_title = str(text.get(menu_key, text["main_menu"]))
         _draw_menu_heading(draw, menu_title, content_top, accent)
@@ -559,18 +608,23 @@ def render_device_ui(
             _draw_main_menu_items(draw, state, text)
         return image.convert("RGB")
 
+    _draw_player_accent_rail(image, content_top, accent)
+    draw = ImageDraw.Draw(image)
+
     station_font = _font(18, bold=True)
     station = _fit_text(draw, state.source, station_font, 164)
     draw.text((14, 94), station, font=station_font, fill=(245, 248, 249))
 
     if state.service == "WEATHER":
         if artwork is not None:
-            weather = ImageOps.fit(
+            weather = ImageOps.contain(
                 artwork.convert("RGB"),
                 (212, 148),
                 method=Image.Resampling.LANCZOS,
             )
-            image.paste(weather, (14, 119))
+            weather_x = 14 + (212 - weather.width) // 2
+            weather_y = 119 + (148 - weather.height) // 2
+            image.paste(weather, (weather_x, weather_y))
         else:
             draw.rounded_rectangle(
                 (14, 119, 225, 266),

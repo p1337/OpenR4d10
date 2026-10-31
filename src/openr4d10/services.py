@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 from .content import (
     CameraSnapshot,
     ContentError,
+    DWD_RADAR_GIF_URL,
     DwdSatelliteFrames,
     FeedReader,
     PresetArtwork,
@@ -35,6 +36,7 @@ DEFAULT_ENABLED_SERVICES = {
 }
 DISPLAY_BRIGHTNESS_KEY = "display.brightness_percent"
 DEFAULT_DISPLAY_BRIGHTNESS = 100
+RADAR_DEFAULT_MIGRATION_KEY = "weather.radar_default_v1"
 
 LOG = logging.getLogger(__name__)
 
@@ -55,7 +57,7 @@ class ServiceManifest:
 BUILTIN_SERVICES = (
     ServiceManifest("system", "System", "core", "Status, updates and diagnostics", ("status", "diagnostics"), "native"),
     ServiceManifest("webradio", "Web Radio", "audio", "Internet radio playback and favorites", ("playback", "favorites", "recording"), "process", ("mpv",)),
-    ServiceManifest("weather", "Weather", "information", "DWD satellite image loops for configured regions", ("images", "channels"), "native"),
+    ServiceManifest("weather", "Weather", "information", "DWD rain radar and satellite image loops", ("images", "channels"), "native"),
     ServiceManifest("local_media", "Local Media", "audio", "Local MP3, FLAC, MP4 and recordings", ("playback", "library"), "process", ("mpv",)),
     ServiceManifest("recorder", "Recorder", "audio", "Record supported audio sources", ("recording", "library"), "process", ("ffmpeg",)),
     ServiceManifest("brandmeister", "BrandMeister", "radio", "DMR audio over a configured lawful gateway", ("playback", "talkgroups", "recording"), "external", requires_credentials=True, credential_hint="Configure an individual BrandMeister-compatible account or gateway locally."),
@@ -143,20 +145,62 @@ class ServiceCatalog:
             (
                 (
                     "dwd-deutschland",
-                    "Deutschland",
-                    {"bbox": [47.0, 5.0, 55.5, 16.0], "provider": "DWD / EUMETSAT"},
+                    "Regenradar Deutschland",
+                    {
+                        "bbox": [47.0, 5.0, 55.5, 16.0],
+                        "kind": "radar_gif",
+                        "provider": "DWD",
+                        "source_url": DWD_RADAR_GIF_URL,
+                    },
                 ),
                 (
                     "dwd-europa",
                     "Europa",
-                    {"bbox": [30.0, -25.0, 72.0, 45.0], "provider": "DWD / EUMETSAT"},
+                    {
+                        "bbox": [30.0, -25.0, 72.0, 45.0],
+                        "kind": "satellite_wms",
+                        "provider": "DWD / EUMETSAT",
+                    },
                 ),
             ),
             marker="weather.defaults_seeded_v1",
         )
+        self._upgrade_germany_weather_default()
         weather_channels = self.store.channels("weather")
         if weather_channels:
             self.active_weather_channel_id = int(weather_channels[0]["id"])
+
+    def _upgrade_germany_weather_default(self) -> None:
+        """Change only the untouched seeded Germany channel; never recreate it."""
+        if self.store.get_setting(RADAR_DEFAULT_MIGRATION_KEY, False) is True:
+            return
+        germany = next(
+            (
+                item
+                for item in self.store.channels("weather")
+                if item["external_id"] == "dwd-deutschland"
+            ),
+            None,
+        )
+        if germany is not None:
+            metadata = germany.get("metadata")
+            if isinstance(metadata, dict) and metadata.get("kind") is None:
+                name = (
+                    "Regenradar Deutschland"
+                    if germany["name"] == "Deutschland"
+                    else str(germany["name"])
+                )
+                self.store.update_channel(
+                    int(germany["id"]),
+                    name,
+                    {
+                        "bbox": metadata.get("bbox", [47.0, 5.0, 55.5, 16.0]),
+                        "kind": "radar_gif",
+                        "provider": "DWD",
+                        "source_url": DWD_RADAR_GIF_URL,
+                    },
+                )
+        self.store.set_setting(RADAR_DEFAULT_MIGRATION_KEY, True)
 
     def display_brightness(self) -> int:
         value = self.store.get_setting(
@@ -257,6 +301,16 @@ class ServiceCatalog:
         for channel, item in enumerate(self.store.channels("weather"), start=1):
             metadata = item.get("metadata")
             bbox = metadata.get("bbox") if isinstance(metadata, dict) else None
+            provider = (
+                str(metadata.get("provider") or "DWD / EUMETSAT")
+                if isinstance(metadata, dict)
+                else "DWD / EUMETSAT"
+            )
+            kind = (
+                str(metadata.get("kind") or "satellite_wms")
+                if isinstance(metadata, dict)
+                else "satellite_wms"
+            )
             frames = self.weather.frames(str(item["external_id"]))
             weather_channels.append(
                 {
@@ -266,7 +320,8 @@ class ServiceCatalog:
                     "position": channel - 1,
                     "channel": channel,
                     "bbox": bbox,
-                    "provider": "DWD / EUMETSAT",
+                    "provider": provider,
+                    "kind": kind,
                     "active": int(item["id"]) == self.active_weather_channel_id,
                     "frames": [
                         {
@@ -582,8 +637,6 @@ class ServiceCatalog:
             if deleted and self.active_weather_channel_id == channel_id:
                 remaining = self.store.channels("weather")
                 self.active_weather_channel_id = int(remaining[0]["id"]) if remaining else None
-                if not remaining:
-                    self.active_service = "system"
             return {"deleted": deleted}
         elif action == "weather_channel_move":
             channel_id = request.get("channel_id")
@@ -600,11 +653,10 @@ class ServiceCatalog:
             self._require_enabled("weather")
             channel_id = request.get("channel_id", self.active_weather_channel_id)
             self._select_weather_channel(channel_id)
-            self.active_service = "weather"
             channel = self.store.channel(self.active_weather_channel_id)  # type: ignore[arg-type]
             assert channel is not None
             self._cache_weather(channel)
-            return {"active_service": "weather", "channel_id": self.active_weather_channel_id}
+            return {"view_service": "weather", "channel_id": self.active_weather_channel_id}
         elif action == "weather_step":
             self._require_enabled("weather")
             steps = request.get("steps")
@@ -616,22 +668,17 @@ class ServiceCatalog:
             ids = [int(item["id"]) for item in channels]
             current = ids.index(self.active_weather_channel_id) if self.active_weather_channel_id in ids else 0
             self.active_weather_channel_id = ids[(current + steps) % len(ids)]
-            self.active_service = "weather"
             selected = self.store.channel(self.active_weather_channel_id)
             assert selected is not None
             self._cache_weather(selected)
-            return {"active_service": "weather", "channel_id": self.active_weather_channel_id}
+            return {"view_service": "weather", "channel_id": self.active_weather_channel_id}
         elif action == "weather_refresh":
             self._require_enabled("weather")
             channel_id = request.get("channel_id", self.active_weather_channel_id)
             self._select_weather_channel(channel_id)
             channel = self.store.channel(self.active_weather_channel_id)  # type: ignore[arg-type]
             assert channel is not None
-            frames = self.weather.refresh(
-                str(channel["external_id"]),
-                self._weather_bbox(channel["metadata"].get("bbox")),
-            )
-            self.active_service = "weather"
+            frames = self._refresh_weather_channel(channel)
             return {"channel_id": self.active_weather_channel_id, "frames": len(frames)}
         else:
             raise ValueError("unsupported control action")
@@ -744,10 +791,7 @@ class ServiceCatalog:
 
         def cache() -> None:
             try:
-                metadata = channel.get("metadata")
-                if not isinstance(metadata, dict):
-                    raise ValueError("weather channel metadata is invalid")
-                self.weather.refresh(key, self._weather_bbox(metadata.get("bbox")))
+                self._refresh_weather_channel(channel)
             except (ContentError, OSError, ValueError) as exc:
                 LOG.warning("DWD weather frames unavailable for %s: %s", key, exc)
             finally:
@@ -755,6 +799,24 @@ class ServiceCatalog:
                     self._weather_pending.discard(key)
 
         self._start_worker(f"openr4d10-weather-{key}", cache)
+
+    def _refresh_weather_channel(
+        self,
+        channel: dict[str, object],
+    ) -> list[dict[str, object]]:
+        metadata = channel.get("metadata")
+        if not isinstance(metadata, dict):
+            raise ValueError("weather channel metadata is invalid")
+        key = str(channel["external_id"])
+        if metadata.get("kind") == "radar_gif":
+            source_url = metadata.get("source_url")
+            if source_url != DWD_RADAR_GIF_URL:
+                raise ValueError("weather radar source is not the reviewed DWD URL")
+            refresh_radar = getattr(self.weather, "refresh_radar", None)
+            if not callable(refresh_radar):
+                raise ValueError("weather backend does not support radar animations")
+            return refresh_radar(key, DWD_RADAR_GIF_URL)
+        return self.weather.refresh(key, self._weather_bbox(metadata.get("bbox")))
 
     def _start_worker(self, name: str, target: Callable[[], None]) -> None:
         def run() -> None:
@@ -816,38 +878,96 @@ class ServiceCatalog:
         except OSError:
             return None
 
-    def receiver_overlay(self) -> dict[str, object]:
-        if self.active_service == "weather" and self.active_weather_channel_id is not None:
+    def receiver_overlay(self, view_service: str | None = None) -> dict[str, object]:
+        """Return metadata for the selected view without changing audio ownership."""
+        requested = str(view_service or "").upper()
+        if requested == "WEATHER" and self.active_weather_channel_id is not None:
             channel = self.store.channel(self.active_weather_channel_id)
             if channel is not None:
                 channels = self.store.channels("weather")
                 ids = [int(item["id"]) for item in channels]
                 frames = self.weather.frames(str(channel["external_id"]))
                 frame = frames[int(time.monotonic() / 2) % len(frames)] if frames else None
+                metadata = channel.get("metadata")
+                provider = (
+                    str(metadata.get("provider") or "DWD / EUMETSAT")
+                    if isinstance(metadata, dict)
+                    else "DWD / EUMETSAT"
+                )
+                loading = (
+                    "Regenradar wird geladen"
+                    if isinstance(metadata, dict) and metadata.get("kind") == "radar_gif"
+                    else "Satellitenbilder werden geladen"
+                )
                 return {
                     "service": "WEATHER",
                     "station": str(channel["name"]),
-                    "title": "DWD / EUMETSAT",
+                    "title": provider,
                     "subtitle": (
-                        str(frame["timestamp"]) if frame is not None else "Satellitenbilder werden geladen"
+                        str(frame["timestamp"]) if frame is not None else loading
                     ),
                     "playing": bool(frames),
                     "channel": ids.index(self.active_weather_channel_id) + 1 if self.active_weather_channel_id in ids else 1,
                     "image_file": str(frame["file"]) if frame is not None else None,
                 }
         playback = self.player.state
+        service_label = {
+            "webradio": "RADIO",
+            "local_media": "PLAYER",
+            "youtube_audio": "PLAYER",
+            "spotify": "PLAYER",
+            "ard_mediathek": "PLAYER",
+            "zdf_mediathek": "PLAYER",
+            "international_media": "PLAYER",
+            "brandmeister": "DMR",
+            "remote_sdr": "DMR",
+            "private_ptt": "DMR",
+            "mumble": "DMR",
+            "discord": "DMR",
+            "teamspeak": "DMR",
+            "recorder": "REC",
+        }.get(self.active_service, "SYSTEM")
+        if requested and requested != service_label:
+            if requested == "RADIO":
+                stations = self.store.stations()
+                station = stations[0] if stations else None
+                preset = self._preset_for_station(station) if station is not None else None
+                return {
+                    "service": "RADIO",
+                    "station": str(station["name"]) if station is not None else "Radio",
+                    "title": str(station["name"]) if station is not None else "Radio",
+                    "subtitle": "Play starts this audio service",
+                    "playing": False,
+                    "volume": playback.volume,
+                    "preset_id": preset.preset_id if preset is not None else None,
+                    "channel": 1 if station is not None else None,
+                }
+            defaults = {
+                "SYSTEM": ("OPENR4D10", "System online", "Receiver ready"),
+                "PLAYER": ("LOCAL MEDIA", "Local media", "Select media and press play"),
+                "DMR": ("DMR", "Digital radio", "Select a channel and press play"),
+                "REC": ("RECORDER", "Recorder", "Recording controls"),
+            }
+            station, title, subtitle = defaults.get(
+                requested,
+                (requested or "OPENR4D10", requested or "System online", "Ready"),
+            )
+            return {
+                "service": requested or "SYSTEM",
+                "station": station,
+                "title": title,
+                "subtitle": subtitle,
+                "playing": False,
+                "volume": playback.volume,
+            }
         if playback.state not in {"playing", "paused"}:
-            return {}
-        selected = self._selected_preset()
+            return {"service": requested or "SYSTEM", "playing": False, "volume": playback.volume}
+        selected = self._selected_preset() if self.active_service == "webradio" else None
         station = (
             str(selected["name"])
             if selected is not None
             else playback.source or self.active_service
         )
-        service_label = {
-            "local_media": "PLAYER",
-            "recorder": "REC",
-        }.get(self.active_service, "RADIO")
         return {
             "service": service_label,
             "station": station,

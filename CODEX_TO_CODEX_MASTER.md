@@ -224,6 +224,16 @@ Die zwei Encoder-Drucktaster sind verbindlich so belegt:
 | links | Hauptmenü | Einstellungen des aktiven Dienstes |
 | rechts | Play/Pause; bei BrandMeister Kanal/Talkgroup aktivieren oder deaktivieren | Quick-Menü inklusive Aufnahme |
 
+Die ausgewählte Geräteansicht und der tatsächlich laufende Audioplayer sind
+zwei getrennte Zustände. Das Drehen des Dienstreglers navigiert ausschließlich
+zwischen Diensten und darf einen laufenden Stream weder stoppen noch den
+angezeigten Dienst beim nächsten Statusrefresh zurücksetzen. Der zuletzt
+gestartete Audiodienst spielt im Hintergrund weiter, bis der Benutzer in einem
+anderen audiofähigen Dienst ausdrücklich Play auslöst; erst dieser Play-Befehl
+ersetzt die bisherige Audioquelle. Informations- und Bilddienste wie Wetter
+besitzen den Player nicht und verändern laufende Musik weder beim Öffnen noch
+beim Kanalwechsel oder Aktualisieren.
+
 Bis die Encoder verfügbar sind, bildet die Weboberfläche dieselben logischen
 Eingaben zusätzlich auf eine PC-Tastatur ab:
 
@@ -233,7 +243,16 @@ Eingaben zusätzlich auf eine PC-Tastatur ab:
 - Pfeil links/rechts: rechter innerer Encoder (Dienst zurück/vor),
 - Leertaste: linker Drucktaster,
 - Enter: rechter Drucktaster,
-- `Q` halten: PTT aktiv; Loslassen beendet PTT.
+- Backspace halten: PTT aktiv; Loslassen beendet PTT. In Text-, Auswahl- und
+  anderen bearbeitbaren Feldern bleibt Backspace ausschließlich die normale
+  Löschtaste und löst niemals PTT oder Zurück aus.
+
+Im geöffneten Gerätemenü folgt die Browser-Pfeiltastatur der sichtbaren
+Listenrichtung: Pfeil hoch bewegt die Markierung genau einen Eintrag nach oben,
+Pfeil runter genau einen Eintrag nach unten. Außerhalb eines Menüs bleibt die
+festgelegte Kanalbedienung unverändert. Browser und späterer Encoder senden
+weiterhin denselben logischen `right_outer`-Eingabepfad; nur die Zuordnung der
+Browserpfeile wird im Menü kontextgerecht gespiegelt.
 
 Die Tastatursteuerung ist in Text- und Auswahlfeldern inaktiv, damit Eingaben
 nicht versehentlich Gerätesteuerungen oder PTT auslösen. In jedem geöffneten
@@ -309,6 +328,20 @@ PTT von einem tatsächlich bereiten Dienst verwendet und gerade gehalten,
 ersetzt ihn ein rotes Feld mit weißem `PTT`: rechts bündig am Displayrand,
 rechts eckig und links abgerundet. Außerhalb eines echten PTT-Kontexts wird
 dieses rote Feld niemals angezeigt.
+
+Der normale Zurück-Hinweis verwendet ein kleines, gefülltes Pfeil-Icon statt
+aus einzelnen Linien zusammengesetzter Striche. Pfeil und Akzentrahmen bilden
+gemeinsam ein rechts angedocktes PTT-Tastenfeld: links abgerundet, oben und
+unten gerahmt, ohne sichtbaren rechten Rand und rechnerisch über den rechten
+Displayrand hinauslaufend. Das rote aktive PTT-Feld verwendet dieselbe
+Silhouette. Die orange linke Akzentlinie bleibt im Menü klar und scharf; im
+normalen Player erhält sie einen kontrollierten weichen Glow.
+
+Wegen der real abgerundeten Displayecken werden beide vertikalen
+Drucktasterbeschriftungen im oberen Funktionskopf einige Pixel nach unten
+versetzt. Die rechte Beschriftung wird gegenüber der bisherigen Fassung um
+180 Grad gedreht, sodass die Randtexte einheitlich von unten beziehungsweise
+von der rechten Geräteseite lesbar bleiben.
 
 Der Funktionskopf muss optisch eindeutig vom Medienbereich getrennt bleiben.
 
@@ -511,14 +544,16 @@ gelangen ausschließlich über geprüfte Pull/Merge Requests in den Katalog.
 - BrandMeister/DMR-Audio über IP zum Hören,
 - Webradio,
 - Wetter als nativer Informationsdienst. Die Grundausstattung besteht zunächst
-  aus genau zwei sortierbaren DWD-METEOSAT-Kanälen: Deutschland und Europa.
-  Beide zeigen die jüngsten verfügbaren Satellitenbilder als endlose lokale
-  Bildfolge. Grundlage ist ausschließlich der offizielle DWD-WMS-Layer
-  `Satellite_meteosat_1km_euat_rgb_day_hrv_and_night_ir108_3h`; Deutschland
-  ist ein begrenzter Ausschnitt desselben Produkts. Die Quellenangabe nennt
-  DWD und EUMETSAT. Der Abruf von Fähigkeiten beziehungsweise neuen Daten darf
-  nicht häufiger als alle fünf Minuten erfolgen. Bei Netz- oder DWD-Ausfall
-  bleiben bereits sicher dekodierte lokale Frames verwendbar,
+  aus genau zwei sortierbaren Kanälen: Deutschland zeigt primär den offiziellen
+  DWD-Regenradarfilm
+  `https://www.wettergefahren.de/DWD/wetter/radar/Radarfilm_WEB_DL.gif`, Europa
+  die jüngsten verfügbaren METEOSAT-Satellitenbilder als endlose lokale
+  Bildfolge. Der Europa-Kanal verwendet den offiziellen DWD-WMS-Layer
+  `Satellite_meteosat_1km_euat_rgb_day_hrv_and_night_ir108_3h`. Die
+  Quellenangabe nennt beim Radar DWD und beim Satellitenbild DWD / EUMETSAT.
+  Beide Quellen werden höchstens alle fünf Minuten abgerufen. GIF- und
+  WMS-Bilder werden begrenzt geladen, dekodiert und als lokale Einzel-JPEGs neu
+  codiert; bei Netz- oder DWD-Ausfall bleiben sichere Cache-Frames verwendbar,
 - YouTube-Audio innerhalb der technisch und rechtlich verfügbaren Schnittstellen,
 - Mumble-Client mit Push-to-Talk,
 - Discord-Client mit Push-to-Talk,
@@ -646,6 +681,23 @@ Im Radio-Tab darf die Überschrift `Sender & Wiedergabe` nicht den verfügbaren
 Inhaltsraum dominieren. Ihre Schriftgröße beträgt ungefähr 50 Prozent der
 bisherigen globalen großen `h1`-Darstellung; diese gezielte Korrektur verändert
 keine anderen Seiten-, Wetter- oder Systemüberschriften.
+
+Die persönliche Radiosenderbibliothek wird im Radio-Tab genau einmal als
+platzsparende Liste dargestellt. Diese eine Liste ist gleichzeitig Schnellwahl
+und Editor: sie zeigt Senderbild, Namen, Herkunft/Genre sowie Abspielen,
+Verschieben und Löschen. Eine zweite Kartenansicht derselben persistenten
+Sender ist unzulässig. Der Abspielen-Knopf der verbleibenden Liste verwendet
+die gelbe Standard-Akzentfarbe, damit die primäre Aktion sofort erkennbar ist.
+
+Wiederholte Sammlungen der Weboberfläche werden grundsätzlich als kompakte
+Listen und nicht als großflächige Kartenraster dargestellt. Das gilt
+insbesondere für Dienstmodule, Radiosender, Wetterkanäle und Medien. Einzelne
+Statuszusammenfassungen und Bedienflächen sind davon nicht betroffen. Über der
+Dienstliste steht ein Suchfeld, das alle vorhandenen Metadaten eines Dienstes
+einschließlich Name, Beschreibung, Bereitschaft, Implementierung, Abhängigkeiten
+und interner Kennung lokal filtert. Verifizierte, lokal mitgelieferte echte
+Logos dürfen angezeigt werden; ohne geprüfte Bildquelle wird ein neutraler
+Initialen-Platzhalter verwendet und niemals ein vermeintliches Logo erfunden.
 
 Auf breiten Browserfenstern bleibt rechts oben eine nicht mitscrollende native
 240-x-280-Liveansicht sichtbar. Sie zeigt die Pixel desselben Pillow-Renderers,
@@ -897,6 +949,57 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-31 – Dienstansicht von Hintergrundaudio getrennt; DWD-Regenradar
+
+- Robert stellt klar, dass ein Dienstwechsel nur die Ansicht wechselt. Der
+  laufende Audiodienst spielt im Hintergrund weiter; erst Play in einem anderen
+  audiofähigen Dienst ersetzt ihn. Wetter und andere visuelle Dienste dürfen
+  Audio weder beim Öffnen noch beim Kanalwechsel oder Refresh verändern.
+- Der wiederholte Sprung zur Wetteransicht entsteht durch den bisher gemeinsam
+  verwendeten `active_service`-Zustand für Ansicht und Medienquelle. Diese
+  Zustände werden getrennt; Kanal- und Play-Routing richten sich nach der
+  sichtbaren Geräteansicht, der Player behält seinen eigenen Audioeigentümer.
+- Der Deutschland-Wetterkanal verwendet künftig primär Roberts offiziellen
+  DWD-Regenradarfilm. Die GIF-Frames werden wie die WMS-Bilder begrenzt geladen,
+  lokal dekodiert und als sichere JPEG-Sequenz gecacht. Europa bleibt vorerst
+  der bestehende METEOSAT-Kanal.
+
+### 2026-10-31 – Einzelne kompakte Radiosenderliste
+
+- Die Senderbibliothek wurde bisher zweimal aus demselben SQLite-Zustand
+  dargestellt: oben als große Schnellwahlkarten und darunter als sortierbare
+  Verwaltungsliste. Robert entfernt die redundante obere Kartenansicht.
+- Im Browser bleibt ausschließlich die kompakte Liste mit Senderbildern,
+  Namen, Metadaten, Sortierung und Löschen erhalten. Ihre Abspielen-Knöpfe
+  verwenden die gelbe Standard-Akzentfarbe.
+
+### 2026-10-31 – Kompakte Dienstliste mit Metadatensuche
+
+- Die großflächigen Dienstkarten werden durch eine einspaltige, responsive
+  Liste ersetzt. Jede Zeile behält Status, Beschreibung, Adapterhinweis,
+  Sortierung und Aktivierung, benötigt aber deutlich weniger Platz.
+- Ein Suchfeld oberhalb der Liste filtert lokal über sämtliche Dienstmetadaten,
+  nicht nur über den Anzeigenamen. Echte Logos werden nur aus verifizierten
+  lokalen Projektdateien verwendet; andernfalls bleibt die Darstellung neutral.
+
+### 2026-10-31 – Menü-Scrollrichtung, PTT-Randfeld und Displayecken
+
+- Robert korrigiert die Browsernavigation im geöffneten Gerätemenü: Pfeil hoch
+  bewegt die Auswahl nach oben, Pfeil runter nach unten. Der bestehende
+  gemeinsame `right_outer`-Pfad bleibt erhalten.
+- Die bisherige Browser-PTT-Taste `Q` wird vollständig durch gehaltenes
+  Backspace ersetzt. Außerhalb bearbeitbarer Felder aktiviert `keydown` PTT
+  beziehungsweise Menü-Zurück; `keyup`, Fokusverlust und ein ausgeblendeter
+  Tab geben den Zustand sicher frei. In Eingabefeldern löscht Backspace normal.
+- Der bisher aus zwei dicken Linien gezeichnete Zurück-Pfeil entfällt. Ein
+  kleines gefülltes Pfeil-Icon sitzt nun in einem links abgerundeten,
+  rechts offenen und über den Displayrand hinauslaufenden Akzentrahmen, der die
+  Zugehörigkeit zur PTT-Taste sichtbar macht. Aktives PTT nutzt dieselbe Form
+  als rotes Feld mit weißer Schrift.
+- Die linke Akzentlinie leuchtet im Player weich, bleibt im Menü aber scharf.
+  Beide vertikalen Kopftexte rücken aus den abgerundeten oberen Displayecken;
+  der rechte Text wird um 180 Grad gedreht.
 
 ### 2026-10-31 – Browser-Sprachumschaltung und kompakter Live-Display-Kopf
 
@@ -1154,12 +1257,13 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ### 2026-10-30 – Browser-Tastatursteuerung und sichere PTT-Taste
 
-- Die virtuelle Encoderbedienung erhält die verbindliche Tastaturbelegung
-  `WASD`, Pfeiltasten, Leertaste, Enter und `Q` für PTT. Alle Tasten verwenden
+- Die virtuelle Encoderbedienung erhielt zunächst `WASD`, Pfeiltasten,
+  Leertaste, Enter und `Q` für PTT. Die spätere Entscheidung vom 2026-10-31
+  ersetzt ausschließlich `Q` durch Backspace; alle Tasten verwenden weiterhin
   die bestehende logische Eingabeschnittstelle und keine parallele Navigation.
-- `Q` ist ein gehaltenes Signal: `keydown` aktiviert PTT, `keyup`, Fokusverlust
-  oder ausgeblendeter Tab deaktiviert es. Damit darf PTT nicht durch einen
-  verlorenen Tastaturzustand eingeschaltet bleiben.
+- Backspace ist ein gehaltenes Signal: `keydown` aktiviert PTT, `keyup`,
+  Fokusverlust oder ausgeblendeter Tab deaktiviert es. Damit darf PTT nicht
+  durch einen verlorenen Tastaturzustand eingeschaltet bleiben.
 - Tastaturkürzel greifen nicht in Formularfeldern oder editierbaren Elementen.
   Solange kein echter berechtigter PTT-Dienstadapter bereitsteht, zeigt die UI
   nur den Eingabestatus und behauptet keine Mikrofon- oder Audioübertragung.
