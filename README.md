@@ -24,6 +24,8 @@ the installer report exactly which adapters still need configuration.
 - explicitly confirmed system updates directly from the web dashboard
 - automatic recovery of stale web-update state after a reboot
 - confirmed NetworkManager WLAN repair without persistent web-side credentials
+- automatic WPA2 setup hotspot when saved WLANs remain unavailable
+- actual connected SSID beside the physical Wi-Fi symbol instead of `WLAN`
 - native Whisplay ST7789 boot animation installed and enabled automatically
 - safe display handoff both at boot and during an in-session installation
 - real-device-confirmed Whisplay SPI transport, colour order and orientation
@@ -146,6 +148,15 @@ explicitly selected replacement. The passphrase is carried in a short-lived
 never in Git, SQLite, status JSON, backups, logs or a process argument. Because
 the current dashboard is plain local HTTP, enter WLAN
 credentials only from a trusted private LAN.
+
+If no saved WLAN can be activated after the boot/disconnect grace period,
+OpenR4d10 automatically starts a device-specific WPA2 setup hotspot through the
+same NetworkManager owner. The Whisplay shows its complete SSID, locally
+generated password and `http://10.42.0.1/`; connect the phone to that hotspot,
+open the shown address and use **Device → WLAN repair**. A successful repair
+replaces the hotspot with the new client connection. The hotspot password is
+generated only on the device and is excluded from Git, status JSON, SQLite,
+logs and backups.
 
 The dashboard shows live service, system and adapter status. Until verified
 Whisplay and PiSugar adapters are configured, it labels those components as

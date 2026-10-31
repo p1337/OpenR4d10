@@ -136,7 +136,7 @@ only BCM4 reset, BCM27 data/command and BCM22 active-low backlight, and writes
 240 x 280 big-endian RGB565 frames through SPI0/CS0 at a conservative 32 MHz.
 
 The UI implements the documented four compact control fields, vertical
-`MENU`/`PLAY` click labels, WLAN/IP, a larger time without a date, the battery
+`MENU`/`PLAY` click labels, actual Wi-Fi SSID/IP, a larger time without a date, the battery
 status and the service-dependent media area. The control header is shorter and
 uses larger labels/values. In radio mode the service caption, written player
 state and lower status/brand strip are omitted; the station artwork is 138 ×
@@ -149,6 +149,16 @@ Logical encoder events are implemented and can be tested without hardware; no
 encoder GPIO assignment is active. The local web dashboard exposes all four
 rotations and both short/long press actions through the same input-event path
 and repaints the physical LCD immediately.
+
+When NetworkManager enters the automatic setup-hotspot mode, the physical
+display temporarily replaces the normal content area with the complete
+device-specific setup SSID, locally generated WPA2 passphrase and
+`http://10.42.0.1/`. This is intentionally a physical provisioning screen: the
+passphrase is never added to semantic frames, public status, SQLite, backups or
+logs. After the phone submits a working client WLAN through the existing web
+repair form, the normal device UI returns and the status row shows that WLAN's
+actual SSID. If no profile is active it shows `OFFLINE`, never the fabricated
+generic label `WLAN`.
 
 The official PiSugar Whisplay
 [`runtime/whisplay.py`](https://github.com/PiSugar/Whisplay/blob/bb4cdcc5371838009804940559e828d6a7a7ba04/runtime/whisplay.py)

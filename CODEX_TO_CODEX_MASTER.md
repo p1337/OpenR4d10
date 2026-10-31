@@ -421,6 +421,23 @@ Startlogik:
 5. Captive Portal beziehungsweise lokale Webadresse öffnet die Konfiguration,
 6. Zugangsdaten werden gespeichert und der Verbindungsversuch wiederholt.
 
+Der Fallback-Hotspot wird vom bereits vorhandenen NetworkManager auf dem
+festen Interface `wlan0` bereitgestellt; ein zweiter Netzwerk- oder DHCP-Stack
+ist verboten. Nach einer Karenzzeit für gespeicherte Clientprofile startet ein
+WPA2-geschützter Hotspot mit einer gerätespezifischen SSID. Das zufällig lokal
+erzeugte Hotspotkennwort liegt ausschließlich in einer Secret-Datei mit Modus
+0600 und im root-only NetworkManager-Profil. Das physische Display zeigt im
+aktiven Einrichtungsmodus SSID, Kennwort und `http://10.42.0.1/`; öffentliche
+JSON-Statusdaten, SQLite, Backups, Logs und Git enthalten das Kennwort niemals.
+Der Hotspot bleibt stabil aktiv, bis eine neue Clientverbindung erfolgreich
+hergestellt oder das Gerät neu gestartet wird; ein kurz instabiles WLAN darf
+keinen ständigen Wechsel zwischen Client und Access Point auslösen.
+
+Neben dem WLAN-Symbol steht immer die tatsächlich aktive SSID des
+NetworkManager-Profils. Der generische Platzhalter `WLAN` ist an dieser Stelle
+unzulässig. Ohne aktive Verbindung wird ehrlich `OFFLINE` angezeigt; im
+Fallbackbetrieb ist die gerätespezifische Setup-SSID sichtbar.
+
 Der Hotspot darf später auch manuell aktiviert werden.
 
 Die lokale Weboberfläche erhält zusätzlich eine ausdrücklich zu bestätigende
@@ -971,6 +988,25 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-31 – Sicherer WLAN-Fallback-Hotspot und echte SSID im Display
+
+- Robert übernimmt das beim OpenFlexure-Mikroskop bewährte Bedienprinzip: Ist
+  kein gespeichertes WLAN erreichbar, öffnet OpenR4d10 automatisch einen
+  eigenen Einrichtungs-Hotspot, damit die WLAN-Reparatur vom Handy erreichbar
+  bleibt.
+- Die reale Zielinstallation bestätigt NetworkManager 1.52.1 auf `wlan0` sowie
+  AP-, WPA2- und 2,4-GHz-Unterstützung. Der Fallback verwendet deshalb
+  ausschließlich diesen vorhandenen Netzwerkbesitzer und dessen
+  `ipv4.method=shared`; kein paralleles `hostapd`, `dnsmasq` oder
+  `wpa_supplicant` wird eingeführt.
+- Der Hotspot ist WPA2-geschützt. SSID und Kennwort werden gerätespezifisch
+  lokal erzeugt und während des Setupmodus auf dem realen Whisplay angezeigt;
+  das Kennwort bleibt aus Status-JSON, SQLite, Backups, Logs und Repository
+  ausgeschlossen.
+- Der bisher feste Text `WLAN` neben dem WLAN-Symbol wird durch die tatsächlich
+  aktive SSID ersetzt. Ohne Verbindung steht dort `OFFLINE`, im Setupmodus die
+  Hotspot-SSID.
 
 ### 2026-10-31 – Update-Recovery nach Reboot und geschützte WLAN-Reparatur
 

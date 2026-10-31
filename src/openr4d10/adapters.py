@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import re
 import socket
+import stat
 import subprocess
 import tempfile
 import threading
@@ -122,18 +123,85 @@ class WhisplayDisplay:
         self,
         panel: WhisplayPanel | None = None,
         artwork_cache_root: Path | None = None,
+        state_directory: Path | None = None,
     ) -> None:
         self.panel = panel or WhisplayPanel()
         self.state = DeviceUiState()
         self.artwork_cache_root = artwork_cache_root
+        self.hotspot_status_path = (
+            state_directory / "hotspot-status.json"
+            if state_directory is not None
+            else None
+        )
+        self.hotspot_secret_path = (
+            state_directory / "hotspot-passphrase"
+            if state_directory is not None
+            else None
+        )
         self.brightness_percent = 100
         self._lock = threading.Lock()
 
     def _show_state(self) -> None:
+        self._refresh_hotspot_setup()
         try:
             self.panel.show(image_to_rgb565(self._render_image()))
         except (OSError, RuntimeError, WhisplayError) as exc:
             raise AdapterError(f"Whisplay display failed: {exc}") from exc
+
+    @staticmethod
+    def _read_small_regular_text(path: Path, limit: int) -> str | None:
+        try:
+            descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        except OSError:
+            return None
+        try:
+            metadata = os.fstat(descriptor)
+            if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > limit:
+                return None
+            with os.fdopen(descriptor, "r", encoding="utf-8") as handle:
+                descriptor = -1
+                return handle.read(limit + 1)
+        except (OSError, UnicodeDecodeError):
+            return None
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
+
+    def _refresh_hotspot_setup(self) -> None:
+        self.state.hotspot_active = False
+        self.state.hotspot_ssid = ""
+        self.state.hotspot_passphrase = ""
+        self.state.hotspot_url = ""
+        if self.hotspot_status_path is None or self.hotspot_secret_path is None:
+            return
+        status_text = self._read_small_regular_text(self.hotspot_status_path, 4096)
+        secret_text = self._read_small_regular_text(self.hotspot_secret_path, 128)
+        if status_text is None or secret_text is None:
+            return
+        try:
+            status = json.loads(status_text)
+        except json.JSONDecodeError:
+            return
+        if not isinstance(status, dict) or status.get("state") != "hotspot":
+            return
+        ssid = status.get("ssid")
+        address = status.get("address")
+        passphrase = secret_text.strip()
+        if (
+            not isinstance(ssid, str)
+            or not ssid
+            or len(ssid.encode("utf-8")) > 32
+            or any(ord(character) < 32 or ord(character) == 127 for character in ssid)
+            or not isinstance(address, str)
+            or not re.fullmatch(r"10\.42\.0\.1", address)
+            or not 8 <= len(passphrase) <= 63
+            or not all(32 <= ord(character) <= 126 for character in passphrase)
+        ):
+            return
+        self.state.hotspot_active = True
+        self.state.hotspot_ssid = ssid
+        self.state.hotspot_passphrase = passphrase
+        self.state.hotspot_url = f"http://{address}/"
 
     def _render_image(self) -> Image.Image:
         artwork = None
@@ -200,6 +268,7 @@ class WhisplayDisplay:
     def screen_png(self) -> bytes:
         """Return the exact native renderer output used for the physical panel."""
         with self._lock:
+            self._refresh_hotspot_setup()
             output = BytesIO()
             self._render_image().save(output, format="PNG", optimize=False)
             return output.getvalue()
@@ -218,6 +287,8 @@ class UnconfiguredTelemetry:
 
 
 class SystemTelemetry:
+    NMCLI = "/usr/bin/nmcli"
+
     @staticmethod
     def _local_ipv4() -> str | None:
         try:
@@ -226,6 +297,54 @@ class SystemTelemetry:
                 return str(probe.getsockname()[0])
         except OSError:
             return None
+
+    @classmethod
+    def _run_nmcli(cls, *arguments: str) -> str | None:
+        try:
+            completed = subprocess.run(
+                [cls.NMCLI, *arguments],
+                text=True,
+                capture_output=True,
+                timeout=1.0,
+                check=False,
+                shell=False,
+                env={"LC_ALL": "C", "PATH": "/usr/sbin:/usr/bin:/sbin:/bin"},
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        if completed.returncode != 0 or len(completed.stdout) > 1024:
+            return None
+        return completed.stdout.strip()
+
+    @classmethod
+    def _active_wifi(cls) -> tuple[str, str]:
+        connection_uuid = cls._run_nmcli(
+            "--get-values", "GENERAL.CON-UUID", "device", "show", "wlan0"
+        )
+        if not connection_uuid or not re.fullmatch(r"[0-9A-Fa-f-]{36}", connection_uuid):
+            return "OFFLINE", "disconnected"
+        profile = cls._run_nmcli(
+            "--get-values",
+            "802-11-wireless.ssid,802-11-wireless.mode",
+            "connection",
+            "show",
+            "uuid",
+            connection_uuid,
+        )
+        if not profile:
+            return "OFFLINE", "disconnected"
+        values = profile.splitlines()
+        if len(values) != 2:
+            return "OFFLINE", "disconnected"
+        ssid, mode = values
+        if (
+            not ssid
+            or len(ssid.encode("utf-8")) > 32
+            or any(ord(character) < 32 or ord(character) == 127 for character in ssid)
+            or mode not in {"infrastructure", "ap"}
+        ):
+            return "OFFLINE", "disconnected"
+        return ssid, "hotspot" if mode == "ap" else "client"
 
     def read(self) -> Mapping[str, Any]:
         uptime = None
@@ -237,10 +356,12 @@ class SystemTelemetry:
             load = round(os.getloadavg()[0], 2)
         except (AttributeError, OSError):
             load = None
+        wifi, wifi_mode = self._active_wifi()
         return {
             "state": "online",
             "hostname": socket.gethostname(),
-            "wifi": "WLAN",
+            "wifi": wifi,
+            "wifi_mode": wifi_mode,
             "ip_address": self._local_ipv4(),
             "uptime_seconds": uptime,
             "load_1m": load,
@@ -271,7 +392,10 @@ def build_adapters(
         cache_root = (
             state_directory / "cache" if state_directory is not None else None
         )
-        display = WhisplayDisplay(artwork_cache_root=cache_root)
+        display = WhisplayDisplay(
+            artwork_cache_root=cache_root,
+            state_directory=state_directory,
+        )
     else:
         display = UnconfiguredDisplay()
 

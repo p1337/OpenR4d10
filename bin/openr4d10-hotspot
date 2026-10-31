@@ -1,0 +1,212 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly INTERFACE=wlan0
+readonly CONNECTION_ID="OpenR4d10 Setup"
+readonly PROFILE_FILE=/etc/NetworkManager/system-connections/openr4d10-setup.nmconnection
+readonly STATE_ROOT=/var/lib/openr4d10
+readonly STATUS_FILE=$STATE_ROOT/hotspot-status.json
+readonly SECRET_FILE=$STATE_ROOT/hotspot-passphrase
+readonly RUNTIME_ROOT=/run/openr4d10
+readonly DISCONNECTED_AT_FILE=$RUNTIME_ROOT/hotspot-disconnected-at
+readonly LOCK_FILE=/run/lock/openr4d10-hotspot.lock
+readonly GRACE_SECONDS=60
+readonly SETUP_ADDRESS=10.42.0.1
+
+[[ $# -eq 0 ]] || { echo "This helper accepts no arguments" >&2; exit 2; }
+
+install -d -m 0750 -o root -g openr4d10 "$STATE_ROOT"
+install -d -m 0770 -o openr4d10 -g openr4d10 "$RUNTIME_ROOT"
+exec 9>"$LOCK_FILE"
+flock -n 9 || exit 0
+
+command -v nmcli >/dev/null
+systemctl is-active --quiet NetworkManager.service
+
+write_status() {
+    local state="$1"
+    local message="$2"
+    local ssid="${3:-}"
+    local address="${4:-}"
+    local temporary
+    temporary="$(mktemp "$STATE_ROOT/.hotspot-status.XXXXXXXX")"
+    local status=0
+    python3 - "$STATUS_FILE" "$temporary" "$state" "$message" "$ssid" "$address" <<'PY' || status=$?
+from datetime import UTC, datetime
+import json
+from pathlib import Path
+import sys
+
+current_path, target, state, message, ssid, address = sys.argv[1:]
+payload = {"state": state, "message": message}
+if ssid:
+    payload["ssid"] = ssid[:32]
+if address:
+    payload["address"] = address
+try:
+    current = json.loads(Path(current_path).read_text(encoding="utf-8"))
+except (OSError, json.JSONDecodeError):
+    current = None
+if isinstance(current, dict) and all(current.get(key) == value for key, value in payload.items()):
+    comparable = {key: current.get(key) for key in payload}
+    if comparable == payload and set(current) <= set(payload) | {"updated_at"}:
+        Path(target).unlink(missing_ok=True)
+        raise SystemExit(3)
+payload["updated_at"] = datetime.now(UTC).isoformat(timespec="seconds")
+Path(target).write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+PY
+    if [[ $status -eq 3 ]]; then
+        return 0
+    fi
+    [[ $status -eq 0 ]] || return "$status"
+    chown root:openr4d10 "$temporary"
+    chmod 0640 "$temporary"
+    mv -f -- "$temporary" "$STATUS_FILE"
+}
+
+active_uuid=""
+active_id=""
+active_mode=""
+active_ssid=""
+read_active_profile() {
+    active_uuid="$(nmcli --get-values GENERAL.CON-UUID device show "$INTERFACE" 2>/dev/null || true)"
+    active_id="$(nmcli --get-values GENERAL.CONNECTION device show "$INTERFACE" 2>/dev/null || true)"
+    active_mode=""
+    active_ssid=""
+    if [[ "$active_uuid" =~ ^[0-9A-Fa-f-]{36}$ ]]; then
+        active_mode="$(nmcli --get-values 802-11-wireless.mode connection show uuid "$active_uuid" 2>/dev/null || true)"
+        active_ssid="$(nmcli --get-values 802-11-wireless.ssid connection show uuid "$active_uuid" 2>/dev/null || true)"
+    fi
+}
+
+read_active_profile
+if [[ "$active_mode" == infrastructure ]]; then
+    rm -f -- "$DISCONNECTED_AT_FILE"
+    write_status client "Connected to saved Wi-Fi." "$active_ssid"
+    exit 0
+fi
+if [[ "$active_mode" == ap ]]; then
+    rm -f -- "$DISCONNECTED_AT_FILE"
+    if [[ "$active_id" == "$CONNECTION_ID" ]]; then
+        write_status hotspot "Setup hotspot is active." "$active_ssid" "$SETUP_ADDRESS"
+    else
+        write_status external "Another access-point profile is active." "$active_ssid"
+    fi
+    exit 0
+fi
+
+if [[ ! -f "$DISCONNECTED_AT_FILE" || -L "$DISCONNECTED_AT_FILE" ]]; then
+    date +%s >"$DISCONNECTED_AT_FILE"
+    chown root:openr4d10 "$DISCONNECTED_AT_FILE"
+    chmod 0640 "$DISCONNECTED_AT_FILE"
+    write_status waiting "Trying saved Wi-Fi profiles before setup hotspot."
+    nmcli --wait 15 device connect "$INTERFACE" >/dev/null 2>&1 || true
+    read_active_profile
+    if [[ "$active_mode" == infrastructure ]]; then
+        rm -f -- "$DISCONNECTED_AT_FILE"
+        write_status client "Connected to saved Wi-Fi." "$active_ssid"
+    fi
+    exit 0
+fi
+
+disconnected_at="$(tr -cd '0-9' <"$DISCONNECTED_AT_FILE")"
+now="$(date +%s)"
+if [[ -z "$disconnected_at" || $((now - disconnected_at)) -lt $GRACE_SECONDS ]]; then
+    write_status waiting "Trying saved Wi-Fi profiles before setup hotspot."
+    exit 0
+fi
+
+metadata="$(python3 - "$PROFILE_FILE" "$SECRET_FILE" <<'PY'
+import os
+from pathlib import Path
+import secrets
+import string
+import sys
+import uuid
+
+profile_path = Path(sys.argv[1])
+secret_path = Path(sys.argv[2])
+mac = Path("/sys/class/net/wlan0/address").read_text(encoding="ascii").strip().replace(":", "")
+suffix = mac[-4:].upper() if len(mac) >= 4 else secrets.token_hex(2).upper()
+ssid = f"OpenR4d10-Setup-{suffix}"
+
+try:
+    passphrase = secret_path.read_text(encoding="ascii").strip()
+except OSError:
+    passphrase = ""
+if not (12 <= len(passphrase) <= 63 and passphrase.isascii() and passphrase.isalnum()):
+    alphabet = string.ascii_letters + string.digits
+    passphrase = "".join(secrets.choice(alphabet) for _ in range(16))
+    temporary_secret = secret_path.with_name(f".{secret_path.name}.{secrets.token_hex(4)}")
+    descriptor = os.open(temporary_secret, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w", encoding="ascii") as handle:
+        handle.write(passphrase + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary_secret, secret_path)
+
+try:
+    existing_profile = profile_path.read_text(encoding="utf-8")
+except OSError:
+    existing_profile = ""
+profile_uuid = ""
+for line in existing_profile.splitlines():
+    if line.startswith("uuid="):
+        candidate = line.removeprefix("uuid=")
+        try:
+            profile_uuid = str(uuid.UUID(candidate))
+        except ValueError:
+            profile_uuid = ""
+        break
+if not profile_uuid:
+    profile_uuid = str(uuid.uuid4())
+profile = f"""[connection]
+id=OpenR4d10 Setup
+uuid={profile_uuid}
+type=wifi
+interface-name=wlan0
+autoconnect=false
+
+[wifi]
+mode=ap
+band=bg
+ssid={ssid}
+ap-isolation=true
+security=802-11-wireless-security
+
+[wifi-security]
+key-mgmt=wpa-psk
+proto=rsn;
+pairwise=ccmp;
+psk={passphrase}
+
+[ipv4]
+address1=10.42.0.1/24
+method=shared
+
+[ipv6]
+method=disabled
+"""
+temporary_profile = profile_path.with_name(f".{profile_path.name}.{secrets.token_hex(4)}")
+descriptor = os.open(temporary_profile, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+    handle.write(profile)
+    handle.flush()
+    os.fsync(handle.fileno())
+os.replace(temporary_profile, profile_path)
+print(ssid)
+print(profile_uuid)
+PY
+)"
+mapfile -t hotspot_metadata <<<"$metadata"
+hotspot_ssid="${hotspot_metadata[0]}"
+hotspot_uuid="${hotspot_metadata[1]}"
+chown openr4d10:openr4d10 "$SECRET_FILE"
+chmod 0600 "$SECRET_FILE"
+chown root:root "$PROFILE_FILE"
+chmod 0600 "$PROFILE_FILE"
+
+nmcli connection load "$PROFILE_FILE" >/dev/null
+nmcli --wait 20 connection up uuid "$hotspot_uuid" ifname "$INTERFACE" >/dev/null
+rm -f -- "$DISCONNECTED_AT_FILE"
+write_status hotspot "Setup hotspot is active." "$hotspot_ssid" "$SETUP_ADDRESS"

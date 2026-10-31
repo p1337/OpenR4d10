@@ -96,6 +96,21 @@ responses contain SSID/passphrase, that a second queued request is rejected,
 and that the installed helper uses the fixed `wlan0`/NetworkManager path with a
 root-only keyfile and creates the new connection before deleting old profiles.
 
+The automatic fallback is a separate fixed root boundary. Tests must require
+the argument-free `openr4d10-hotspot` helper, its timer, the fixed `wlan0`
+interface, NetworkManager AP mode, WPA-PSK, `ipv4.method=shared`, a disconnect
+grace period and a non-autoconnecting setup profile. They must reject any
+parallel `hostapd`/`wpa_supplicant` implementation and prove that the generated
+passphrase is absent from hotspot status and `DeviceUiState.public_state()`.
+The physical setup renderer may receive it only from the local 0600 secret
+file. Unit tests use temporary status/secret files; they never use a real
+credential.
+
+Receiver telemetry tests mock the two fixed `nmcli` calls: active connection
+UUID followed by that profile's `802-11-wireless.ssid` and mode. The displayed
+label must be the actual SSID, not the connection ID and not the old literal
+`WLAN`; failures and disconnected state become `OFFLINE`.
+
 Browser localization tests extract every static `data-i18n*` reference and
 every literal runtime `t()` key, require it in the checked-in catalog, require
 all five non-empty translations, and compare placeholder sets. A new visible

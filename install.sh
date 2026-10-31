@@ -14,6 +14,9 @@ readonly UPDATE_RECOVER_HELPER_FILE=/usr/local/sbin/openr4d10-update-recover
 readonly WIFI_REPAIR_SERVICE_FILE=/etc/systemd/system/openr4d10-wifi-repair.service
 readonly WIFI_REPAIR_PATH_FILE=/etc/systemd/system/openr4d10-wifi-repair.path
 readonly WIFI_REPAIR_HELPER_FILE=/usr/local/sbin/openr4d10-wifi-repair
+readonly HOTSPOT_SERVICE_FILE=/etc/systemd/system/openr4d10-hotspot.service
+readonly HOTSPOT_TIMER_FILE=/etc/systemd/system/openr4d10-hotspot.timer
+readonly HOTSPOT_HELPER_FILE=/usr/local/sbin/openr4d10-hotspot
 
 CHECK_ONLY=false
 ALLOW_UNSUPPORTED=false
@@ -54,8 +57,10 @@ required=(
     systemd/openr4d10.service systemd/openr4d10-update.service
     systemd/openr4d10-update.path systemd/openr4d10-update-recover.service
     systemd/openr4d10-wifi-repair.service systemd/openr4d10-wifi-repair.path
+    systemd/openr4d10-hotspot.service systemd/openr4d10-hotspot.timer
     bin/openr4d10 bin/openr4d10-update bin/openr4d10-update-recover
     bin/openr4d10-wifi-repair
+    bin/openr4d10-hotspot
     boot/install.sh boot/openr4d10-boot.service
     boot/native/openr4d10_boot.c boot/native/LICENSE.PiSugar
     boot/native/NOTICE.PiSugar boot/assets/boot.opb boot/assets/first.opb
@@ -143,7 +148,7 @@ apt-get install -y --no-install-recommends \
     python3 python3-pil python3-libgpiod python3-spidev fonts-dejavu-core \
     mpv ffmpeg ca-certificates gcc make kmod libc6-dev zlib1g-dev \
     "linux-headers-$kernel_release" device-tree-compiler alsa-utils \
-    libasound2-plugins sox network-manager
+    libasound2-plugins sox network-manager dnsmasq-base
 
 kernel_build_root="/lib/modules/$kernel_release/build"
 [[ -f "$kernel_build_root/Makefile" ]] \
@@ -230,6 +235,9 @@ install -m 0644 -o root -g root "$SOURCE_ROOT/systemd/openr4d10-update-recover.s
 install -m 0755 -o root -g root "$SOURCE_ROOT/bin/openr4d10-wifi-repair" "$WIFI_REPAIR_HELPER_FILE"
 install -m 0644 -o root -g root "$SOURCE_ROOT/systemd/openr4d10-wifi-repair.service" "$WIFI_REPAIR_SERVICE_FILE"
 install -m 0644 -o root -g root "$SOURCE_ROOT/systemd/openr4d10-wifi-repair.path" "$WIFI_REPAIR_PATH_FILE"
+install -m 0755 -o root -g root "$SOURCE_ROOT/bin/openr4d10-hotspot" "$HOTSPOT_HELPER_FILE"
+install -m 0644 -o root -g root "$SOURCE_ROOT/systemd/openr4d10-hotspot.service" "$HOTSPOT_SERVICE_FILE"
+install -m 0644 -o root -g root "$SOURCE_ROOT/systemd/openr4d10-hotspot.timer" "$HOTSPOT_TIMER_FILE"
 
 note "Installing the verified Whisplay ST7789 boot display"
 OPENR4D10_SKIP_APT=1 bash "$SOURCE_ROOT/boot/install.sh"
@@ -252,6 +260,7 @@ systemctl daemon-reload
 systemctl enable openr4d10.service
 systemctl enable --now openr4d10-update-recover.service
 systemctl enable --now openr4d10-update.path openr4d10-wifi-repair.path
+systemctl enable --now openr4d10-hotspot.timer
 systemctl restart openr4d10.service
 
 note "Checking local web dashboard"

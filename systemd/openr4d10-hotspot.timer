@@ -1,0 +1,12 @@
+[Unit]
+Description=Periodically check whether the OpenR4d10 setup hotspot is needed
+Documentation=https://github.com/p1337/OpenR4d10
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=30s
+AccuracySec=2s
+Unit=openr4d10-hotspot.service
+
+[Install]
+WantedBy=timers.target

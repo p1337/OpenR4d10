@@ -1,5 +1,8 @@
 from datetime import datetime
 from io import BytesIO
+import json
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -145,6 +148,23 @@ class DeviceUiTests(unittest.TestCase):
             self.assertIn(label, drawn)
         self.assertNotIn("SWR3", drawn)
         self.assertNotIn("Current programme", drawn)
+
+    def test_hotspot_setup_replaces_player_and_keeps_secret_out_of_public_state(self) -> None:
+        state = DeviceUiState(
+            wifi_label="OpenR4d10-Setup-8FDE",
+            hotspot_active=True,
+            hotspot_ssid="OpenR4d10-Setup-8FDE",
+            hotspot_passphrase="LocalOnlyA1B2C3D4",
+            hotspot_url="http://10.42.0.1/",
+            language="de",
+        )
+        drawn = self._drawn_text(state)
+        self.assertIn("WLAN-EINRICHTUNG", drawn)
+        self.assertIn("OpenR4d10-Setup-8FDE", drawn)
+        self.assertIn("LocalOnlyA1B2C3D4", drawn)
+        self.assertIn("http://10.42.0.1/", drawn)
+        self.assertNotIn("hotspot_passphrase", state.public_state())
+        self.assertNotIn("LocalOnlyA1B2C3D4", json.dumps(state.public_state()))
 
     def test_main_menu_scroll_select_and_ptt_back_navigation(self) -> None:
         state = DeviceUiState(channel=3, language="de")
@@ -366,6 +386,33 @@ class WhisplayDisplayTests(unittest.TestCase):
         payload = display.screen_png()
         self.assertTrue(payload.startswith(b"\x89PNG\r\n\x1a\n"))
         self.assertEqual(Image.open(BytesIO(payload)).size, (WIDTH, HEIGHT))
+
+    def test_hotspot_secret_is_read_only_by_the_physical_display_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            state_root = Path(raw)
+            (state_root / "hotspot-status.json").write_text(
+                json.dumps(
+                    {
+                        "state": "hotspot",
+                        "ssid": "OpenR4d10-Setup-8FDE",
+                        "address": "10.42.0.1",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (state_root / "hotspot-passphrase").write_text(
+                "LocalOnlyA1B2C3D4\n", encoding="ascii"
+            )
+            panel = FakePanel()
+            display = WhisplayDisplay(
+                panel=panel,  # type: ignore[arg-type]
+                state_directory=state_root,
+            )
+            display.render(Frame(screen="dashboard", title="OpenR4d10"))
+            self.assertTrue(display.state.hotspot_active)
+            self.assertEqual(display.state.hotspot_passphrase, "LocalOnlyA1B2C3D4")
+            self.assertNotIn("LocalOnlyA1B2C3D4", json.dumps(display.snapshot()))
+            self.assertEqual(len(panel.frames), 1)
 
     def test_display_brightness_reaches_panel_and_public_state(self) -> None:
         panel = FakePanel()

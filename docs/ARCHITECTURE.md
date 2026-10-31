@@ -122,6 +122,9 @@ path, not a second menu surface or a fabricated PTT adapter.
 - service logs: system journal, unit `openr4d10.service`
 - transient WLAN repair request: `/run/openr4d10/wifi-repair.request`
 - non-secret WLAN repair status: `/var/lib/openr4d10/wifi-repair-status.json`
+- non-secret hotspot state: `/var/lib/openr4d10/hotspot-status.json`
+- local hotspot secret: `/var/lib/openr4d10/hotspot-passphrase` (0600,
+  never part of status, SQLite or backup)
 
 Portable core backups contain a SQLite online-backup snapshot plus a public
 manifest and SHA-256. Restore accepts exactly those two archive members,
@@ -291,6 +294,39 @@ the bounded public status contains only
 queued/running/succeeded/failed plus a generic message. The current dashboard
 uses local HTTP, so this operation is documented for trusted private networks
 only until a local HTTPS provisioning boundary exists.
+
+## NetworkManager fallback hotspot
+
+The existing NetworkManager instance remains the sole owner of `wlan0`. A
+root-owned, argument-free timer helper checks the active NetworkManager profile
+without accepting browser input. An active infrastructure profile clears the
+fallback timer. If no client profile can be activated, the helper waits through
+a disconnect grace period and then loads one fixed AP profile with
+`ipv4.method=shared`. NetworkManager supplies the private address, DHCP and DNS;
+OpenR4d10 does not start parallel `hostapd`, `dnsmasq`, `wpa_supplicant` or
+network configuration services.
+
+The setup SSID contains a non-secret suffix derived from the `wlan0` hardware
+address so nearby devices can be distinguished. Its WPA2 passphrase is randomly
+generated on the device, stored only in the root-only NetworkManager keyfile and
+a 0600 file owned by the display service account. The helper's public status is
+bounded to mode, SSID and setup address. The Whisplay adapter reads the secret
+only while that public state says the setup hotspot is active and paints SSID,
+passphrase and `http://10.42.0.1/` directly on the physical setup screen. The
+semantic frame, `/api/status`, SQLite, logs and portable backup never receive
+the passphrase.
+
+The timer does not periodically tear down an active setup hotspot to probe for
+client networks. This avoids flapping on unstable WLANs. Submitting a confirmed
+WLAN repair activates the new infrastructure profile on the same interface;
+that successful transition naturally replaces the AP. A reboot starts the
+normal saved-profile attempt and grace period again.
+
+`SystemTelemetry` resolves the actual SSID through fixed, bounded `nmcli`
+queries using the active connection UUID. It reports the SSID beside the Wi-Fi
+symbol, `OFFLINE` when there is no active Wi-Fi profile, and the setup SSID
+while the AP profile is active. A NetworkManager connection-profile name is
+not substituted for the SSID.
 
 ## Startup sequence
 

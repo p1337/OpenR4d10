@@ -25,6 +25,10 @@ class InstallerContractTests(unittest.TestCase):
         self.assertIn("bin/openr4d10-wifi-repair", installer)
         self.assertIn("systemd/openr4d10-wifi-repair.path", installer)
         self.assertIn("network-manager", installer)
+        self.assertIn("dnsmasq-base", installer)
+        self.assertIn("bin/openr4d10-hotspot", installer)
+        self.assertIn("systemd/openr4d10-hotspot.timer", installer)
+        self.assertIn("systemctl enable --now openr4d10-hotspot.timer", installer)
         self.assertIn("Backing up persistent OpenR4d10 state before the update", installer)
         self.assertIn("from openr4d10.backup import create_backup", installer)
         self.assertLess(
@@ -100,6 +104,28 @@ class InstallerContractTests(unittest.TestCase):
         self.assertTrue(
             (repository / "vendor" / "pisugar-whisplay" / "LICENSE").is_file()
         )
+
+    def test_fallback_hotspot_uses_only_the_existing_networkmanager_owner(self) -> None:
+        repository = Path(__file__).resolve().parents[1]
+        helper = (repository / "bin" / "openr4d10-hotspot").read_text(encoding="utf-8")
+        service = (repository / "systemd" / "openr4d10-hotspot.service").read_text(encoding="utf-8")
+        timer = (repository / "systemd" / "openr4d10-hotspot.timer").read_text(encoding="utf-8")
+
+        self.assertIn("INTERFACE=wlan0", helper)
+        self.assertIn('CONNECTION_ID="OpenR4d10 Setup"', helper)
+        self.assertIn("GRACE_SECONDS=60", helper)
+        self.assertIn("mode=ap", helper)
+        self.assertIn("key-mgmt=wpa-psk", helper)
+        self.assertIn("method=shared", helper)
+        self.assertIn("autoconnect=false", helper)
+        self.assertIn("chmod 0600 \"$SECRET_FILE\"", helper)
+        self.assertIn("[[ $# -eq 0 ]]", helper)
+        self.assertNotIn("hostapd", helper)
+        self.assertNotIn("wpa_supplicant", helper)
+        self.assertIn("User=root", service)
+        self.assertIn("ExecStart=/usr/local/sbin/openr4d10-hotspot", service)
+        self.assertIn("OnBootSec=30s", timer)
+        self.assertIn("OnUnitActiveSec=30s", timer)
 
 
 if __name__ == "__main__":

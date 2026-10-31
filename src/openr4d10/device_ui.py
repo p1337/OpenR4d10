@@ -51,6 +51,10 @@ DISPLAY_TEXT = {
         "language": "LANGUAGE",
         "system": "SYSTEM",
         "about_support": "ABOUT & SUPPORT",
+        "wifi_setup": "WI-FI SETUP",
+        "wifi_name": "NETWORK",
+        "wifi_password": "PASSWORD",
+        "wifi_open": "OPEN ON PHONE",
     },
     "de": {
         "controls": ("LAU", "SQL", "KAN", "DST"),
@@ -71,6 +75,10 @@ DISPLAY_TEXT = {
         "language": "SPRACHE",
         "system": "SYSTEM",
         "about_support": "INFO & SUPPORT",
+        "wifi_setup": "WLAN-EINRICHTUNG",
+        "wifi_name": "NETZWERK",
+        "wifi_password": "KENNWORT",
+        "wifi_open": "AM HANDY ÖFFNEN",
     },
     "pl": {
         "controls": ("GŁO", "SQL", "KAN", "USŁ"),
@@ -91,6 +99,10 @@ DISPLAY_TEXT = {
         "language": "JĘZYK",
         "system": "SYSTEM",
         "about_support": "INFO I WSPARCIE",
+        "wifi_setup": "KONFIGURACJA WI-FI",
+        "wifi_name": "SIEĆ",
+        "wifi_password": "HASŁO",
+        "wifi_open": "OTWÓRZ W TELEFONIE",
     },
     "fr": {
         "controls": ("VOL", "SQL", "CAN", "SRV"),
@@ -111,6 +123,10 @@ DISPLAY_TEXT = {
         "language": "LANGUE",
         "system": "SYSTÈME",
         "about_support": "INFOS ET SOUTIEN",
+        "wifi_setup": "CONFIGURATION WI-FI",
+        "wifi_name": "RÉSEAU",
+        "wifi_password": "MOT DE PASSE",
+        "wifi_open": "OUVRIR SUR MOBILE",
     },
     "es": {
         "controls": ("VOL", "SQL", "CAN", "SRV"),
@@ -131,6 +147,10 @@ DISPLAY_TEXT = {
         "language": "IDIOMA",
         "system": "SISTEMA",
         "about_support": "INFO Y SOPORTE",
+        "wifi_setup": "CONFIGURACIÓN WI-FI",
+        "wifi_name": "RED",
+        "wifi_password": "CONTRASEÑA",
+        "wifi_open": "ABRIR EN EL MÓVIL",
     },
 }
 
@@ -143,7 +163,7 @@ class DeviceUiState:
     service_index: int = 0
     left_action: str = "MENU"
     right_action: str = "PLAY"
-    wifi_label: str = "WLAN"
+    wifi_label: str = "OFFLINE"
     ip_address: str = "--"
     battery_percent: int | None = None
     source: str = "OPENR4D10"
@@ -161,6 +181,10 @@ class DeviceUiState:
     menu_return_subtitle: str | None = None
     ptt_active: bool = False
     ptt_context_active: bool = False
+    hotspot_active: bool = False
+    hotspot_ssid: str = ""
+    hotspot_passphrase: str = ""
+    hotspot_url: str = ""
     language: str = "en"
     accent: tuple[int, int, int] = DEFAULT_ACCENT
     timestamp: datetime = field(default_factory=datetime.now)
@@ -316,7 +340,7 @@ class DeviceUiState:
         if not self.menu_open:
             self.title = str(receiver.get("title") or frame.title)[:48]
             self.subtitle = str(receiver.get("subtitle") or frame.body)[:72]
-        self.wifi_label = str(receiver.get("wifi") or "WLAN")[:12]
+        self.wifi_label = str(receiver.get("wifi") or "OFFLINE")[:32]
         self.ip_address = str(receiver.get("ip_address") or "--")[:15]
         self.playing = bool(receiver.get("playing", self.playing))
         self.right_action = "PAUSE" if self.playing else "PLAY"
@@ -553,6 +577,43 @@ def _draw_main_menu_items(
         draw.polygon(((231, 264), (239, 264), (235, 270)), fill=state.accent)
 
 
+def _draw_hotspot_setup(
+    draw: ImageDraw.ImageDraw,
+    state: DeviceUiState,
+    text: Mapping[str, object],
+) -> None:
+    heading_font = _font(18, bold=True)
+    label_font = _font(8, bold=True)
+    value_font = _font(12, bold=True)
+    url_font = _font(11, bold=True)
+    draw.text(
+        (14, 92),
+        _fit_text(draw, str(text["wifi_setup"]), heading_font, 212),
+        font=heading_font,
+        fill=state.accent,
+    )
+    rows = (
+        (127, str(text["wifi_name"]), state.hotspot_ssid, value_font),
+        (174, str(text["wifi_password"]), state.hotspot_passphrase, value_font),
+        (221, str(text["wifi_open"]), state.hotspot_url, url_font),
+    )
+    for top, label, value, font in rows:
+        draw.text((15, top), label, font=label_font, fill=(128, 140, 145))
+        draw.rounded_rectangle(
+            (13, top + 13, 226, top + 42),
+            radius=7,
+            fill=(13, 25, 28),
+            outline=(75, 92, 96),
+            width=1,
+        )
+        draw.text(
+            (21, top + 20),
+            _fit_text(draw, value, font, 196),
+            font=font,
+            fill=(245, 248, 249),
+        )
+
+
 def render_device_ui(
     state: DeviceUiState,
     artwork: Image.Image | None = None,
@@ -598,6 +659,10 @@ def render_device_ui(
 
     content_top = 82
     draw.rectangle((0, content_top, WIDTH - 1, HEIGHT - 1), fill=(6, 12, 15))
+    if state.hotspot_active:
+        draw.rectangle((0, content_top, 3, HEIGHT - 1), fill=accent)
+        _draw_hotspot_setup(draw, state, text)
+        return image.convert("RGB")
     if state.menu_open:
         draw.rectangle((0, content_top, 3, HEIGHT - 1), fill=accent)
         menu_key = state.menu_kind or "main_menu"
