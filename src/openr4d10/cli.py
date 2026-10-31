@@ -124,6 +124,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     if services is not None:
         services.prefetch_ambient_audio()
+        services.start_brandmeister_receiver()
     application = OpenR4d10App(
         app_config,
         display=display,

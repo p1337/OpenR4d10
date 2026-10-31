@@ -129,6 +129,8 @@ class _DashboardHandler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         if path == "/api/status":
             self._serve_status()
+        elif path == "/api/brandmeister-talkgroups":
+            self._serve_content("brandmeister-talkgroups.json")
         elif path == "/api/device-screen.png":
             self._serve_screen()
         elif path in {"/api/camera/1", "/api/camera/2"}:

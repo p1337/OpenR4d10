@@ -24,6 +24,11 @@ from .ambient import (
     AMBIENT_PRESETS,
     ambient_text,
 )
+from .brandmeister import (
+    BrandmeisterReceiver,
+    BrandmeisterTalkgroupCatalog,
+    country_code,
+)
 from .content import (
     AmbientAudioCache,
     CameraSnapshot,
@@ -47,7 +52,7 @@ MEDIA_EXTENSIONS = {
     ".aac", ".flac", ".m4a", ".mka", ".mp3", ".mp4", ".ogg", ".opus", ".wav",
 }
 DEFAULT_ENABLED_SERVICES = {
-    "system", "webradio", "weather", "ambient", "local_media", "recorder", "rss", "podcasts", "webcam",
+    "system", "webradio", "weather", "ambient", "local_media", "recorder", "rss", "podcasts", "webcam", "brandmeister",
 }
 DISPLAY_BRIGHTNESS_KEY = "display.brightness_percent"
 DEFAULT_DISPLAY_BRIGHTNESS = 100
@@ -66,6 +71,7 @@ GERMANY_SATELLITE_MIGRATION_KEY = "weather.germany_satellite_v1"
 RADIO_DEFAULTS_V2_MIGRATION_KEY = "radio.defaults_seeded_v2"
 RADIO_CONTINUOUS_KEY = "radio.continuous_recording"
 LAST_VIEW_KEY = "ui.last_view_service"
+BRANDMEISTER_NATIVE_MIGRATION_KEY = "brandmeister.native_receiver_v1"
 RADIO_V2_PRESET_IDS = {"die_neue_1077", "afn_eagle", "rock_antenne", "rock_fm"}
 SOLIX_METRIC_RANGES = {
     "solar_w": (0.0, 100_000.0),
@@ -100,7 +106,7 @@ BUILTIN_SERVICES = (
     ServiceManifest("anker_solix", "Anker SOLIX", "energy", "Live photovoltaic, home, grid and battery telemetry", ("energy", "solar", "battery"), "external", requires_credentials=True, credential_hint="Prefer supported local Modbus TCP devices; otherwise configure the isolated community cloud adapter locally."),
     ServiceManifest("local_media", "Local Media", "audio", "Local MP3, FLAC, MP4 and recordings", ("playback", "library"), "process", ("mpv",)),
     ServiceManifest("recorder", "Recorder", "audio", "Record supported audio sources", ("recording", "library"), "process", ("ffmpeg",)),
-    ServiceManifest("brandmeister", "BrandMeister", "radio", "DMR audio over a configured lawful gateway", ("playback", "talkgroups", "recording"), "external", requires_credentials=True, credential_hint="Configure an individual BrandMeister-compatible account or gateway locally."),
+    ServiceManifest("brandmeister", "BrandMeister", "radio", "Receive-only DMR audio through native HoseLine", ("playback", "talkgroups"), "process", ("aplay",)),
     ServiceManifest("remote_sdr", "Remote SDR", "radio", "OpenWebRX or another configured remote receiver", ("playback", "channels", "squelch"), "external"),
     ServiceManifest("private_ptt", "Private PTT", "voice", "Private push-to-talk between explicitly paired devices", ("ptt", "playback", "recording"), "external", requires_credentials=True, credential_hint="Pair devices locally; never ship a shared key."),
     ServiceManifest("mumble", "Mumble", "voice", "Mumble voice and push-to-talk", ("ptt", "channels"), "external", requires_credentials=True, credential_hint="Enter the user's own server and account locally."),
@@ -140,6 +146,8 @@ class ServiceCatalog:
         adapter_registry: ServiceAdapterRegistry | None = None,
         ambient_artwork_root: Path | None = None,
         ambient_audio_cache: AmbientAudioCache | None = None,
+        brandmeister: BrandmeisterReceiver | None = None,
+        brandmeister_catalog: BrandmeisterTalkgroupCatalog | None = None,
     ) -> None:
         self.store = StateStore(state_directory / "openr4d10.sqlite3")
         self.executable_lookup = executable_lookup
@@ -159,6 +167,10 @@ class ServiceCatalog:
         self.ambient_artwork_root = ambient_artwork_root or AMBIENT_ARTWORK_ROOT
         self.ambient_audio = ambient_audio_cache or AmbientAudioCache(
             self.media_root / "ambient"
+        )
+        self.brandmeister = brandmeister or BrandmeisterReceiver()
+        self.brandmeister_catalog = brandmeister_catalog or BrandmeisterTalkgroupCatalog(
+            state_directory / "cache" / "brandmeister-talkgroups.json"
         )
         self.radio_buffer = radio_buffer or (
             IcyRadioBuffer(self._store_buffered_track) if player is None else None
@@ -192,6 +204,7 @@ class ServiceCatalog:
         self.active_weather_channel_id: int | None = None
         self.selected_ambient_scene_id: int | None = None
         self.active_ambient_scene_id: int | None = None
+        self.selected_brandmeister_channel_id: int | None = None
         self.store.ensure_services(
             tuple(item.service_id for item in BUILTIN_SERVICES),
             DEFAULT_ENABLED_SERVICES,
@@ -269,6 +282,14 @@ class ServiceCatalog:
             ),
             marker="ambient.defaults_seeded_v1",
         )
+        self.store.seed_channels_once(
+            "brandmeister",
+            (("91", "Worldwide", {"talkgroup": 91, "enabled": True}),),
+            marker="brandmeister.defaults_seeded_v1",
+        )
+        if self.store.get_setting(BRANDMEISTER_NATIVE_MIGRATION_KEY, False) is not True:
+            self.store.set_service_enabled("brandmeister", True)
+            self.store.set_setting(BRANDMEISTER_NATIVE_MIGRATION_KEY, True)
         self._upgrade_germany_weather_default()
         self._seed_germany_satellite_upgrade()
         self._upgrade_ambient_source_urls()
@@ -279,12 +300,26 @@ class ServiceCatalog:
         ambient_scenes = self.store.channels("ambient")
         if ambient_scenes:
             self.selected_ambient_scene_id = int(ambient_scenes[0]["id"])
+        brandmeister_channels = self.store.channels("brandmeister")
+        if brandmeister_channels:
+            self.selected_brandmeister_channel_id = int(brandmeister_channels[0]["id"])
         if self.radio_buffer is not None:
             self.radio_buffer.set_continuous(
                 self.store.get_setting(RADIO_CONTINUOUS_KEY, False) is True
             )
         self._initial_view_resolved = False
         self._ambient_prefetch_started = False
+
+    def start_brandmeister_receiver(self) -> None:
+        """Restore the persisted receive-only scanner in the real service process."""
+
+        if not self.store.service_enabled("brandmeister"):
+            return
+        talkgroups = self._enabled_brandmeister_talkgroups()
+        if talkgroups:
+            self.brandmeister.set_volume(self.player.state.volume)
+            self.brandmeister.listen(talkgroups)
+            self.active_service = "brandmeister"
 
     def prefetch_ambient_audio(self) -> None:
         """Populate the reviewed offline cache once in the real service process."""
@@ -296,6 +331,58 @@ class ServiceCatalog:
             "openr4d10-ambient-offline-cache",
             self._cache_builtin_ambient_audio,
         )
+
+    def _enabled_brandmeister_talkgroups(self) -> list[int]:
+        enabled: list[int] = []
+        for channel in self.store.channels("brandmeister"):
+            metadata = channel.get("metadata")
+            talkgroup = metadata.get("talkgroup") if isinstance(metadata, dict) else None
+            if (
+                isinstance(talkgroup, int)
+                and not isinstance(talkgroup, bool)
+                and metadata.get("enabled") is True
+            ):
+                enabled.append(talkgroup)
+            if len(enabled) == 5:
+                break
+        return enabled
+
+    def _selected_brandmeister_channel(self) -> dict[str, object] | None:
+        channels = self.store.channels("brandmeister")
+        if not channels:
+            return None
+        selected = (
+            self.store.channel(self.selected_brandmeister_channel_id)
+            if self.selected_brandmeister_channel_id is not None
+            else None
+        )
+        if selected is None or selected.get("service_id") != "brandmeister":
+            selected = channels[0]
+            self.selected_brandmeister_channel_id = int(selected["id"])
+        return selected
+
+    def _restart_brandmeister_receiver(self) -> dict[str, object]:
+        talkgroups = self._enabled_brandmeister_talkgroups()
+        if not talkgroups:
+            self.brandmeister.stop()
+            if self.active_service == "brandmeister":
+                self.active_service = "system"
+            return self.brandmeister.snapshot()
+        self.player.stop()
+        if self.radio_buffer is not None:
+            self.radio_buffer.stop(flush=True)
+        self.brandmeister.set_volume(self.player.state.volume)
+        state = self.brandmeister.listen(talkgroups)
+        self.active_service = "brandmeister"
+        self.active_preset_id = None
+        self.active_station_id = None
+        self._active_podcast_episode = None
+        self.active_ambient_scene_id = None
+        return state
+
+    def _stop_brandmeister_for_audio_owner(self) -> None:
+        if self.active_service == "brandmeister":
+            self.brandmeister.stop()
 
     def _upgrade_germany_weather_default(self) -> None:
         """Change only the untouched seeded Germany channel; never recreate it."""
@@ -771,6 +858,25 @@ class ServiceCatalog:
                     "active": int(item["id"]) == self.active_ambient_scene_id,
                 }
             )
+        brandmeister_channels = []
+        for channel, item in enumerate(self.store.channels("brandmeister"), start=1):
+            metadata = item.get("metadata")
+            metadata = metadata if isinstance(metadata, dict) else {}
+            talkgroup = metadata.get("talkgroup")
+            if not isinstance(talkgroup, int) or isinstance(talkgroup, bool):
+                continue
+            brandmeister_channels.append(
+                {
+                    "id": int(item["id"]),
+                    "talkgroup": talkgroup,
+                    "name": str(item["name"]),
+                    "enabled": metadata.get("enabled") is True,
+                    "country_code": country_code(talkgroup),
+                    "position": channel - 1,
+                    "channel": channel,
+                    "selected": int(item["id"]) == self.selected_brandmeister_channel_id,
+                }
+            )
         return {
             "schema_version": SCHEMA_VERSION,
             "settings": {
@@ -817,6 +923,12 @@ class ServiceCatalog:
                 "active_scene_id": self.active_ambient_scene_id,
                 "scenes": ambient_scenes,
             },
+            "brandmeister": {
+                **self.brandmeister.snapshot(),
+                "selected_channel_id": self.selected_brandmeister_channel_id,
+                "channels": brandmeister_channels,
+                "limits": {"saved": 30, "enabled": 5},
+            },
             "media": media,
             "items": services,
         }
@@ -836,6 +948,8 @@ class ServiceCatalog:
             if service_id == "system" and not enabled:
                 raise ValueError("system service cannot be disabled")
             if not enabled:
+                if service_id == "brandmeister":
+                    self.brandmeister.stop()
                 if self.active_service == service_id:
                     self.player.stop()
                     if service_id == "webradio" and self.radio_buffer is not None:
@@ -862,7 +976,7 @@ class ServiceCatalog:
             service_id = request.get("service_id", "webradio")
             source = request.get("source")
             allowed = {
-                "webradio", "local_media", "brandmeister", "remote_sdr",
+                "webradio", "local_media", "remote_sdr",
                 "youtube_audio", "spotify", "ard_mediathek", "zdf_mediathek",
                 "international_media",
             }
@@ -871,6 +985,7 @@ class ServiceCatalog:
             self._require_enabled(service_id)
             if not isinstance(source, str):
                 raise ValueError("play action requires a media source")
+            self._stop_brandmeister_for_audio_owner()
             self.player.load(source)
             if service_id == "webradio" and self.radio_buffer is not None:
                 self.radio_buffer.tune(source, "Direkte Radioquelle")
@@ -884,6 +999,7 @@ class ServiceCatalog:
                 raise ValueError("no active media to pause or resume")
             self.player.toggle_pause()
         elif action == "stop":
+            self.brandmeister.stop()
             self.player.stop()
             if self.radio_buffer is not None:
                 self.radio_buffer.stop(flush=True)
@@ -893,7 +1009,12 @@ class ServiceCatalog:
             self._active_podcast_episode = None
             self.active_ambient_scene_id = None
         elif action == "volume":
-            self.player.set_volume(request.get("value"))  # type: ignore[arg-type]
+            value = request.get("value")
+            if self.active_service == "brandmeister":
+                self.brandmeister.set_volume(value)  # type: ignore[arg-type]
+                self.player.state.volume = value  # type: ignore[assignment]
+            else:
+                self.player.set_volume(value)  # type: ignore[arg-type]
         elif action == "volume_step":
             steps = request.get("steps")
             if (
@@ -904,7 +1025,11 @@ class ServiceCatalog:
             ):
                 raise ValueError("volume steps must be between -10 and 10, excluding zero")
             volume = max(0, min(100, self.player.state.volume + steps * 10))
-            self.player.set_volume(volume)
+            if self.active_service == "brandmeister":
+                self.brandmeister.set_volume(volume)
+                self.player.state.volume = volume
+            else:
+                self.player.set_volume(volume)
         elif action == "record_start":
             self._require_enabled("recorder")
             source = request.get("source")
@@ -1105,6 +1230,125 @@ class ServiceCatalog:
             if isinstance(direction, bool) or not isinstance(direction, int):
                 raise ValueError("ambient_scene_move requires an integer direction")
             return {"moved": self.store.move_channel(int(scene["id"]), direction)}
+        elif action == "brandmeister_step":
+            self._require_enabled("brandmeister")
+            steps = request.get("steps")
+            if isinstance(steps, bool) or not isinstance(steps, int) or steps == 0 or abs(steps) > 10:
+                raise ValueError("BrandMeister steps must be between -10 and 10")
+            channels = self.store.channels("brandmeister")
+            if not channels:
+                raise ValueError("the BrandMeister talkgroup list is empty")
+            ids = [int(item["id"]) for item in channels]
+            current = (
+                ids.index(self.selected_brandmeister_channel_id)
+                if self.selected_brandmeister_channel_id in ids
+                else 0
+            )
+            self.selected_brandmeister_channel_id = ids[(current + steps) % len(ids)]
+            return {"channel_id": self.selected_brandmeister_channel_id}
+        elif action == "brandmeister_toggle_selected":
+            self._require_enabled("brandmeister")
+            channel = self._selected_brandmeister_channel()
+            if channel is None:
+                raise ValueError("the BrandMeister talkgroup list is empty")
+            metadata = channel.get("metadata")
+            metadata = dict(metadata) if isinstance(metadata, dict) else {}
+            enabled = metadata.get("enabled") is not True
+            if enabled and len(self._enabled_brandmeister_talkgroups()) >= 5:
+                raise ValueError("at most five BrandMeister talkgroups can be active")
+            metadata["enabled"] = enabled
+            self.store.update_channel(int(channel["id"]), str(channel["name"]), metadata)
+            state = self._restart_brandmeister_receiver()
+            return {"channel_id": int(channel["id"]), "enabled": enabled, "brandmeister": state}
+        elif action == "brandmeister_talkgroup_add":
+            self._require_enabled("brandmeister")
+            talkgroup = request.get("talkgroup")
+            name = request.get("name")
+            enabled = request.get("enabled", False)
+            if (
+                isinstance(talkgroup, bool)
+                or not isinstance(talkgroup, int)
+                or talkgroup <= 90
+                or talkgroup > 9_999_999
+            ):
+                raise ValueError("talkgroup must be an integer from 91 through 9999999")
+            if name is not None and (not isinstance(name, str) or not name.strip()):
+                raise ValueError("talkgroup name must be text")
+            if not isinstance(enabled, bool):
+                raise ValueError("talkgroup enabled state must be boolean")
+            channels = self.store.channels("brandmeister")
+            if len(channels) >= 30 and not any(str(item["external_id"]) == str(talkgroup) for item in channels):
+                raise ValueError("at most 30 BrandMeister talkgroups can be saved")
+            if enabled and len(self._enabled_brandmeister_talkgroups()) >= 5:
+                raise ValueError("at most five BrandMeister talkgroups can be active")
+            channel_id = self.store.add_channel(
+                "brandmeister",
+                str(talkgroup),
+                name.strip()[:160] if isinstance(name, str) else f"TG {talkgroup}",
+                {"talkgroup": talkgroup, "enabled": enabled},
+            )
+            existing = self.store.channel(channel_id)
+            if existing is not None and str(existing["external_id"]) == str(talkgroup):
+                metadata = existing.get("metadata")
+                metadata = dict(metadata) if isinstance(metadata, dict) else {}
+                if metadata.get("talkgroup") != talkgroup or metadata.get("enabled") is not enabled:
+                    metadata.update({"talkgroup": talkgroup, "enabled": enabled})
+                    self.store.update_channel(channel_id, str(existing["name"]), metadata)
+            self.selected_brandmeister_channel_id = channel_id
+            if enabled:
+                self._restart_brandmeister_receiver()
+            return {"channel_id": channel_id}
+        elif action == "brandmeister_talkgroup_set":
+            self._require_enabled("brandmeister")
+            channel_id = request.get("channel_id")
+            enabled = request.get("enabled")
+            if isinstance(channel_id, bool) or not isinstance(channel_id, int):
+                raise ValueError("BrandMeister channel id must be an integer")
+            if not isinstance(enabled, bool):
+                raise ValueError("talkgroup enabled state must be boolean")
+            channel = self.store.channel(channel_id)
+            if channel is None or channel.get("service_id") != "brandmeister":
+                raise ValueError("BrandMeister talkgroup was not found")
+            metadata = channel.get("metadata")
+            metadata = dict(metadata) if isinstance(metadata, dict) else {}
+            if enabled and metadata.get("enabled") is not True and len(self._enabled_brandmeister_talkgroups()) >= 5:
+                raise ValueError("at most five BrandMeister talkgroups can be active")
+            metadata["enabled"] = enabled
+            self.store.update_channel(channel_id, str(channel["name"]), metadata)
+            state = self._restart_brandmeister_receiver()
+            return {"channel_id": channel_id, "enabled": enabled, "brandmeister": state}
+        elif action == "brandmeister_talkgroup_delete":
+            self._require_enabled("brandmeister")
+            channel_id = request.get("channel_id")
+            if isinstance(channel_id, bool) or not isinstance(channel_id, int):
+                raise ValueError("BrandMeister channel id must be an integer")
+            channel = self.store.channel(channel_id)
+            if channel is None or channel.get("service_id") != "brandmeister":
+                return {"deleted": False}
+            deleted = self.store.delete_channel(channel_id)
+            remaining = self.store.channels("brandmeister")
+            ids = [int(item["id"]) for item in remaining]
+            if self.selected_brandmeister_channel_id not in ids:
+                self.selected_brandmeister_channel_id = ids[0] if ids else None
+            self._restart_brandmeister_receiver()
+            return {"deleted": deleted}
+        elif action == "brandmeister_talkgroup_move":
+            self._require_enabled("brandmeister")
+            channel_id = request.get("channel_id")
+            direction = request.get("direction")
+            if isinstance(channel_id, bool) or not isinstance(channel_id, int):
+                raise ValueError("BrandMeister channel id must be an integer")
+            if isinstance(direction, bool) or not isinstance(direction, int):
+                raise ValueError("BrandMeister move direction must be an integer")
+            return {"moved": self.store.move_channel(channel_id, direction)}
+        elif action == "brandmeister_listen":
+            self._require_enabled("brandmeister")
+            return {"brandmeister": self._restart_brandmeister_receiver()}
+        elif action == "brandmeister_stop":
+            self.brandmeister.stop()
+            if self.active_service == "brandmeister":
+                self.active_service = "system"
+            return {"brandmeister": self.brandmeister.snapshot()}
         elif action == "media_scan":
             self._require_enabled("local_media")
             return {"scanned": self.scan_media()}
@@ -1116,6 +1360,7 @@ class ServiceCatalog:
             media = self.store.media_item(media_id)
             if media is None:
                 raise ValueError("media item was not found")
+            self._stop_brandmeister_for_audio_owner()
             self.player.load(str(media["path"]))
             self.active_service = "local_media"
             self.active_preset_id = None
@@ -1173,6 +1418,7 @@ class ServiceCatalog:
                 )
             paths = [str(item["path"]) for item in media]
             random.shuffle(paths)
+            self._stop_brandmeister_for_audio_owner()
             self.player.load_playlist(
                 paths,
                 shuffle=False,
@@ -1250,6 +1496,7 @@ class ServiceCatalog:
             source = validate_media_source(str(episode["enclosure_url"]), (self.media_root,))
             if self.radio_buffer is not None:
                 self.radio_buffer.stop(flush=True)
+            self._stop_brandmeister_for_audio_owner()
             self.player.load(source)
             self.active_service = "podcasts"
             self.active_preset_id = None
@@ -1426,6 +1673,7 @@ class ServiceCatalog:
         return {
             "active_service": self.active_service,
             "playback": self.player.state.as_dict(),
+            "brandmeister": self.brandmeister.snapshot(),
             "recording": self.recorder.state.as_dict(),
             "radio_buffer": (
                 self.radio_buffer.snapshot() if self.radio_buffer is not None else None
@@ -1467,6 +1715,7 @@ class ServiceCatalog:
                 source = validate_media_source(str(cached), (self.media_root,))
         if self.radio_buffer is not None:
             self.radio_buffer.stop(flush=True)
+        self._stop_brandmeister_for_audio_owner()
         self.player.load_playlist([source], loop=True)
         scene_id = int(scene["id"])
         self.active_service = "ambient"
@@ -1511,6 +1760,7 @@ class ServiceCatalog:
         self._play_station(station)
 
     def _play_station(self, station: dict[str, object]) -> None:
+        self._stop_brandmeister_for_audio_owner()
         self.player.load(str(station["stream_url"]))
         if self.radio_buffer is not None:
             self.radio_buffer.tune(
@@ -1760,6 +2010,12 @@ class ServiceCatalog:
         return count
 
     def content_asset(self, path: str) -> tuple[str, bytes] | None:
+        if path == "brandmeister-talkgroups.json":
+            try:
+                return "application/json; charset=utf-8", self.brandmeister_catalog.payload()
+            except OSError as exc:
+                LOG.warning("BrandMeister talkgroup catalog unavailable: %s", exc)
+                return None
         if path in {"camera-1.jpg", "camera-2.jpg"}:
             target = self.camera.cache_root / path
         elif path.startswith("ambient-art/"):
@@ -1872,6 +2128,46 @@ class ServiceCatalog:
                     if scene_id is not None and scene_id in ids
                     else None
                 ),
+            }
+        if requested == "DMR":
+            channels = self.store.channels("brandmeister")
+            selected = self._selected_brandmeister_channel()
+            metadata = selected.get("metadata") if selected is not None else None
+            selected_talkgroup = (
+                metadata.get("talkgroup") if isinstance(metadata, dict) else None
+            )
+            state = self.brandmeister.snapshot()
+            destination = state.get("destination")
+            active_talkgroup = (
+                destination
+                if isinstance(destination, int) and not isinstance(destination, bool)
+                else selected_talkgroup
+            )
+            source = state.get("source")
+            alias = state.get("alias")
+            status = str(state.get("status") or "stopped")
+            channel_ids = [int(item["id"]) for item in channels]
+            selected_id = int(selected["id"]) if selected is not None else None
+            listening = status in {"connecting", "listening", "call", "reconnecting"}
+            return {
+                "service": "DMR",
+                "station": f"TG {active_talkgroup}" if isinstance(active_talkgroup, int) else "BrandMeister",
+                "title": str(alias)[:80] if isinstance(alias, str) and alias else "BrandMeister",
+                "subtitle": (
+                    f"DMR ID {source}"
+                    if isinstance(source, int) and not isinstance(source, bool)
+                    else "HoseLine receive-only"
+                    if listening
+                    else "Select talkgroups and press play"
+                ),
+                "playing": listening,
+                "volume": int(state.get("volume", playback.volume)),
+                "channel": (
+                    channel_ids.index(selected_id) + 1
+                    if selected_id is not None and selected_id in channel_ids
+                    else None
+                ),
+                "flag_code": country_code(active_talkgroup) if isinstance(active_talkgroup, int) else None,
             }
         service_label = {
             "webradio": "RADIO",
@@ -2010,6 +2306,7 @@ class ServiceCatalog:
             for worker in workers:
                 worker.join(timeout=max(0.0, remaining / len(workers)))
         self.recorder.close()
+        self.brandmeister.close()
         if self.radio_buffer is not None:
             self.radio_buffer.close()
         self.player.close()

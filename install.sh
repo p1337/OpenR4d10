@@ -147,7 +147,7 @@ export DEBIAN_FRONTEND=noninteractive
 kernel_release="$(uname -r)"
 apt-get update
 apt-get install -y --no-install-recommends \
-    python3 python3-pil python3-libgpiod python3-spidev fonts-dejavu-core \
+    python3 python3-pil python3-libgpiod python3-spidev python3-websockets python3-msgpack fonts-dejavu-core \
     mpv ffmpeg libchromaprint-tools ca-certificates gcc make kmod libc6-dev zlib1g-dev \
     "linux-headers-$kernel_release" device-tree-compiler alsa-utils \
     libasound2-plugins sox network-manager dnsmasq-base

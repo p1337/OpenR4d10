@@ -16,8 +16,10 @@ let stationSearchQuery = "";
 let stationLanguageFilter = "";
 let stationCategoryFilter = "";
 let podcastSearchQuery = "";
-const BRANDMEISTER_STORAGE_KEY = "openr4d10.brandmeister.talkgroups";
 let brandmeisterTalkgroups = [];
+let brandmeisterCatalog = [];
+let brandmeisterCatalogQuery = "";
+let brandmeisterCatalogSignature = "";
 let brandmeisterReceiver = null;
 
 const BRANDMEISTER_FLAGS = new Map([
@@ -293,6 +295,7 @@ function renderServices(catalog) {
   renderPresets(catalog);
   renderLibrary(catalog);
   renderAmbient(catalog);
+  renderBrandmeisterTalkgroups(catalog.brandmeister || {});
   renderPodcasts(catalog);
   renderWeather(catalog);
 }
@@ -1350,38 +1353,76 @@ function brandmeisterFlag(talkgroup) {
   return BRANDMEISTER_FLAGS.get(text.slice(0, 3)) || "🌐";
 }
 
-function saveBrandmeisterTalkgroups() {
-  try {
-    localStorage.setItem(BRANDMEISTER_STORAGE_KEY, JSON.stringify(brandmeisterTalkgroups));
-  } catch (_error) {
-    // Listening still works when browser storage is unavailable.
-  }
-}
-
-function loadBrandmeisterTalkgroups() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(BRANDMEISTER_STORAGE_KEY) || "[]");
-    if (Array.isArray(saved)) {
-      let enabledCount = 0;
-      brandmeisterTalkgroups = saved
-        .filter((item) => Number.isInteger(item?.id) && item.id > 90 && item.id <= 9999999)
-        .slice(0, 30)
-        .map((item) => {
-          const enabled = item.enabled === true && enabledCount < 5;
-          if (enabled) enabledCount += 1;
-          return { id: item.id, enabled };
-        });
-    }
-  } catch (_error) {
-    brandmeisterTalkgroups = [];
-  }
-}
-
 function selectedBrandmeisterTalkgroups() {
-  return brandmeisterTalkgroups.filter((item) => item.enabled).map((item) => item.id);
+  return brandmeisterTalkgroups.filter((item) => item.enabled).map((item) => item.talkgroup);
 }
 
-function renderBrandmeisterTalkgroups() {
+async function brandmeisterCommand(action, extra = {}) {
+  const output = byId("brandmeister-hoseline-status");
+  try {
+    const response = await fetch("/api/control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...extra }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    await refresh();
+    return payload;
+  } catch (error) {
+    output.textContent = t("Error: {{message}}", { message: error.message });
+    return null;
+  }
+}
+
+function renderBrandmeisterCatalog() {
+  const list = byId("brandmeister-catalog-list");
+  const query = brandmeisterCatalogQuery.trim().toLocaleLowerCase(currentLocale);
+  const selected = new Map(brandmeisterTalkgroups.map((item) => [item.talkgroup, item]));
+  const signature = `${currentLocale}|${query}|${brandmeisterCatalog.length}|${brandmeisterTalkgroups.map((item) => `${item.talkgroup}:${item.enabled}`).join(",")}`;
+  if (signature === brandmeisterCatalogSignature) return;
+  brandmeisterCatalogSignature = signature;
+  list.replaceChildren();
+  const matches = brandmeisterCatalog.filter((item) => {
+    const haystack = `${item.talkgroup} ${item.name} ${item.country_code || ""}`.toLocaleLowerCase(currentLocale);
+    return !query || haystack.includes(query);
+  });
+  for (const item of matches) {
+    const row = document.createElement("li");
+    const label = document.createElement("label");
+    label.className = "station-row-copy";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = selected.get(item.talkgroup)?.enabled === true;
+    checkbox.addEventListener("change", async () => {
+      const saved = selected.get(item.talkgroup);
+      if (saved) {
+        await brandmeisterCommand("brandmeister_talkgroup_set", {
+          channel_id: saved.id,
+          enabled: checkbox.checked,
+        });
+      } else {
+        await brandmeisterCommand("brandmeister_talkgroup_add", {
+          talkgroup: item.talkgroup,
+          name: item.name,
+          enabled: checkbox.checked,
+        });
+      }
+    });
+    const copy = document.createElement("span");
+    const strong = document.createElement("strong");
+    strong.textContent = `${brandmeisterFlag(item.talkgroup)} TG ${item.talkgroup}`;
+    const detail = document.createElement("small");
+    detail.textContent = item.name;
+    copy.append(strong, detail);
+    label.append(checkbox, copy);
+    row.append(label);
+    list.append(row);
+  }
+}
+
+function renderBrandmeisterTalkgroups(state = {}) {
+  brandmeisterTalkgroups = Array.isArray(state.channels) ? state.channels : [];
   const list = byId("brandmeister-talkgroup-list");
   list.replaceChildren();
   for (const item of brandmeisterTalkgroups) {
@@ -1391,50 +1432,42 @@ function renderBrandmeisterTalkgroups() {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = item.enabled;
-    checkbox.addEventListener("change", () => {
-      if (checkbox.checked && selectedBrandmeisterTalkgroups().length >= 5) {
-        checkbox.checked = false;
-        byId("brandmeister-hoseline-status").textContent = t("At most five talkgroups can be active at once.");
-        return;
-      }
-      item.enabled = checkbox.checked;
-      saveBrandmeisterTalkgroups();
-      renderBrandmeisterTalkgroups();
-    });
+    checkbox.addEventListener("change", () => brandmeisterCommand(
+      "brandmeister_talkgroup_set",
+      { channel_id: item.id, enabled: checkbox.checked },
+    ));
     const copy = document.createElement("strong");
-    copy.textContent = `${brandmeisterFlag(item.id)} TG ${item.id}`;
+    copy.textContent = `${brandmeisterFlag(item.talkgroup)} TG ${item.talkgroup} · ${item.name}`;
     label.append(checkbox, copy);
     const actions = document.createElement("span");
     actions.className = "library-actions";
     const remove = document.createElement("button");
     remove.type = "button";
     remove.textContent = t("Delete");
-    remove.addEventListener("click", () => {
-      brandmeisterTalkgroups = brandmeisterTalkgroups.filter((entry) => entry !== item);
-      saveBrandmeisterTalkgroups();
-      renderBrandmeisterTalkgroups();
-    });
+    remove.addEventListener("click", () => brandmeisterCommand(
+      "brandmeister_talkgroup_delete",
+      { channel_id: item.id },
+    ));
     actions.append(remove);
     row.append(label, actions);
     list.append(row);
   }
   byId("brandmeister-talkgroup-count").textContent = `${selectedBrandmeisterTalkgroups().length} / 5`;
+  renderBrandmeisterCatalog();
+  updateBrandmeisterState(state);
 }
 
-function addBrandmeisterTalkgroup() {
+async function addBrandmeisterTalkgroup() {
   const input = byId("brandmeister-talkgroup");
   const talkgroup = Number(input.value);
   if (!Number.isInteger(talkgroup) || talkgroup <= 90 || talkgroup > 9999999) {
     byId("brandmeister-hoseline-status").textContent = t("Enter a valid talkgroup above 90.");
     return false;
   }
-  let item = brandmeisterTalkgroups.find((entry) => entry.id === talkgroup);
-  if (!item) {
-    item = { id: talkgroup, enabled: selectedBrandmeisterTalkgroups().length < 5 };
-    brandmeisterTalkgroups.push(item);
-  }
-  saveBrandmeisterTalkgroups();
-  renderBrandmeisterTalkgroups();
+  await brandmeisterCommand("brandmeister_talkgroup_add", {
+    talkgroup,
+    enabled: selectedBrandmeisterTalkgroups().length < 5,
+  });
   input.value = "";
   return true;
 }
@@ -1442,11 +1475,11 @@ function addBrandmeisterTalkgroup() {
 function updateBrandmeisterState(state) {
   const output = byId("brandmeister-hoseline-status");
   const call = byId("brandmeister-call");
-  byId("brandmeister-disconnect").disabled = ["closed", "error"].includes(state.status);
   call.hidden = true;
   if (state.status === "connecting") output.textContent = t("Connecting to HoseLine …");
-  if (state.status === "connected") output.textContent = t("Listening to {{count}} talkgroups.", { count: state.talkgroups.length });
-  if (state.status === "closed") output.textContent = t("HoseLine reception stopped.");
+  if (["connected", "listening"].includes(state.status)) output.textContent = t("Listening to {{count}} talkgroups.", { count: state.talkgroups.length });
+  if (["closed", "stopped"].includes(state.status)) output.textContent = t("HoseLine reception stopped.");
+  if (state.status === "reconnecting") output.textContent = t("Reconnecting to HoseLine …");
   if (state.status === "error") output.textContent = t("HoseLine connection failed. Use the official player link below.");
   if (state.status === "call") {
     const destination = Number(state.destination);
@@ -1456,18 +1489,24 @@ function updateBrandmeisterState(state) {
   }
 }
 
-loadBrandmeisterTalkgroups();
-renderBrandmeisterTalkgroups();
 if (window.OpenR4d10HoseLine) {
   brandmeisterReceiver = new window.OpenR4d10HoseLine(updateBrandmeisterState);
 }
 
 byId("brandmeister-add-talkgroup").addEventListener("click", addBrandmeisterTalkgroup);
 
-byId("brandmeister-hoseline-form").addEventListener("submit", (event) => {
+byId("brandmeister-hoseline-form").addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (byId("brandmeister-talkgroup").value) await addBrandmeisterTalkgroup();
+  await brandmeisterCommand("brandmeister_listen");
+});
+
+byId("brandmeister-device-stop").addEventListener("click", () => {
+  brandmeisterCommand("brandmeister_stop");
+});
+
+byId("brandmeister-browser-listen").addEventListener("click", () => {
   const output = byId("brandmeister-hoseline-status");
-  if (byId("brandmeister-talkgroup").value) addBrandmeisterTalkgroup();
   const talkgroups = selectedBrandmeisterTalkgroups();
   if (!talkgroups.length) {
     output.textContent = t("Activate at least one talkgroup.");
@@ -1481,11 +1520,28 @@ byId("brandmeister-hoseline-form").addEventListener("submit", (event) => {
     status: "error",
     talkgroups,
   }));
+  byId("brandmeister-disconnect").disabled = false;
 });
 
 byId("brandmeister-disconnect").addEventListener("click", () => {
   brandmeisterReceiver?.disconnect();
+  byId("brandmeister-disconnect").disabled = true;
 });
+
+byId("brandmeister-search").addEventListener("input", (event) => {
+  brandmeisterCatalogQuery = event.currentTarget.value;
+  renderBrandmeisterCatalog();
+});
+
+fetch("/api/brandmeister-talkgroups", { cache: "no-store" })
+  .then((response) => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
+  .then((payload) => {
+    brandmeisterCatalog = Array.isArray(payload.talkgroups) ? payload.talkgroups : [];
+    renderBrandmeisterCatalog();
+  })
+  .catch((error) => {
+    byId("brandmeister-hoseline-status").textContent = t("Error: {{message}}", { message: error.message });
+  });
 
 byId("podcast-search").addEventListener("input", (event) => {
   podcastSearchQuery = event.currentTarget.value;

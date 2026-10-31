@@ -76,9 +76,10 @@ the installer report exactly which adapters still need configuration.
   forest, beach, brook, rain and night soundscapes, endless looping and a
   persistent sortable scene library with one consistent bundled artwork per
   built-in scene in both the browser and physical display
-- direct receive-only BrandMeister HoseLine browser audio with a persistent
-  multi-talkgroup checkbox quick list, country flags and active-call display;
-  no account password, user token, PTT or claimed Whisplay-speaker routing
+- native receive-only BrandMeister HoseLine audio through the Whisplay ALSA
+  speaker plus optional browser audio, with a persistent multi-talkgroup
+  checkbox quick list, complete searchable official catalog, country flags and
+  active-call display; no account password, user token or PTT
 - standard-library-only test suite and GitHub Actions CI
 
 Hardware-specific integration still pending:

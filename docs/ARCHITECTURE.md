@@ -299,6 +299,15 @@ playlist to the single `MpvEngine`, thereby deliberately replacing the prior
 audio owner. Device labels and descriptions are localized independently of the
 browser while custom user names remain unchanged. See `AMBIENT.md`.
 
+BrandMeister uses the same generic ordered `channels` table for a non-secret
+device talkgroup quick list. The native receive-only adapter owns one bounded
+HoseLine WebSocket thread and one lazy `aplay` PCM sink for the verified
+`whisplaysound` ALSA device. It decodes only the documented MessagePack call,
+alias and G.711 µ-law packet shapes. Browser controls and physical encoder
+events mutate the same SQLite rows. A separate bounded daily cache of the
+official public talkgroup-name endpoint supplies search metadata without
+placing thousands of catalog rows into every status snapshot.
+
 Curated radio and news source definitions remain reviewable data in `presets.py`,
 separate from playback and parser logic. Radio definitions are seeded exactly
 once into the ordered SQLite station library only when `default_enabled` is

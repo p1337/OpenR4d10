@@ -305,6 +305,15 @@ class OpenR4d10App:
                 {"action": "ambient_step", "steps": event.steps}
             )
         elif (
+            self.services is not None
+            and event.control == Control.RIGHT_OUTER
+            and not menu_open
+            and selected_service == "DMR"
+        ):
+            media_result = self.services.control(
+                {"action": "brandmeister_step", "steps": event.steps}
+            )
+        elif (
             event.control == Control.RIGHT_PRESS
             and event.held_seconds < 2.0
             and not menu_open
@@ -317,6 +326,8 @@ class OpenR4d10App:
                 action = "radio_toggle"
             elif selected_service == "AMBIENT":
                 action = "ambient_toggle"
+            elif selected_service == "DMR":
+                action = "brandmeister_toggle_selected"
             else:
                 action = None
             if action is not None:
@@ -351,9 +362,14 @@ class OpenR4d10App:
             if "selected_preset" in media_result:
                 response["selected_preset"] = media_result.get("selected_preset")
             if "channel_id" in media_result:
-                response["weather_channel_id"] = media_result["channel_id"]
+                if selected_service == "DMR":
+                    response["brandmeister_channel_id"] = media_result["channel_id"]
+                else:
+                    response["weather_channel_id"] = media_result["channel_id"]
             if "scene_id" in media_result:
                 response["ambient_scene_id"] = media_result["scene_id"]
+            if "brandmeister" in media_result:
+                response["brandmeister"] = media_result["brandmeister"]
             if "radio_buffer" in media_result:
                 response["radio_buffer"] = media_result["radio_buffer"]
         return response

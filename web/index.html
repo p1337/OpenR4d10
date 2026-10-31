@@ -93,13 +93,17 @@
         <section class="tab-panel" role="tabpanel" data-tab-panel="brandmeister" hidden>
           <section class="panel services-panel" aria-labelledby="brandmeister-title">
             <div class="panel-heading"><div><p class="eyebrow" data-i18n="BRANDMEISTER">BRANDMEISTER</p><h1 class="tab-title" id="brandmeister-title" data-i18n="Listen to a talkgroup">Listen to a talkgroup</h1></div><span class="version" data-i18n="Official HoseLine">Official HoseLine</span></div>
-            <p class="services-note" data-i18n="Receive a BrandMeister talkgroup directly in this browser. OpenR4d10 stores no password or user token and never transmits.">Receive a BrandMeister talkgroup directly in this browser. OpenR4d10 stores no password or user token and never transmits.</p>
+            <p class="services-note" data-i18n="Receive BrandMeister on the Whisplay speaker or additionally in this browser. OpenR4d10 stores no password or user token and never transmits.">Receive BrandMeister on the Whisplay speaker or additionally in this browser. OpenR4d10 stores no password or user token and never transmits.</p>
             <form class="content-control" id="brandmeister-hoseline-form">
               <label for="brandmeister-talkgroup" data-i18n="Talkgroup number">Talkgroup number</label>
               <div class="media-source-row"><input id="brandmeister-talkgroup" type="number" inputmode="numeric" min="91" max="9999999" step="1" placeholder="262"><button id="brandmeister-add-talkgroup" type="button" data-i18n="Add talkgroup">Add talkgroup</button></div>
               <div class="library-heading"><strong data-i18n="Talkgroup quick list">Talkgroup quick list</strong><span id="brandmeister-talkgroup-count">0 / 5</span></div>
               <ul id="brandmeister-talkgroup-list" class="library-list"></ul>
-              <div class="media-source-row"><button type="submit" data-i18n="Connect and listen">Connect and listen</button><button id="brandmeister-disconnect" type="button" data-i18n="Disconnect" disabled>Disconnect</button></div>
+              <label for="brandmeister-search" data-i18n="All official talkgroups">All official talkgroups</label>
+              <input id="brandmeister-search" type="search" placeholder="Search number, name or country …" data-i18n-placeholder="Search number, name or country …" autocomplete="off">
+              <ul id="brandmeister-catalog-list" class="library-list station-catalog-list"></ul>
+              <div class="media-source-row"><button type="submit" data-i18n="Listen on device">Listen on device</button><button id="brandmeister-device-stop" type="button" data-i18n="Stop device reception">Stop device reception</button></div>
+              <div class="media-source-row"><button id="brandmeister-browser-listen" type="button" data-i18n="Also listen in browser">Also listen in browser</button><button id="brandmeister-disconnect" type="button" data-i18n="Stop browser reception" disabled>Stop browser reception</button></div>
               <output id="brandmeister-hoseline-status" aria-live="polite" data-i18n="Enter a talkgroup above 90.">Enter a talkgroup above 90.</output>
               <p id="brandmeister-call" class="services-note" hidden></p>
             </form>

@@ -18,6 +18,8 @@ class InstallerContractTests(unittest.TestCase):
         for relative in ("media", "media/ambient", "recordings", "cache"):
             self.assertIn(f'"$STATE_ROOT/{relative}"', installer)
         self.assertNotIn('chown -R openr4d10', installer)
+        self.assertIn("python3-websockets", installer)
+        self.assertIn("python3-msgpack", installer)
 
     def test_main_installer_owns_whisplay_audio_installation(self) -> None:
         repository = Path(__file__).resolve().parents[1]

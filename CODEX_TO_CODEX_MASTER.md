@@ -1120,6 +1120,26 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   gibt Ton im bedienenden Browser aus; eine Ausgabe über den Whisplay-Lautsprecher
   darf erst nach einem separaten realen Pi-Audiotest behauptet werden. Senden/PTT
   ist ausdrücklich nicht Teil dieser Ausbaustufe.
+- Robert stellt ausdrücklich klar, dass Browseraudio nur ein Zusatzweg ist und
+  den Hauptzweck nicht erfüllt: BrandMeister muss nativ auf dem Raspberry Pi
+  empfangen, über die reale ALSA-Karte `whisplaysound` wiedergegeben und auf dem
+  physischen Whisplay bedient und angezeigt werden. Die Geräteansicht zeigt die
+  ausgewählte Talkgroup samt Länderflagge sowie bei einem Ruf Ziel-Talkgroup,
+  DMR-Quelle und verfügbaren Alias. Mehrere aktivierte Talkgroups bleiben
+  gleichzeitig abonniert; der jeweils aktive Ruf erhält Anzeige- und
+  Audiopriorität. Die Talkgroup-Liste und ihre Aktivierung sind nicht nur
+  Browser-LocalStorage, sondern nicht geheim und updatefest in der bestehenden
+  SQLite-Gerätekonfiguration gespeichert. Erst nach einem realen Empfangs- und
+  Lautsprechertest auf dem Pi darf dieser native Pfad als funktionsfähig gelten.
+- Die Talkgroup-Verwaltung zeigt zusätzlich den vollständigen, durchsuchbaren
+  öffentlichen Katalog vom festen offiziellen Endpunkt
+  `https://api.brandmeister.network/v2/talkgroup`. Nummer, Name und abgeleitete
+  Länderkennung werden begrenzt und lokal zwischengespeichert; eine numerische
+  eigene Talkgroup bleibt ergänzend möglich. Das Anhaken legt die Talkgroup in
+  der updatefesten Geräte-Quickliste an beziehungsweise aktiviert sie dort.
+  Der öffentliche Katalog benötigt keinen Benutzer-API-Schlüssel; persönliche
+  Hotspot- oder SelfCare-Konfiguration bleibt ausdrücklich außerhalb dieses
+  Receive-only-Pfads.
 
 ### 2026-10-31 – Einheitliche Web-Pfeilrichtung und direkt geladene Ambient-Bilder
 

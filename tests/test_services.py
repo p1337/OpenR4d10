@@ -491,7 +491,11 @@ class ServiceCatalogTests(unittest.TestCase):
         self.assertEqual(persisted[0]["name"], "Science Weekly")
 
     def test_catalog_covers_documented_services_without_claiming_credentials(self) -> None:
-        available = {"mpv": "/usr/bin/mpv", "ffmpeg": "/usr/bin/ffmpeg"}
+        available = {
+            "mpv": "/usr/bin/mpv",
+            "ffmpeg": "/usr/bin/ffmpeg",
+            "aplay": "/usr/bin/aplay",
+        }
         with tempfile.TemporaryDirectory() as raw:
             catalog = ServiceCatalog(
                 Path(raw).resolve(),
@@ -511,8 +515,80 @@ class ServiceCatalogTests(unittest.TestCase):
         self.assertTrue(expected.issubset(items))
         self.assertEqual(len(items), len(BUILTIN_SERVICES))
         self.assertEqual(items["webradio"]["readiness"], "ready")
-        self.assertEqual(items["brandmeister"]["readiness"], "disabled")
+        self.assertEqual(items["brandmeister"]["readiness"], "ready")
         self.assertNotIn("credential", items["brandmeister"])
+
+    def test_brandmeister_talkgroups_are_device_persistent_and_drive_receiver(self) -> None:
+        class Receiver:
+            def __init__(self):
+                self.state = {
+                    "status": "stopped",
+                    "talkgroups": [],
+                    "destination": None,
+                    "source": None,
+                    "alias": "",
+                    "volume": 30,
+                    "error": None,
+                    "country_code": None,
+                }
+
+            def snapshot(self):
+                return dict(self.state)
+
+            def set_volume(self, volume):
+                self.state["volume"] = volume
+                return self.snapshot()
+
+            def listen(self, talkgroups):
+                self.state["status"] = "listening"
+                self.state["talkgroups"] = list(talkgroups)
+                return self.snapshot()
+
+            def stop(self):
+                self.state["status"] = "stopped"
+                self.state["talkgroups"] = []
+                return self.snapshot()
+
+            def close(self):
+                self.stop()
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            receiver = Receiver()
+            catalog = ServiceCatalog(
+                root,
+                brandmeister=receiver,  # type: ignore[arg-type]
+                executable_lookup=lambda _name: "/bin/true",
+            )
+            try:
+                initial = catalog.snapshot()["brandmeister"]
+                self.assertEqual(initial["channels"][0]["talkgroup"], 91)
+                self.assertTrue(initial["channels"][0]["enabled"])
+                added = catalog.control(
+                    {
+                        "action": "brandmeister_talkgroup_add",
+                        "talkgroup": 262,
+                        "name": "Germany",
+                        "enabled": True,
+                    }
+                )
+                self.assertIsInstance(added["channel_id"], int)
+                self.assertEqual(receiver.state["talkgroups"], [91, 262])
+            finally:
+                catalog.close()
+            reopened = ServiceCatalog(
+                root,
+                brandmeister=Receiver(),  # type: ignore[arg-type]
+                executable_lookup=lambda _name: "/bin/true",
+            )
+            try:
+                persisted = reopened.snapshot()["brandmeister"]["channels"]
+                self.assertEqual(
+                    [item["talkgroup"] for item in persisted],
+                    [91, 262],
+                )
+            finally:
+                reopened.close()
 
     def test_solix_adapter_exposes_only_bounded_public_energy_metrics(self) -> None:
         class Registry:

@@ -277,6 +277,7 @@ class DeviceUiState:
     source: str = "OPENR4D10"
     preset_id: str | None = None
     image_file: str | None = None
+    flag_code: str | None = None
     title: str = "System online"
     subtitle: str = "Receiver ready"
     playing: bool = False
@@ -322,6 +323,7 @@ class DeviceUiState:
             "subtitle": self.subtitle,
             "preset_id": self.preset_id,
             "image_file": self.image_file,
+            "flag_code": self.flag_code,
             "accent_color": "#{:02X}{:02X}{:02X}".format(*self.accent),
         }
 
@@ -446,6 +448,12 @@ class DeviceUiState:
         self.preset_id = preset_id if isinstance(preset_id, str) else None
         image_file = receiver.get("image_file")
         self.image_file = image_file if isinstance(image_file, str) else None
+        flag_code = receiver.get("flag_code")
+        self.flag_code = (
+            flag_code.upper()
+            if isinstance(flag_code, str) and len(flag_code) == 2
+            else None
+        )
         if not self.menu_open:
             self.title = str(receiver.get("title") or frame.title)[:48]
             self.subtitle = str(receiver.get("subtitle") or frame.body)[:72]
@@ -555,6 +563,56 @@ def _battery(
     if percent is not None:
         fill_width = max(1, round(15 * percent / 100))
         draw.rectangle((x + 2, y + 2, x + 1 + fill_width, y + 7), fill=color)
+
+
+def _draw_country_flag(
+    draw: ImageDraw.ImageDraw,
+    bounds: tuple[int, int, int, int],
+    code: str,
+) -> None:
+    """Draw a small dependency-free flag cue for supported DMR MCCs."""
+
+    left, top, right, bottom = bounds
+    width = right - left
+    height = bottom - top
+    horizontal = {
+        "DE": ((0, 0, 0), (205, 0, 0), (255, 206, 0)),
+        "PL": ((250, 250, 250), (250, 250, 250), (220, 20, 60)),
+        "NL": ((174, 28, 40), (250, 250, 250), (33, 70, 139)),
+        "ES": ((170, 21, 27), (250, 190, 0), (170, 21, 27)),
+        "AT": ((220, 20, 60), (250, 250, 250), (220, 20, 60)),
+    }
+    vertical = {
+        "FR": ((0, 85, 164), (250, 250, 250), (239, 65, 53)),
+        "IT": ((0, 146, 70), (250, 250, 250), (206, 43, 55)),
+        "PT": ((0, 102, 0), (0, 102, 0), (206, 17, 38)),
+    }
+    if code in horizontal:
+        colors = horizontal[code]
+        for index, color in enumerate(colors):
+            y0 = top + round(height * index / 3)
+            y1 = top + round(height * (index + 1) / 3)
+            draw.rectangle((left, y0, right, y1), fill=color)
+    elif code in vertical:
+        colors = vertical[code]
+        for index, color in enumerate(colors):
+            x0 = left + round(width * index / 3)
+            x1 = left + round(width * (index + 1) / 3)
+            draw.rectangle((x0, top, x1, bottom), fill=color)
+    else:
+        draw.rectangle(bounds, fill=(35, 67, 112))
+        code_font = _font(28, bold=True)
+        label = code if code in {"GB", "US", "CA", "AU", "CH"} else "TG"
+        text_bounds = draw.textbbox((0, 0), label, font=code_font)
+        draw.text(
+            (
+                left + (width - (text_bounds[2] - text_bounds[0])) / 2,
+                top + (height - (text_bounds[3] - text_bounds[1])) / 2 - text_bounds[1],
+            ),
+            label,
+            font=code_font,
+            fill=(255, 255, 255),
+        )
 
 
 def _control_value(
@@ -1084,6 +1142,16 @@ def render_device_ui(
         )
         mask = _media_mask(tile_size)
         image.paste(tile, tile_xy, mask)
+    elif state.service == "DMR":
+        _fill_media_shape(image, media_bounds, (13, 31, 35))
+        flag_bounds = (
+            media_bounds[0] + 23,
+            media_bounds[1] + 35,
+            media_bounds[2] - 23,
+            media_bounds[1] + 102,
+        )
+        _draw_country_flag(draw, flag_bounds, state.flag_code or "TG")
+        draw.rounded_rectangle(flag_bounds, radius=5, outline=(210, 218, 220), width=2)
     else:
         _fill_media_shape(image, media_bounds, (13, 31, 35))
         initials = "".join(part[:1] for part in state.source.split()[:2]).upper() or "OR"
