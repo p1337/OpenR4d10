@@ -29,7 +29,7 @@ the installer report exactly which adapters still need configuration.
 - native Whisplay ST7789 boot animation installed and enabled automatically
 - safe display handoff both at boot and during an in-session installation
 - real-device-confirmed Whisplay SPI transport, colour order and orientation
-- persistent, C-timed 0–100% Whisplay brightness control in the web settings
+- persistent, kernel-timed 0–100% Whisplay brightness control in the web settings
 - persistent accent color plus a permanent strong, soft player-edge glow following
   the rounded display contour and closing below the status row
 - read-only PiSugar 3 battery percentage over the manufacturer-documented I2C
@@ -102,7 +102,8 @@ starts the local installer, which requests root access when required.
 The installer verifies the operating system, CPU architecture and Raspberry Pi
 model, installs files below `/opt/openr4d10`, preserves existing configuration,
 compiles the Whisplay boot player locally for the Pi, installs the Debian
-Pillow/libgpiod/lgpio/spidev/mpv/ffmpeg packages, enables SPI, builds the pinned
+Pillow/libgpiod/spidev/mpv/ffmpeg packages, enables SPI, installs the kernel
+`pwm-gpio` backlight overlay, builds the pinned
 official unified Whisplay sound-card driver for the running kernel, enables
 I²C/I²S, installs its overlay and ALSA configuration, installs and enables
 the systemd services, and runs a final diagnostic. The official driver supports
@@ -185,13 +186,15 @@ immediately from 0 through 100 percent. The value is stored in the existing
 non-secret SQLite state, included in the normal pre-update backup and restored
 automatically when the application starts. The early native boot animation
 runs before that database is available; the saved value takes effect when the
-normal OpenR4d10 device UI takes over the panel. Intermediate values use the
-Raspberry Pi OS `lgpio` C-timed PWM facility on the manufacturer-verified
-active-low BCM22 backlight line; Python no longer schedules the pulses. An
-unchanged brightness value is not re-submitted on every display frame, because
-re-arming the same waveform caused the remaining rare bright/dark jump. Its
-private notification pipe stays inside `/run/openr4d10`, the already protected
-runtime directory, without weakening the service's read-only system boundary.
+normal OpenR4d10 device UI takes over the panel. Intermediate values use
+Raspberry Pi OS's in-tree `pwm-gpio` driver on the manufacturer-verified
+active-low BCM22 backlight line. Its high-resolution kernel timer continues to
+generate pulse edges when the application process is delayed by CPU load. The
+application publishes only a bounded 0–100 request below
+`/run/openr4d10-backlight`; a fixed root-owned helper validates it and changes
+the kernel PWM interface. The native boot player no longer claims BCM22, keeps
+the backlight dark until its first complete frame and then uses the same
+bounded handoff. This transition needs the installer's automatic reboot.
 The same settings area stores the selected accent color. The normal player
 always receives a clearly visible strong, soft edge glow in that color along the physical rounded
 contour, including a straight upper glow immediately below the status row. It

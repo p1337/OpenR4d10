@@ -102,12 +102,28 @@ def _whisplay_audio_checks(
     ]
 
 
+def _whisplay_backlight_checks(
+    ready_path: Path = Path("/run/openr4d10-backlight/kernel-pwm.ready"),
+) -> list[Check]:
+    try:
+        backend = ready_path.read_text(encoding="ascii").strip()
+    except OSError:
+        backend = ""
+    if backend == "pwm_gpio@22":
+        return [Check("OK", "Whisplay backlight uses kernel-timed PWM on BCM22")]
+    return [
+        Check(
+            "WARN",
+            "Whisplay kernel PWM is installed but not active; reboot and re-check",
+        )
+    ]
+
+
 def _whisplay_checks() -> list[Check]:
     checks: list[Check] = []
     for module, package in (
         ("PIL", "python3-pil"),
         ("gpiod", "python3-libgpiod"),
-        ("lgpio", "python3-lgpio"),
         ("spidev", "python3-spidev"),
     ):
         if importlib.util.find_spec(module) is not None:
@@ -121,6 +137,7 @@ def _whisplay_checks() -> list[Check]:
             checks.append(
                 Check("WARN", f"Whisplay device is not available yet: {device}; reboot after installation")
             )
+    checks.extend(_whisplay_backlight_checks())
     checks.extend(_whisplay_audio_checks())
     return checks
 

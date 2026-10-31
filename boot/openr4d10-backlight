@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly RUNTIME_ROOT=/run/openr4d10-backlight
+readonly REQUEST_FILE=$RUNTIME_ROOT/brightness.request
+readonly READY_FILE=$RUNTIME_ROOT/kernel-pwm.ready
+readonly LOCK_FILE=/run/lock/openr4d10-backlight.lock
+readonly PERIOD_NS=1000000
+
+usage() {
+    echo "Usage: openr4d10-backlight [--initialize]" >&2
+    exit 2
+}
+
+[[ $# -le 1 ]] || usage
+[[ $# -eq 0 || "${1:-}" == --initialize ]] || usage
+
+find_pwm_chip() {
+    local chip node
+    for chip in /sys/class/pwm/pwmchip*; do
+        [[ -d "$chip" ]] || continue
+        node="$(basename -- "$(readlink -f -- "$chip/device/of_node" 2>/dev/null || true)")"
+        if [[ "$node" == pwm_gpio@22 ]]; then
+            printf '%s\n' "$chip"
+            return 0
+        fi
+    done
+    return 1
+}
+
+open_pwm() {
+    local chip="" pwm=""
+    for _attempt in {1..50}; do
+        chip="$(find_pwm_chip || true)"
+        [[ -n "$chip" ]] && break
+        sleep 0.1
+    done
+    [[ -n "$chip" ]] || {
+        echo "OpenR4d10 kernel PWM for pwm_gpio@22 is unavailable; reboot after installing the overlay." >&2
+        return 1
+    }
+    [[ "$(<"$chip/npwm")" == 1 ]] || {
+        echo "Unexpected PWM channel count for $chip" >&2
+        return 1
+    }
+    pwm="$chip/pwm0"
+    if [[ ! -d "$pwm" ]]; then
+        printf '0\n' >"$chip/export" 2>/dev/null || [[ -d "$pwm" ]]
+        for _attempt in {1..50}; do
+            [[ -d "$pwm" ]] && break
+            sleep 0.02
+        done
+    fi
+    [[ -d "$pwm" ]] || {
+        echo "Cannot export OpenR4d10 PWM channel" >&2
+        return 1
+    }
+    printf '%s\n' "$pwm"
+}
+
+configure_pwm() {
+    local pwm="$1" brightness="$2" duty_ns
+    [[ "$brightness" =~ ^([0-9]|[1-9][0-9]|100)$ ]] || {
+        echo "Brightness request must be an integer from 0 through 100" >&2
+        return 1
+    }
+    duty_ns=$(( PERIOD_NS * (100 - brightness) / 100 ))
+
+    if [[ "$(<"$pwm/period")" != "$PERIOD_NS" ]]; then
+        if [[ "$(<"$pwm/enable")" == 1 ]]; then
+            printf '0\n' >"$pwm/enable"
+        fi
+        printf '0\n' >"$pwm/duty_cycle"
+        printf '%s\n' "$PERIOD_NS" >"$pwm/period"
+        printf 'normal\n' >"$pwm/polarity"
+    fi
+    printf '%s\n' "$duty_ns" >"$pwm/duty_cycle"
+    if [[ "$(<"$pwm/enable")" != 1 ]]; then
+        printf '1\n' >"$pwm/enable"
+    fi
+}
+
+install -d -m 0770 -o root -g openr4d10 "$RUNTIME_ROOT"
+exec 9>"$LOCK_FILE"
+flock 9
+pwm="$(open_pwm)"
+
+if [[ "${1:-}" == --initialize ]]; then
+    # Active-low backlight: 0% visible brightness is 100% GPIO high-time.
+    # Keep the panel dark until the native player has written its first frame.
+    configure_pwm "$pwm" 0
+    printf 'pwm_gpio@22\n' >"$READY_FILE"
+    chown root:openr4d10 "$READY_FILE"
+    chmod 0640 "$READY_FILE"
+    exit 0
+fi
+
+[[ -f "$REQUEST_FILE" && ! -L "$REQUEST_FILE" ]] || exit 0
+work_file="$RUNTIME_ROOT/.brightness.$$.request"
+mv -- "$REQUEST_FILE" "$work_file"
+trap 'rm -f -- "$work_file"' EXIT
+[[ "$(stat -c '%a' "$work_file")" == 600 ]] || {
+    echo "Unsafe OpenR4d10 brightness request permissions" >&2
+    exit 1
+}
+owner="$(stat -c '%U' "$work_file")"
+[[ "$owner" == root || "$owner" == openr4d10 ]] || {
+    echo "Unsafe OpenR4d10 brightness request owner" >&2
+    exit 1
+}
+IFS= read -r brightness <"$work_file"
+[[ "$(wc -l <"$work_file")" -eq 1 ]] || {
+    echo "Invalid OpenR4d10 brightness request" >&2
+    exit 1
+}
+configure_pwm "$pwm" "$brightness"
+

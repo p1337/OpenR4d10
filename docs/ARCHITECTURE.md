@@ -129,6 +129,7 @@ and one logical input path, not a second menu surface or a fabricated PTT adapte
 - immutable application release: `/opt/openr4d10/releases/<version>`
 - active release symlink: `/opt/openr4d10/current`
 - ephemeral runtime output: `/run/openr4d10`
+- bounded brightness handoff: `/run/openr4d10-backlight/brightness.request`
 - persistent application state: `/var/lib/openr4d10`
 - non-secret SQLite state: `/var/lib/openr4d10/openr4d10.sqlite3`
 - service logs: system journal, unit `openr4d10.service`
@@ -157,26 +158,21 @@ Display brightness is the non-secret integer setting
 construction the saved value is passed to the configured display adapter; a
 web change is first accepted by the existing `WhisplayDisplay` owner and then
 committed to SQLite. A failed database write attempts to restore the previous
-hardware value. No parallel settings file, daemon or GPIO owner exists.
-BCM22 is not a native PWM output on the verified Zero 2 W mapping. The same
-`WhisplayPanel` process therefore owns that line through the Raspberry Pi OS
-`python3-lgpio` binding and uses `lgpio.tx_pwm`, whose timing loop is in the
-packaged C library. Reset and data/command remain ordinary `libgpiod` lines.
-The replaced Python PWM thread must not be reintroduced; its scheduler jitter
-was visibly confirmed as brightness flicker on the real panel.
-The `lgpio` module creates its private `.lgd-nfy*` notification pipe in the
-process working directory during import. The hardened application unit therefore
-uses its existing `RuntimeDirectory=/run/openr4d10` as `WorkingDirectory`.
-That path was already the unit's private writable runtime boundary;
-`ProtectSystem=strict` and the existing `ReadWritePaths` remain unchanged.
-The packaged 0.2.2 binding rejects an idle `tx_pwm(..., 0, 0)` stop request
-with `bad PWM micros` despite its API text. `_LgpioPwm` therefore tracks
-whether it has successfully started PWM and sends the stop request only in
-that state. Steady endpoint writes never issue a speculative stop. The real
-panel still showed a rarer bright/dark jump below 100 percent because the
-periodic renderer called the brightness path after every frame and re-armed an
-unchanged PWM waveform. `_LgpioPwm` now caches its current duty cycle and does
-not call `tx_pwm` unless the requested duty actually changes.
+hardware value. BCM22 is not a native PWM output on the verified Zero 2 W
+mapping. The installed `pwm-gpio,gpio=22` overlay therefore owns it and uses
+the kernel's high-resolution timer rather than an application-scheduled pulse
+thread. Reset and data/command remain ordinary `libgpiod` lines.
+
+The unprivileged application never writes PWM sysfs. `_KernelPwmBacklight`
+atomically publishes only one 0600 integer request below
+`/run/openr4d10-backlight`. A fixed root-owned systemd path/service validates
+the owner, mode, exact 0–100 range and the `pwm_gpio@22` device before applying
+the active-low duty. The helper is the sole sysfs writer; neither a URL nor an
+arbitrary path crosses this boundary. The native player no longer claims
+BCM22. An early initializer holds it off until the first decoded boot frame,
+after which the player queues 100 percent through the same fixed request.
+Application handoff then restores SQLite brightness without changing the PWM
+owner.
 
 The non-secret setting `ui.accent_color` (`#RRGGBB`) is restored into the one
 `WhisplayDisplay` renderer. The browser may change it only through the bounded
@@ -425,23 +421,26 @@ not substituted for the SSID.
 
 ## Startup sequence
 
-1. `openr4d10-boot.service` opens SPI0/CS0 plus only the verified LCD GPIO
-   lines and plays the native animation; its final second loops.
-2. `systemd` creates application runtime and state directories as the
+1. `openr4d10-backlight-init.service` claims BCM22 through kernel `pwm-gpio`
+   and keeps the active-low backlight dark.
+2. `openr4d10-boot.service` opens SPI0/CS0 plus reset/DC only, queues full
+   brightness after its first complete frame and plays the native animation;
+   its final second loops.
+3. `systemd` creates application runtime and state directories as the
    `openr4d10` user.
-3. The CLI parses and validates both TOML files.
-4. Adapters are created from explicit backend names.
-5. The service catalog migrates the non-secret state database and evaluates
+4. The CLI parses and validates both TOML files.
+5. Adapters are created from explicit backend names.
+6. The service catalog migrates the non-secret state database and evaluates
    local dependencies.
-6. The persisted display brightness and device language are loaded into the
+7. The persisted display brightness and device language are loaded into the
    display adapter without opening a second hardware path.
-7. The local web dashboard binds to the configured local address and port.
-8. The semantic text boot manifest is rendered when enabled.
-9. The semantic dashboard state is refreshed at the configured interval and
+8. The local web dashboard binds to the configured local address and port.
+9. The semantic text boot manifest is rendered when enabled.
+10. The semantic dashboard state is refreshed at the configured interval and
    exposed through `/api/status`.
-10. The Whisplay UI calls `claim_display()`, waits for the boot player to close
+11. The Whisplay UI calls `claim_display()`, waits for the boot player to close
    SPI/GPIO and keeps the ownership lock for its entire lifetime.
-11. `SIGTERM` or `SIGINT` stops the loop, database and HTTP server cleanly.
+12. `SIGTERM` or `SIGINT` stops the loop, database and HTTP server cleanly.
 
 Both display services declare the shared `/run/openr4d10-boot` runtime. This is
 also required when the installer starts the application in an already running

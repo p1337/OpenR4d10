@@ -1,6 +1,7 @@
 from datetime import datetime
 from io import BytesIO
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -22,7 +23,7 @@ from openr4d10.device_ui import (
 )
 from openr4d10.input_events import Control, InputEvent
 from openr4d10.models import Frame
-from openr4d10.whisplay import WhisplayPanel, _LgpioPwm
+from openr4d10.whisplay import WhisplayPanel, _KernelPwmBacklight
 
 
 class DeviceUiTests(unittest.TestCase):
@@ -453,51 +454,32 @@ class WhisplayDisplayTests(unittest.TestCase):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 panel.set_brightness(invalid)  # type: ignore[arg-type]
 
-    def test_brightness_uses_active_low_lgpio_pwm_mapping(self) -> None:
+    def test_brightness_is_queued_for_kernel_pwm(self) -> None:
         panel = WhisplayPanel()
-        pwm = Mock()
-        panel._backlight_pwm = pwm
+        backlight = Mock()
+        panel._backlight = backlight
+        panel._spi = Mock()
         panel.set_brightness(35)
-        pwm.set_duty_cycle.assert_called_once_with(65)
+        backlight.set_brightness.assert_called_once_with(35)
         panel.set_brightness(80)
-        pwm.set_duty_cycle.assert_called_with(20)
+        backlight.set_brightness.assert_called_with(80)
 
-    def test_lgpio_pwm_keeps_timing_out_of_python(self) -> None:
-        lgpio = Mock()
-        lgpio.gpiochip_open.return_value = 17
-        pwm = _LgpioPwm(lgpio, 0, 22, initial_high=True)
-        lgpio.gpio_claim_output.assert_called_once_with(17, 22, 1)
+    def test_kernel_pwm_request_is_atomic_and_deduplicated(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            request = Path(raw) / "brightness.request"
+            backlight = _KernelPwmBacklight(request)
 
-        pwm.set_duty_cycle(0)
-        lgpio.tx_pwm.assert_not_called()
-        lgpio.gpio_write.assert_called_with(17, 22, 0)
+            backlight.set_brightness(35)
+            first_stat = request.stat()
+            self.assertEqual(request.read_text(encoding="ascii"), "35\n")
+            if os.name != "nt":
+                self.assertEqual(first_stat.st_mode & 0o777, 0o600)
 
-        pwm.set_duty_cycle(65)
-        lgpio.tx_pwm.assert_called_with(17, 22, 1_000, 65)
+            backlight.set_brightness(35)
+            self.assertEqual(request.stat().st_mtime_ns, first_stat.st_mtime_ns)
 
-        pwm.set_duty_cycle(65)
-        self.assertEqual(lgpio.tx_pwm.call_count, 1)
-
-        pwm.set_duty_cycle(0)
-        lgpio.tx_pwm.assert_called_with(17, 22, 0, 0)
-        lgpio.gpio_write.assert_called_with(17, 22, 0)
-
-        pwm.set_duty_cycle(100)
-        lgpio.gpio_write.assert_called_with(17, 22, 1)
-
-        pwm.close(final_high=False)
-        lgpio.gpio_free.assert_called_once_with(17, 22)
-        lgpio.gpiochip_close.assert_called_once_with(17)
-
-    def test_lgpio_pwm_idle_close_does_not_send_invalid_stop(self) -> None:
-        lgpio = Mock()
-        lgpio.gpiochip_open.return_value = 17
-        pwm = _LgpioPwm(lgpio, 0, 22, initial_high=False)
-        pwm.close(final_high=False)
-        lgpio.tx_pwm.assert_not_called()
-        lgpio.gpio_write.assert_called_once_with(17, 22, 0)
-        lgpio.gpio_free.assert_called_once_with(17, 22)
-        lgpio.gpiochip_close.assert_called_once_with(17)
+            backlight.set_brightness(80)
+            self.assertEqual(request.read_text(encoding="ascii"), "80\n")
 
     def test_boot_animation_is_not_replaced_by_text_fallback(self) -> None:
         panel = FakePanel()

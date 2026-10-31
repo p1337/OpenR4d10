@@ -378,11 +378,10 @@ Die Geräteeinstellungen enthalten genau diese Hauptbereiche:
    - der Wert wird als nicht geheime UI-Einstellung dauerhaft in SQLite
      gespeichert und nach Dienst- oder Geräteneustart wieder angewendet,
    - die Raspberry-Pi-Zero-2-W-Umsetzung behält das verifizierte aktive-low
-     Backlight BCM22, verlagert das Software-PWM-Timing aber in die bereits
-     installierte C-Laufzeit von `lgpio`; der auf dem realen Gerät flackernde
-     Python-PWM-Thread bleibt entfernt, und kein neuer Pin oder paralleler
-     Hardwareadapter wird erfunden. Ein unveränderter Tastgrad wird nicht bei
-     jedem UI-Frame erneut gestartet, sondern als durchlaufende Welle belassen.
+     Backlight BCM22, verlagert sämtliche PWM-Flanken aber in den
+     Kernel-`pwm-gpio`-HRTimer. Die Anwendung übergibt ausschließlich einen
+     atomaren, begrenzten Prozentwert an den festen Root-Helfer. Weder Python
+     noch `lgpio` takten die Helligkeit, und kein neuer Pin wird erfunden.
 2. **Akzentfarbe**
    - normaler Menüeintrag wie alle anderen,
    - öffnet beim Anwählen eine eigene Farbauswahl,
@@ -1076,6 +1075,33 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-31 – Lastabhängiges Restflackern ausschließlich im Akkubetrieb
+
+- Robert korrigiert die bisherige Einstufung des seltenen Restflackerns: Bei
+  Zwischenhelligkeiten tritt es im PiSugar-Akkubetrieb erneut und erkennbar
+  besonders dann auf, wenn der Raspberry Pi Rechenlast erzeugt. Bei externer
+  Stromversorgung bleibt dieselbe Anzeige stabil. Die Helligkeit springt dabei
+  nicht nur kurz nach unten, sondern gelegentlich auch nach oben.
+- Ein kontrollierter Akkulasttest mit vier Rechenprozessen hielt
+  `get_throttled=0x0`, 1 GHz CPU-Takt und normale Temperatur. Damit ist weder
+  eine Firmware-Unterspannung noch thermisches Drosseln belegt. Kleine
+  Versorgungsschwankungen unterhalb der Pi-Schwelle bleiben ohne Messgerät
+  messbar offen, erklären aber das Springen in beide Richtungen schlechter.
+- Quellprüfung von `lgpio` zeigt: `tx_pwm` wird trotz C-Implementierung durch
+  einen normalen Userspace-Thread mit absoluten Sleeps getaktet. Rechenlast
+  kann deshalb sowohl Ein- als auch Ausschaltflanke verspäten. Eine bloße neue
+  Frequenz wäre kein belastbarer Fix.
+- OpenR4d10 verwendet ab 0.10.38 deshalb den auf dem Zielkernel vorhandenen
+  `pwm-gpio`-Treiber auf BCM22. Dessen HRTimer erzeugt die 1-kHz-Flanken im
+  Kernel. Ein fester Root-Helfer prüft nur atomare Werte von 0 bis 100 aus
+  `/run/openr4d10-backlight`; die Anwendung erhält keinen Sysfs-Schreibzugriff.
+- Der Boot-Handoff ist angepasst: Der Kernel besitzt BCM22 durchgehend, die
+  frühe Initialisierung hält das aktive-low Backlight zunächst aus, der native
+  Player besitzt nur Reset/DC und schaltet erst nach seinem ersten vollständigen
+  Frame über denselben begrenzten Request auf 100 Prozent. Danach stellt die
+  Anwendung den persistenten SQLite-Wert wieder her. Der neue Overlay-Zustand
+  benötigt den ohnehin automatischen Neustart des Installers.
+
 ### 2026-10-31 – Mehrsprachiger Radiokatalog und abonnierbarer Podcast-Dienst
 
 - Die unveränderliche, vorinstallierte Radioauswahl wird zu einem kuratierten
@@ -1217,6 +1243,8 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Tastgrad und ändert die laufende Welle nur bei einer echten Wertänderung. Der
   vorhandene Kernel-`pwm-gpio`-Treiber wird nicht parallel per Boot-Overlay
   aktiviert, weil er BCM22 vor dem nativen Bootplayer beanspruchen würde.
+  **Historischer Stand bis 0.10.37:** Der oben dokumentierte 0.10.38-Handoff
+  löst genau diesen Eigentümerkonflikt und ersetzt diese Zwischenlösung.
 - Eine LED kann wissenschaftlich als Photodiode über Photostrom oder die
   lichtabhängige Entladezeit ihrer Sperrschichtkapazität verwendet werden; es
   handelt sich nicht um eine Widerstandsmessung. Beim Whisplay sind jedoch nur
@@ -1363,7 +1391,8 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   merkt sich deshalb, ob auf BCM22 tatsächlich PWM aktiv ist. Ein Stopbefehl
   wird nur dann gesendet; bei einem festen 0-/100-Prozent-Pegel wird direkt
   geschrieben. Damit bleibt auch das Schließen nach einem frühen Fehler
-  ausnahmefrei.
+  ausnahmefrei. **Historischer Zwischenstand:** Seit 0.10.38 taktet nicht mehr
+  `lgpio`, sondern der oben beschriebene Kernel-`pwm-gpio`-Pfad.
 - Der Displaykopf wird flacher, die Uhr exakt auf der Gesamtbreite zentriert
   und der Abstand zum Diensttitel verkleinert. Der frei werdende Platz wird dem
   unteren Inhalt zugeschlagen.

@@ -1,0 +1,17 @@
+[Unit]
+Description=Apply an OpenR4d10 display-brightness request through kernel PWM
+Documentation=https://github.com/p1337/OpenR4d10
+DefaultDependencies=no
+Requires=openr4d10-backlight-init.service
+After=openr4d10-backlight-init.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/local/sbin/openr4d10-backlight
+UMask=0077
+NoNewPrivileges=true
+ProtectHome=true
+PrivateTmp=true
+

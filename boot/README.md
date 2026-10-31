@@ -89,7 +89,8 @@ sudo bash boot/install.sh --initramfs
 The installer compiles on the Pi for its installed architecture, enables SPI
 through `raspi-config` when available and otherwise adds the standard
 `dtparam=spi=on` setting with a timestamped configuration backup,
-installs the native player and enables its service for the next boot. It does
+adds `dtoverlay=pwm-gpio,gpio=22`, installs the native player plus its bounded
+kernel-backlight helper and enables their services for the next boot. It does
 not reboot or start the player over an active display session. It refuses an
 active/enabled `whisplay-daemon`, because two independent owners must not write
 the LCD. If the application uses that daemon, implement the handoff in the
@@ -123,11 +124,12 @@ lets the UI initialize the panel directly when installation or a manual restart
 happens in a boot where the native player never ran. It does not start a second
 player and does not change the normal boot-time lock/release protocol.
 
-The native player deliberately has no SQLite dependency and uses its fixed
-boot backlight state. The persistent 0–100% application brightness is restored
-only when `WhisplayDisplay` takes over BCM22 with the same display-owner lock.
-Do not add a second boot setting or another GPIO process to bridge this short
-startup interval.
+The native player deliberately has no SQLite dependency. The kernel `pwm-gpio`
+owner keeps active-low BCM22 dark until the first complete animation frame,
+then the player queues 100 percent through the fixed request path. The player
+and application claim only reset/DC themselves. When `WhisplayDisplay` takes
+over, it restores persistent 0–100% brightness through that same request
+without changing the GPIO/PWM owner.
 
 ## Verification and performance
 

@@ -62,6 +62,8 @@ required=(
     bin/openr4d10-wifi-repair
     bin/openr4d10-hotspot
     boot/install.sh boot/openr4d10-boot.service
+    boot/openr4d10-backlight boot/openr4d10-backlight-init.service
+    boot/openr4d10-backlight.path boot/openr4d10-backlight.service
     boot/native/openr4d10_boot.c boot/native/LICENSE.PiSugar
     boot/native/NOTICE.PiSugar boot/assets/boot.opb boot/assets/first.opb
     boot/assets/manifest.json
@@ -145,7 +147,7 @@ export DEBIAN_FRONTEND=noninteractive
 kernel_release="$(uname -r)"
 apt-get update
 apt-get install -y --no-install-recommends \
-    python3 python3-pil python3-libgpiod python3-lgpio python3-spidev fonts-dejavu-core \
+    python3 python3-pil python3-libgpiod python3-spidev fonts-dejavu-core \
     mpv ffmpeg libchromaprint-tools ca-certificates gcc make kmod libc6-dev zlib1g-dev \
     "linux-headers-$kernel_release" device-tree-compiler alsa-utils \
     libasound2-plugins sox network-manager dnsmasq-base

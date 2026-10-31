@@ -232,33 +232,28 @@ usable timing implementation: 100 percent is steady, while every intermediate
 setting visibly alternates between bright and dark. OpenR4d10 must retain the
 verified BCM22 mapping and active-low polarity but move the timing out of
 Python to a target-available stable PWM implementation. The real target
-already includes Raspberry Pi OS package `python3-lgpio` 0.2.2; OpenR4d10 now
-uses its C-timed `lgpio.tx_pwm` in the same `WhisplayPanel` process. The
-BCM22 mapping and active-low duty remain unchanged, while 0 and 100 percent use
-steady levels without PWM. This does not claim that BCM22 has native hardware
-PWM. The web display setting remains persistent in
-SQLite. The native C boot player precedes SQLite startup and therefore retains
-its fixed boot brightness until the application takes ownership.
-The real 0.10.22 start additionally established that `lgpio` creates its
-private `.lgd-nfy*` pipe in the current directory. The service now uses its
-existing writable `/run/openr4d10` runtime directory as its working directory;
-the root filesystem remains protected read-only by systemd.
-The real 0.10.23 start also confirmed that `lgpio` 0.2.2 rejects an idle
-frequency-zero PWM stop with `bad PWM micros`. The adapter now records whether
-PWM is active, stops only an active waveform, and otherwise writes the steady
-active-low endpoint directly. A later real-device observation found rarer
-flicker at every intermediate setting. Code inspection showed that each UI
-frame re-submitted the same `tx_pwm` request even when brightness had not
-changed. The adapter now caches the active duty and leaves an unchanged C-timed
-waveform running continuously. Raspberry Pi OS also provides a kernel
-`pwm-gpio` driver for arbitrary GPIO, but a permanent boot overlay would claim
-BCM22 before the native boot animation can own it; it is therefore not enabled
-without a designed boot-to-application ownership handoff.
-Real follow-up at 60 percent confirms that this change makes the panel stable
-for normal use. One very brief residual flicker was seen on battery power,
-possibly during a compute-load transition, and is currently accepted by the
-owner. This evidence means "rare residual event", not a guarantee of
-zero-flicker electrical behavior.
+used Raspberry Pi OS package `python3-lgpio` 0.2.2 as an intermediate repair.
+That removed Python scheduling and redundant waveform restarts, but the real
+battery-powered stack still produced occasional brighter and darker jumps
+under CPU load. A controlled four-worker CPU test kept `get_throttled=0x0`,
+1 GHz CPU frequency and normal temperature, so no firmware-level under-voltage
+or thermal throttle event was recorded. This does not measure small 5 V rail
+movement below the Pi threshold, but the bidirectional jumps match delayed PWM
+on/off edges.
+
+Source inspection established that `lgpio.tx_pwm` is still a normal userspace
+software-timing thread using absolute sleeps. OpenR4d10 therefore installs the
+Raspberry Pi kernel's `pwm-gpio,gpio=22` overlay and drives its 1 kHz PWM through
+the kernel high-resolution-timer path. BCM22 mapping and active-low duty remain
+unchanged; this is kernel-timed software PWM, not native PWM hardware. A fixed
+root helper is the only sysfs writer. The application queues a validated 0–100
+integer below `/run/openr4d10-backlight` and never owns BCM22.
+
+The boot ownership conflict is explicitly resolved: an early initializer holds
+the backlight off, the native C player owns only reset and data/command, and it
+queues 100 percent only after the first complete frame is in display RAM. The
+application later restores the persistent SQLite value through the same bounded
+request. The overlay becomes active only after the installer's reboot.
 
 The proposed RGB-LED light experiment cannot be a direct resistance read: the
 Pi header exposes digital GPIO and no ADC. A later supervised test may look for

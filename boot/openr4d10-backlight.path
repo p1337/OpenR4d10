@@ -1,0 +1,15 @@
+[Unit]
+Description=Watch for a bounded OpenR4d10 display-brightness request
+Documentation=https://github.com/p1337/OpenR4d10
+DefaultDependencies=no
+Requires=openr4d10-backlight-init.service
+After=openr4d10-backlight-init.service
+Before=basic.target
+
+[Path]
+PathExists=/run/openr4d10-backlight/brightness.request
+Unit=openr4d10-backlight.service
+
+[Install]
+WantedBy=sysinit.target
+

@@ -138,22 +138,21 @@ both bounds, invalid booleans/non-integers, restart persistence and delivery to
 the Whisplay adapter. Do not add a second configuration file or a direct web
 GPIO path. The early native boot player intentionally has no SQLite dependency;
 brightness restoration begins at application display handoff.
-The target implementation keeps BCM22 active-low but delegates intermediate
-PWM timing to the installed `python3-lgpio` C runtime. Do not implement pulse
-timing with `threading`, `sleep`, or `Event.wait`: that earlier path visibly
-flickered on the real Pi Zero 2 W. Unit tests must cover the active-low mapping,
-steady 0/100-percent endpoints and the `lgpio.tx_pwm` call for intermediate
-values. Repeated calls with an unchanged intermediate value must not issue a
-second `tx_pwm`: the periodic renderer previously re-armed the waveform on
-every frame and the real panel still made rare bright/dark jumps.
-`lgpio` also requires a writable current directory for its private notification
-pipe. Keep `WorkingDirectory=/run/openr4d10` in the application unit and test
-that the unit still retains `ProtectSystem=strict`; do not solve this by making
-`/` writable or broadening `ReadWritePaths`.
-Do not call `lgpio.tx_pwm(..., 0, 0)` unless the adapter has successfully
-started PWM on that claimed output. Raspberry Pi OS package 0.2.2 returns
-`bad PWM micros` for an idle stop. Tests must cover a steady endpoint before
-the first intermediate PWM value and cleanup in both active and idle states.
+The target implementation keeps BCM22 active-low but delegates every pulse
+edge to the in-tree `pwm-gpio` kernel driver at a 1 ms period. Do not
+reintroduce `threading`, `sleep`, `Event.wait` or `lgpio.tx_pwm`: normal
+userspace scheduling caused load-correlated brighter and darker jumps on the
+real battery-powered Pi. Unit tests must require the exact
+`dtoverlay=pwm-gpio,gpio=22`, the fixed root helper/path boundary, active-low
+duty mapping and an atomic, deduplicated 0–100 request. The application must
+not receive sysfs write access.
+
+The early initializer owns BCM22 before the native animation and sets 0
+percent. The native player owns only reset/DC and queues 100 percent after its
+first full frame. The normal display later restores the persisted value through
+the same request. Tests must reject a GPIO22 request in the native player. Keep
+the application's `ProtectSystem=strict`; its only added writable path is the
+dedicated `/run/openr4d10-backlight` request directory.
 
 `display_appearance` accepts and persists only one `#RRGGBB` accent string.
 The Whisplay renderer used for the physical panel and PNG preview always draws
@@ -308,6 +307,10 @@ aplay -l | grep -i whisplay
 amixer -c whisplaysound cget name='speaker'
 sudo openr4d10 doctor
 ```
+
+`doctor` also reports whether `pwm_gpio@22` is active. Immediately after an
+in-session install it correctly requests a reboot; after reboot it must report
+`Whisplay backlight uses kernel-timed PWM on BCM22`.
 
 The vendored source provenance and upstream archive checksum live in
 `vendor/pisugar-whisplay/UPSTREAM.md`. Updates must replace that reviewed

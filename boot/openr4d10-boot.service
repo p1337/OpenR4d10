@@ -1,7 +1,8 @@
 [Unit]
 Description=OpenR4d10 native Whisplay early boot animation
 DefaultDependencies=no
-After=local-fs.target systemd-udevd.service systemd-udev-trigger.service
+Requires=openr4d10-backlight-init.service openr4d10-backlight.path
+After=local-fs.target systemd-udevd.service systemd-udev-trigger.service openr4d10-backlight-init.service openr4d10-backlight.path
 Before=basic.target shutdown.target
 Conflicts=shutdown.target
 ConditionPathExists=/usr/share/openr4d10/boot/boot.opb

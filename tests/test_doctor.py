@@ -2,7 +2,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from openr4d10.doctor import _whisplay_audio_checks
+from openr4d10.doctor import _whisplay_audio_checks, _whisplay_backlight_checks
 
 
 class WhisplayAudioDoctorTests(unittest.TestCase):
@@ -41,6 +41,25 @@ class WhisplayAudioDoctorTests(unittest.TestCase):
 
             self.assertEqual(checks[0].level, "WARN")
             self.assertIn("not installed", checks[0].message)
+
+
+class WhisplayBacklightDoctorTests(unittest.TestCase):
+    def test_reports_active_kernel_pwm(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            ready = Path(raw) / "kernel-pwm.ready"
+            ready.write_text("pwm_gpio@22\n", encoding="ascii")
+
+            checks = _whisplay_backlight_checks(ready)
+
+            self.assertEqual(checks[0].level, "OK")
+            self.assertIn("kernel-timed PWM", checks[0].message)
+
+    def test_reports_reboot_required_before_kernel_pwm_is_active(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            checks = _whisplay_backlight_checks(Path(raw) / "missing")
+
+            self.assertEqual(checks[0].level, "WARN")
+            self.assertIn("reboot", checks[0].message)
 
 
 if __name__ == "__main__":

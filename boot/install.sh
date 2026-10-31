@@ -17,6 +17,10 @@ esac
 MODEL="$(tr -d '\0' </proc/device-tree/model)"
 [[ "$MODEL" == *'Raspberry Pi Zero 2'* ]] || { echo "Unverified model: $MODEL; nothing changed." >&2; exit 1; }
 [[ -r "$BOOT_SOURCE/assets/boot.opb" ]] || { echo 'Build boot assets first.' >&2; exit 1; }
+for required in openr4d10-backlight openr4d10-backlight-init.service \
+  openr4d10-backlight.path openr4d10-backlight.service; do
+  [[ -r "$BOOT_SOURCE/$required" ]] || { echo "Missing boot component: $required" >&2; exit 1; }
+done
 if systemctl is-enabled --quiet whisplay-daemon.service 2>/dev/null ||
    systemctl is-active --quiet whisplay-daemon.service 2>/dev/null; then
   echo 'whisplay-daemon already owns the LCD. Plan its handoff before enabling this direct-SPI player.' >&2
@@ -41,15 +45,33 @@ gcc -static -O2 -std=c11 -Wall -Wextra -Werror \
   "$BOOT_SOURCE/native/openr4d10_boot.c" -lz -o "$BUILD_DIR/openr4d10-boot"
 "$BUILD_DIR/openr4d10-boot" --verify "$BOOT_SOURCE/assets/boot.opb"
 install -d -m 0755 /usr/libexec /usr/share/openr4d10/boot /etc/openr4d10
+install -d -m 0770 -o root -g openr4d10 /run/openr4d10-backlight
 install -m 0755 "$BUILD_DIR/openr4d10-boot" /usr/libexec/openr4d10-boot
+install -m 0755 "$BOOT_SOURCE/openr4d10-backlight" /usr/local/sbin/openr4d10-backlight
 install -m 0644 "$BOOT_SOURCE/assets/boot.opb" "$BOOT_SOURCE/assets/first.opb" \
   "$BOOT_SOURCE/assets/manifest.json" /usr/share/openr4d10/boot/
 install -m 0644 "$BOOT_SOURCE/native/LICENSE.PiSugar" "$BOOT_SOURCE/native/NOTICE.PiSugar" \
   /usr/share/openr4d10/boot/
 install -m 0644 "$BOOT_SOURCE/openr4d10-boot.service" /etc/systemd/system/openr4d10-boot.service
+install -m 0644 "$BOOT_SOURCE/openr4d10-backlight-init.service" \
+  /etc/systemd/system/openr4d10-backlight-init.service
+install -m 0644 "$BOOT_SOURCE/openr4d10-backlight.path" \
+  /etc/systemd/system/openr4d10-backlight.path
+install -m 0644 "$BOOT_SOURCE/openr4d10-backlight.service" \
+  /etc/systemd/system/openr4d10-backlight.service
 if [[ ! -f /etc/openr4d10/boot.env ]]; then
   printf 'OPENR4D10_SPI_HZ=32000000\n' >/etc/openr4d10/boot.env
   chmod 0644 /etc/openr4d10/boot.env
+fi
+
+# BCM22 has no native PWM function on the Zero 2 W. The in-tree pwm-gpio
+# overlay moves its software PWM timing into the kernel hrtimer path, avoiding
+# load-dependent userspace scheduling jitter. The panel backlight is active-low.
+if ! grep -Eq '^[[:space:]]*dtoverlay=pwm-gpio([,].*)?gpio=22([,].*)?[[:space:]]*$' "$BOOT_CONFIG"; then
+  BACKUP="${BOOT_CONFIG}.openr4d10.$(date -u +%Y%m%dT%H%M%SZ).bak"
+  cp --preserve=mode,timestamps "$BOOT_CONFIG" "$BACKUP"
+  printf '\n[all]\n# OpenR4d10 kernel-timed Whisplay backlight on BCM22\ndtoverlay=pwm-gpio,gpio=22\n' >>"$BOOT_CONFIG"
+  echo "Boot configuration backup: $BACKUP"
 fi
 # The initializer enables only SPI and does not touch I2S, audio or button pins.
 if command -v raspi-config >/dev/null 2>&1; then
@@ -84,7 +106,8 @@ if [[ $EARLY -eq 1 ]]; then
   echo 'Check that the Pi OS kernel hooks copied the matching initramfs to the firmware partition before reboot.'
 fi
 systemctl daemon-reload
-systemctl enable openr4d10-boot.service
+systemctl enable openr4d10-backlight-init.service openr4d10-backlight.path \
+  openr4d10-boot.service
 # Do not start mid-session or reboot without permission. New boot state applies
 # at the next user-controlled reboot; no active UI is interrupted here.
 rm -- "$BUILD_DIR/openr4d10-boot"

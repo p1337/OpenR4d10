@@ -1,0 +1,22 @@
+[Unit]
+Description=Initialize the kernel-timed OpenR4d10 Whisplay backlight
+Documentation=https://github.com/p1337/OpenR4d10
+DefaultDependencies=no
+After=local-fs.target systemd-modules-load.service
+Before=openr4d10-backlight.path openr4d10-boot.service openr4d10.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStartPre=-/sbin/modprobe pwm-gpio
+ExecStart=/usr/local/sbin/openr4d10-backlight --initialize
+RemainAfterExit=yes
+UMask=0007
+NoNewPrivileges=true
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=sysinit.target
+

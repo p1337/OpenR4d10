@@ -37,6 +37,7 @@ class InstallerContractTests(unittest.TestCase):
         self.assertIn("bin/openr4d10-hotspot", installer)
         self.assertIn("systemd/openr4d10-hotspot.timer", installer)
         self.assertIn("systemctl enable --now openr4d10-hotspot.timer", installer)
+        self.assertIn("boot/openr4d10-backlight", installer)
         self.assertIn("Backing up persistent OpenR4d10 state before the update", installer)
         self.assertIn("from openr4d10.backup import create_backup", installer)
         self.assertLess(
@@ -50,9 +51,26 @@ class InstallerContractTests(unittest.TestCase):
         self.assertIn("modprobe i2c-dev", installer)
         self.assertIn('backend = "pisugar3"', (repository / "config" / "hardware.toml").read_text(encoding="utf-8"))
         self.assertIn(
-            "ReadWritePaths=/run/openr4d10 /var/lib/openr4d10",
+            "ReadWritePaths=/run/openr4d10 /run/openr4d10-backlight /var/lib/openr4d10",
             application_service,
         )
+
+    def test_whisplay_backlight_uses_fixed_kernel_pwm_boundary(self) -> None:
+        repository = Path(__file__).resolve().parents[1]
+        boot_installer = (repository / "boot" / "install.sh").read_text(encoding="utf-8")
+        helper = (repository / "boot" / "openr4d10-backlight").read_text(encoding="utf-8")
+        path_unit = (repository / "boot" / "openr4d10-backlight.path").read_text(encoding="utf-8")
+        service = (repository / "boot" / "openr4d10-backlight.service").read_text(encoding="utf-8")
+        boot_source = (repository / "boot" / "native" / "openr4d10_boot.c").read_text(encoding="utf-8")
+
+        self.assertIn("dtoverlay=pwm-gpio,gpio=22", boot_installer)
+        self.assertIn("openr4d10-backlight-init.service", boot_installer)
+        self.assertIn("pwm_gpio@22", helper)
+        self.assertIn("PERIOD_NS=1000000", helper)
+        self.assertIn("PathExists=/run/openr4d10-backlight/brightness.request", path_unit)
+        self.assertIn("User=root", service)
+        self.assertNotIn("req.offsets[2]=22", boot_source)
+        self.assertIn("queue_backlight(100)", boot_source)
 
     def test_web_updater_has_a_fixed_privilege_boundary(self) -> None:
         repository = Path(__file__).resolve().parents[1]

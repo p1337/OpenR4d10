@@ -31,6 +31,7 @@ static const char *panel_id="ST7789-240x280-C0-y20\n";
 static volatile sig_atomic_t stop_requested=0;
 static int spi_fd=-1, lines_fd=-1, lock_fd=-1;
 static uint32_t speed_hz=32000000;
+static bool backlight_queued=false;
 
 typedef struct {
     unsigned char *data;
@@ -55,10 +56,24 @@ static void pause_ms(unsigned ms) {
     while(nanosleep(&t,&t)&&errno==EINTR&&!stop_requested) {}
 }
 static void cleanup(void) {
-    /* Deliberately do not clear display RAM or switch the backlight off. */
+    /* Deliberately do not clear display RAM or change the kernel-owned backlight. */
     if(spi_fd>=0) close(spi_fd);
     if(lines_fd>=0) close(lines_fd);
     if(lock_fd>=0) close(lock_fd);
+}
+static void queue_backlight(unsigned brightness) {
+    const char *dir="/run/openr4d10-backlight";
+    const char *request="/run/openr4d10-backlight/brightness.request";
+    char temporary[160];
+    if(brightness>100) invalid("invalid backlight brightness");
+    int n=snprintf(temporary,sizeof(temporary),"%s/.brightness.%ld",dir,(long)getpid());
+    if(n<0||(size_t)n>=sizeof(temporary)) invalid("backlight request path too long");
+    int fd=open(temporary,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
+    if(fd<0) fail("open backlight request");
+    char value[8];
+    n=snprintf(value,sizeof(value),"%u\n",brightness);
+    if(n<0||write(fd,value,(size_t)n)!=n||fsync(fd)||close(fd)) fail("write backlight request");
+    if(rename(temporary,request)) fail("publish backlight request");
 }
 static void movie_open(Movie *m,const char *path) {
     int fd=open(path,O_RDONLY|O_CLOEXEC);
@@ -156,12 +171,12 @@ static void hardware_open(void) {
     if(ioctl(chip,GPIO_GET_CHIPINFO_IOCTL,&chip_info)) fail("GPIO chip info");
     if(!strstr(chip_info.label,"bcm2835")) invalid("unexpected GPIO controller; refusing guessed pin mapping");
     struct gpio_v2_line_request req={0};
-    req.offsets[0]=4; req.offsets[1]=27; req.offsets[2]=22; req.num_lines=3;
+    req.offsets[0]=4; req.offsets[1]=27; req.num_lines=2;
     strcpy(req.consumer,"openr4d10-boot"); req.config.flags=GPIO_V2_LINE_FLAG_OUTPUT;
     req.config.num_attrs=1;
     req.config.attrs[0].attr.id=GPIO_V2_LINE_ATTR_ID_OUTPUT_VALUES;
-    req.config.attrs[0].attr.values=initialized?3:7;
-    req.config.attrs[0].mask=7;
+    req.config.attrs[0].attr.values=3;
+    req.config.attrs[0].mask=3;
     if(ioctl(chip,GPIO_V2_GET_LINE_IOCTL,&req)) fail("Whisplay GPIO request; another owner may be active");
     lines_fd=req.fd; close(chip);
     uint8_t mode=SPI_MODE_0,bits=8;
@@ -173,7 +188,11 @@ static void show_frame(const unsigned char *frame) {
     CMD(0x2A,0x00,0x00,0x00,0xEF);
     CMD(0x2B,0x00,0x14,0x01,0x2B); /* rows 20 through 299 inclusive */
     command(0x2C,NULL,0); spi_bytes(frame,FRAME_BYTES);
-    gpio_value(2,false); /* active-low backlight; first valid image already in RAM */
+    if(!backlight_queued) {
+        /* The kernel PWM kept the active-low backlight off until this frame. */
+        queue_backlight(100);
+        backlight_queued=true;
+    }
 }
 int main(int argc,char **argv) {
     bool verify=false,still=false,loop=false;

@@ -8,6 +8,7 @@ retains the vendor notice and license in boot/native/.
 from __future__ import annotations
 
 from contextlib import AbstractContextManager
+import os
 from pathlib import Path
 import time
 from typing import Any
@@ -20,88 +21,56 @@ HEIGHT = 280
 FRAME_BYTES = WIDTH * HEIGHT * 2
 PANEL_MARKER = Path("/run/openr4d10-boot/panel.ready")
 PANEL_ID = "ST7789-240x280-C0-y20\n"
+BACKLIGHT_REQUEST = Path("/run/openr4d10-backlight/brightness.request")
 
 
 class WhisplayError(RuntimeError):
     pass
 
 
-class _LgpioPwm:
-    """C-timed PWM on an arbitrary gpiochip line.
+class _KernelPwmBacklight:
+    """Queue a bounded brightness request for the root-owned kernel PWM helper.
 
-    BCM22 has no native PWM function on the Zero 2 W.  ``lgpio.tx_pwm`` keeps
-    the software timing in the packaged C library instead of a Python thread,
-    avoiding the Python scheduler jitter visible on the real Whisplay
-    backlight. Repeated frames must not re-arm an unchanged waveform.
+    The application never toggles BCM22 itself.  A fixed systemd path/service
+    boundary validates this file and updates Linux ``pwm-gpio``.  Atomic
+    replacement prevents the helper from observing a partially written value.
     """
 
-    def __init__(
-        self,
-        lgpio: Any,
-        chip_number: int,
-        line_offset: int,
-        *,
-        initial_high: bool,
-        frequency_hz: int = 1_000,
-    ) -> None:
-        self._lgpio = lgpio
-        self._line_offset = line_offset
-        self._frequency_hz = frequency_hz
-        self._pwm_active = False
-        self._duty_percent = 100 if initial_high else 0
-        self._handle = lgpio.gpiochip_open(chip_number)
-        try:
-            lgpio.gpio_claim_output(
-                self._handle,
-                line_offset,
-                1 if initial_high else 0,
-            )
-        except Exception:
-            lgpio.gpiochip_close(self._handle)
-            self._handle = None
-            raise
+    def __init__(self, request_path: Path = BACKLIGHT_REQUEST) -> None:
+        self._request_path = request_path
+        self._brightness_percent: int | None = None
 
-    def set_duty_cycle(self, duty_percent: int) -> None:
-        if self._handle is None:
+    def set_brightness(self, brightness_percent: int) -> None:
+        if brightness_percent == self._brightness_percent:
             return
-        if duty_percent == self._duty_percent:
-            return
-        if duty_percent <= 0 or duty_percent >= 100:
-            if self._pwm_active:
-                self._lgpio.tx_pwm(self._handle, self._line_offset, 0, 0)
-                self._pwm_active = False
-            self._lgpio.gpio_write(
-                self._handle,
-                self._line_offset,
-                1 if duty_percent >= 100 else 0,
-            )
-            self._duty_percent = 100 if duty_percent >= 100 else 0
-            return
-        self._lgpio.tx_pwm(
-            self._handle,
-            self._line_offset,
-            self._frequency_hz,
-            duty_percent,
+        request_root = self._request_path.parent
+        temporary = request_root / (
+            f".brightness.{os.getpid()}.{time.monotonic_ns()}"
         )
-        self._pwm_active = True
-        self._duty_percent = duty_percent
-
-    def close(self, *, final_high: bool) -> None:
-        if self._handle is None:
-            return
+        descriptor: int | None = None
         try:
-            if self._pwm_active:
-                self._lgpio.tx_pwm(self._handle, self._line_offset, 0, 0)
-                self._pwm_active = False
-            self._lgpio.gpio_write(
-                self._handle,
-                self._line_offset,
-                1 if final_high else 0,
+            descriptor = os.open(
+                temporary,
+                os.O_WRONLY
+                | os.O_CREAT
+                | os.O_EXCL
+                | getattr(os, "O_NOFOLLOW", 0),
+                0o600,
             )
-            self._lgpio.gpio_free(self._handle, self._line_offset)
-        finally:
-            self._lgpio.gpiochip_close(self._handle)
-            self._handle = None
+            os.write(descriptor, f"{brightness_percent}\n".encode("ascii"))
+            os.fsync(descriptor)
+            os.close(descriptor)
+            descriptor = None
+            os.replace(temporary, self._request_path)
+        except Exception:
+            if descriptor is not None:
+                os.close(descriptor)
+            try:
+                temporary.unlink()
+            except OSError:
+                pass
+            raise
+        self._brightness_percent = brightness_percent
 
 
 class WhisplayPanel:
@@ -123,7 +92,7 @@ class WhisplayPanel:
         self._value_active: Any = None
         self._value_inactive: Any = None
         self._brightness_percent = 100
-        self._backlight_pwm: _LgpioPwm | None = None
+        self._backlight = _KernelPwmBacklight()
 
     def open(self) -> None:
         if self._spi is not None:
@@ -139,13 +108,12 @@ class WhisplayPanel:
     def _open_hardware(self) -> None:
         try:
             import gpiod
-            import lgpio
             import spidev
             from gpiod.line import Direction, Value
         except (ImportError, AttributeError) as exc:
             raise WhisplayError(
-                "Whisplay requires Debian packages python3-libgpiod, "
-                "python3-lgpio and python3-spidev"
+                "Whisplay requires Debian packages python3-libgpiod and "
+                "python3-spidev"
             ) from exc
 
         if not hasattr(gpiod, "LineSettings"):
@@ -174,12 +142,6 @@ class WhisplayPanel:
                 gpiod, Direction, self.RESET_BCM, high=True
             )
             self._dc = self._request_output(gpiod, Direction, self.DC_BCM, high=True)
-            self._backlight_pwm = _LgpioPwm(
-                lgpio,
-                0,
-                self.BACKLIGHT_BCM,
-                initial_high=initialized,
-            )
             self._spi = spidev.SpiDev()
             self._spi.open(0, 0)
             self._spi.max_speed_hz = self.speed_hz
@@ -221,16 +183,11 @@ class WhisplayPanel:
         ):
             raise ValueError("display brightness must be an integer from 0 to 100")
         self._brightness_percent = brightness_percent
-        if self._backlight_pwm is not None:
+        if self._spi is not None:
             self._apply_brightness()
 
     def _apply_brightness(self) -> None:
-        if self._backlight_pwm is None:
-            return
-        duty_percent = 100 - self._brightness_percent
-        # The Whisplay backlight is active-low, so the GPIO high-time is the
-        # inverse of the user-visible brightness percentage.
-        self._backlight_pwm.set_duty_cycle(duty_percent)
+        self._backlight.set_brightness(self._brightness_percent)
 
     def _write(self, data: bytes) -> None:
         if hasattr(self._spi, "writebytes2"):
@@ -285,9 +242,6 @@ class WhisplayPanel:
         self._apply_brightness()
 
     def close(self) -> None:
-        if self._backlight_pwm is not None:
-            self._backlight_pwm.close(final_high=self._brightness_percent == 0)
-            self._backlight_pwm = None
         for request_name in ("_dc", "_reset"):
             request = getattr(self, request_name)
             if request is not None:
