@@ -506,13 +506,67 @@ class ServiceCatalogTests(unittest.TestCase):
             "brandmeister", "webradio", "local_media", "recorder", "mumble",
             "discord", "telegram", "webcam", "rss", "youtube_audio",
             "spotify", "ard_mediathek", "zdf_mediathek", "remote_sdr",
-            "speech", "codex_remote",
+            "speech", "codex_remote", "anker_solix",
         }
         self.assertTrue(expected.issubset(items))
         self.assertEqual(len(items), len(BUILTIN_SERVICES))
         self.assertEqual(items["webradio"]["readiness"], "ready")
         self.assertEqual(items["brandmeister"]["readiness"], "disabled")
         self.assertNotIn("credential", items["brandmeister"])
+
+    def test_solix_adapter_exposes_only_bounded_public_energy_metrics(self) -> None:
+        class Registry:
+            def configured(self, service_id):
+                return service_id == "anker_solix"
+
+            def status(self, service_id):
+                return {
+                    "ok": True,
+                    "ready": True,
+                    "status": "connected",
+                    "metrics": {
+                        "solar_w": 612,
+                        "home_w": 281,
+                        "grid_w": -144,
+                        "battery_w": 187,
+                        "battery_percent": 73,
+                        "energy_today_kwh": 2.8,
+                        "serial_number": "must-not-leak",
+                        "impossible_w": 999_999,
+                    },
+                }
+
+            def call(self, service_id, operation, parameters=None):
+                return {"ok": True}
+
+        with tempfile.TemporaryDirectory() as raw:
+            catalog = ServiceCatalog(Path(raw).resolve(), adapter_registry=Registry())
+            try:
+                catalog.control(
+                    {
+                        "action": "service_set_enabled",
+                        "service_id": "anker_solix",
+                        "enabled": True,
+                    }
+                )
+                solix = {
+                    item["service_id"]: item for item in catalog.snapshot()["items"]
+                }["anker_solix"]
+            finally:
+                catalog.close()
+
+        self.assertEqual(solix["readiness"], "ready")
+        self.assertEqual(
+            solix["adapter"]["metrics"],
+            {
+                "solar_w": 612,
+                "home_w": 281,
+                "grid_w": -144,
+                "battery_w": 187,
+                "battery_percent": 73,
+                "energy_today_kwh": 2.8,
+            },
+        )
 
     def test_missing_process_dependency_is_visible(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

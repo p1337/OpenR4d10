@@ -55,6 +55,14 @@ RADIO_DEFAULTS_V2_MIGRATION_KEY = "radio.defaults_seeded_v2"
 RADIO_CONTINUOUS_KEY = "radio.continuous_recording"
 LAST_VIEW_KEY = "ui.last_view_service"
 RADIO_V2_PRESET_IDS = {"die_neue_1077", "afn_eagle", "rock_antenne", "rock_fm"}
+SOLIX_METRIC_RANGES = {
+    "solar_w": (0.0, 100_000.0),
+    "home_w": (0.0, 100_000.0),
+    "grid_w": (-100_000.0, 100_000.0),
+    "battery_w": (-100_000.0, 100_000.0),
+    "battery_percent": (0.0, 100.0),
+    "energy_today_kwh": (0.0, 10_000.0),
+}
 
 LOG = logging.getLogger(__name__)
 
@@ -76,6 +84,7 @@ BUILTIN_SERVICES = (
     ServiceManifest("system", "System", "core", "Status, updates and diagnostics", ("status", "diagnostics"), "native"),
     ServiceManifest("webradio", "Web Radio", "audio", "Internet radio playback and favorites", ("playback", "favorites", "recording"), "process", ("mpv",)),
     ServiceManifest("weather", "Weather", "information", "DWD rain radar and satellite image loops", ("images", "channels"), "native"),
+    ServiceManifest("anker_solix", "Anker SOLIX", "energy", "Live photovoltaic, home, grid and battery telemetry", ("energy", "solar", "battery"), "external", requires_credentials=True, credential_hint="Prefer supported local Modbus TCP devices; otherwise configure the isolated community cloud adapter locally."),
     ServiceManifest("local_media", "Local Media", "audio", "Local MP3, FLAC, MP4 and recordings", ("playback", "library"), "process", ("mpv",)),
     ServiceManifest("recorder", "Recorder", "audio", "Record supported audio sources", ("recording", "library"), "process", ("ffmpeg",)),
     ServiceManifest("brandmeister", "BrandMeister", "radio", "DMR audio over a configured lawful gateway", ("playback", "talkgroups", "recording"), "external", requires_credentials=True, credential_hint="Configure an individual BrandMeister-compatible account or gateway locally."),
@@ -463,6 +472,20 @@ class ServiceCatalog:
                     try:
                         adapter_status = self.adapters.status(manifest.service_id)
                         adapter_state["status"] = adapter_status.get("status", "ready")
+                        if manifest.service_id == "anker_solix":
+                            metrics = adapter_status.get("metrics")
+                            if isinstance(metrics, dict):
+                                public_metrics: dict[str, int | float] = {}
+                                for key, (minimum, maximum) in SOLIX_METRIC_RANGES.items():
+                                    value = metrics.get(key)
+                                    if (
+                                        not isinstance(value, bool)
+                                        and isinstance(value, (int, float))
+                                        and minimum <= float(value) <= maximum
+                                    ):
+                                        public_metrics[key] = value
+                                if public_metrics:
+                                    adapter_state["metrics"] = public_metrics
                         readiness = (
                             "ready" if adapter_status.get("ready") is True
                             else "configuration_required"

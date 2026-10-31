@@ -49,6 +49,11 @@ the installer report exactly which adapters still need configuration.
   priority
 - central catalog covering all specified service modules with honest dependency,
   adapter and local-login readiness
+- disabled-by-default Anker SOLIX service contract for bounded PV, house, grid
+  and battery telemetry; supported local Modbus devices are preferred and any
+  community cloud login remains isolated outside the core
+- researched service roadmap with 88 concrete energy, PTT, camera, VPN,
+  location, sensor, media and operations integrations
 - persistent enable/disable lifecycle for native and external service modules
 - checksummed, secret-free SQLite backup and guarded offline restore
 - direct web-radio/local-media playback through private mpv JSON IPC and

@@ -73,3 +73,52 @@ network access that the one adapter actually needs.
 Do not place an account-bearing adapter directly in the OpenR4d10 process and
 do not store its credentials in `openr4d10.sqlite3`, a manifest, Git, a command
 line or the journal.
+
+## Anker SOLIX telemetry contract
+
+`anker_solix` is a known, disabled-by-default external service. Its manifest is
+non-secret and follows the normal fixed socket rule:
+
+```toml
+[adapter]
+protocol = 1
+socket = "/run/openr4d10-adapters/anker_solix.sock"
+timeout_seconds = 3
+```
+
+The preferred adapter is local Modbus TCP for the device models supported by
+Anker's official integration. It needs the SOLIX device IP and enabled
+third-party Modbus control, but no Anker cloud password. Other models may use
+the community `anker-solix-api` only as a separately installed, explicitly
+unofficial cloud adapter. In that case account, password and two-letter country
+code must be supplied through service-specific `LoadCredential=` files. They
+must never be placed in the manifest, database, environment file, web URL,
+command line or journal.
+
+The core calls `status`. A ready adapter may return this bounded public payload:
+
+```json
+{
+  "ok": true,
+  "ready": true,
+  "status": "connected",
+  "metrics": {
+    "solar_w": 612,
+    "home_w": 281,
+    "grid_w": -144,
+    "battery_w": 187,
+    "battery_percent": 73,
+    "energy_today_kwh": 2.8
+  }
+}
+```
+
+Only these six numeric fields and sane ranges reach the dashboard. Negative
+`grid_w` or `battery_w` values are permitted because import/export and
+charge/discharge direction depend on the adapter's documented convention.
+Serial numbers, site IDs, device IDs, account names and all secret-shaped fields
+must be omitted. A model that cannot supply a value simply omits that field.
+
+No SOLIX adapter is claimed ready merely because this contract exists. The
+dashboard remains `configuration_required` until a real isolated adapter is
+installed, its socket responds, and the exact user's device has been tested.

@@ -186,6 +186,24 @@ function serviceMatchesSearch(service, detail) {
   return normalizedSearchText(metadata).includes(query);
 }
 
+function solixMetricText(service) {
+  if (service.service_id !== "anker_solix") return "";
+  const metrics = service.adapter?.metrics;
+  if (!metrics || typeof metrics !== "object") return "";
+  const values = [
+    ["solar_w", "PV", "W"],
+    ["home_w", t("Home"), "W"],
+    ["grid_w", t("Grid"), "W"],
+    ["battery_w", t("Battery"), "W"],
+    ["battery_percent", t("Battery"), "%"],
+    ["energy_today_kwh", t("Today"), "kWh"],
+  ];
+  return values
+    .filter(([key]) => Number.isFinite(metrics[key]))
+    .map(([key, label, unit]) => `${label} ${metrics[key]} ${unit}`)
+    .join(" · ");
+}
+
 function renderServices(catalog) {
   const list = byId("service-list");
   const items = Array.isArray(catalog?.items) ? catalog.items : [];
@@ -228,6 +246,13 @@ function renderServices(catalog) {
     const copy = document.createElement("div");
     copy.className = "service-row-copy";
     copy.append(heading, description, detail);
+    const metricText = solixMetricText(service);
+    if (metricText) {
+      const metrics = document.createElement("small");
+      metrics.className = "service-row-metrics";
+      metrics.textContent = metricText;
+      copy.append(metrics);
+    }
     const actions = document.createElement("div");
     actions.className = "service-row-actions";
     const up = libraryButton("↑", "service_move", { service_id: service.service_id, direction: -1 });

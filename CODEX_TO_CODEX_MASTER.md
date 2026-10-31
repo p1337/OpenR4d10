@@ -1075,6 +1075,65 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-31 – Solix-Energie, freie Kameras, VPN und großer Dienstideen-Katalog
+
+- Robert verlangt zusätzlich zur bisherigen kurzen Kandidatenauswahl eine
+  dauerhaft versionierte, priorisierte Liste mit mindestens 50 weiteren
+  realistischen Diensten beziehungsweise Geräteprojekten. Sie soll bewusst
+  auch Ideen enthalten, die bisher nicht genannt wurden, insbesondere
+  Push-to-Talk, weltweite öffentliche Kameras, Netzwerk-/VPN-Funktionen,
+  lokale Automatisierung, Energie, Mobilität, Sicherheit und sinnvolle
+  standortabhängige Funktionen. Jeder Eintrag benennt Nutzen, vorhandenen
+  Integrationsweg, Pi-Zero-2-W-Tauglichkeit, Zugangsdatenbedarf, Datenschutz
+  und technische beziehungsweise rechtliche Grenzen; eine Idee gilt dadurch
+  noch nicht als implementiert.
+- Anker SOLIX wird als konkreter Energiedienst eingeplant. Vor Neuentwicklung
+  wird Roberts vorhandenes Cheap-Yellow-Display-/Arduino-Projekt auf diesem
+  Rechner gesucht und dessen nachweislich funktionierender Datenweg geprüft.
+  Die Geräteansicht soll mindestens aktuelle PV-Erzeugung, Haus-/Verbrauchs-
+  leistung, Akku-Ladezustand, Laden/Entladen und Netzfluss darstellen, soweit
+  diese Werte die vorhandene Schnittstelle tatsächlich liefert. Login,
+  Cookies und Tokens bleiben ausschließlich in einem dienstbezogenen lokalen
+  Secret-Speicher, niemals in Git, Core-SQLite, Status, Logs oder Backups. Ein
+  inoffizieller Cloudpfad wird sichtbar als solcher gekennzeichnet und darf
+  nicht als stabile offizielle Anker-API ausgegeben werden.
+- Der Webcam-Dienst wird von zwei festen Snapshot-Slots zu einer persistenten,
+  sortierbaren Benutzerbibliothek erweitert. Eigene öffentliche HTTP(S)-
+  Quellen können als begrenztes Standbild oder als MJPEG-Stream angelegt,
+  getestet, aktiviert und gelöscht werden. Fremde Bytes werden nicht blind
+  weitergereicht: Einzelbilder werden dekodiert, dimensions-/größenbegrenzt
+  und lokal neu codiert; MJPEG erhält Zeit-, Bildgrößen- und Framerategrenzen.
+  Zugangsdaten in URLs sowie private Netzbereiche sind ohne ausdrücklich
+  isolierten lokalen Modus verboten.
+- Ein VPN-Dienst darf ausschließlich vorhandene, gepflegte Linux-Backends wie
+  WireGuard oder NetworkManager-Profile steuern. Schlüssel und Konfigurationen
+  bleiben root-only und außerhalb des Core; die UI sieht nur Profilname,
+  verbunden/getrennt, sichere Gegenstelle, Tunneladresse und Datenzähler.
+  Import, Aktivierung und Abschaltung benötigen einen festen privilegierten
+  Helfer statt allgemeiner Shell- oder sudo-Rechte.
+- Standortschätzung über sichtbare WLAN-SSIDs/BSSIDs ist nur nach ausdrücklicher
+  Einwilligung zulässig. Eine rein lokale Wiedererkennung selbst benannter Orte
+  wird gegenüber externen BSSID-Geolocation-Diensten bevorzugt. Rohscans und
+  Nachbar-BSSIDs dürfen weder öffentlich ausgegeben noch ungefragt an Dritte
+  gesendet werden; GPS oder präziser Standort werden nicht vorgetäuscht.
+- Die lokale Suche fand kein Anker-/SOLIX-Projekt und insbesondere keinen
+  belastbaren früheren CYD-SOLIX-Datenweg. Der zuletzt von PlatformIO bekannte
+  CYD-Pfad ist ein Crypto-Dashboard und wird nicht als SOLIX-Quelle ausgegeben.
+- Version 0.10.39 setzt deshalb den ehrlichen ersten SOLIX-Schritt um:
+  `anker_solix` ist ein standardmäßig deaktivierter externer Energiedienst,
+  erscheint im Dienstkatalog und übernimmt nach einem erfolgreichen isolierten
+  Adapter-Handshake ausschließlich die sechs begrenzten öffentlichen Messwerte
+  `solar_w`, `home_w`, `grid_w`, `battery_w`, `battery_percent` und
+  `energy_today_kwh`. Seriennummern, Site-/Device-IDs und Zugangsdaten bleiben
+  ausgeschlossen. Unterstützte Geräte sollen Ankers lokale Modbus-TCP-
+  Integration verwenden; ein Community-Cloudadapter bleibt ausdrücklich
+  inoffiziell und getrennt.
+- `docs/SERVICE_CANDIDATES.md` enthält nun 88 nummerierte Vorschläge in den
+  Bereichen Energie/Smart Home, PTT/Kommunikation, Kameras/Weltbilder,
+  Netzwerk/VPN, Standort/Mobilität, Sensorik, Medien und Betrieb. Die Liste
+  trennt technische Eignung und Voraussetzungen von tatsächlicher
+  Implementierung und nennt eine konkrete empfohlene Reihenfolge.
+
 ### 2026-10-31 – Lastabhängiges Restflackern ausschließlich im Akkubetrieb
 
 - Robert korrigiert die bisherige Einstufung des seltenen Restflackerns: Bei

@@ -416,6 +416,7 @@ kbd { display: inline-block; min-width: 24px; padding: 3px 6px; border: 1px soli
 .service-row[data-readiness="disabled"] .service-row-heading span { color: #7d9290; }
 .service-row p { overflow: hidden; margin: 4px 0 3px; color: var(--muted); font-size: .72rem; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .service-row small { color: #627675; font-size: .63rem; }
+.service-row .service-row-metrics { display: block; margin-top: 5px; color: var(--amber); font-size: .74rem; font-weight: 700; }
 .service-row-actions { display: flex; gap: 6px; }
 .service-row-actions button { min-width: 34px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); background: rgba(255, 255, 255, .025); cursor: pointer; }
 .service-list-empty { padding: 18px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); text-align: center; }
