@@ -63,7 +63,10 @@ the installer report exactly which adapters still need configuration.
   non-technical fallback text when a station supplies no title
 - simple recorded-music player with favorites, `My Soundmix`, shuffle,
   previous/next, optional cover cache and confirmed deletion
-- curated one-click radio and news-feed presets with locally re-encoded artwork
+- curated 41-station radio catalog across eight languages with local artwork,
+  persistent active/disabled selection, search and language/category filters
+- persistent podcast subscriptions with bounded RSS/Atom episode loading,
+  search and playback through the existing audio owner
 - standard-library-only test suite and GitHub Actions CI
 
 Hardware-specific integration still pending:
@@ -270,14 +273,25 @@ The navigation tree is maintained only as an internal debugging overview in
 [`docs/MENU_TREE.md`](docs/MENU_TREE.md). It is not a product page or a visible
 menu entry.
 
-The built-in selection currently includes SWR3, sunshine live,
-Deutschlandfunk, RMF FM, Radio ZET, BBC World Service, DIE NEUE 107.7,
-AFN The Eagle, ROCK ANTENNE and ROCK FM. News presets include
+The personal list initially includes SWR3, sunshine live, Deutschlandfunk,
+RMF FM, Radio ZET, BBC World Service, DIE NEUE 107.7, AFN The Eagle,
+ROCK ANTENNE and ROCK FM. A separate inactive catalog expands this to 41
+reviewed stations with at least five each in German, English, Polish, French,
+Spanish, Italian, Dutch and Portuguese. Activating a catalog row moves it into
+the persistent personal list; updates do not activate new stations or restore
+ones the user removed. News presets include
 tagesschau, Deutschlandfunk Nachrichten, RMF24 and BBC News World. The source
 addresses and their review references are documented in
 [`docs/PRESETS.md`](docs/PRESETS.md). Station artwork is fetched only from the
 reviewed list, size-limited, decoded and locally re-encoded as JPEG. If a logo
 is unavailable, the dashboard keeps working and displays a text tile instead.
+
+The **Podcasts** tab accepts a public RSS/Atom podcast-feed address, stores the
+subscription in the same non-secret SQLite state, loads at most 50 playable
+audio episodes on demand and can search or play those episodes. Raw feed and
+enclosure URLs are not returned by the status API. Feeds with embedded
+credentials or persistent query strings are refused so signed/private feed
+tokens cannot accidentally enter backups or public state.
 
 If the repository files are already present, the local command remains:
 

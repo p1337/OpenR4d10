@@ -1076,6 +1076,38 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
 
+### 2026-10-31 – Mehrsprachiger Radiokatalog und abonnierbarer Podcast-Dienst
+
+- Die unveränderliche, vorinstallierte Radioauswahl wird zu einem kuratierten
+  Katalog mit mindestens fünf verifizierten Sendern je Hauptsprache erweitert.
+  Startumfang: Deutsch, Englisch, Polnisch, Französisch, Spanisch, Italienisch,
+  Niederländisch und Portugiesisch. Jeder Eintrag besitzt Sprache, Land,
+  Kategorien, geprüfte öffentliche Streamquelle, Homepage und ein geprüftes
+  Logo. Technische oder wissenschaftliche Inhalte sind als eigene Kategorie
+  auffindbar. Nicht verifizierte Adressen oder erfundene Logos sind verboten.
+- Die bisherige persönliche Liste mit zehn Sendern bleibt bei Neuinstallation
+  aktiv. Alle neu hinzukommenden Katalogsender sind zunächst deaktiviert und
+  werden durch Updates niemals ungefragt in eine bestehende persönliche Liste
+  kopiert. Der aktive Bereich steht im Web oben, der deaktivierte Katalog
+  darunter. Aktivieren kopiert einen Katalogeintrag in die persistente
+  persönliche SQLite-Liste und verschiebt ihn damit nach oben; Deaktivieren
+  entfernt nur die persönliche Zuordnung, nicht den Katalogeintrag.
+- Suche, Sprachfilter und Kategorienfilter arbeiten über Namen, Sprache, Land,
+  Kategorien und redaktionelle Beschreibung. Die persönliche Reihenfolge bleibt
+  unabhängig davon persistent. Senderlogos werden weiterhin ausschließlich
+  über den vorhandenen begrenzten Download-, Prüf- und lokalen
+  Re-Encoding-Pfad ausgeliefert; fremde Bild-URLs erscheinen nicht im Browser.
+- Podcasts werden als echter lokaler Dienst ergänzt, nicht als bloßer Link zum
+  vorhandenen RSS-Textleser. Nutzer können öffentliche RSS-/Atom-Podcastfeeds
+  abonnieren, aktualisieren, durchsuchen, Episoden abspielen und Abonnements
+  wieder entfernen. Abonnements bleiben in SQLite erhalten; Episodenlisten
+  werden begrenzt aus dem Feed gelesen. Audio-Enclosures laufen über den
+  vorhandenen mpv-Player und übernehmen bei explizitem Play die Audioquelle.
+- Feed- und Enclosure-URLs müssen HTTP(S), öffentlich und ohne eingebettete
+  Zugangsdaten sein. Es werden weder Tokens noch private Feed-Adressen aus Git
+  geladen oder in öffentliche Statusdaten geschrieben. Downloads, XML-Größe,
+  Episodenzahl, Zeitüberschreitung und Bildverarbeitung bleiben begrenzt.
+
 ### 2026-10-31 – Symmetrischer Funktionskopf und Glow-Faktor 1,3
 
 - Der zweizeilige Funktionskopf wird als gespiegeltes Raster aufgeräumt. Links

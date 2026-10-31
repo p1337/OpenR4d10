@@ -267,6 +267,7 @@ class OpenR4d10App:
                 "webradio": "RADIO",
                 "weather": "WEATHER",
                 "local_media": "PLAYER",
+                "podcasts": "PLAYER",
                 "brandmeister": "DMR",
                 "recorder": "REC",
             }.get(getattr(self.services, "active_service", "system"), "SYSTEM")

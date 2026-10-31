@@ -39,6 +39,7 @@
 
     <nav class="workspace-tabs" role="tablist" aria-label="OpenR4d10 sections" data-i18n-aria-label="OpenR4d10 sections">
       <button type="button" role="tab" aria-selected="true" data-tab="radio" data-i18n="Radio">Radio</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="podcasts" data-i18n="Podcasts">Podcasts</button>
       <button type="button" role="tab" aria-selected="false" data-tab="weather" data-i18n="Weather">Weather</button>
       <button type="button" role="tab" aria-selected="false" data-tab="media" data-i18n="Media &amp; News">Media &amp; News</button>
       <button type="button" role="tab" aria-selected="false" data-tab="device" data-i18n="Device">Device</button>
@@ -72,8 +73,39 @@
               <label for="station-name" data-i18n="Add and sort radio stations">Add and sort radio stations</label>
               <input id="station-name" type="text" maxlength="160" placeholder="Station name" data-i18n-placeholder="Station name" autocomplete="off" required>
               <div class="media-source-row"><input id="station-url" type="url" placeholder="https://…/stream" autocomplete="off" required><button type="submit" data-i18n="Save">Save</button></div>
+              <div class="catalog-toolbar">
+                <input id="station-search" type="search" placeholder="Search stations, countries and categories …" data-i18n-placeholder="Search stations, countries and categories …" autocomplete="off">
+                <select id="station-language" aria-label="Filter by language" data-i18n-aria-label="Filter by language"><option value="" data-i18n="All languages">All languages</option></select>
+                <select id="station-category" aria-label="Filter by category" data-i18n-aria-label="Filter by category"><option value="" data-i18n="All categories">All categories</option></select>
+              </div>
+              <div class="library-heading"><strong data-i18n="Active stations">Active stations</strong><span id="active-station-count">0</span></div>
               <ul id="station-list" class="library-list station-list"></ul>
+              <div class="library-heading catalog-heading"><strong data-i18n="Available station catalog">Available station catalog</strong><span id="catalog-station-count">0</span></div>
+              <p class="services-note" data-i18n="Activate a station to move it into your personal list above.">Activate a station to move it into your personal list above.</p>
+              <ul id="station-catalog-list" class="library-list station-list station-catalog-list"></ul>
             </form>
+          </section>
+        </section>
+
+        <section class="tab-panel" role="tabpanel" data-tab-panel="podcasts" hidden>
+          <section class="panel services-panel" aria-labelledby="podcast-title">
+            <div class="panel-heading"><div><p class="eyebrow" data-i18n="PODCASTS">PODCASTS</p><h1 class="tab-title" id="podcast-title" data-i18n="Subscriptions &amp; episodes">Subscriptions &amp; episodes</h1></div><span class="version" data-i18n="RSS / Atom">RSS / Atom</span></div>
+            <form class="content-control" id="podcast-subscribe-form">
+              <label for="podcast-feed-url" data-i18n="Subscribe to a public podcast feed">Subscribe to a public podcast feed</label>
+              <div class="media-source-row"><input id="podcast-feed-url" type="url" placeholder="https://…/podcast.xml" autocomplete="off" required><button type="submit" data-i18n="Subscribe">Subscribe</button></div>
+              <output id="podcast-status" aria-live="polite" data-i18n="No podcast selected.">No podcast selected.</output>
+            </form>
+            <div class="podcast-layout">
+              <section class="content-control" aria-labelledby="podcast-subscriptions-title">
+                <div class="library-heading"><strong id="podcast-subscriptions-title" data-i18n="Subscriptions">Subscriptions</strong><span id="podcast-subscription-count">0</span></div>
+                <ul id="podcast-subscription-list" class="library-list podcast-subscription-list"></ul>
+              </section>
+              <section class="content-control" aria-labelledby="podcast-episodes-title">
+                <div class="library-heading"><strong id="podcast-episodes-title" data-i18n="Episodes">Episodes</strong><span id="podcast-episode-count">0</span></div>
+                <input id="podcast-search" type="search" placeholder="Search titles and descriptions …" data-i18n-placeholder="Search titles and descriptions …" autocomplete="off">
+                <ul id="podcast-episode-list" class="library-list podcast-episode-list"></ul>
+              </section>
+            </div>
           </section>
         </section>
 

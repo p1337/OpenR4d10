@@ -236,6 +236,19 @@ internal stream or feed URL. Normal radio UI control uses `station_play`,
 Update source definitions and their evidence together in
 [`PRESETS.md`](PRESETS.md), then test the current addresses without adding
 cookies, tokens or signed URLs.
+The default seed is deliberately limited to the ten entries whose
+`default_enabled` flag is true. Tests must count at least five catalog entries
+for each supported catalog language, prove that a new database activates only
+those ten, and prove that deleting one does not recreate it. Browser tests must
+require one active list, one inactive catalog list, search, language and
+category controls, and the `preset_save` activation path.
+
+Podcast regressions use bounded local XML fixtures. They must cover RSS/Atom
+audio-enclosure parsing, the 50-episode limit, persistent `podcasts` channels,
+stable public episode IDs, playback through the existing `MpvEngine`, and the
+absence of raw feed/enclosure URLs in snapshots. Network tests are diagnostic
+only. Never check in a private podcast URL, a feed query token or a signed
+enclosure URL.
 Radio recording regressions must cover ICY parsing, title-boundary splitting,
 PTT retention of already buffered bytes, the production memory bound,
 continuous mode, storage deduplication and explicit deletion. `fpcalc` comes

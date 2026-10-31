@@ -5,11 +5,15 @@ Installationsversprechen. Ein Dienst wird erst nach eigener Sicherheits-,
 Lizenz-, Last- und Bedienprüfung in den Dienst-Store aufgenommen. Zugangsdaten
 bleiben immer ausschließlich auf dem Gerät.
 
+Podcasts sind seit 0.10.37 kein Kandidat mehr: Der native Dienst kann
+öffentliche RSS-/Atom-Feeds abonnieren, begrenzt aktualisieren, durchsuchen und
+Audio-Episoden über den vorhandenen Player abspielen. Downloads, Kapitel,
+Tempo und Fortsetzungsposition bleiben mögliche spätere Erweiterungen.
+
 ## Priorität A – hoher Nutzen, gut für den Pi Zero 2 W
 
 | Kandidat | Nutzen am Gerät | Anbindung | Aufwand / Grenze |
 |---|---|---|---|
-| Podcasts | Abonnieren, Cover, Kapitel, Tempo, Fortsetzen | RSS/Atom und Podcasting-2.0-Tags | niedrig; Downloads und Speicherlimit nötig |
 | Home Assistant | Zustände anzeigen, Szenen und Geräte schalten | lokale REST-/WebSocket-API mit eigenem Token | niedrig bis mittel; nur freigegebene Entitäten |
 | MQTT | Sensorwerte, kurze Meldungen, Schalter und Automationen | TLS-fähiger MQTT-Client | niedrig; Broker-Zugang lokal konfigurieren |
 | OpenSubsonic / Navidrome | eigene Musik, Suche, Favoriten, Playlists, Cover | OpenSubsonic-API | mittel; API-Schlüssel lokal, Audio per Direktstream |

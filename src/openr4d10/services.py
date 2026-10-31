@@ -24,6 +24,7 @@ from .content import (
     DWD_RADAR_GIF_URL,
     DwdSatelliteFrames,
     FeedReader,
+    PodcastReader,
     PresetArtwork,
     TrackArtwork,
 )
@@ -39,7 +40,7 @@ MEDIA_EXTENSIONS = {
     ".aac", ".flac", ".m4a", ".mka", ".mp3", ".mp4", ".ogg", ".opus", ".wav",
 }
 DEFAULT_ENABLED_SERVICES = {
-    "system", "webradio", "weather", "local_media", "recorder", "rss", "webcam",
+    "system", "webradio", "weather", "local_media", "recorder", "rss", "podcasts", "webcam",
 }
 DISPLAY_BRIGHTNESS_KEY = "display.brightness_percent"
 DEFAULT_DISPLAY_BRIGHTNESS = 100
@@ -84,6 +85,7 @@ BUILTIN_SERVICES = (
     ServiceManifest("discord", "Discord", "voice", "Official Discord application/bot integration", ("ptt", "channels", "messages"), "official_api", requires_credentials=True, credential_hint="Use an individual official OAuth or app flow."),
     ServiceManifest("telegram", "Telegram", "messages", "Messages and voice notes through a local TDLib adapter", ("messages", "voice_notes", "tts"), "external", requires_credentials=True, credential_hint="Complete Telegram login locally through TDLib."),
     ServiceManifest("rss", "Feeds", "information", "RSS and Atom subscriptions with optional read-aloud", ("feeds", "tts"), "native"),
+    ServiceManifest("podcasts", "Podcasts", "audio", "Podcast subscriptions and episode playback", ("subscriptions", "episodes", "playback"), "process", ("mpv",)),
     ServiceManifest("webcam", "Webcams", "video", "Up to two configured still-image or live views", ("images", "video"), "process", ("ffmpeg",)),
     ServiceManifest("youtube_audio", "YouTube Audio", "media", "Audio access only where technically and legally permitted", ("playback", "library"), "external"),
     ServiceManifest("spotify", "Spotify", "media", "Spotify Connect through a user-configured compatible client", ("playback",), "external", requires_credentials=True, credential_hint="Use the user's own eligible Spotify account locally."),
@@ -106,6 +108,7 @@ class ServiceCatalog:
         player: MpvEngine | None = None,
         recorder: StreamRecorder | None = None,
         feed_reader: FeedReader | None = None,
+        podcast_reader: PodcastReader | None = None,
         camera: CameraSnapshot | None = None,
         artwork: PresetArtwork | None = None,
         track_artwork: TrackArtwork | None = None,
@@ -124,6 +127,7 @@ class ServiceCatalog:
             media_roots=(self.media_root,),
         )
         self.feed_reader = feed_reader or FeedReader()
+        self.podcast_reader = podcast_reader or PodcastReader()
         self.camera = camera or CameraSnapshot(state_directory / "cache")
         self.artwork = artwork or PresetArtwork(state_directory / "cache")
         self.track_artwork = track_artwork or TrackArtwork(self.cover_root)
@@ -137,6 +141,9 @@ class ServiceCatalog:
         self._weather_guard = threading.Lock()
         self._worker_threads: set[threading.Thread] = set()
         self._worker_guard = threading.Lock()
+        self._podcast_cache: dict[int, dict[str, object]] = {}
+        self._active_podcast_subscription_id: int | None = None
+        self._active_podcast_episode: dict[str, object] | None = None
         external_ids = {
             item.service_id
             for item in BUILTIN_SERVICES
@@ -161,7 +168,11 @@ class ServiceCatalog:
         )
         self.store.seed_stations_once(
             "webradio",
-            tuple((item.name, item.stream_url) for item in RADIO_PRESETS),
+            tuple(
+                (item.name, item.stream_url)
+                for item in RADIO_PRESETS
+                if item.default_enabled
+            ),
             marker="radio.defaults_seeded_v1",
         )
         self.store.seed_stations_once(
@@ -485,12 +496,48 @@ class ServiceCatalog:
                     "preset_id": preset.preset_id if preset is not None else None,
                     "country": preset.country if preset is not None else "Eigener Sender",
                     "genre": preset.genre if preset is not None else "Webradio",
+                    "language": preset.language if preset is not None else "",
+                    "categories": list(preset.categories) if preset is not None else [],
+                    "description": preset.description if preset is not None else "",
                     "artwork": (
                         f"/api/radio-art/{preset.preset_id}"
                         if preset is not None else None
                     ),
                 }
             )
+        podcast_subscriptions = []
+        for position, item in enumerate(self.store.channels("podcasts")):
+            metadata = item.get("metadata")
+            metadata = metadata if isinstance(metadata, dict) else {}
+            feed_url = metadata.get("feed_url")
+            source = ""
+            if isinstance(feed_url, str):
+                source = urlsplit(feed_url).hostname or ""
+            cached = self._podcast_cache.get(int(item["id"]))
+            podcast_subscriptions.append(
+                {
+                    "id": int(item["id"]),
+                    "name": str(item["name"]),
+                    "description": str(metadata.get("description") or ""),
+                    "homepage": str(metadata.get("homepage") or ""),
+                    "source": source,
+                    "position": position,
+                    "selected": int(item["id"]) == self._active_podcast_subscription_id,
+                    "episode_count": (
+                        int(cached.get("episode_count", 0)) if cached is not None else None
+                    ),
+                }
+            )
+        selected_podcast = (
+            self._podcast_cache.get(self._active_podcast_subscription_id)
+            if self._active_podcast_subscription_id is not None
+            else None
+        )
+        podcast_episodes = (
+            self._public_podcast_episodes(selected_podcast)
+            if selected_podcast is not None
+            else []
+        )
         media = [
             {
                 "id": item["id"],
@@ -571,6 +618,13 @@ class ServiceCatalog:
                 "feeds": [item.public() for item in FEED_PRESETS],
             },
             "stations": stations,
+            "podcasts": {
+                "selected_subscription_id": self._active_podcast_subscription_id,
+                "subscriptions": podcast_subscriptions,
+                "episodes": podcast_episodes,
+                "active_episode": self._active_podcast_episode,
+                "limits": {"subscriptions": 100, "episodes_per_feed": 50},
+            },
             "weather": {
                 "active_channel_id": self.active_weather_channel_id,
                 "channels": weather_channels,
@@ -603,6 +657,7 @@ class ServiceCatalog:
                     self.active_service = "system"
                     self.active_preset_id = None
                     self.active_station_id = None
+                    self._active_podcast_episode = None
                 if service_id == "recorder":
                     self.recorder.stop()
             self.store.set_service_enabled(service_id, enabled)
@@ -635,6 +690,7 @@ class ServiceCatalog:
             self.active_service = service_id
             self.active_preset_id = None
             self.active_station_id = None
+            self._active_podcast_episode = None
         elif action == "pause":
             if self.player.state.state not in {"playing", "paused"}:
                 raise ValueError("no active media to pause or resume")
@@ -646,6 +702,7 @@ class ServiceCatalog:
             self.active_service = "system"
             self.active_preset_id = None
             self.active_station_id = None
+            self._active_podcast_episode = None
         elif action == "volume":
             self.player.set_volume(request.get("value"))  # type: ignore[arg-type]
         elif action == "volume_step":
@@ -785,6 +842,7 @@ class ServiceCatalog:
             self.active_service = "local_media"
             self.active_preset_id = None
             self.active_station_id = None
+            self._active_podcast_episode = None
         elif action == "media_favorite":
             self._require_enabled("local_media")
             media_id = request.get("media_id")
@@ -844,12 +902,105 @@ class ServiceCatalog:
             self.active_service = "local_media"
             self.active_preset_id = None
             self.active_station_id = None
+            self._active_podcast_episode = None
         elif action == "media_next":
             self._require_enabled("local_media")
             self.player.next()
         elif action == "media_previous":
             self._require_enabled("local_media")
             self.player.previous()
+        elif action == "podcast_subscribe":
+            self._require_enabled("podcasts")
+            url = request.get("url")
+            if not isinstance(url, str):
+                raise ValueError("podcast_subscribe requires a URL")
+            parsed = urlsplit(url)
+            if parsed.query:
+                raise ValueError("podcast feed URLs with a query cannot be saved")
+            if len(self.store.channels("podcasts")) >= 100:
+                raise ValueError("podcast subscription limit reached")
+            feed = self.podcast_reader.fetch(url)
+            external_id = hashlib.sha256(url.encode("utf-8")).hexdigest()[:32]
+            subscription_id = self.store.add_channel(
+                "podcasts",
+                external_id,
+                str(feed["title"]),
+                {
+                    "feed_url": url,
+                    "description": str(feed.get("description") or ""),
+                    "homepage": str(feed.get("homepage") or ""),
+                },
+            )
+            self._podcast_cache[subscription_id] = feed
+            self._active_podcast_subscription_id = subscription_id
+            return {
+                "subscription_id": subscription_id,
+                "episode_count": int(feed["episode_count"]),
+            }
+        elif action == "podcast_refresh":
+            self._require_enabled("podcasts")
+            subscription_id = request.get("subscription_id")
+            self._podcast_subscription(subscription_id)
+            feed = self._refresh_podcast(int(subscription_id))
+            return {
+                "subscription_id": int(subscription_id),
+                "episode_count": int(feed["episode_count"]),
+            }
+        elif action == "podcast_play":
+            self._require_enabled("podcasts")
+            subscription_id = request.get("subscription_id")
+            episode_id = request.get("episode_id")
+            if not isinstance(episode_id, str):
+                raise ValueError("podcast_play requires an episode id")
+            self._podcast_subscription(subscription_id)
+            subscription_id = int(subscription_id)
+            feed = self._podcast_cache.get(subscription_id)
+            if feed is None:
+                feed = self._refresh_podcast(subscription_id)
+            episodes = feed.get("episodes")
+            episode = next(
+                (
+                    item for item in episodes
+                    if isinstance(item, dict) and self._podcast_episode_id(item) == episode_id
+                ),
+                None,
+            ) if isinstance(episodes, list) else None
+            if episode is None:
+                raise ValueError("podcast episode was not found")
+            source = validate_media_source(str(episode["enclosure_url"]), (self.media_root,))
+            if self.radio_buffer is not None:
+                self.radio_buffer.stop(flush=True)
+            self.player.load(source)
+            self.active_service = "podcasts"
+            self.active_preset_id = None
+            self.active_station_id = None
+            self._active_podcast_subscription_id = subscription_id
+            self._active_podcast_episode = {
+                "subscription_id": subscription_id,
+                "episode_id": episode_id,
+                "podcast": str(feed.get("title") or "Podcast"),
+                "title": str(episode.get("title") or "Untitled episode"),
+            }
+        elif action == "podcast_unsubscribe":
+            subscription_id = request.get("subscription_id")
+            self._podcast_subscription(subscription_id)
+            subscription_id = int(subscription_id)
+            deleted = self.store.delete_channel(subscription_id)
+            self._podcast_cache.pop(subscription_id, None)
+            if self._active_podcast_subscription_id == subscription_id:
+                self._active_podcast_subscription_id = None
+                self._active_podcast_episode = None
+                if self.active_service == "podcasts":
+                    self.player.stop()
+                    self.active_service = "system"
+            return {"deleted": deleted}
+        elif action == "podcast_move":
+            subscription_id = request.get("subscription_id")
+            direction = request.get("direction")
+            self._podcast_subscription(subscription_id)
+            if isinstance(direction, bool) or not isinstance(direction, int):
+                raise ValueError("podcast_move requires an integer direction")
+            return {"moved": self.store.move_channel(int(subscription_id), direction)}
         elif action == "adapter_call":
             service_id = request.get("service_id")
             operation = request.get("operation")
@@ -1023,6 +1174,7 @@ class ServiceCatalog:
             )
         self.active_service = "webradio"
         self.active_station_id = int(station["id"])
+        self._active_podcast_episode = None
         preset = self._preset_for_station(station)
         self.active_preset_id = preset.preset_id if preset is not None else None
         if preset is not None:
@@ -1104,6 +1256,63 @@ class ServiceCatalog:
             (item for item in RADIO_PRESETS if item.stream_url == stream_url),
             None,
         )
+
+    @staticmethod
+    def _podcast_episode_id(episode: dict[str, object]) -> str:
+        identity = str(episode.get("guid") or episode.get("enclosure_url") or "")
+        return hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24]
+
+    @classmethod
+    def _public_podcast_episodes(
+        cls, feed: dict[str, object]
+    ) -> list[dict[str, object]]:
+        episodes = feed.get("episodes")
+        if not isinstance(episodes, list):
+            return []
+        public: list[dict[str, object]] = []
+        for item in episodes:
+            if not isinstance(item, dict):
+                continue
+            public.append(
+                {
+                    "episode_id": cls._podcast_episode_id(item),
+                    "title": str(item.get("title") or "Untitled episode"),
+                    "summary": str(item.get("summary") or ""),
+                    "published": str(item.get("published") or ""),
+                    "duration": str(item.get("duration") or ""),
+                }
+            )
+        return public
+
+    def _podcast_subscription(self, subscription_id: object) -> dict[str, object]:
+        if isinstance(subscription_id, bool) or not isinstance(subscription_id, int):
+            raise ValueError("podcast subscription id must be an integer")
+        channel = self.store.channel(subscription_id)
+        if channel is None or channel["service_id"] != "podcasts":
+            raise ValueError("podcast subscription was not found")
+        return channel
+
+    def _refresh_podcast(self, subscription_id: int) -> dict[str, object]:
+        channel = self._podcast_subscription(subscription_id)
+        metadata = channel.get("metadata")
+        metadata = metadata if isinstance(metadata, dict) else {}
+        feed_url = metadata.get("feed_url")
+        if not isinstance(feed_url, str):
+            raise ValueError("podcast subscription has no feed URL")
+        feed = self.podcast_reader.fetch(feed_url)
+        self._podcast_cache[subscription_id] = feed
+        self._active_podcast_subscription_id = subscription_id
+        if str(feed.get("title") or "").strip() and str(channel["name"]) != str(feed["title"]):
+            self.store.update_channel(
+                subscription_id,
+                str(feed["title"]),
+                {
+                    **metadata,
+                    "description": str(feed.get("description") or ""),
+                    "homepage": str(feed.get("homepage") or ""),
+                },
+            )
+        return feed
 
     def _require_enabled(self, service_id: str) -> None:
         if not self.store.service_enabled(service_id):
@@ -1285,6 +1494,7 @@ class ServiceCatalog:
             "ard_mediathek": "PLAYER",
             "zdf_mediathek": "PLAYER",
             "international_media": "PLAYER",
+            "podcasts": "PLAYER",
             "brandmeister": "DMR",
             "remote_sdr": "DMR",
             "private_ptt": "DMR",
@@ -1337,6 +1547,8 @@ class ServiceCatalog:
         station = (
             str(selected["name"])
             if selected is not None
+            else str(self._active_podcast_episode["podcast"])
+            if self.active_service == "podcasts" and self._active_podcast_episode is not None
             else playback.source or self.active_service
         )
         track_line = "No title information"
@@ -1348,6 +1560,8 @@ class ServiceCatalog:
                 or buffered.get("continuous") is True
             )
             track_line = self._radio_track_line(buffered) or track_line
+        elif self.active_service == "podcasts" and self._active_podcast_episode is not None:
+            track_line = str(self._active_podcast_episode["title"])
         return {
             "service": service_label,
             "station": station,

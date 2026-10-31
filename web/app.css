@@ -323,6 +323,14 @@ kbd { display: inline-block; min-width: 24px; padding: 3px 6px; border: 1px soli
 .content-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
 .library-controls { margin-top: 20px; }
 .library-heading { align-items: center; display: flex; justify-content: space-between; gap: 12px; }
+.catalog-toolbar { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(140px, .35fr) minmax(140px, .35fr); gap: 8px; margin: 16px 0; }
+.catalog-heading { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 16px; }
+.station-catalog-list { max-height: 620px; overflow: auto; padding-right: 3px; }
+.station-catalog-list li[data-language] { border-left: 2px solid color-mix(in srgb, var(--cyan) 55%, transparent); }
+.podcast-layout { display: grid; grid-template-columns: minmax(260px, .42fr) minmax(360px, 1fr); gap: 12px; margin-top: 12px; }
+.podcast-subscription-list small, .podcast-episode-list small { display: block; color: var(--muted); margin-top: 4px; }
+.podcast-episode-list li { align-items: flex-start; }
+.podcast-episode-list .station-row-copy p { color: var(--muted); font-size: .72rem; line-height: 1.45; margin: 5px 0 0; }
 .library-list { display: grid; gap: 8px; list-style: none; margin: 12px 0 0; padding: 0; }
 .library-list li { align-items: center; background: rgba(255, 255, 255, .035); border-radius: 9px; display: flex; gap: 12px; justify-content: space-between; min-width: 0; padding: 10px 11px; }
 .library-list li > span:first-child { overflow-wrap: anywhere; }
@@ -423,6 +431,7 @@ footer { justify-content: space-between; gap: 20px; padding: 32px 4px 0; color: 
   .weather-channel-fields { grid-template-columns: repeat(2, 1fr); }
   .weather-channel-fields input:first-child { grid-column: 1 / -1; }
   .encoder-grid { grid-template-columns: repeat(2, 1fr); }
+  .podcast-layout { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 620px) {
@@ -447,6 +456,7 @@ footer { justify-content: space-between; gap: 20px; padding: 32px 4px 0; color: 
   .service-row-mark { width: 38px; height: 38px; }
   .service-row-actions { grid-column: 1 / -1; justify-content: flex-end; }
   .content-controls { grid-template-columns: 1fr; }
+  .catalog-toolbar { grid-template-columns: 1fr; }
   .weather-viewer { min-height: 310px; }
   .weather-viewer img, .weather-viewer > div { min-height: 270px; height: 270px; }
   .weather-channel-fields { grid-template-columns: 1fr; }

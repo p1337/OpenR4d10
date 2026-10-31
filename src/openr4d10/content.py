@@ -162,6 +162,118 @@ class FeedReader:
         return self.parse(payload)
 
 
+@dataclass(frozen=True, slots=True)
+class PodcastEpisode:
+    title: str
+    summary: str
+    published: str
+    duration: str
+    guid: str
+    enclosure_url: str
+    enclosure_type: str
+
+
+class PodcastReader:
+    """Read bounded public podcast feeds and retain only playable enclosures."""
+
+    def __init__(self, fetcher: BoundedFetcher | None = None) -> None:
+        self.fetcher = fetcher or BoundedFetcher()
+
+    @staticmethod
+    def _link(node: ET.Element, *, enclosure: bool = False) -> tuple[str, str]:
+        for child in node:
+            local_name = child.tag.rsplit("}", 1)[-1].lower()
+            if enclosure and local_name in {"enclosure", "content"}:
+                url = child.attrib.get("url", "")
+                media_type = child.attrib.get("type", "")
+                if url and (not media_type or media_type.startswith("audio/")):
+                    return url, media_type
+            if local_name == "link":
+                relation = child.attrib.get("rel", "alternate").lower()
+                href = child.attrib.get("href", "")
+                if enclosure and relation == "enclosure":
+                    media_type = child.attrib.get("type", "")
+                    if href and (not media_type or media_type.startswith("audio/")):
+                        return href, media_type
+                if not enclosure and relation in {"", "alternate"}:
+                    return href or (child.text or ""), child.attrib.get("type", "")
+        return "", ""
+
+    @staticmethod
+    def parse(payload: bytes) -> dict[str, object]:
+        try:
+            root = ET.fromstring(payload)
+        except ET.ParseError as exc:
+            raise ContentError(f"invalid podcast XML: {exc}") from exc
+        channel = next(
+            (node for node in root.iter() if node.tag.rsplit("}", 1)[-1].lower() == "channel"),
+            root,
+        )
+        title = _plain_text(_child_text(channel, ("title",)), 160) or "Podcast"
+        description = _plain_text(
+            _child_text(channel, ("description", "subtitle", "summary")), 500
+        )
+        homepage, _homepage_type = PodcastReader._link(channel)
+        episodes: list[PodcastEpisode] = []
+        for node in root.iter():
+            if node.tag.rsplit("}", 1)[-1].lower() not in {"item", "entry"}:
+                continue
+            enclosure_url, enclosure_type = PodcastReader._link(node, enclosure=True)
+            if not enclosure_url:
+                continue
+            try:
+                enclosure_url = validate_content_url(enclosure_url)
+            except ValueError:
+                continue
+            guid = _plain_text(_child_text(node, ("guid", "id")), 512)
+            episodes.append(
+                PodcastEpisode(
+                    title=_plain_text(_child_text(node, ("title",)), 240) or "Untitled episode",
+                    summary=_plain_text(
+                        _child_text(node, ("description", "summary", "content", "subtitle")),
+                        800,
+                    ),
+                    published=_plain_text(
+                        _child_text(node, ("pubdate", "published", "updated")), 80
+                    ),
+                    duration=_plain_text(_child_text(node, ("duration",)), 32),
+                    guid=guid or enclosure_url,
+                    enclosure_url=enclosure_url,
+                    enclosure_type=enclosure_type[:80],
+                )
+            )
+            if len(episodes) >= 50:
+                break
+        if not episodes:
+            raise ContentError("podcast feed contains no playable audio episodes")
+        if homepage:
+            try:
+                homepage = validate_content_url(homepage)
+            except ValueError:
+                homepage = ""
+        return {
+            "title": title,
+            "description": description,
+            "homepage": homepage,
+            "episode_count": len(episodes),
+            "episodes": [asdict(item) for item in episodes],
+        }
+
+    def fetch(self, url: str) -> dict[str, object]:
+        payload, _content_type = self.fetcher.fetch(
+            url,
+            max_bytes=3 * 1024 * 1024,
+            accepted_types=(
+                "application/rss+xml",
+                "application/atom+xml",
+                "application/xml",
+                "text/xml",
+            ),
+            timeout=10,
+        )
+        return self.parse(payload)
+
+
 class CameraSnapshot:
     def __init__(self, cache_root: Path, fetcher: BoundedFetcher | None = None) -> None:
         if not cache_root.is_absolute():

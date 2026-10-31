@@ -197,7 +197,7 @@ PiSugar network service are intentionally absent.
 ## Service catalog
 
 `ServiceCatalog` is the single inventory for device and web UI. It currently
-covers system, web radio, local media, recorder, BrandMeister, remote SDR,
+covers system, web radio, podcasts, local media, recorder, BrandMeister, remote SDR,
 private PTT, Mumble, Discord, Telegram, feeds, webcams, YouTube audio, Spotify,
 ARD/ZDF/international media, speech, Bluetooth, remote Codex and TeamSpeak.
 Each entry declares capabilities, implementation boundary, external executable
@@ -254,9 +254,15 @@ one-off sender layouts.
 
 The web dashboard persists named radio stations without query strings and can
 rescan the private media directory for a bounded set of supported extensions.
-It renders that persistent station collection once, in the compact sortable
-editor/list; there is no second preset-card copy of the same rows. The list's
-play action uses the normal yellow interface accent.
+It renders the compact sortable personal list first and a separate inactive
+catalog list below it. The immutable catalog is not a second active-player
+copy: a station exists in exactly one of those two regions. Activating copies
+the reviewed entry into the personal SQLite list; deactivating removes only
+that personal row, so the catalog entry becomes available again. The initial
+seed contains exactly the original ten stations. Later catalog additions never
+activate themselves on a new release. Search, language and category filters are
+client-side operations over already-public metadata and do not change personal
+order. The active list's play action uses the normal yellow interface accent.
 The service catalog is likewise rendered as one compact list. Client-side
 search compares a normalized query with the complete already-public service
 object plus its localized visible labels; it neither sends queries nor exposes
@@ -268,18 +274,30 @@ and sizes, never local filesystem paths or raw stored stream URLs. SQLite
 access is serialized because the application loop and threaded HTTP server
 share one `StateStore` connection.
 
-`BoundedFetcher` supplies the native feed and camera modules. It accepts only
+`BoundedFetcher` supplies the native feed, podcast and camera modules. It accepts only
 HTTP(S) URLs without embedded credentials and enforces response-type, size and
 timeout limits. The feed reader parses at most 50 RSS/Atom entries and converts
 markup to bounded text. Camera slots accept at most 5 MiB, reject excessive
 pixel dimensions and always decode, resize and atomically re-encode JPEG rather
 than serving untrusted remote bytes.
 
+`PodcastReader` accepts at most 3 MiB of RSS/Atom XML and at most 50 entries
+with HTTP(S) audio enclosures. A subscription is stored as a `podcasts` channel
+whose metadata contains the local feed address; public snapshots expose only
+its host, title, description and homepage. Raw feed and enclosure URLs remain
+inside the core. The process-local episode cache uses stable hashes for public
+episode IDs. `podcast_play` resolves an ID back to the cached enclosure and
+hands it to the one `MpvEngine`; therefore explicit podcast playback replaces
+the previous audio owner, while browsing subscriptions does not. Persistent
+feed URLs with query strings are rejected to prevent signed/private tokens from
+entering SQLite and portable backups.
+
 Curated radio and news source definitions remain reviewable data in `presets.py`,
 separate from playback and parser logic. Radio definitions are seeded exactly
-once into the ordered SQLite station library; the seed marker prevents deleted
-defaults from returning. Channel stepping, Enter-at-stop and the web editor all
-use this persistent list. Public status includes display metadata and a
+once into the ordered SQLite station library only when `default_enabled` is
+true; the seed marker prevents deleted defaults from returning. All other
+definitions remain inactive catalog data until selected. Channel stepping,
+Enter-at-stop and the web editor all use the persistent personal list. Public status includes display metadata and a
 local artwork route, but omits the underlying stream, feed and remote artwork
 addresses. Selecting a radio resolves the reviewed stream only inside the
 core. Preset artwork uses the same bounded-download boundary as camera images,

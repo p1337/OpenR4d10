@@ -15,6 +15,7 @@ from openr4d10.content import (
     DWD_RADAR_GIF_URL,
     DwdSatelliteFrames,
     FeedReader,
+    PodcastReader,
     PresetArtwork,
     TrackArtwork,
     validate_content_url,
@@ -80,6 +81,24 @@ class ContentTests(unittest.TestCase):
         self.assertEqual(feed["title"], "Open Feed")
         self.assertEqual(feed["item_count"], 1)
         self.assertEqual(feed["items"][0]["summary"], "Safe summary")
+
+    def test_podcast_parser_keeps_only_safe_audio_enclosures(self) -> None:
+        payload = b"""<?xml version='1.0'?>
+        <rss><channel><title>Open Podcast</title><description>Science show</description>
+        <link>https://example.test/show</link><item><title>Episode 1</title>
+        <guid>episode-one</guid><pubDate>today</pubDate><itunes:duration xmlns:itunes='urn:itunes'>12:34</itunes:duration>
+        <description>&lt;b&gt;Safe&lt;/b&gt; episode</description>
+        <enclosure url='https://media.example.test/one.mp3' type='audio/mpeg'/></item>
+        <item><title>Video</title><enclosure url='https://media.example.test/video.mp4' type='video/mp4'/></item>
+        </channel></rss>"""
+        podcast = PodcastReader.parse(payload)
+        self.assertEqual(podcast["title"], "Open Podcast")
+        self.assertEqual(podcast["episode_count"], 1)
+        self.assertEqual(podcast["episodes"][0]["summary"], "Safe episode")
+        self.assertEqual(
+            podcast["episodes"][0]["enclosure_url"],
+            "https://media.example.test/one.mp3",
+        )
 
     def test_bounded_fetcher_rejects_credentials_type_and_size(self) -> None:
         with self.assertRaises(ValueError):

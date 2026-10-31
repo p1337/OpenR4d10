@@ -12,6 +12,10 @@ let weatherAnimationIndex = 0;
 let latestWeather = null;
 let weatherRefreshPending = false;
 let serviceSearchQuery = "";
+let stationSearchQuery = "";
+let stationLanguageFilter = "";
+let stationCategoryFilter = "";
+let podcastSearchQuery = "";
 
 function t(key, variables = {}) {
   const template = translations[currentLocale]?.[key] ?? translations.en?.[key] ?? key;
@@ -252,6 +256,7 @@ function renderServices(catalog) {
   }
   renderPresets(catalog);
   renderLibrary(catalog);
+  renderPodcasts(catalog);
   renderWeather(catalog);
 }
 
@@ -449,30 +454,76 @@ function renderRadioBuffer(buffer) {
   setText("radio-buffer-status", message);
 }
 
+function stationMatchesFilters(station) {
+  if (stationLanguageFilter && station.language !== stationLanguageFilter) return false;
+  if (stationCategoryFilter && !station.categories?.includes(stationCategoryFilter)) return false;
+  const query = normalizedSearchText(stationSearchQuery.trim());
+  if (!query) return true;
+  return normalizedSearchText([
+    station.name,
+    station.country,
+    station.genre,
+    station.language,
+    station.description,
+    ...(station.categories || []),
+  ].join(" ")).includes(query);
+}
+
+function languageName(code) {
+  try {
+    return new Intl.DisplayNames([currentLocale], { type: "language" }).of(code) || code.toUpperCase();
+  } catch (_error) {
+    return code.toUpperCase();
+  }
+}
+
+function stationRow(station, actions) {
+  const row = document.createElement("li");
+  row.dataset.language = station.language || "";
+  const artwork = document.createElement("div");
+  artwork.className = "station-row-artwork";
+  artwork.dataset.initials = initials(station.name);
+  if (station.artwork) {
+    const image = document.createElement("img");
+    image.src = station.artwork;
+    image.alt = t("Artwork for {{station}}", { station: station.name });
+    image.loading = "lazy";
+    image.addEventListener("error", () => image.remove());
+    artwork.append(image);
+  }
+  const label = document.createElement("span");
+  label.className = "station-row-copy";
+  const name = document.createElement("strong");
+  name.textContent = station.name;
+  const detail = document.createElement("small");
+  const language = station.language ? languageName(station.language) : "–";
+  detail.textContent = `${language} · ${station.country} · ${station.genre}`;
+  label.append(name, detail);
+  row.append(artwork, label, actions);
+  return row;
+}
+
 function renderLibrary(catalog) {
   const stations = Array.isArray(catalog?.stations) ? catalog.stations : [];
+  const presets = Array.isArray(catalog?.presets?.stations) ? catalog.presets.stations : [];
+  const languages = [...new Set(presets.map((item) => item.language).filter(Boolean))].sort();
+  const categories = [...new Set(presets.flatMap((item) => item.categories || []))].sort();
+  const languageSelect = byId("station-language");
+  const categorySelect = byId("station-category");
+  const currentLanguage = stationLanguageFilter;
+  const currentCategory = stationCategoryFilter;
+  languageSelect.replaceChildren(new Option(t("All languages"), ""));
+  for (const language of languages) languageSelect.add(new Option(languageName(language), language));
+  categorySelect.replaceChildren(new Option(t("All categories"), ""));
+  for (const category of categories) categorySelect.add(new Option(t(category), category));
+  languageSelect.value = languages.includes(currentLanguage) ? currentLanguage : "";
+  categorySelect.value = categories.includes(currentCategory) ? currentCategory : "";
+
   const stationList = byId("station-list");
   stationList.replaceChildren();
-  stations.forEach((station, index) => {
-    const row = document.createElement("li");
-    const artwork = document.createElement("div");
-    artwork.className = "station-row-artwork";
-    artwork.dataset.initials = initials(station.name);
-    if (station.artwork) {
-      const image = document.createElement("img");
-      image.src = station.artwork;
-      image.alt = t("Artwork for {{station}}", { station: station.name });
-      image.loading = "lazy";
-      image.addEventListener("error", () => image.remove());
-      artwork.append(image);
-    }
-    const label = document.createElement("span");
-    label.className = "station-row-copy";
-    const name = document.createElement("strong");
-    name.textContent = station.name;
-    const detail = document.createElement("small");
-    detail.textContent = `${station.country} · ${station.genre}`;
-    label.append(name, detail);
+  const visibleStations = stations.filter(stationMatchesFilters);
+  visibleStations.forEach((station) => {
+    const index = stations.indexOf(station);
     const actions = document.createElement("span");
     actions.className = "library-actions";
     const up = libraryButton("↑", "station_move", { station_id: station.id, direction: -1 });
@@ -485,15 +536,40 @@ function renderLibrary(catalog) {
       play,
       up,
       down,
-      libraryButton(t("Delete"), "station_delete", { station_id: station.id }),
+      libraryButton(t(station.preset_id ? "Deactivate" : "Delete"), "station_delete", { station_id: station.id }),
     );
-    row.append(artwork, label, actions);
-    stationList.append(row);
+    stationList.append(stationRow(station, actions));
   });
-  if (!stations.length) {
+  setText("active-station-count", `${visibleStations.length} / ${stations.length}`);
+  if (!visibleStations.length) {
     const row = document.createElement("li");
-    row.textContent = t("No stations saved yet.");
+    row.textContent = t(stations.length ? "No stations match these filters." : "No stations saved yet.");
     stationList.append(row);
+  }
+
+  const activePresetIds = new Set(stations.map((item) => item.preset_id).filter(Boolean));
+  const available = presets
+    .filter((preset) => !activePresetIds.has(preset.preset_id))
+    .filter(stationMatchesFilters)
+    .sort((left, right) => (
+      left.language.localeCompare(right.language) || left.name.localeCompare(right.name)
+    ));
+  const catalogList = byId("station-catalog-list");
+  catalogList.replaceChildren();
+  for (const preset of available) {
+    const actions = document.createElement("span");
+    actions.className = "library-actions";
+    const activate = libraryButton(t("Activate"), "preset_save", { preset_id: preset.preset_id });
+    activate.classList.add("library-play");
+    actions.append(activate);
+    catalogList.append(stationRow(preset, actions));
+  }
+  const totalAvailable = presets.filter((preset) => !activePresetIds.has(preset.preset_id)).length;
+  setText("catalog-station-count", `${available.length} / ${totalAvailable}`);
+  if (!available.length) {
+    const row = document.createElement("li");
+    row.textContent = t(totalAvailable ? "No stations match these filters." : "All catalog stations are active.");
+    catalogList.append(row);
   }
 
   const media = Array.isArray(catalog?.media) ? catalog.media : [];
@@ -549,6 +625,116 @@ function renderLibrary(catalog) {
     const row = document.createElement("li");
     row.textContent = t("No local audio files scanned yet.");
     mediaList.append(row);
+  }
+}
+
+function podcastButton(label, action, extra, primary = false) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = label;
+  if (primary) button.classList.add("library-play");
+  button.addEventListener("click", () => podcastCommand(action, extra));
+  return button;
+}
+
+function renderPodcasts(catalog) {
+  const podcasts = catalog?.podcasts || {};
+  const subscriptions = Array.isArray(podcasts.subscriptions) ? podcasts.subscriptions : [];
+  const subscriptionList = byId("podcast-subscription-list");
+  subscriptionList.replaceChildren();
+  subscriptions.forEach((subscription, index) => {
+    const row = document.createElement("li");
+    if (subscription.selected) row.dataset.active = "true";
+    const copy = document.createElement("span");
+    copy.className = "station-row-copy";
+    const name = document.createElement("strong");
+    name.textContent = subscription.name;
+    const detail = document.createElement("small");
+    detail.textContent = subscription.episode_count === null
+      ? `${subscription.source} · ${t("Not loaded yet")}`
+      : `${subscription.source} · ${t("{{count}} episodes", { count: subscription.episode_count })}`;
+    copy.append(name, detail);
+    const actions = document.createElement("span");
+    actions.className = "library-actions";
+    const up = podcastButton("↑", "podcast_move", { subscription_id: subscription.id, direction: -1 });
+    const down = podcastButton("↓", "podcast_move", { subscription_id: subscription.id, direction: 1 });
+    up.disabled = index === 0;
+    down.disabled = index === subscriptions.length - 1;
+    actions.append(
+      podcastButton(t("Update"), "podcast_refresh", { subscription_id: subscription.id }, true),
+      up,
+      down,
+      podcastButton(t("Remove"), "podcast_unsubscribe", { subscription_id: subscription.id }),
+    );
+    row.append(copy, actions);
+    subscriptionList.append(row);
+  });
+  setText("podcast-subscription-count", subscriptions.length);
+  if (!subscriptions.length) {
+    const row = document.createElement("li");
+    row.textContent = t("No podcast subscriptions yet.");
+    subscriptionList.append(row);
+  }
+
+  const query = normalizedSearchText(podcastSearchQuery.trim());
+  const episodes = (Array.isArray(podcasts.episodes) ? podcasts.episodes : []).filter((episode) => (
+    !query || normalizedSearchText([
+      episode.title, episode.summary, episode.published, episode.duration,
+    ].join(" ")).includes(query)
+  ));
+  const episodeList = byId("podcast-episode-list");
+  episodeList.replaceChildren();
+  for (const episode of episodes) {
+    const row = document.createElement("li");
+    const copy = document.createElement("span");
+    copy.className = "station-row-copy";
+    const title = document.createElement("strong");
+    title.textContent = episode.title;
+    const detail = document.createElement("small");
+    detail.textContent = [episode.published, episode.duration].filter(Boolean).join(" · ");
+    const summary = document.createElement("p");
+    summary.textContent = episode.summary;
+    copy.append(title, detail, summary);
+    const actions = document.createElement("span");
+    actions.className = "library-actions";
+    actions.append(podcastButton(t("Play"), "podcast_play", {
+      subscription_id: podcasts.selected_subscription_id,
+      episode_id: episode.episode_id,
+    }, true));
+    row.append(copy, actions);
+    episodeList.append(row);
+  }
+  setText("podcast-episode-count", episodes.length);
+  if (!episodes.length) {
+    const row = document.createElement("li");
+    row.textContent = t(subscriptions.length
+      ? "Select Update on a subscription to load its episodes."
+      : "Subscribe to a public podcast feed first.");
+    episodeList.append(row);
+  }
+}
+
+async function podcastCommand(action, extra = {}) {
+  const output = byId("podcast-status");
+  output.textContent = t("Working …");
+  try {
+    const response = await fetch("/api/control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...extra }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    output.textContent = Number.isInteger(payload.episode_count)
+      ? t("{{count}} episodes loaded.", { count: payload.episode_count })
+      : action === "podcast_play"
+        ? t("Episode is playing.")
+        : action === "podcast_unsubscribe"
+          ? t("Subscription removed.")
+          : t("Podcast change saved.");
+    await refresh();
+  } catch (error) {
+    output.textContent = t("Error: {{message}}", { message: error.message });
   }
 }
 
@@ -998,6 +1184,30 @@ byId("station-control").addEventListener("submit", async (event) => {
     source: byId("station-url").value,
   });
   event.currentTarget.reset();
+});
+
+byId("station-search").addEventListener("input", (event) => {
+  stationSearchQuery = event.currentTarget.value;
+  if (latestStatus?.services) renderLibrary(latestStatus.services);
+});
+byId("station-language").addEventListener("change", (event) => {
+  stationLanguageFilter = event.currentTarget.value;
+  if (latestStatus?.services) renderLibrary(latestStatus.services);
+});
+byId("station-category").addEventListener("change", (event) => {
+  stationCategoryFilter = event.currentTarget.value;
+  if (latestStatus?.services) renderLibrary(latestStatus.services);
+});
+
+byId("podcast-subscribe-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await podcastCommand("podcast_subscribe", { url: byId("podcast-feed-url").value });
+  event.currentTarget.reset();
+});
+
+byId("podcast-search").addEventListener("input", (event) => {
+  podcastSearchQuery = event.currentTarget.value;
+  if (latestStatus?.services) renderPodcasts(latestStatus.services);
 });
 
 byId("media-scan").addEventListener("click", () => sendControl("media_scan"));

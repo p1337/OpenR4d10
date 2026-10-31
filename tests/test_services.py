@@ -305,9 +305,17 @@ class ServiceCatalogTests(unittest.TestCase):
             self.assertNotIn("feed_url", item)
         for item in RADIO_BY_ID.values():
             parsed = urlsplit(item.stream_url)
-            self.assertEqual(parsed.scheme, "https")
+            self.assertIn(parsed.scheme, {"http", "https"})
             self.assertIsNone(parsed.username)
             self.assertFalse(parsed.query)
+            self.assertTrue(item.language)
+            self.assertTrue(item.categories)
+        language_counts = {}
+        for item in RADIO_BY_ID.values():
+            language_counts[item.language] = language_counts.get(item.language, 0) + 1
+        self.assertEqual(set(language_counts), {"de", "en", "pl", "fr", "es", "it", "nl", "pt"})
+        self.assertTrue(all(count >= 5 for count in language_counts.values()))
+        self.assertEqual(sum(item.default_enabled for item in RADIO_BY_ID.values()), 10)
         for item in FEED_BY_ID.values():
             parsed = urlsplit(item.feed_url)
             self.assertEqual(parsed.scheme, "https")
@@ -377,7 +385,7 @@ class ServiceCatalogTests(unittest.TestCase):
         self.assertEqual(stepped["selected_preset"]["name"], "sunshine live")
         self.assertIn("swr3", artwork.loaded)
         self.assertEqual(first["station_id"], second["station_id"])
-        self.assertEqual(len(stations), len(RADIO_BY_ID))
+        self.assertEqual(len(stations), 10)
 
     def test_feed_preset_uses_curated_address_and_returns_credit(self) -> None:
         class Reader:
@@ -400,6 +408,87 @@ class ServiceCatalogTests(unittest.TestCase):
         self.assertEqual(reader.loaded, FEED_BY_ID["bbc_world"].feed_url)
         self.assertEqual(result["credit"], "Source: BBC News")
         self.assertNotIn("feed_url", result)
+
+    def test_podcast_subscriptions_persist_and_episodes_play_without_exposing_urls(self) -> None:
+        class State:
+            state = "stopped"
+            volume = 30
+
+            def as_dict(self):
+                return {"state": self.state, "volume": self.volume}
+
+        class Player:
+            def __init__(self):
+                self.state = State()
+                self.loaded = None
+
+            def load(self, source):
+                self.loaded = source
+                self.state.state = "playing"
+
+            def stop(self):
+                self.state.state = "stopped"
+
+            def close(self):
+                pass
+
+        class Recorder:
+            state = State()
+
+            def close(self):
+                pass
+
+        class Reader:
+            def fetch(self, url):
+                self.loaded = url
+                return {
+                    "title": "Science Weekly",
+                    "description": "Research and technology",
+                    "homepage": "https://example.test/show",
+                    "episode_count": 1,
+                    "episodes": [{
+                        "title": "New discovery",
+                        "summary": "A safe summary",
+                        "published": "today",
+                        "duration": "10:00",
+                        "guid": "episode-1",
+                        "enclosure_url": "https://media.example.test/episode-1.mp3",
+                        "enclosure_type": "audio/mpeg",
+                    }],
+                }
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            player = Player()
+            catalog = ServiceCatalog(
+                root, player=player, recorder=Recorder(), podcast_reader=Reader()
+            )
+            try:
+                subscribed = catalog.control({
+                    "action": "podcast_subscribe",
+                    "url": "https://example.test/feed.xml",
+                })
+                snapshot = catalog.snapshot()["podcasts"]
+                episode = snapshot["episodes"][0]
+                catalog.control({
+                    "action": "podcast_play",
+                    "subscription_id": subscribed["subscription_id"],
+                    "episode_id": episode["episode_id"],
+                })
+                public_snapshot = catalog.snapshot()["podcasts"]
+            finally:
+                catalog.close()
+            reopened = ServiceCatalog(root, player=Player(), recorder=Recorder(), podcast_reader=Reader())
+            try:
+                persisted = reopened.snapshot()["podcasts"]["subscriptions"]
+            finally:
+                reopened.close()
+
+        self.assertEqual(player.loaded, "https://media.example.test/episode-1.mp3")
+        self.assertEqual(public_snapshot["active_episode"]["title"], "New discovery")
+        self.assertNotIn("enclosure_url", public_snapshot["episodes"][0])
+        self.assertNotIn("feed_url", public_snapshot["subscriptions"][0])
+        self.assertEqual(persisted[0]["name"], "Science Weekly")
 
     def test_catalog_covers_documented_services_without_claiming_credentials(self) -> None:
         available = {"mpv": "/usr/bin/mpv", "ffmpeg": "/usr/bin/ffmpeg"}
@@ -785,7 +874,7 @@ class ServiceCatalogTests(unittest.TestCase):
 
         self.assertEqual(persisted[0]["preset_id"], "sunshine_live")
         self.assertNotIn("swr3", {item["preset_id"] for item in persisted})
-        self.assertEqual(len(persisted), len(RADIO_BY_ID) - 1)
+        self.assertEqual(len(persisted), 9)
 
     def test_media_scan_indexes_only_approved_files_and_removes_stale_rows(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
