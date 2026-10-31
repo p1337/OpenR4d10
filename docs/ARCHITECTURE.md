@@ -172,8 +172,11 @@ preview or second appearance store.
 The built-in `pisugar3` power backend is a narrow read-only I2C boundary. It
 opens `/dev/i2c-1`, selects the documented `0x57` controller, verifies version
 `3` and application mode `0x0F`, and then reads calculated capacity register
-`0x2A`. It exposes only model, ready state and bounded percentage. Controller
-writes and an additional PiSugar network service are intentionally absent.
+`0x2A` through the manufacturer's SMBus byte-data transaction. Split raw
+write/read transactions are forbidden because the real controller returns the
+version byte again after their STOP condition. The adapter exposes only model,
+ready state and bounded percentage. Controller writes and an additional
+PiSugar network service are intentionally absent.
 
 ## Service catalog
 

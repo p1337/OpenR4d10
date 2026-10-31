@@ -168,8 +168,9 @@ generated only on the device and is excluded from Git, status JSON, SQLite,
 logs and backups.
 
 The dashboard shows live service, system and adapter status. The real Whisplay
-display and sound card are verified. The PiSugar 3 adapter checks the official
-device identity and application mode at I2C address `0x57`, then reads only the
+display and sound card are verified. The PiSugar 3 adapter uses the same SMBus
+byte-data transaction as the manufacturer driver, checks the official device
+identity and application mode at I2C address `0x57`, then reads only the
 calculated 0–100% capacity register. The percentage appears immediately left
 of the physical battery icon and in the web energy card. It never changes
 charging, RTC, shutdown or controller configuration.

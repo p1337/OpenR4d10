@@ -150,9 +150,11 @@ border, its open top and the absent decorative player border when disabled.
 
 The `pisugar3` backend must verify registers `0x00 == 3` and `0x01 == 0x0F`
 before accepting register `0x2A` as a percentage. Tests mock the I2C boundary
-and require exactly those three register selections; no write-capable control
-register may appear. The installed unit may access only `/dev/i2c-1`, and the
-installer must load `i2c-dev` without installing a PiSugar web account.
+and require exactly those three SMBus byte-data reads; separate raw
+register-selection writes are not allowed because they failed on the real
+controller. No write-capable control register may appear. The installed unit
+may access only `/dev/i2c-1`, and the installer must load `i2c-dev` without
+installing a PiSugar web account.
 
 The `device_input` action is the hardware-free input source for the native
 display. It accepts only the checked-in logical control names, rotary steps

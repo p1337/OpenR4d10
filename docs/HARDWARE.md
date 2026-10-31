@@ -264,13 +264,21 @@ percentage in register `0x2A`. The manufacturer's
 uses the same identity checks and register mapping.
 
 `PiSugar3Telemetry` opens only `/dev/i2c-1`, selects address `0x57`, verifies
-the identity and application mode, and reads the single percentage byte. A
-value outside 0 through 100 or an identity mismatch becomes an adapter error;
-it is never drawn as a plausible battery level. The adapter does not write
+the identity and application mode, and reads the single percentage byte using
+the manufacturer's `I2C_SMBUS_BYTE_DATA` transaction. A value outside 0
+through 100 or an identity mismatch becomes an adapter error; it is never
+drawn as a plausible battery level. The adapter does not write
 charging, RTC, watchdog, shutdown or configuration registers. The installer
 loads `i2c-dev`, grants the service only its existing I2C group plus
 `/dev/i2c-1`, and does not install the optional PiSugar HTTP server or create
 an account.
+
+The first real-target implementation used separate register-selection and
+read system calls. On this physical PiSugar that starts a new transaction and
+returns the version byte `0x03` for every requested register. A target probe on
+2026-10-31 confirmed the required SMBus byte-data path as `0x03` for register
+`0x00`, `0x0F` for `0x01`, and `0x5A` (90%) for `0x2A`. Do not replace the
+combined SMBus transaction with split raw I2C calls.
 
 ## Still deliberately unknown
 

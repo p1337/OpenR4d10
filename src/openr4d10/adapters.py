@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import ctypes
 from io import BytesIO
 import json
 import logging
@@ -307,6 +308,23 @@ class UnconfiguredTelemetry:
         return {"state": "unconfigured", "component": self.component}
 
 
+class _I2cSmbusData(ctypes.Union):
+    _fields_ = (
+        ("byte", ctypes.c_uint8),
+        ("word", ctypes.c_uint16),
+        ("block", ctypes.c_uint8 * 34),
+    )
+
+
+class _I2cSmbusRequest(ctypes.Structure):
+    _fields_ = (
+        ("read_write", ctypes.c_uint8),
+        ("command", ctypes.c_uint8),
+        ("size", ctypes.c_uint32),
+        ("data", ctypes.POINTER(_I2cSmbusData)),
+    )
+
+
 class PiSugar3Telemetry:
     """Read the documented PiSugar 3 battery percentage over I2C.
 
@@ -316,6 +334,9 @@ class PiSugar3Telemetry:
     """
 
     I2C_SLAVE = 0x0703
+    I2C_SMBUS = 0x0720
+    I2C_SMBUS_READ = 1
+    I2C_SMBUS_BYTE_DATA = 2
     ADDRESS = 0x57
     VERSION_REGISTER = 0x00
     MODE_REGISTER = 0x01
@@ -327,14 +348,24 @@ class PiSugar3Telemetry:
         self.device = device
         self._lock = threading.Lock()
 
-    @staticmethod
-    def _register(fd: int, register: int) -> int:
-        if os.write(fd, bytes((register,))) != 1:
-            raise AdapterError("PiSugar 3 register selection failed")
-        value = os.read(fd, 1)
-        if len(value) != 1:
-            raise AdapterError("PiSugar 3 returned an incomplete register value")
-        return value[0]
+    @classmethod
+    def _register(cls, fd: int, register: int) -> int:
+        """Read one byte with the combined transaction used by the vendor driver."""
+        data = _I2cSmbusData()
+        request = _I2cSmbusRequest(
+            cls.I2C_SMBUS_READ,
+            register,
+            cls.I2C_SMBUS_BYTE_DATA,
+            ctypes.pointer(data),
+        )
+        libc = ctypes.CDLL(None, use_errno=True)
+        ioctl = libc.ioctl
+        ioctl.argtypes = (ctypes.c_int, ctypes.c_ulong, ctypes.c_void_p)
+        ioctl.restype = ctypes.c_int
+        if ioctl(fd, cls.I2C_SMBUS, ctypes.byref(request)) < 0:
+            error = ctypes.get_errno()
+            raise OSError(error, os.strerror(error))
+        return int(data.byte)
 
     def read(self) -> Mapping[str, Any]:
         try:

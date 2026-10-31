@@ -51,28 +51,75 @@ class AdapterTests(unittest.TestCase):
 
     def test_pisugar3_reads_only_identity_mode_and_capacity(self) -> None:
         ioctl = Mock()
+        registers: list[int] = []
+
+        def read_register(_fd: int, register: int) -> int:
+            registers.append(register)
+            return {0x00: 0x03, 0x01: 0x0F, 0x2A: 0x51}[register]
+
         with (
             patch.dict(sys.modules, {"fcntl": SimpleNamespace(ioctl=ioctl)}),
             patch("openr4d10.adapters.os.open", return_value=17),
-            patch("openr4d10.adapters.os.write", return_value=1) as write,
-            patch("openr4d10.adapters.os.read", side_effect=[b"\x03", b"\x0f", b"\x51"]),
+            patch.object(PiSugar3Telemetry, "_register", side_effect=read_register),
             patch("openr4d10.adapters.os.close") as close,
         ):
             value = PiSugar3Telemetry().read()
         self.assertEqual(value, {"state": "ready", "model": "PiSugar 3", "battery_percent": 81})
         ioctl.assert_called_once_with(17, PiSugar3Telemetry.I2C_SLAVE, 0x57)
-        self.assertEqual(
-            [call.args[1] for call in write.call_args_list],
-            [b"\x00", b"\x01", b"\x2a"],
-        )
+        self.assertEqual(registers, [0x00, 0x01, 0x2A])
         close.assert_called_once_with(17)
+
+    def test_pisugar3_register_uses_smbus_byte_data_not_split_raw_io(self) -> None:
+        calls: list[tuple[int, int, int, int, int]] = []
+
+        class FakeIoctl:
+            argtypes = None
+            restype = None
+
+            def __call__(self, fd: int, operation: int, pointer: object) -> int:
+                request = pointer._obj  # type: ignore[attr-defined]
+                calls.append(
+                    (
+                        fd,
+                        operation,
+                        request.read_write,
+                        request.command,
+                        request.size,
+                    )
+                )
+                request.data.contents.byte = 0x5A
+                return 0
+
+        with (
+            patch(
+                "openr4d10.adapters.ctypes.CDLL",
+                return_value=SimpleNamespace(ioctl=FakeIoctl()),
+            ),
+            patch("openr4d10.adapters.os.write") as raw_write,
+            patch("openr4d10.adapters.os.read") as raw_read,
+        ):
+            value = PiSugar3Telemetry._register(17, 0x2A)
+        self.assertEqual(value, 90)
+        self.assertEqual(
+            calls,
+            [
+                (
+                    17,
+                    PiSugar3Telemetry.I2C_SMBUS,
+                    PiSugar3Telemetry.I2C_SMBUS_READ,
+                    0x2A,
+                    PiSugar3Telemetry.I2C_SMBUS_BYTE_DATA,
+                )
+            ],
+        )
+        raw_write.assert_not_called()
+        raw_read.assert_not_called()
 
     def test_pisugar3_rejects_an_unverified_device_identity(self) -> None:
         with (
             patch.dict(sys.modules, {"fcntl": SimpleNamespace(ioctl=Mock())}),
             patch("openr4d10.adapters.os.open", return_value=17),
-            patch("openr4d10.adapters.os.write", return_value=1),
-            patch("openr4d10.adapters.os.read", side_effect=[b"\x02", b"\x0f"]),
+            patch.object(PiSugar3Telemetry, "_register", side_effect=[0x02, 0x0F]),
             patch("openr4d10.adapters.os.close"),
             self.assertRaisesRegex(AdapterError, "did not identify a PiSugar 3"),
         ):

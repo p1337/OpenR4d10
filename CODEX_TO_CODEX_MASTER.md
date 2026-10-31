@@ -1080,6 +1080,13 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   PiSugar-3-Pfad zugreifen. Sie darf weder Ladeparameter, RTC, Abschaltung noch
   andere Register verändern und keinen fremden Webserver mit
   Standardzugangsdaten installieren.
+- Reale Zielmessung am 31.10.2026: Ein getrennter I²C-Write/Read-Zugriff liefert
+  bei diesem PiSugar für jedes Register erneut das Versionsbyte `0x03` und ist
+  deshalb ausdrücklich ungeeignet. Wie der Hersteller-Kerneltreiber muss
+  OpenR4d10 `I2C_SMBUS_BYTE_DATA` verwenden. Damit antwortet das reale Gerät
+  reproduzierbar mit Version `0x03`, Anwendungsmodus `0x0F` und Kapazität
+  `0x5A` beziehungsweise 90 Prozent. Dieser SMBus-Ablauf ist als
+  Regressionstest festzuhalten.
 
 ### 2026-10-31 – Intelligente Radioaufnahme und einfacher Musikplayer
 
