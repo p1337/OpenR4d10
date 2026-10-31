@@ -17,6 +17,7 @@ LOG = logging.getLogger(__name__)
 StatusProvider = Callable[[], dict[str, Any]]
 ControlProvider = Callable[[dict[str, object]], dict[str, object]]
 ContentProvider = Callable[[str], tuple[str, bytes] | None]
+ScreenProvider = Callable[[], bytes | None]
 
 STATIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
@@ -31,6 +32,7 @@ class _DashboardHandler(BaseHTTPRequestHandler):
     status_provider: StatusProvider
     control_provider: ControlProvider | None = None
     content_provider: ContentProvider | None = None
+    screen_provider: ScreenProvider | None = None
     server_version = "OpenR4d10"
     sys_version = ""
 
@@ -114,10 +116,19 @@ class _DashboardHandler(BaseHTTPRequestHandler):
         content_type, payload = item
         self._send(200, content_type, payload)
 
+    def _serve_screen(self) -> None:
+        payload = self.screen_provider() if self.screen_provider is not None else None
+        if payload is None:
+            self._send(404, "text/plain; charset=utf-8", b"Native screen unavailable\n")
+            return
+        self._send(200, "image/png", payload)
+
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
         path = urlsplit(self.path).path
         if path == "/api/status":
             self._serve_status()
+        elif path == "/api/device-screen.png":
+            self._serve_screen()
         elif path in {"/api/camera/1", "/api/camera/2"}:
             self._serve_content(f"camera-{path[-1]}.jpg")
         elif re.fullmatch(r"/api/radio-art/[a-z][a-z0-9_]{1,63}", path):
@@ -149,6 +160,7 @@ class WebServer:
         status_provider: StatusProvider,
         control_provider: ControlProvider | None = None,
         content_provider: ContentProvider | None = None,
+        screen_provider: ScreenProvider | None = None,
     ) -> None:
         handler = type(
             "DashboardHandler",
@@ -158,6 +170,7 @@ class WebServer:
                 "status_provider": staticmethod(status_provider),
                 "control_provider": staticmethod(control_provider) if control_provider else None,
                 "content_provider": staticmethod(content_provider) if content_provider else None,
+                "screen_provider": staticmethod(screen_provider) if screen_provider else None,
             },
         )
         self._server = ThreadingHTTPServer((host, port), handler)

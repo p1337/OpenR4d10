@@ -186,6 +186,9 @@ class OpenR4d10App:
     def _apply_device_event(self, event: InputEvent, handler: Any) -> dict[str, object]:
         """Resolve one logical input and repaint it as one serialized action."""
         media_result: dict[str, object] | None = None
+        display_snapshot = getattr(self.display, "snapshot", None)
+        current_ui = display_snapshot() if callable(display_snapshot) else {}
+        menu_open = isinstance(current_ui, dict) and current_ui.get("menu_open") is True
         if self.services is not None and event.control == Control.LEFT_OUTER:
             media_result = self.services.control(
                 {"action": "volume_step", "steps": event.steps}
@@ -193,15 +196,19 @@ class OpenR4d10App:
         elif (
             self.services is not None
             and event.control == Control.RIGHT_OUTER
+            and not menu_open
             and self.services.active_service == "webradio"
         ):
             media_result = self.services.control(
                 {"action": "preset_step", "steps": event.steps}
             )
-        elif event.control == Control.RIGHT_PRESS and event.held_seconds < 2.0:
+        elif (
+            event.control == Control.RIGHT_PRESS
+            and event.held_seconds < 2.0
+            and not menu_open
+        ):
             if self.services is None:
                 raise RuntimeError("media control is unavailable")
-            display_snapshot = getattr(self.display, "snapshot", None)
             current_ui = display_snapshot() if callable(display_snapshot) else {}
             radio_selected = (
                 isinstance(current_ui, dict)
@@ -232,6 +239,11 @@ class OpenR4d10App:
             response["playback"] = media_result["playback"]
             response["selected_preset"] = media_result.get("selected_preset")
         return response
+
+    def device_screen(self) -> bytes | None:
+        """Return the native device pixels when the display owns that renderer."""
+        provider = getattr(self.display, "screen_png", None)
+        return provider() if callable(provider) else None
 
     def show_boot(self) -> None:
         if not self.config.boot_enabled:
@@ -283,6 +295,7 @@ class OpenR4d10App:
                     self.status_snapshot,
                     self.control,
                     self.services.content_asset if self.services is not None else None,
+                    self.device_screen,
                 )
                 self._web_server.start()
                 LOG.info(

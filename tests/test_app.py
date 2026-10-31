@@ -305,6 +305,61 @@ class AppTests(unittest.TestCase):
         self.assertEqual(volume["playback"]["volume"], 46)
         self.assertEqual(station["selected_preset"]["name"], "sunshine live")
 
+    def test_open_menu_owns_channel_and_enter_without_media_side_effects(self) -> None:
+        class InputDisplay:
+            def __init__(self) -> None:
+                self.events = []
+
+            def render(self, _frame) -> None:
+                pass
+
+            def snapshot(self):
+                return {"menu_open": True, "service": "RADIO"}
+
+            def apply_input(self, event):
+                self.events.append(event)
+                return self.snapshot()
+
+        class Services:
+            active_service = "webradio"
+
+            def __init__(self) -> None:
+                self.requests = []
+
+            def control(self, request):
+                self.requests.append(request)
+                raise AssertionError("menu input reached media services")
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            display = InputDisplay()
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=display,
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,  # type: ignore[arg-type]
+            )
+            app.control(
+                {"action": "device_input", "control": "right_outer", "steps": 1}
+            )
+            app.control({"action": "device_input", "control": "right_press"})
+
+        self.assertEqual(services.requests, [])
+        self.assertEqual(
+            [event.control for event in display.events],
+            [Control.RIGHT_OUTER, Control.RIGHT_PRESS],
+        )
+
     def test_enter_starts_radio_when_radio_ui_is_selected_and_player_stopped(self) -> None:
         class InputDisplay:
             def render(self, _frame) -> None:

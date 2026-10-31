@@ -15,8 +15,20 @@ from .models import Frame
 
 WIDTH = 240
 HEIGHT = 280
-DEFAULT_ACCENT = (73, 222, 204)
+DEFAULT_ACCENT = (253, 184, 19)
 SERVICES = ("SYSTEM", "RADIO", "DMR", "PLAYER", "REC")
+MAIN_MENU_ITEMS = (
+    "display",
+    "accent_color",
+    "wlan",
+    "service_modules",
+    "service_store",
+    "bluetooth",
+    "input_speech",
+    "language",
+    "system",
+    "about_support",
+)
 FONT_REGULAR = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
 FONT_BOLD = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
 DISPLAY_TEXT = {
@@ -28,6 +40,16 @@ DISPLAY_TEXT = {
         "main_menu": "MAIN MENU",
         "service_settings": "SERVICE SETTINGS",
         "quick_menu": "QUICK MENU",
+        "display": "DISPLAY",
+        "accent_color": "ACCENT COLOR",
+        "wlan": "WI-FI",
+        "service_modules": "SERVICE MODULES",
+        "service_store": "SERVICE STORE",
+        "bluetooth": "BLUETOOTH",
+        "input_speech": "INPUT & SPEECH",
+        "language": "LANGUAGE",
+        "system": "SYSTEM",
+        "about_support": "ABOUT & SUPPORT",
     },
     "de": {
         "controls": ("LAU", "SQL", "KAN", "DST"),
@@ -37,6 +59,16 @@ DISPLAY_TEXT = {
         "main_menu": "HAUPTMENÜ",
         "service_settings": "DIENST-EINSTELLUNGEN",
         "quick_menu": "SCHNELLMENÜ",
+        "display": "ANZEIGE",
+        "accent_color": "AKZENTFARBE",
+        "wlan": "WLAN",
+        "service_modules": "DIENSTMODULE",
+        "service_store": "DIENST-STORE",
+        "bluetooth": "BLUETOOTH",
+        "input_speech": "EINGABE & SPRACHE",
+        "language": "SPRACHE",
+        "system": "SYSTEM",
+        "about_support": "INFO & SUPPORT",
     },
     "pl": {
         "controls": ("GŁO", "SQL", "KAN", "USŁ"),
@@ -46,6 +78,16 @@ DISPLAY_TEXT = {
         "main_menu": "MENU GŁÓWNE",
         "service_settings": "USTAWIENIA USŁUGI",
         "quick_menu": "SZYBKIE MENU",
+        "display": "EKRAN",
+        "accent_color": "KOLOR AKCENTU",
+        "wlan": "WI-FI",
+        "service_modules": "MODUŁY USŁUG",
+        "service_store": "SKLEP USŁUG",
+        "bluetooth": "BLUETOOTH",
+        "input_speech": "STEROWANIE I MOWA",
+        "language": "JĘZYK",
+        "system": "SYSTEM",
+        "about_support": "INFO I WSPARCIE",
     },
     "fr": {
         "controls": ("VOL", "SQL", "CAN", "SRV"),
@@ -55,6 +97,16 @@ DISPLAY_TEXT = {
         "main_menu": "MENU PRINCIPAL",
         "service_settings": "RÉGLAGES SERVICE",
         "quick_menu": "MENU RAPIDE",
+        "display": "ÉCRAN",
+        "accent_color": "COULEUR D’ACCENT",
+        "wlan": "WI-FI",
+        "service_modules": "MODULES DE SERVICE",
+        "service_store": "BOUTIQUE SERVICES",
+        "bluetooth": "BLUETOOTH",
+        "input_speech": "ENTRÉE ET PAROLE",
+        "language": "LANGUE",
+        "system": "SYSTÈME",
+        "about_support": "INFOS ET SOUTIEN",
     },
     "es": {
         "controls": ("VOL", "SQL", "CAN", "SRV"),
@@ -64,6 +116,16 @@ DISPLAY_TEXT = {
         "main_menu": "MENÚ PRINCIPAL",
         "service_settings": "AJUSTES SERVICIO",
         "quick_menu": "MENÚ RÁPIDO",
+        "display": "PANTALLA",
+        "accent_color": "COLOR DE ACENTO",
+        "wlan": "WI-FI",
+        "service_modules": "MÓDULOS DE SERVICIO",
+        "service_store": "TIENDA DE SERVICIOS",
+        "bluetooth": "BLUETOOTH",
+        "input_speech": "ENTRADA Y VOZ",
+        "language": "IDIOMA",
+        "system": "SISTEMA",
+        "about_support": "INFO Y SOPORTE",
     },
 }
 
@@ -87,7 +149,12 @@ class DeviceUiState:
     recording: bool = False
     menu_open: bool = False
     menu_kind: str | None = None
+    menu_selection: int = 0
+    menu_stack: list[tuple[str, int]] = field(default_factory=list)
+    menu_return_title: str | None = None
+    menu_return_subtitle: str | None = None
     ptt_active: bool = False
+    ptt_context_active: bool = False
     language: str = "en"
     accent: tuple[int, int, int] = DEFAULT_ACCENT
     timestamp: datetime = field(default_factory=datetime.now)
@@ -108,12 +175,56 @@ class DeviceUiState:
             "playing": self.playing,
             "menu_open": self.menu_open,
             "menu_kind": self.menu_kind,
+            "menu_selection": self.menu_selection,
+            "menu_item": self.selected_menu_item,
             "ptt_active": self.ptt_active,
+            "ptt_context_active": self.ptt_context_active,
             "language": self.language,
             "title": self.title,
             "subtitle": self.subtitle,
             "preset_id": self.preset_id,
         }
+
+    @property
+    def selected_menu_item(self) -> str | None:
+        if self.menu_kind != "main_menu" or not 0 <= self.menu_selection < len(
+            MAIN_MENU_ITEMS
+        ):
+            return None
+        return MAIN_MENU_ITEMS[self.menu_selection]
+
+    def _open_menu(self, kind: str) -> None:
+        if not self.menu_open:
+            self.menu_return_title = self.title
+            self.menu_return_subtitle = self.subtitle
+        self.menu_open = True
+        self.menu_kind = kind
+        self.menu_selection = 0
+        self.menu_stack.clear()
+
+    def _select_menu_item(self) -> None:
+        if self.menu_kind != "main_menu":
+            return
+        selected = self.selected_menu_item
+        if selected is None:
+            return
+        self.menu_stack.append(("main_menu", self.menu_selection))
+        self.menu_kind = selected
+        self.menu_selection = 0
+
+    def _menu_back(self) -> None:
+        if self.menu_stack:
+            self.menu_kind, self.menu_selection = self.menu_stack.pop()
+            return
+        self.menu_open = False
+        self.menu_kind = None
+        self.menu_selection = 0
+        if self.menu_return_title is not None:
+            self.title = self.menu_return_title
+        if self.menu_return_subtitle is not None:
+            self.subtitle = self.menu_return_subtitle
+        self.menu_return_title = None
+        self.menu_return_subtitle = None
 
     def apply(self, event: InputEvent) -> None:
         if event.control == Control.LEFT_OUTER:
@@ -121,32 +232,41 @@ class DeviceUiState:
         elif event.control == Control.LEFT_INNER:
             self.squelch = max(0, min(9, self.squelch + event.steps))
         elif event.control == Control.RIGHT_OUTER:
-            self.channel = max(1, min(999, self.channel + event.steps))
+            if self.menu_open and self.menu_kind == "main_menu":
+                self.menu_selection = max(
+                    0,
+                    min(len(MAIN_MENU_ITEMS) - 1, self.menu_selection + event.steps),
+                )
+            elif not self.menu_open:
+                self.channel = max(1, min(999, self.channel + event.steps))
         elif event.control == Control.RIGHT_INNER:
             self.service_index = (self.service_index + event.steps) % len(SERVICES)
         elif event.control == Control.LEFT_PRESS:
-            self.menu_open = True
             if event.held_seconds >= 2.0:
-                self.menu_kind = "service_settings"
+                self._open_menu("service_settings")
                 self.title = "Service settings"
                 self.subtitle = "Settings for the active service"
             else:
-                self.menu_kind = "main_menu"
+                self._open_menu("main_menu")
                 self.title = "Main menu"
                 self.subtitle = "Rotate SERVICE to select"
         elif event.control == Control.RIGHT_PRESS:
             if event.held_seconds >= 2.0:
-                self.menu_open = True
-                self.menu_kind = "quick_menu"
+                self._open_menu("quick_menu")
                 self.title = "Quick menu"
                 self.subtitle = "Recording and playback actions"
+            elif self.menu_open:
+                self._select_menu_item()
             else:
                 self.playing = not self.playing
                 self.right_action = "PAUSE" if self.playing else "PLAY"
         elif event.control == Control.PTT:
-            self.ptt_active = bool(event.active)
-            self.title = "PTT input active" if self.ptt_active else "PTT released"
-            self.subtitle = "No PTT service adapter configured"
+            if self.ptt_context_active:
+                self.ptt_active = bool(event.active)
+            else:
+                self.ptt_active = False
+                if event.active and self.menu_open:
+                    self._menu_back()
 
     def update_from_frame(self, frame: Frame) -> None:
         fields = frame.fields
@@ -162,6 +282,13 @@ class DeviceUiState:
             controls = {}
         if not isinstance(ui, Mapping):
             ui = {}
+
+        ptt_context = ui.get("ptt_context_active")
+        self.ptt_context_active = (
+            ptt_context if isinstance(ptt_context, bool) else False
+        )
+        if not self.ptt_context_active:
+            self.ptt_active = False
 
         language = ui.get("language")
         if isinstance(language, str):
@@ -292,24 +419,80 @@ def _control_value(
     draw.text((x + 36, y - 2), value, font=large, fill=accent)
 
 
-def _draw_centered_menu(
+def _draw_menu_heading(
     draw: ImageDraw.ImageDraw,
     title: str,
     top: int,
     accent: tuple[int, int, int],
 ) -> None:
-    words = title.split()
-    lines = words if len(words) > 1 else [title]
-    font = _font(25, bold=True)
-    line_height = 31
-    block_height = len(lines) * line_height
-    y = top + (HEIGHT - top - block_height) // 2
-    for line in lines:
-        fitted = _fit_text(draw, line, font, WIDTH - 28)
-        bounds = draw.textbbox((0, 0), fitted, font=font)
-        width = bounds[2] - bounds[0]
-        draw.text(((WIDTH - width) / 2, y), fitted, font=font, fill=accent)
-        y += line_height
+    font = _font(20, bold=True)
+    fitted = _fit_text(draw, title, font, WIDTH - 76)
+    draw.text((14, top + 9), fitted, font=font, fill=accent)
+
+
+def _draw_back_or_ptt(
+    draw: ImageDraw.ImageDraw,
+    accent: tuple[int, int, int],
+    ptt_active: bool,
+) -> None:
+    if ptt_active:
+        draw.rounded_rectangle((188, 89, 239, 119), radius=9, fill=(207, 38, 49))
+        draw.rectangle((230, 89, 239, 119), fill=(207, 38, 49))
+        font = _font(12, bold=True)
+        bounds = draw.textbbox((0, 0), "PTT", font=font)
+        draw.text(
+            (213 - (bounds[2] - bounds[0]) / 2, 96),
+            "PTT",
+            font=font,
+            fill=(255, 255, 255),
+        )
+        return
+    draw.line((224, 99, 202, 104, 224, 109), fill=accent, width=4, joint="curve")
+    draw.line((203, 104, 231, 104), fill=accent, width=4)
+
+
+def _draw_main_menu_items(
+    draw: ImageDraw.ImageDraw,
+    state: DeviceUiState,
+    text: Mapping[str, object],
+) -> None:
+    visible_rows = 5
+    start = max(
+        0,
+        min(
+            state.menu_selection - visible_rows // 2,
+            len(MAIN_MENU_ITEMS) - visible_rows,
+        ),
+    )
+    font = _font(14, bold=True)
+    row_top = 121
+    for row, key in enumerate(MAIN_MENU_ITEMS[start : start + visible_rows]):
+        index = start + row
+        y = row_top + row * 29
+        selected = index == state.menu_selection
+        if selected:
+            draw.rounded_rectangle(
+                (11, y - 2, 229, y + 24),
+                radius=6,
+                fill=(42, 34, 13),
+                outline=state.accent,
+                width=2,
+            )
+            draw.polygon(
+                ((18, y + 6), (24, y + 11), (18, y + 16)),
+                fill=state.accent,
+            )
+        label = _fit_text(draw, str(text[key]), font, 191)
+        draw.text(
+            (31, y + 2),
+            label,
+            font=font,
+            fill=(250, 250, 248) if selected else (178, 187, 189),
+        )
+    if start > 0:
+        draw.polygon(((235, 124), (231, 130), (239, 130)), fill=state.accent)
+    if start + visible_rows < len(MAIN_MENU_ITEMS):
+        draw.polygon(((231, 264), (239, 264), (235, 270)), fill=state.accent)
 
 
 def render_device_ui(
@@ -323,7 +506,9 @@ def render_device_ui(
     controls = text["controls"]
     assert isinstance(controls, tuple)
     left_action = str(text["menu"])
-    right_action = str(text["pause"] if state.playing else text["play"])
+    right_action = "OK" if state.menu_open else str(
+        text["pause"] if state.playing else text["play"]
+    )
 
     header_height = 53
     draw.rectangle((0, 0, WIDTH - 1, 52), fill=(2, 5, 7), outline=(35, 47, 51))
@@ -358,7 +543,10 @@ def render_device_ui(
     if state.menu_open:
         menu_key = state.menu_kind or "main_menu"
         menu_title = str(text.get(menu_key, text["main_menu"]))
-        _draw_centered_menu(draw, menu_title, content_top, accent)
+        _draw_menu_heading(draw, menu_title, content_top, accent)
+        _draw_back_or_ptt(draw, accent, state.ptt_active)
+        if menu_key == "main_menu":
+            _draw_main_menu_items(draw, state, text)
         return image.convert("RGB")
 
     station_font = _font(18, bold=True)
@@ -409,12 +597,15 @@ def render_device_ui(
         spacing=3,
     )
 
-    draw.ellipse((184, 88, 228, 132), fill=(12, 23, 27), outline=accent, width=2)
-    if state.playing:
-        draw.rectangle((200, 101, 204, 119), fill=accent)
-        draw.rectangle((209, 101, 213, 119), fill=accent)
+    if state.ptt_active:
+        _draw_back_or_ptt(draw, accent, True)
     else:
-        draw.polygon(((200, 99), (200, 121), (216, 110)), fill=accent)
+        draw.ellipse((184, 88, 228, 132), fill=(12, 23, 27), outline=accent, width=2)
+        if state.playing:
+            draw.rectangle((200, 101, 204, 119), fill=accent)
+            draw.rectangle((209, 101, 213, 119), fill=accent)
+        else:
+            draw.polygon(((200, 99), (200, 121), (216, 110)), fill=accent)
     if state.recording:
         draw.ellipse((220, 87, 228, 95), fill=(255, 78, 78))
     return image.convert("RGB")

@@ -44,8 +44,11 @@ Physical-renderer regressions must inspect the native 240 × 280 pixels, not a
 browser approximation. Tests verify the compact header boundary, language
 mapping, absence of date/footer/player-status text, enlarged artwork bounds,
 the play button position and that main-menu rendering contains neither artwork
-nor player title. The five curated languages use the same renderer and fall
-back to English for unknown language codes.
+nor player title. They also verify the vertical ten-entry main-menu list,
+selection scrolling, Enter selection without media side effects, PTT back
+navigation, the normal accent-coloured back arrow and the red/white edge-aligned
+PTT indicator only for an explicit ready PTT context. The five curated languages
+use the same renderer and fall back to English for unknown language codes.
 
 The normal `run` command also creates a migrated non-secret state database in
 the configured state directory. Tests must always point this at a temporary
@@ -67,6 +70,7 @@ files in `web/` plus the following endpoints:
 - `POST /api/control` — bounded same-origin JSON media controls
 - `/api/camera/1` and `/api/camera/2` — locally re-encoded camera snapshots
 - `/api/radio-art/<preset-id>` — bounded, locally re-encoded preset artwork
+- `/api/device-screen.png` — exact current native 240 × 280 renderer output
 
 The control endpoint accepts only JSON up to 4096 bytes, rejects mismatched
 browser origins and never accepts or stores credentials. It supports explicit

@@ -236,9 +236,13 @@ Eingaben zusätzlich auf eine PC-Tastatur ab:
 - `Q` halten: PTT aktiv; Loslassen beendet PTT.
 
 Die Tastatursteuerung ist in Text- und Auswahlfeldern inaktiv, damit Eingaben
-nicht versehentlich Gerätesteuerungen oder PTT auslösen. PTT bleibt bis zur
-Einrichtung eines berechtigten PTT-Dienstadapters ein sichtbares logisches
-Eingabesignal und darf keine funktionierende Audioübertragung vortäuschen.
+nicht versehentlich Gerätesteuerungen oder PTT auslösen. In jedem geöffneten
+Gerätemenü ist ein aktiver PTT-Druck die Zurück-Funktion und schließt zunächst
+die aktuelle Menüebene. Nur wenn der gerade aktive Dienst PTT tatsächlich als
+bereite Funktion beansprucht, bleibt der Druck beim Dienst und darf nicht als
+Zurück interpretiert werden. Ohne einen solchen berechtigten PTT-Kontext darf
+die Oberfläche weder aktives PTT noch eine funktionierende Audioübertragung
+vortäuschen.
 
 Die Druckfunktionen werden im oberen Displaybereich vertikal angezeigt:
 
@@ -292,9 +296,19 @@ vollständig. Sie darf weder Text noch Ersatzstatus enthalten.
 
 Wenn das lokalisierte Hauptmenü (`MAIN MENU`, `HAUPTMENÜ` beziehungsweise die
 korrespondierende Übersetzung) geöffnet ist, wird der komplette Player- und
-Medienbereich ausgeblendet. Der freie Bereich zeigt ausschließlich das Menü
-in großer, gut lesbarer Schrift; Senderbild, Titel, Dienstname, Playerstatus
-und Play/Pause-Schaltfläche sind dort nicht sichtbar.
+Medienbereich ausgeblendet. Direkt unter der großen, gut lesbaren Überschrift
+stehen die zehn in Abschnitt 6 festgelegten Hauptbereiche untereinander. Der
+rechte äußere Kanal-/Eintragsregler verschiebt die sichtbare Markierung und
+scrollt die Liste; ein kurzer Druck auf den rechten Encoder beziehungsweise
+Enter öffnet den markierten Bereich. Senderbild, Titel, Dienstname,
+Playerstatus und Play/Pause-Schaltfläche sind dort nicht sichtbar.
+
+In Menüs sitzt unterhalb der Batterie ein nach links gerichteter Pfeil in der
+aktiven Akzentfarbe als sichtbarer Hinweis auf die PTT-Zurück-Funktion. Wird
+PTT von einem tatsächlich bereiten Dienst verwendet und gerade gehalten,
+ersetzt ihn ein rotes Feld mit weißem `PTT`: rechts bündig am Displayrand,
+rechts eckig und links abgerundet. Außerhalb eines echten PTT-Kontexts wird
+dieses rote Feld niemals angezeigt.
 
 Der Funktionskopf muss optisch eindeutig vom Medienbereich getrennt bleiben.
 
@@ -316,6 +330,8 @@ Die Geräteeinstellungen enthalten genau diese Hauptbereiche:
    - Farbton, Sättigung, Helligkeit und Preset werden mit den vier Drehachsen
      bedient,
    - Live-Vorschau der Akzentfarbe.
+   - Standard ist das festgelegte warme Orange `#FDB813`; ein Marken- oder
+     Quellenname erscheint weder in der Geräte- noch in der Weboberfläche.
 3. **WLAN**
    - vollständige Standalone-Einrichtung am Gerät,
    - Netzsuche, SSID, Kennwort, DHCP/feste IP, gespeicherte Netze und Priorität.
@@ -602,6 +618,19 @@ Die Weboberfläche ist eine responsive PWA und zeigt:
 - ausschließlich hier den Datenbankeditor,
 - WLAN-Ersteinrichtung im Hotspotmodus.
 
+Sie ist keine endlose Einzelseite. Die großen Funktionsgruppen werden in klar
+beschriftete Tabs beziehungsweise gleichwertige getrennte Ansichten gegliedert,
+insbesondere Radio, Medien/Feeds, Gerät, System und Dienste. Ein Tabwechsel
+verändert keine Wiedergabe und lädt die Anwendung nicht neu.
+
+Auf breiten Browserfenstern bleibt rechts oben eine nicht mitscrollende native
+240-x-280-Liveansicht sichtbar. Sie zeigt die Pixel desselben Pillow-Renderers,
+der das reale Whisplay versorgt, und keine separat nachgebaute Browsergrafik.
+Auf kleinen Bildschirmen darf sie zur kollisionsfreien responsiven Ansicht in
+den normalen Dokumentfluss wechseln. Die persönliche Senderverwaltung zeigt
+für bekannte kuratierte Sender wieder deren vorhandenes lokales Senderbild;
+eigene Sender erhalten ausschließlich den bestehenden Initialen-Platzhalter.
+
 Systemupdates müssen direkt aus der lokalen Weboberfläche ausdrücklich
 bestätigt und gestartet werden können; eine SSH-Konsole darf dafür nicht
 erforderlich sein. Der unprivilegierte Webdienst erhält dabei weder `sudo`
@@ -832,6 +861,30 @@ lokale Konfiguration. Hardwaretreiber dürfen erst aktiviert werden, wenn die
 tatsächlich verwendete Hardwareversion verifiziert ist.
 
 ## 21. Änderungsprotokoll
+
+### 2026-10-31 – Scrollbares Hauptmenü, PTT-Zurück und oranges Grundthema
+
+- Die bisherige alleinstehende Hauptmenüüberschrift war nicht bedienbar. Direkt
+  darunter stehen künftig die zehn bereits festgelegten Hauptbereiche als
+  vertikale, scrollbare Liste. Der rechte äußere Kanal-/Eintragsregler navigiert
+  ausschließlich in dieser Liste; Enter beziehungsweise der rechte Klick
+  öffnet den markierten Punkt und darf dabei weder Sender noch Player ändern.
+- PTT ist in jeder geöffneten Menüebene die Zurück-Taste. Nur ein tatsächlich
+  bereiter, aktuell PTT verwendender Dienst darf diese Navigation übernehmen.
+  Ohne einen solchen Dienst gibt es keine rote PTT-Anzeige und keine behauptete
+  Sprachübertragung.
+- Unterhalb der Batterie zeigt ein Menü deshalb normalerweise einen Pfeil nach
+  links in der Akzentfarbe. Bei real aktivem PTT erscheint an derselben Stelle
+  ein rotes Feld mit weißem `PTT`, rechts bündig und rechts eckig sowie links
+  abgerundet.
+- Die Standard-Akzentfarbe wird auf das vom Nutzer festgelegte Orange
+  `#FDB813` gesetzt. Ein fremder Marken- oder Quellenname wird in keiner
+  sichtbaren Oberfläche ausgegeben.
+- Die Browseroberfläche wird gleichzeitig von der langen Einzelseite auf
+  getrennte Funktions-Tabs umgestellt. Rechts oben bleibt auf Desktopbreite die
+  exakte native 240-x-280-Geräteansicht stehen; sie wird serverseitig mit dem
+  vorhandenen Displayrenderer erzeugt. Die Senderverwaltung zeigt die bereits
+  vorhandenen Senderbilder wieder neben den jeweiligen bekannten Sendern.
 
 ### 2026-10-31 – Kompakter Funktionskopf und aufgeräumte Geräteansicht
 

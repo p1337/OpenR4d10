@@ -1,6 +1,31 @@
 const byId = (id) => document.getElementById(id);
 let presetSignature = "";
 
+function activateTab(name) {
+  for (const button of document.querySelectorAll("[data-tab]")) {
+    button.setAttribute("aria-selected", button.dataset.tab === name ? "true" : "false");
+  }
+  for (const panel of document.querySelectorAll("[data-tab-panel]")) {
+    panel.hidden = panel.dataset.tabPanel !== name;
+  }
+}
+
+for (const button of document.querySelectorAll("[data-tab]")) {
+  button.addEventListener("click", () => activateTab(button.dataset.tab));
+}
+
+function refreshDeviceScreen() {
+  const image = byId("device-screen-preview");
+  image.src = `/api/device-screen.png?t=${Date.now()}`;
+}
+
+byId("device-screen-preview").addEventListener("load", () => {
+  setText("device-screen-status", "240 × 280 · live");
+});
+byId("device-screen-preview").addEventListener("error", () => {
+  setText("device-screen-status", "Native Ansicht nicht verfügbar");
+});
+
 function setText(id, value, fallback = "–") {
   byId(id).textContent = value === null || value === undefined || value === "" ? fallback : String(value);
 }
@@ -186,8 +211,24 @@ function renderLibrary(catalog) {
   stationList.replaceChildren();
   stations.forEach((station, index) => {
     const row = document.createElement("li");
+    const artwork = document.createElement("div");
+    artwork.className = "station-row-artwork";
+    artwork.dataset.initials = initials(station.name);
+    if (station.artwork) {
+      const image = document.createElement("img");
+      image.src = station.artwork;
+      image.alt = `${station.name} Senderbild`;
+      image.loading = "lazy";
+      image.addEventListener("error", () => image.remove());
+      artwork.append(image);
+    }
     const label = document.createElement("span");
-    label.textContent = `${station.name} · ${station.source}`;
+    label.className = "station-row-copy";
+    const name = document.createElement("strong");
+    name.textContent = station.name;
+    const detail = document.createElement("small");
+    detail.textContent = `${station.country} · ${station.genre}`;
+    label.append(name, detail);
     const actions = document.createElement("span");
     actions.className = "library-actions";
     const up = libraryButton("↑", "station_move", { station_id: station.id, direction: -1 });
@@ -200,7 +241,7 @@ function renderLibrary(catalog) {
       down,
       libraryButton("Löschen", "station_delete", { station_id: station.id }),
     );
-    row.append(label, actions);
+    row.append(artwork, label, actions);
     stationList.append(row);
   });
   if (!stations.length) {
@@ -322,8 +363,12 @@ function renderDeviceState(state) {
   setText(
     "device-ptt",
     state.ptt_active
-      ? "PTT-Eingabe aktiv – kein Audioadapter verbunden"
-      : "Bereit – kein PTT-Dienstadapter konfiguriert"
+      ? "PTT aktiv"
+      : state.ptt_context_active
+        ? "PTT-Dienst bereit"
+        : state.menu_open
+          ? "PTT / Q = eine Menüebene zurück"
+          : "Kein aktiver PTT-Dienst"
   );
 }
 
@@ -341,6 +386,7 @@ async function refresh() {
     const response = await fetch("/api/status", { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     render(await response.json());
+    refreshDeviceScreen();
   } catch (error) {
     renderOffline();
   }
@@ -440,6 +486,7 @@ async function postDeviceInput(request, button = null) {
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
     renderDeviceState(payload.device_ui);
+    refreshDeviceScreen();
     const state = payload.device_ui || {};
     if (payload.selected_preset && request.control === "right_outer") {
       output.textContent = `Kanal ${payload.selected_preset.channel} · ${payload.selected_preset.name}`;
@@ -451,7 +498,7 @@ async function postDeviceInput(request, button = null) {
         : "Wiedergabe läuft";
     } else {
       output.textContent = request.control === "ptt"
-        ? (state.ptt_active ? "PTT-Eingabe aktiv · kein PTT-Audioadapter verbunden" : "PTT-Eingabe beendet")
+        ? (state.ptt_active ? "PTT aktiv" : state.menu_open ? "PTT / Q = Zurück" : "Eingabe übernommen")
         : `${state.service || "Gerät"} · ${state.title || "Eingabe übernommen"}`;
     }
   } catch (error) {
@@ -497,7 +544,6 @@ let pttQueue = Promise.resolve();
 function setPttInput(active) {
   if (pttKeyActive === active) return;
   pttKeyActive = active;
-  byId("ptt-button").setAttribute("aria-pressed", active ? "true" : "false");
   pttQueue = pttQueue
     .catch(() => undefined)
     .then(() => postDeviceInput({ control: "ptt", active }));

@@ -66,6 +66,13 @@ class WebTests(unittest.TestCase):
         self.assertIn('action: "display_brightness"', script)
         self.assertIn("display_brightness_percent", script)
         self.assertIn("dauerhaft gespeichert", script)
+        for tab in ("radio", "media", "device", "system", "services"):
+            self.assertIn(f'data-tab="{tab}"', html)
+            self.assertIn(f'data-tab-panel="{tab}"', html)
+        self.assertIn('id="device-screen-preview"', html)
+        self.assertIn("/api/device-screen.png", html)
+        self.assertIn("station-row-artwork", script)
+        self.assertNotIn("`${station.name} · ${station.source}`", script)
 
     def test_dashboard_and_status_endpoint(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -84,6 +91,7 @@ class WebTests(unittest.TestCase):
                 lambda name: ("image/jpeg", name.encode("ascii"))
                 if name in {"camera-1.jpg", "radio-art/swr3"}
                 else None,
+                lambda: b"native-png",
             )
             server.start()
             try:
@@ -115,6 +123,9 @@ class WebTests(unittest.TestCase):
                 with urlopen(f"http://{host}:{port}/api/radio-art/swr3", timeout=2) as response:
                     self.assertEqual(response.headers["Content-Type"], "image/jpeg")
                     self.assertEqual(response.read(), b"radio-art/swr3")
+                with urlopen(f"http://{host}:{port}/api/device-screen.png", timeout=2) as response:
+                    self.assertEqual(response.headers["Content-Type"], "image/png")
+                    self.assertEqual(response.read(), b"native-png")
             finally:
                 server.stop()
 

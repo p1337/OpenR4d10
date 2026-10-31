@@ -152,8 +152,10 @@ uses larger type, the status row shows a larger clock without a date, and the
 radio view reserves the freed space for a 138 × 138 station image and a larger
 station heading. The redundant service caption, written playback state and
 bottom `READY`/`OpenR4d10` strip are not rendered. Opening the main menu hides
-the complete player and shows only the localized menu heading in the content
-area.
+the complete player and shows the localized heading plus the ten documented
+settings areas as a scrollable list. Up/down on the right outer control moves
+the selection, Enter opens it and PTT returns one menu level unless a ready
+service explicitly owns PTT. The default interface accent is `#FDB813`.
 
 The service section accepts an explicit `http` or `https` audio URL for local
 playback and recording. It rejects credentials embedded in URLs and does not
@@ -169,6 +171,10 @@ curated stations are copied once into this persistent library. All entries can
 then be reordered, deleted or extended; an intentionally deleted default is not
 recreated by a restart or update. Station URLs with a query are intentionally
 refused for persistent storage, while direct temporary playback remains possible.
+The dashboard separates radio, media/news, device, system and services into
+tabs instead of one long page. On desktop it keeps the exact native 240 × 280
+renderer output visible at the upper right; known stations reuse the same safe
+local artwork route in both playback cards and the sortable station editor.
 Local files copied below
 `/var/lib/openr4d10/media` appear after selecting **Neu einlesen**; their full
 paths never appear in the public status response.

@@ -39,6 +39,14 @@ added; it is not a second navigation model. Browser keyboard bindings translate
 WASD, arrow keys, Space, Enter and held Q into this same contract and are
 disabled while the user edits a form field.
 
+The dashboard navigation is a client-side tab switch over the existing local
+application sections, not a set of new routes or a second application state.
+Its fixed desktop device preview requests `/api/device-screen.png`; that image
+is encoded from the same `render_device_ui()` call and locked `DeviceUiState`
+used for SPI output. It therefore cannot drift into a separately maintained
+CSS approximation. The endpoint is same-origin, non-cacheable and unavailable
+when the configured display adapter has no native renderer.
+
 Semantic actions are resolved by the application before the display reflects
 them. In particular, a short `right_press` routes through `ServiceCatalog` to
 the same `MpvEngine.toggle_pause()` operation as the HTTP media control; only a
@@ -72,9 +80,13 @@ not repeat the selected service or a written playback state; playback remains
 visible through the button icon and actual media state. The old bottom status/
 brand strip is removed and its space belongs to the larger station artwork.
 When `DeviceUiState.menu_open` identifies the main menu, the renderer exits the
-player branch entirely and paints only the localized menu heading in the body.
-This remains one Pillow renderer and one logical input path, not a second menu
-surface.
+player branch entirely and paints the localized heading plus the documented
+ten-item settings list. The right outer encoder moves only the bounded menu
+selection, and a short right press opens the selected page instead of reaching
+media controls. Menu history stays inside `DeviceUiState`; an active PTT press
+returns one level unless the current semantic frame explicitly declares a
+ready PTT-owning context. This remains one Pillow renderer and one logical input
+path, not a second menu surface or a fabricated PTT adapter.
 
 ## Configuration and storage
 

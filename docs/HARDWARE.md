@@ -141,7 +141,10 @@ status and the service-dependent media area. The control header is shorter and
 uses larger labels/values. In radio mode the service caption, written player
 state and lower status/brand strip are omitted; the station artwork is 138 ×
 138 pixels and the play/pause icon sits at the upper right below the battery.
-The main-menu body contains only its large localized heading and no player.
+The main-menu body contains its large localized heading followed immediately by
+the documented vertical settings list and no player. The right outer encoder
+scrolls that list, the right press selects, and PTT returns one menu level unless
+a ready service explicitly owns PTT.
 Logical encoder events are implemented and can be tested without hardware; no
 encoder GPIO assignment is active. The local web dashboard exposes all four
 rotations and both short/long press actions through the same input-event path

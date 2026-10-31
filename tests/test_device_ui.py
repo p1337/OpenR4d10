@@ -1,4 +1,5 @@
 from datetime import datetime
+from io import BytesIO
 import unittest
 from unittest.mock import patch
 
@@ -6,8 +7,10 @@ from PIL import Image, ImageDraw
 
 from openr4d10.adapters import WhisplayDisplay
 from openr4d10.device_ui import (
+    DEFAULT_ACCENT,
     DeviceUiState,
     HEIGHT,
+    MAIN_MENU_ITEMS,
     WIDTH,
     _display_text,
     image_to_rgb565,
@@ -74,6 +77,7 @@ class DeviceUiTests(unittest.TestCase):
         self.assertEqual(_display_text("pl")["main_menu"], "MENU GŁÓWNE")
         self.assertEqual(_display_text("fr")["main_menu"], "MENU PRINCIPAL")
         self.assertEqual(_display_text("es")["main_menu"], "MENÚ PRINCIPAL")
+        self.assertEqual(DEFAULT_ACCENT, (253, 184, 19))
         image = render_device_ui(DeviceUiState())
         self.assertEqual(image.getpixel((100, 60)), (12, 20, 23))
 
@@ -112,8 +116,52 @@ class DeviceUiTests(unittest.TestCase):
         self.assertNotIn((220, 20, 40), {color for _, color in colors or []})
         drawn = self._drawn_text(state, artwork)
         self.assertIn("HAUPTMENÜ", drawn)
+        for label in ("ANZEIGE", "AKZENTFARBE", "WLAN", "DIENSTMODULE"):
+            self.assertIn(label, drawn)
         self.assertNotIn("SWR3", drawn)
         self.assertNotIn("Current programme", drawn)
+
+    def test_main_menu_scroll_select_and_ptt_back_navigation(self) -> None:
+        state = DeviceUiState(channel=3, language="de")
+        state.apply(InputEvent(Control.LEFT_PRESS))
+        state.apply(InputEvent(Control.RIGHT_OUTER, steps=4))
+        self.assertEqual(state.channel, 3)
+        self.assertEqual(state.selected_menu_item, "service_store")
+        self.assertEqual(state.menu_selection, 4)
+        drawn = self._drawn_text(state)
+        self.assertIn("DIENST-STORE", drawn)
+
+        state.apply(InputEvent(Control.RIGHT_PRESS))
+        self.assertEqual(state.menu_kind, "service_store")
+        self.assertTrue(state.menu_open)
+        state.apply(InputEvent(Control.PTT, active=True))
+        self.assertEqual(state.menu_kind, "main_menu")
+        self.assertEqual(state.menu_selection, 4)
+        state.apply(InputEvent(Control.PTT, active=False))
+        self.assertTrue(state.menu_open)
+        state.apply(InputEvent(Control.PTT, active=True))
+        self.assertFalse(state.menu_open)
+
+    def test_explicit_ptt_context_owns_button_and_uses_edge_badge(self) -> None:
+        state = DeviceUiState(
+            menu_open=True,
+            menu_kind="main_menu",
+            ptt_context_active=True,
+        )
+        state.apply(InputEvent(Control.PTT, active=True))
+        self.assertTrue(state.ptt_active)
+        self.assertEqual(state.menu_kind, "main_menu")
+        image = render_device_ui(state)
+        self.assertEqual(image.getpixel((239, 100)), (207, 38, 49))
+        state.apply(InputEvent(Control.PTT, active=False))
+        self.assertFalse(state.ptt_active)
+        self.assertTrue(state.menu_open)
+
+    def test_menu_back_arrow_uses_accent_below_battery(self) -> None:
+        state = DeviceUiState(menu_open=True, menu_kind="main_menu")
+        image = render_device_ui(state)
+        self.assertEqual(image.getpixel((203, 104)), state.accent)
+        self.assertEqual(len(MAIN_MENU_ITEMS), 10)
 
     def test_play_control_is_below_battery_and_footer_is_empty(self) -> None:
         state = DeviceUiState(playing=True)
@@ -140,6 +188,7 @@ class DeviceUiTests(unittest.TestCase):
         state.apply(InputEvent(Control.RIGHT_OUTER, steps=5))
         state.apply(InputEvent(Control.RIGHT_INNER, steps=1))
         state.apply(InputEvent(Control.RIGHT_PRESS))
+        state.ptt_context_active = True
         state.apply(InputEvent(Control.PTT, active=True))
         self.assertEqual(state.volume, 80)
         self.assertEqual(state.squelch, 2)
@@ -275,6 +324,14 @@ class WhisplayDisplayTests(unittest.TestCase):
         self.assertEqual(display.snapshot()["volume"], 76)
         self.assertEqual(len(panel.frames), 2)
         display.close()
+
+    def test_native_screen_preview_uses_same_renderer(self) -> None:
+        panel = FakePanel()
+        display = WhisplayDisplay(panel=panel)  # type: ignore[arg-type]
+        display.render(Frame(screen="dashboard", title="OpenR4d10"))
+        payload = display.screen_png()
+        self.assertTrue(payload.startswith(b"\x89PNG\r\n\x1a\n"))
+        self.assertEqual(Image.open(BytesIO(payload)).size, (WIDTH, HEIGHT))
 
     def test_display_brightness_reaches_panel_and_public_state(self) -> None:
         panel = FakePanel()

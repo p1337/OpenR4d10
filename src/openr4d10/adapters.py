@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from io import BytesIO
 import json
 import logging
 import os
@@ -130,21 +131,24 @@ class WhisplayDisplay:
 
     def _show_state(self) -> None:
         try:
-            artwork = None
-            if (
-                self.artwork_cache_root is not None
-                and self.state.preset_id is not None
-                and re.fullmatch(r"[a-z][a-z0-9_]{1,63}", self.state.preset_id)
-            ):
-                path = self.artwork_cache_root / f"radio-{self.state.preset_id}.jpg"
-                try:
-                    with Image.open(path) as source:
-                        artwork = source.convert("RGB").copy()
-                except OSError:
-                    artwork = None
-            self.panel.show(image_to_rgb565(render_device_ui(self.state, artwork)))
+            self.panel.show(image_to_rgb565(self._render_image()))
         except (OSError, RuntimeError, WhisplayError) as exc:
             raise AdapterError(f"Whisplay display failed: {exc}") from exc
+
+    def _render_image(self) -> Image.Image:
+        artwork = None
+        if (
+            self.artwork_cache_root is not None
+            and self.state.preset_id is not None
+            and re.fullmatch(r"[a-z][a-z0-9_]{1,63}", self.state.preset_id)
+        ):
+            path = self.artwork_cache_root / f"radio-{self.state.preset_id}.jpg"
+            try:
+                with Image.open(path) as source:
+                    artwork = source.convert("RGB").copy()
+            except OSError:
+                artwork = None
+        return render_device_ui(self.state, artwork)
 
     def render(self, frame: Frame) -> None:
         # Keep the approved native animation visible until the first real UI
@@ -178,6 +182,13 @@ class WhisplayDisplay:
     def snapshot(self) -> dict[str, object]:
         with self._lock:
             return self._public_state()
+
+    def screen_png(self) -> bytes:
+        """Return the exact native renderer output used for the physical panel."""
+        with self._lock:
+            output = BytesIO()
+            self._render_image().save(output, format="PNG", optimize=False)
+            return output.getvalue()
 
     def close(self) -> None:
         with self._lock:

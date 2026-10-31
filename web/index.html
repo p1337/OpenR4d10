@@ -25,263 +25,116 @@
       </div>
     </header>
 
-    <section class="hero" aria-labelledby="hero-title">
-      <div>
-        <p class="eyebrow">SYSTEMSTATUS</p>
-        <h1 id="hero-title">OpenR4d10 startet …</h1>
-        <p class="hero-copy" id="hero-copy">Die aktuellen Gerätedaten werden geladen.</p>
-      </div>
-      <div class="hero-meta">
-        <span id="hostname">OpenR4d10</span>
-        <time id="updated">–</time>
-      </div>
-    </section>
+    <nav class="workspace-tabs" role="tablist" aria-label="OpenR4d10 Bereiche">
+      <button type="button" role="tab" aria-selected="true" data-tab="radio">Radio</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="media">Medien &amp; News</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="device">Gerät</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="system">System</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="services">Dienste</button>
+    </nav>
 
-    <section class="metrics" aria-label="Systemübersicht">
-      <article class="metric-card feature-card">
-        <div class="card-heading">
-          <span class="card-icon radio-icon" aria-hidden="true"></span>
-          <span class="tag">EMPFÄNGER</span>
-        </div>
-        <strong class="metric-main" id="receiver-state">Wird geladen</strong>
-        <span class="metric-detail" id="receiver-detail">Statusquelle wird geprüft</span>
-      </article>
+    <div class="workspace-layout">
+      <div class="workspace-content">
+        <section class="tab-panel" role="tabpanel" data-tab-panel="radio">
+          <section class="panel services-panel" aria-labelledby="radio-presets-title">
+            <div class="panel-heading">
+              <div><p class="eyebrow">WEBRADIO</p><h1 id="radio-presets-title">Sender &amp; Wiedergabe</h1></div>
+              <span class="version">Live</span>
+            </div>
+            <div class="radio-preset-grid" id="radio-preset-grid"></div>
+            <form class="media-control" id="media-control">
+              <label for="media-source">Direkte Audioquelle</label>
+              <div class="media-source-row">
+                <input id="media-source" name="source" type="url" inputmode="url" placeholder="https://…" autocomplete="off" required>
+                <button type="submit">Abspielen</button>
+              </div>
+              <div class="media-actions" aria-label="Wiedergabesteuerung">
+                <button type="button" data-action="pause">Play / Pause</button><button type="button" data-action="stop">Stopp</button>
+                <button type="button" data-action="record_start">Aufnahme starten</button><button type="button" data-action="record_stop">Aufnahme stoppen</button>
+              </div>
+              <output id="control-result" aria-live="polite">Keine Quelle aktiv.</output>
+            </form>
+            <form class="content-control station-control" id="station-control">
+              <label for="station-name">Radiosender hinzufügen und sortieren</label>
+              <input id="station-name" type="text" maxlength="160" placeholder="Sendername" autocomplete="off" required>
+              <div class="media-source-row"><input id="station-url" type="url" placeholder="https://…/stream" autocomplete="off" required><button type="submit">Speichern</button></div>
+              <ul id="station-list" class="library-list station-list"></ul>
+            </form>
+          </section>
+        </section>
 
-      <article class="metric-card">
-        <div class="card-heading">
-          <span class="card-icon power-icon" aria-hidden="true"></span>
-          <span class="tag">ENERGIE</span>
-        </div>
-        <strong class="metric-main" id="power-state">–</strong>
-        <span class="metric-detail" id="power-detail">PiSugar-Adapter</span>
-      </article>
+        <section class="tab-panel" role="tabpanel" data-tab-panel="media" hidden>
+          <section class="panel">
+            <div class="panel-heading"><div><p class="eyebrow">MEDIEN &amp; NEWS</p><h1>Bibliothek, Feeds und Kamera</h1></div></div>
+            <section class="content-control" aria-labelledby="media-library-title">
+              <div class="library-heading"><label id="media-library-title">Lokale Medienbibliothek</label><button type="button" id="media-scan">Neu einlesen</button></div>
+              <p class="services-note">Dateien aus dem geschützten Medienordner des Geräts.</p><ul id="media-list" class="library-list"></ul>
+            </section>
+            <div class="content-controls">
+              <form class="content-control" id="feed-control">
+                <label for="feed-url">RSS/Atom-Feed</label>
+                <div class="feed-preset-row"><select id="feed-preset" aria-label="Nachrichtenquelle auswählen"><option value="">Nachrichtenquelle auswählen …</option></select><button type="button" id="feed-preset-load">Auswahl laden</button></div>
+                <p class="services-note">Oder eine eigene, öffentliche Feed-Adresse eingeben:</p>
+                <div class="media-source-row"><input id="feed-url" type="url" placeholder="https://…/feed.xml" autocomplete="off" required><button type="submit">Feed laden</button></div>
+                <p id="feed-credit" class="feed-credit" hidden></p><ol id="feed-results" class="feed-results"></ol>
+              </form>
+              <form class="content-control" id="camera-control">
+                <label for="camera-url">Kamera-Standbild</label>
+                <div class="media-source-row"><input id="camera-url" type="url" placeholder="https://…/snapshot.jpg" autocomplete="off" required><button type="submit">Bild laden</button></div>
+                <img id="camera-preview" class="camera-preview" alt="Kamerabild" hidden>
+              </form>
+            </div>
+          </section>
+        </section>
 
-      <article class="metric-card">
-        <div class="card-heading">
-          <span class="card-icon display-icon" aria-hidden="true"></span>
-          <span class="tag">DISPLAY</span>
-        </div>
-        <strong class="metric-main" id="display-state">–</strong>
-        <span class="metric-detail" id="display-detail">Whisplay-Adapter</span>
-      </article>
+        <section class="tab-panel" role="tabpanel" data-tab-panel="device" hidden>
+          <section class="panel settings-panel" aria-labelledby="settings-title">
+            <div class="panel-heading"><div><p class="eyebrow">EINSTELLUNGEN</p><h2 id="settings-title">Display</h2></div><span class="version">persistent</span></div>
+            <div class="display-brightness-setting">
+              <label for="display-brightness"><strong>Displayhelligkeit</strong><span>Wird sofort am Whisplay angewendet und dauerhaft gespeichert.</span></label>
+              <output id="display-brightness-value" for="display-brightness">100%</output><input id="display-brightness" type="range" min="0" max="100" step="5" value="100"><output id="display-brightness-status" aria-live="polite">Gespeicherte Einstellung wird geladen.</output>
+            </div>
+          </section>
+          <section class="panel device-control-panel" aria-labelledby="device-control-title">
+            <div class="panel-heading"><div><p class="eyebrow">VIRTUELLE ENCODER</p><h2 id="device-control-title">Gerät ohne Hardware bedienen</h2></div><span class="version">direkt aufs LCD</span></div>
+            <p class="keyboard-help"><kbd>W</kbd><kbd>S</kbd> Lautstärke · <kbd>A</kbd><kbd>D</kbd> Squelch · <kbd>↑</kbd><kbd>↓</kbd> Kanal/Eintrag · <kbd>←</kbd><kbd>→</kbd> Dienst · <kbd>Leertaste</kbd> Menü · <kbd>Enter</kbd> Auswahl</p>
+            <div class="encoder-grid">
+              <article class="encoder-control"><span>Links außen</span><strong>Lautstärke <output id="device-volume">–</output></strong><div class="encoder-buttons"><button type="button" data-device-control="left_outer" data-steps="-1">−10</button><button type="button" data-device-control="left_outer" data-steps="1">+10</button></div></article>
+              <article class="encoder-control"><span>Links innen</span><strong>Squelch <output id="device-squelch">–</output></strong><div class="encoder-buttons"><button type="button" data-device-control="left_inner" data-steps="-1">−</button><button type="button" data-device-control="left_inner" data-steps="1">+</button></div></article>
+              <article class="encoder-control"><span>Rechts außen</span><strong>Kanal/Eintrag <output id="device-channel">–</output></strong><div class="encoder-buttons"><button type="button" data-device-control="right_outer" data-steps="-1">−</button><button type="button" data-device-control="right_outer" data-steps="1">+</button></div></article>
+              <article class="encoder-control"><span>Rechts innen</span><strong>Dienst <output id="device-service">–</output></strong><div class="encoder-buttons"><button type="button" data-device-control="right_inner" data-steps="-1">−</button><button type="button" data-device-control="right_inner" data-steps="1">+</button></div></article>
+            </div>
+            <div class="press-grid"><div><span>Linker Drucktaster</span><button type="button" data-device-control="left_press">Menü</button><button type="button" data-device-control="left_press" data-held="2">Dienst-Einstellungen</button></div><div><span>Rechter Drucktaster</span><button type="button" data-device-control="right_press">Auswahl / Play</button><button type="button" data-device-control="right_press" data-held="2">Quick-Menü</button></div></div>
+            <div class="ptt-control"><button type="button" id="ptt-button" aria-pressed="false"><kbd>Q</kbd> halten · PTT / Zurück</button><span id="device-ptt">In Menüs: Zurück</span></div>
+            <output class="device-control-result" id="device-control-result" aria-live="polite">Bereit.</output>
+          </section>
+        </section>
 
-      <article class="metric-card">
-        <div class="card-heading">
-          <span class="card-icon load-icon" aria-hidden="true"></span>
-          <span class="tag">SYSTEM</span>
-        </div>
-        <strong class="metric-main" id="uptime">–</strong>
-        <span class="metric-detail">Load 1 min: <span id="load">–</span></span>
-      </article>
-    </section>
+        <section class="tab-panel" role="tabpanel" data-tab-panel="system" hidden>
+          <section class="hero" aria-labelledby="hero-title"><div><p class="eyebrow">SYSTEMSTATUS</p><h1 id="hero-title">OpenR4d10 startet …</h1><p class="hero-copy" id="hero-copy">Die aktuellen Gerätedaten werden geladen.</p></div><div class="hero-meta"><span id="hostname">OpenR4d10</span><time id="updated">–</time></div></section>
+          <section class="metrics" aria-label="Systemübersicht">
+            <article class="metric-card feature-card"><div class="card-heading"><span class="card-icon radio-icon"></span><span class="tag">EMPFÄNGER</span></div><strong class="metric-main" id="receiver-state">Wird geladen</strong><span class="metric-detail" id="receiver-detail">Statusquelle wird geprüft</span></article>
+            <article class="metric-card"><div class="card-heading"><span class="card-icon power-icon"></span><span class="tag">ENERGIE</span></div><strong class="metric-main" id="power-state">–</strong><span class="metric-detail" id="power-detail">PiSugar-Adapter</span></article>
+            <article class="metric-card"><div class="card-heading"><span class="card-icon display-icon"></span><span class="tag">DISPLAY</span></div><strong class="metric-main" id="display-state">–</strong><span class="metric-detail" id="display-detail">Whisplay-Adapter</span></article>
+            <article class="metric-card"><div class="card-heading"><span class="card-icon load-icon"></span><span class="tag">SYSTEM</span></div><strong class="metric-main" id="uptime">–</strong><span class="metric-detail">Load 1 min: <span id="load">–</span></span></article>
+          </section>
+          <section class="lower-grid">
+            <article class="panel status-panel"><div class="panel-heading"><div><p class="eyebrow">LAUFENDER DIENST</p><h2>Aktueller Zustand</h2></div><span class="version" id="version">v–</span></div><div class="status-line"><span class="status-orb" id="status-orb" data-severity="info"></span><div><strong id="screen-title">Dienst wird gestartet</strong><p id="screen-body">Bitte einen Moment warten.</p></div></div><div class="update-control"><div><strong>Systemupdate</strong><p>Installiert die aktuelle geprüfte Version und startet das Gerät anschließend neu.</p></div><button type="button" id="system-update">Update installieren</button><output id="update-status" aria-live="polite">Kein Update läuft.</output></div></article>
+            <article class="panel adapter-panel"><div class="panel-heading"><div><p class="eyebrow">HARDWARE</p><h2>Adapterbereitschaft</h2></div></div><ul class="adapter-list"><li><span>Empfängerquelle</span><strong id="receiver-adapter">–</strong></li><li><span>Displaytreiber</span><strong id="display-adapter">–</strong></li><li><span>Stromversorgung</span><strong id="power-adapter">–</strong></li></ul></article>
+          </section>
+        </section>
 
-    <section class="lower-grid">
-      <article class="panel status-panel">
-        <div class="panel-heading">
-          <div>
-            <p class="eyebrow">LAUFENDER DIENST</p>
-            <h2>Aktueller Zustand</h2>
-          </div>
-          <span class="version" id="version">v–</span>
-        </div>
-        <div class="status-line">
-          <span class="status-orb" id="status-orb" data-severity="info"></span>
-          <div>
-            <strong id="screen-title">Dienst wird gestartet</strong>
-            <p id="screen-body">Bitte einen Moment warten.</p>
-          </div>
-        </div>
-        <div class="update-control">
-          <div>
-            <strong>Systemupdate</strong>
-            <p>Installiert die aktuelle geprüfte OpenR4d10-Version und startet das Gerät anschließend neu.</p>
-          </div>
-          <button type="button" id="system-update">Update installieren</button>
-          <output id="update-status" aria-live="polite">Kein Update läuft.</output>
-        </div>
-      </article>
-
-      <article class="panel adapter-panel">
-        <div class="panel-heading">
-          <div>
-            <p class="eyebrow">HARDWARE</p>
-            <h2>Adapterbereitschaft</h2>
-          </div>
-        </div>
-        <ul class="adapter-list">
-          <li><span>Empfängerquelle</span><strong id="receiver-adapter">–</strong></li>
-          <li><span>Displaytreiber</span><strong id="display-adapter">–</strong></li>
-          <li><span>Stromversorgung</span><strong id="power-adapter">–</strong></li>
-        </ul>
-      </article>
-    </section>
-
-    <section class="panel settings-panel" aria-labelledby="settings-title">
-      <div class="panel-heading">
-        <div>
-          <p class="eyebrow">EINSTELLUNGEN</p>
-          <h2 id="settings-title">Display</h2>
-        </div>
-        <span class="version">persistent</span>
-      </div>
-      <div class="display-brightness-setting">
-        <label for="display-brightness">
-          <strong>Displayhelligkeit</strong>
-          <span>Wird sofort am Whisplay angewendet und dauerhaft gespeichert.</span>
-        </label>
-        <output id="display-brightness-value" for="display-brightness">100%</output>
-        <input id="display-brightness" type="range" min="0" max="100" step="5" value="100">
-        <output id="display-brightness-status" aria-live="polite">Gespeicherte Einstellung wird geladen.</output>
-      </div>
-    </section>
-
-    <section class="panel device-control-panel" aria-labelledby="device-control-title">
-      <div class="panel-heading">
-        <div>
-          <p class="eyebrow">VIRTUELLE ENCODER</p>
-          <h2 id="device-control-title">Gerät ohne Hardware bedienen</h2>
-        </div>
-        <span class="version">direkt aufs LCD</span>
-      </div>
-      <p class="services-note">Diese Tasten senden dieselben logischen Ereignisse wie die späteren Doppelencoder.</p>
-      <p class="keyboard-help" aria-label="Tastaturbelegung">
-        <kbd>W</kbd><kbd>S</kbd> Lautstärke · <kbd>A</kbd><kbd>D</kbd> Squelch ·
-        <kbd>↑</kbd><kbd>↓</kbd> Kanal · <kbd>←</kbd><kbd>→</kbd> Dienst ·
-        <kbd>Leertaste</kbd> linker Klick · <kbd>Enter</kbd> rechter Klick
-      </p>
-      <div class="encoder-grid">
-        <article class="encoder-control">
-          <span>Links außen</span>
-          <strong>Lautstärke <output id="device-volume">–</output></strong>
-          <div class="encoder-buttons">
-            <button type="button" data-device-control="left_outer" data-steps="-1" aria-label="Lautstärke um 10 Prozentpunkte verringern">−10</button>
-            <button type="button" data-device-control="left_outer" data-steps="1" aria-label="Lautstärke um 10 Prozentpunkte erhöhen">+10</button>
-          </div>
-        </article>
-        <article class="encoder-control">
-          <span>Links innen</span>
-          <strong>Squelch <output id="device-squelch">–</output></strong>
-          <div class="encoder-buttons">
-            <button type="button" data-device-control="left_inner" data-steps="-1" aria-label="Squelch verringern">−</button>
-            <button type="button" data-device-control="left_inner" data-steps="1" aria-label="Squelch erhöhen">+</button>
-          </div>
-        </article>
-        <article class="encoder-control">
-          <span>Rechts außen</span>
-          <strong>Kanal <output id="device-channel">–</output></strong>
-          <div class="encoder-buttons">
-            <button type="button" data-device-control="right_outer" data-steps="-1" aria-label="Vorheriger Kanal">−</button>
-            <button type="button" data-device-control="right_outer" data-steps="1" aria-label="Nächster Kanal">+</button>
-          </div>
-        </article>
-        <article class="encoder-control">
-          <span>Rechts innen</span>
-          <strong>Dienst <output id="device-service">–</output></strong>
-          <div class="encoder-buttons">
-            <button type="button" data-device-control="right_inner" data-steps="-1" aria-label="Vorheriger Dienst">−</button>
-            <button type="button" data-device-control="right_inner" data-steps="1" aria-label="Nächster Dienst">+</button>
-          </div>
-        </article>
-      </div>
-      <div class="press-grid">
-        <div>
-          <span>Linker Drucktaster</span>
-          <button type="button" data-device-control="left_press">Menü</button>
-          <button type="button" data-device-control="left_press" data-held="2">Dienst-Einstellungen</button>
-        </div>
-        <div>
-          <span>Rechter Drucktaster</span>
-          <button type="button" data-device-control="right_press">Play / Pause</button>
-          <button type="button" data-device-control="right_press" data-held="2">Quick-Menü</button>
-        </div>
-      </div>
-      <div class="ptt-control">
-        <button type="button" id="ptt-button" aria-pressed="false"><kbd>Q</kbd> halten · PTT</button>
-        <span id="device-ptt">Bereit – kein PTT-Dienstadapter konfiguriert</span>
-      </div>
-      <output class="device-control-result" id="device-control-result" aria-live="polite">Bereit.</output>
-    </section>
-
-    <section class="panel services-panel" aria-labelledby="services-title">
-      <div class="panel-heading">
-        <div>
-          <p class="eyebrow">DIENSTMODULE</p>
-          <h2 id="services-title">Integrationen und Bereitschaft</h2>
-        </div>
-        <span class="version" id="service-count">–</span>
-      </div>
-      <p class="services-note">Zugangsdaten werden niemals aus dem Repository geladen oder in der Statusdatenbank gespeichert.</p>
-      <section class="preset-section" aria-labelledby="radio-presets-title">
-        <div class="library-heading">
-          <div>
-            <p class="eyebrow">SENDERAUSWAHL</p>
-            <h3 id="radio-presets-title">Persönliche Senderliste</h3>
-          </div>
-          <span class="version">ohne Anmeldung</span>
-        </div>
-        <div class="radio-preset-grid" id="radio-preset-grid"></div>
-      </section>
-      <form class="media-control" id="media-control">
-        <label for="media-source">Direkte Audioquelle</label>
-        <div class="media-source-row">
-          <input id="media-source" name="source" type="url" inputmode="url" placeholder="https://…" autocomplete="off" required>
-          <button type="submit">Abspielen</button>
-        </div>
-        <div class="media-actions" aria-label="Wiedergabesteuerung">
-          <button type="button" data-action="pause">Play / Pause</button>
-          <button type="button" data-action="stop">Stopp</button>
-          <button type="button" data-action="record_start">Aufnahme starten</button>
-          <button type="button" data-action="record_stop">Aufnahme stoppen</button>
-        </div>
-        <output id="control-result" aria-live="polite">Keine Quelle aktiv.</output>
-      </form>
-      <div class="content-controls library-controls">
-        <form class="content-control" id="station-control">
-          <label for="station-name">Radiosender hinzufügen und sortieren</label>
-          <input id="station-name" type="text" maxlength="160" placeholder="Sendername" autocomplete="off" required>
-          <div class="media-source-row">
-            <input id="station-url" type="url" placeholder="https://…/stream" autocomplete="off" required>
-            <button type="submit">Speichern</button>
-          </div>
-          <ul id="station-list" class="library-list"></ul>
-        </form>
-        <section class="content-control" aria-labelledby="media-library-title">
-          <div class="library-heading">
-            <label id="media-library-title">Lokale Medienbibliothek</label>
-            <button type="button" id="media-scan">Neu einlesen</button>
-          </div>
-          <p class="services-note">Dateien aus dem geschützten Medienordner des Geräts.</p>
-          <ul id="media-list" class="library-list"></ul>
+        <section class="tab-panel" role="tabpanel" data-tab-panel="services" hidden>
+          <section class="panel services-panel" aria-labelledby="services-title"><div class="panel-heading"><div><p class="eyebrow">DIENSTMODULE</p><h1 id="services-title">Integrationen und Bereitschaft</h1></div><span class="version" id="service-count">–</span></div><p class="services-note">Zugangsdaten werden niemals aus dem Repository geladen oder in der Statusdatenbank gespeichert.</p><div class="service-grid" id="service-grid" aria-live="polite"></div></section>
         </section>
       </div>
-      <div class="content-controls">
-        <form class="content-control" id="feed-control">
-          <label for="feed-url">RSS/Atom-Feed</label>
-          <div class="feed-preset-row">
-            <select id="feed-preset" aria-label="Nachrichtenquelle auswählen">
-              <option value="">Nachrichtenquelle auswählen …</option>
-            </select>
-            <button type="button" id="feed-preset-load">Auswahl laden</button>
-          </div>
-          <p class="services-note">Oder eine eigene, öffentliche Feed-Adresse eingeben:</p>
-          <div class="media-source-row">
-            <input id="feed-url" type="url" placeholder="https://…/feed.xml" autocomplete="off" required>
-            <button type="submit">Feed laden</button>
-          </div>
-          <p id="feed-credit" class="feed-credit" hidden></p>
-          <ol id="feed-results" class="feed-results"></ol>
-        </form>
-        <form class="content-control" id="camera-control">
-          <label for="camera-url">Kamera-Standbild</label>
-          <div class="media-source-row">
-            <input id="camera-url" type="url" placeholder="https://…/snapshot.jpg" autocomplete="off" required>
-            <button type="submit">Bild laden</button>
-          </div>
-          <img id="camera-preview" class="camera-preview" alt="Kamerabild" hidden>
-        </form>
-      </div>
-      <div class="service-grid" id="service-grid" aria-live="polite"></div>
-    </section>
+
+      <aside class="device-screen-dock" aria-labelledby="device-screen-title">
+        <div><p class="eyebrow">LIVE-DISPLAY</p><h2 id="device-screen-title">Geräteansicht</h2></div>
+        <img id="device-screen-preview" src="/api/device-screen.png" width="240" height="280" alt="Aktueller Inhalt des OpenR4d10-Displays">
+        <span id="device-screen-status">240 × 280 · live</span>
+      </aside>
+    </div>
 
     <footer>
       <span>OpenR4d10 · lokale Geräteoberfläche</span>
