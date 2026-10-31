@@ -80,7 +80,8 @@ the installer report exactly which adapters still need configuration.
 - native receive-only BrandMeister HoseLine audio through the Whisplay ALSA
   speaker plus optional browser audio, with a persistent multi-talkgroup
   checkbox quick list, complete searchable official catalog, country flags and
-  active-call display; no account password, user token or PTT
+  compact per-talkgroup current/last-heard participant rows on web and device;
+  no account password, user token or PTT
 - standard-library-only test suite and GitHub Actions CI
 
 Hardware-specific integration still pending:
@@ -272,6 +273,12 @@ persistent quick list or disables it when already enabled. The localized
 header shows these real assignments (`JMP`/`TG` in English) instead of the
 normal `SQL`/`CH` labels. On 2026-10-31 a real subscribed HoseLine call was
 heard through the fitted Whisplay speaker, confirming the native ALSA path.
+The BrandMeister device view uses its content area for up to five compact
+talkgroup rows instead of a decorative country image. An active row is moved
+to the top and shows the DMR source ID plus the HoseLine talker alias when the
+network supplied one. Ended calls remain visibly marked as last heard until a
+new receiver session begins. This is observed HoseLine activity, not a claim
+that every member of a talkgroup is online.
 
 The service section accepts an explicit `http` or `https` audio URL for local
 playback and recording. It rejects credentials embedded in URLs and does not

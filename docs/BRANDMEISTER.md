@@ -42,6 +42,16 @@ call takes display priority and shows its destination, source ID, available
 alias and a conservative country flag cue. No transmit or PTT message exists
 in this adapter.
 
+The native receiver keeps one bounded current/last-heard row for each of the
+up to five subscribed talkgroups. A row contains only data actually observed
+in HoseLine packets: destination talkgroup, source DMR ID, optional talker
+alias, active state and update time. Active rows sort first. The browser and
+physical display render these rows as a compact icon list; the device no longer
+uses its BrandMeister content area for a large decorative country image. The
+list does not claim to enumerate silent members of a talkgroup. Geographic or
+callsign enrichment through third-party subscriber databases is deliberately
+not performed without a separately reviewed data-use contract.
+
 On 2026-10-31 the user heard a real subscribed HoseLine call through the fitted
 Whisplay speaker. This confirms the complete native WebSocket, MessagePack,
 G.711 µ-law, PCM and `whisplaysound` ALSA path on the target hardware.

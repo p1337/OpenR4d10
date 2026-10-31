@@ -2733,3 +2733,21 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Authentifizierte private RTSP-/ONVIF-Kameras benötigen den nachfolgenden
   isolierten Adapter mit eigener 0600-Secret-Datei. Diese Grenze ist sichtbar
   dokumentiert und darf nicht durch Zugangsdaten in SQLite umgangen werden.
+
+### 2026-10-31 – BrandMeister-Aktivitäts- und Teilnehmerliste
+
+- Die BrandMeister-Geräteansicht verwendet die bisherige große Bildfläche nicht
+  mehr für eine dekorative Länderflagge. Stattdessen zeigt sie bis zu fünf
+  kompakte Talkgroup-Zeilen mit Statussymbol, Nummer, Name und – ausschließlich
+  soweit im empfangenen HoseLine-Paket vorhanden – DMR-Quell-ID und Talker
+  Alias. Der Browser verwendet dieselbe Information in seiner Quickliste.
+- Aktuell sprechende Talkgroups stehen oben und erhalten eine klare aktive
+  Markierung. Nach Rufende bleibt der letzte beobachtete Teilnehmer als
+  „zuletzt gehört“ sichtbar, bis eine neue Empfangssitzung beginnt. Die Liste
+  behauptet ausdrücklich nicht, alle stillen Mitglieder einer Talkgroup oder
+  deren Anwesenheit zu kennen.
+- Eine geografische oder personenbezogene Anreicherung über RadioID wird nicht
+  ungefragt eingebaut. Dessen öffentliche API erlaubt normale Einzelabfragen,
+  weist für öffentliche Integrationen aber auf Genehmigung beziehungsweise
+  API-Key und Nutzungsregeln hin. OpenR4d10 zeigt daher zunächst nur die real
+  aus HoseLine empfangenen Identitäten.

@@ -200,6 +200,37 @@ class DeviceUiTests(unittest.TestCase):
         self.assertNotIn("SQL", labels)
         self.assertNotIn("KAN", labels)
 
+    def test_dmr_view_uses_compact_activity_rows_instead_of_artwork(self) -> None:
+        state = DeviceUiState(
+            service_index=SERVICES.index("DMR"),
+            source="TG 262",
+            title="Germany",
+            playing=True,
+            activity_rows=[
+                {
+                    "talkgroup": 262,
+                    "name": "Germany",
+                    "country_code": "DE",
+                    "active": True,
+                    "source": 2621234,
+                    "alias": "DL1TEST",
+                },
+                {
+                    "talkgroup": 91,
+                    "name": "Worldwide",
+                    "country_code": "",
+                    "active": False,
+                    "source": None,
+                    "alias": "",
+                },
+            ],
+        )
+        drawn = self._drawn_text(state)
+        self.assertIn("TG 262  Germany", drawn)
+        self.assertIn("DL1TEST", drawn)
+        self.assertIn("TG 91  Worldwide", drawn)
+        self.assertIn("Bereit" if state.language == "de" else "Ready", drawn)
+
     def test_date_and_redundant_player_text_are_not_rendered(self) -> None:
         first = DeviceUiState(
             service_index=1,

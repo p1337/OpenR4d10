@@ -368,6 +368,10 @@ kbd { display: inline-block; min-width: 24px; padding: 3px 6px; border: 1px soli
 .ambient-attribution a { color: var(--accent); }
 .station-control { margin-top: 16px; }
 .library-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.brandmeister-activity-list li { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; }
+.brandmeister-activity-list li[data-active="true"] { box-shadow: inset 3px 0 0 var(--accent); background: rgba(253, 184, 19, .08); }
+.brandmeister-activity-icon { width: 11px; height: 11px; border-radius: 50%; background: #526164; box-shadow: 0 0 0 2px rgba(82, 97, 100, .18); }
+.brandmeister-activity-list li[data-active="true"] .brandmeister-activity-icon { background: var(--accent); box-shadow: 0 0 12px rgba(253, 184, 19, .8); }
 .library-actions button.library-play { color: #151005; border-color: var(--cyan); background: var(--cyan); font-weight: 750; }
 .music-toolbar { display: flex; flex-wrap: wrap; gap: 7px; margin: 13px 0; }
 .music-toolbar button { min-height: 38px; }

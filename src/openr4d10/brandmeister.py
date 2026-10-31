@@ -75,12 +75,14 @@ class BrandmeisterState:
     destination: int | None = None
     source: int | None = None
     alias: str = ""
+    activity: tuple[dict[str, object], ...] = ()
     volume: int = 30
     error: str | None = None
 
     def as_dict(self) -> dict[str, object]:
         value = asdict(self)
         value["talkgroups"] = list(self.talkgroups)
+        value["activity"] = [dict(item) for item in self.activity]
         value["country_code"] = (
             country_code(self.destination) if self.destination is not None else None
         )
@@ -130,6 +132,8 @@ class BrandmeisterReceiver:
         self._thread: threading.Thread | None = None
         self._connection: Any = None
         self._audio: subprocess.Popen[bytes] | None = None
+        self._activity: dict[int, dict[str, object]] = {}
+        self._active_destination: int | None = None
 
     def snapshot(self) -> dict[str, object]:
         with self._lock:
@@ -159,6 +163,8 @@ class BrandmeisterReceiver:
         self.stop()
         with self._lock:
             self._stop = threading.Event()
+            self._activity.clear()
+            self._active_destination = None
             self.state = BrandmeisterState(
                 status="connecting",
                 talkgroups=normalized,
@@ -194,6 +200,8 @@ class BrandmeisterReceiver:
             volume = self.state.volume
             self._thread = None
             self._connection = None
+            self._activity.clear()
+            self._active_destination = None
             self.state = BrandmeisterState(volume=volume)
             snapshot = self.state.as_dict()
         self._notify(snapshot)
@@ -259,6 +267,7 @@ class BrandmeisterReceiver:
         if kind == 11 and len(message) >= 4:
             source = message[2] if isinstance(message[2], int) else None
             destination = message[3] if isinstance(message[3], int) else None
+            self._remember_activity(destination, source, "", active=True)
             self._set_state(
                 "call",
                 source=source,
@@ -267,6 +276,12 @@ class BrandmeisterReceiver:
                 error=None,
             )
         elif kind == 13:
+            self._remember_activity(
+                self._active_destination,
+                self.state.source,
+                self.state.alias,
+                active=False,
+            )
             self._set_state(
                 "listening",
                 source=None,
@@ -277,7 +292,14 @@ class BrandmeisterReceiver:
         elif kind == 20 and len(message) >= 2 and isinstance(message[1], bytes):
             self._play(message[1])
         elif kind == 21 and len(message) >= 2:
-            self._set_state("call", alias=str(message[1] or "")[:80])
+            alias = str(message[1] or "")[:80]
+            self._remember_activity(
+                self._active_destination,
+                self.state.source,
+                alias,
+                active=True,
+            )
+            self._set_state("call", alias=alias)
         elif kind == 80:
             self._set_state("error", error="HoseLine rejected the subscription")
 
@@ -289,6 +311,41 @@ class BrandmeisterReceiver:
                     setattr(self.state, key, value)
             snapshot = self.state.as_dict()
         self._notify(snapshot)
+
+    def _remember_activity(
+        self,
+        destination: int | None,
+        source: int | None,
+        alias: str,
+        *,
+        active: bool,
+    ) -> None:
+        if destination is None:
+            return
+        with self._lock:
+            if active:
+                for entry in self._activity.values():
+                    entry["active"] = False
+                self._active_destination = destination
+            elif self._active_destination == destination:
+                self._active_destination = None
+            previous = self._activity.get(destination, {})
+            entry = {
+                "talkgroup": destination,
+                "source": source if source is not None else previous.get("source"),
+                "alias": alias or str(previous.get("alias") or ""),
+                "active": active,
+                "updated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+            }
+            self._activity[destination] = entry
+            ordered = sorted(
+                self._activity.values(),
+                key=lambda item: str(item.get("updated_at") or ""),
+                reverse=True,
+            )
+            ordered.sort(key=lambda item: not bool(item.get("active")))
+            ordered = ordered[:MAX_TALKGROUPS]
+            self.state.activity = tuple(dict(item) for item in ordered)
 
     def _notify(self, snapshot: dict[str, object]) -> None:
         if self.on_state is not None:

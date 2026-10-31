@@ -67,6 +67,7 @@ DISPLAY_TEXT = {
         "system_online": "System online",
         "select_media_play": "Select media and press PLAY",
         "select_channel_play": "Select a channel and press PLAY",
+        "select_talkgroups_play": "Select talkgroups and press PLAY",
         "recording_controls": "Recording controls",
         "ready": "Ready",
         "paused": "Paused",
@@ -110,6 +111,7 @@ DISPLAY_TEXT = {
         "system_online": "System online",
         "select_media_play": "Medium wählen und PLAY drücken",
         "select_channel_play": "Kanal wählen und PLAY drücken",
+        "select_talkgroups_play": "Talkgroups wählen und PLAY drücken",
         "recording_controls": "Aufnahmesteuerung",
         "ready": "Bereit",
         "paused": "Pausiert",
@@ -153,6 +155,7 @@ DISPLAY_TEXT = {
         "system_online": "System online",
         "select_media_play": "Wybierz plik i naciśnij GRAJ",
         "select_channel_play": "Wybierz kanał i naciśnij GRAJ",
+        "select_talkgroups_play": "Wybierz grupy i naciśnij GRAJ",
         "recording_controls": "Sterowanie nagrywaniem",
         "ready": "Gotowe",
         "paused": "Pauza",
@@ -196,6 +199,7 @@ DISPLAY_TEXT = {
         "system_online": "Système en ligne",
         "select_media_play": "Choisir un média puis LIRE",
         "select_channel_play": "Choisir un canal puis LIRE",
+        "select_talkgroups_play": "Choisir des groupes puis LIRE",
         "recording_controls": "Commandes d’enregistrement",
         "ready": "Prêt",
         "paused": "En pause",
@@ -239,6 +243,7 @@ DISPLAY_TEXT = {
         "system_online": "Sistema en línea",
         "select_media_play": "Elige un medio y pulsa PLAY",
         "select_channel_play": "Elige un canal y pulsa PLAY",
+        "select_talkgroups_play": "Elige grupos y pulsa PLAY",
         "recording_controls": "Controles de grabación",
         "ready": "Listo",
         "paused": "En pausa",
@@ -259,6 +264,7 @@ DEVICE_TEXT_KEYS = {
     "System online": "system_online",
     "Select media and press play": "select_media_play",
     "Select a channel and press play": "select_channel_play",
+    "Select talkgroups and press play": "select_talkgroups_play",
     "Recording controls": "recording_controls",
     "Ready": "ready",
     "Paused": "paused",
@@ -289,6 +295,7 @@ class DeviceUiState:
     preset_id: str | None = None
     image_file: str | None = None
     flag_code: str | None = None
+    activity_rows: list[dict[str, object]] = field(default_factory=list)
     title: str = "System online"
     subtitle: str = "Receiver ready"
     playing: bool = False
@@ -336,6 +343,7 @@ class DeviceUiState:
             "preset_id": self.preset_id,
             "image_file": self.image_file,
             "flag_code": self.flag_code,
+            "activity_rows": [dict(item) for item in self.activity_rows],
             "accent_color": "#{:02X}{:02X}{:02X}".format(*self.accent),
         }
 
@@ -466,6 +474,26 @@ class DeviceUiState:
             if isinstance(flag_code, str) and len(flag_code) == 2
             else None
         )
+        activity_rows = receiver.get("activity_rows")
+        self.activity_rows = []
+        if isinstance(activity_rows, list):
+            for item in activity_rows[:5]:
+                if not isinstance(item, Mapping):
+                    continue
+                talkgroup = item.get("talkgroup")
+                source = item.get("source")
+                if not isinstance(talkgroup, int) or isinstance(talkgroup, bool):
+                    continue
+                self.activity_rows.append(
+                    {
+                        "talkgroup": talkgroup,
+                        "name": str(item.get("name") or "")[:40],
+                        "country_code": str(item.get("country_code") or "")[:2].upper(),
+                        "active": item.get("active") is True,
+                        "source": source if isinstance(source, int) and not isinstance(source, bool) else None,
+                        "alias": str(item.get("alias") or "")[:40],
+                    }
+                )
         if not self.menu_open:
             self.title = str(receiver.get("title") or frame.title)[:48]
             self.subtitle = str(receiver.get("subtitle") or frame.body)[:72]
@@ -1092,6 +1120,56 @@ def render_device_ui(
     station_font = _font(18, bold=True)
     station = _fit_text(draw, state.source, station_font, 164)
     draw.text((14, content_top + 4), station, font=station_font, fill=(245, 248, 249))
+
+    if state.service == "DMR":
+        detail_font = _font(9, bold=True)
+        detail = state.title if state.title.casefold() != state.source.casefold() else state.subtitle
+        draw.text(
+            (14, content_top + 27),
+            _fit_text(draw, _localized_device_text(detail, text), detail_font, 164),
+            font=detail_font,
+            fill=(196, 207, 209),
+        )
+        draw.ellipse(
+            (200, content_top + 5, 234, content_top + 39),
+            fill=(12, 23, 27),
+            outline=accent,
+            width=2,
+        )
+        if state.playing:
+            draw.rectangle((211, content_top + 15, 214, content_top + 29), fill=accent)
+            draw.rectangle((220, content_top + 15, 223, content_top + 29), fill=accent)
+        else:
+            draw.polygon(
+                ((211, content_top + 13), (211, content_top + 31), (225, content_top + 22)),
+                fill=accent,
+            )
+        list_top = content_top + 45
+        if not state.activity_rows:
+            empty_font = _font(12, bold=True)
+            empty = _localized_device_text("Select talkgroups and press play", text)
+            draw.text((14, list_top + 22), _fit_text(draw, empty, empty_font, 208), font=empty_font, fill=(178, 187, 189))
+        for index, item in enumerate(state.activity_rows[:5]):
+            top = list_top + index * 33
+            active = item.get("active") is True
+            if active:
+                draw.rounded_rectangle((9, top, 230, top + 29), radius=7, fill=(28, 38, 34), outline=accent, width=2)
+            else:
+                draw.rounded_rectangle((9, top, 230, top + 29), radius=7, fill=(11, 22, 25), outline=(45, 61, 65), width=1)
+            icon_fill = accent if active else (77, 94, 98)
+            draw.ellipse((15, top + 8, 26, top + 19), fill=icon_fill)
+            code = str(item.get("country_code") or "TG")[:2]
+            code_font = _font(7, bold=True)
+            draw.text((31, top + 2), code, font=code_font, fill=accent if active else (151, 164, 167))
+            primary_font = _font(10, bold=True)
+            primary = f"TG {item['talkgroup']}  {item.get('name') or ''}".strip()
+            draw.text((49, top + 1), _fit_text(draw, primary, primary_font, 173), font=primary_font, fill=(240, 245, 246))
+            alias = str(item.get("alias") or "")
+            source = item.get("source")
+            secondary = alias or (f"DMR {source}" if isinstance(source, int) else str(text["ready"]))
+            secondary_font = _font(8)
+            draw.text((49, top + 16), _fit_text(draw, secondary, secondary_font, 173), font=secondary_font, fill=(171, 184, 187))
+        return image.convert("RGB")
 
     if state.service == "WEATHER":
         credit_font = _font(8, bold=True)

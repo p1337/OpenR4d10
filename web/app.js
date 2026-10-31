@@ -1426,8 +1426,13 @@ function renderBrandmeisterTalkgroups(state = {}) {
   brandmeisterTalkgroups = Array.isArray(state.channels) ? state.channels : [];
   const list = byId("brandmeister-talkgroup-list");
   list.replaceChildren();
-  for (const item of brandmeisterTalkgroups) {
+  const ordered = [...brandmeisterTalkgroups].sort((left, right) => Number(right.active === true) - Number(left.active === true));
+  for (const item of ordered) {
     const row = document.createElement("li");
+    row.dataset.active = item.active === true ? "true" : "false";
+    const activityIcon = document.createElement("span");
+    activityIcon.className = "brandmeister-activity-icon";
+    activityIcon.setAttribute("aria-label", item.active ? t("Active now") : t("Waiting for activity"));
     const label = document.createElement("label");
     label.className = "station-row-copy";
     const checkbox = document.createElement("input");
@@ -1437,8 +1442,17 @@ function renderBrandmeisterTalkgroups(state = {}) {
       "brandmeister_talkgroup_set",
       { channel_id: item.id, enabled: checkbox.checked },
     ));
-    const copy = document.createElement("strong");
-    copy.textContent = `${brandmeisterFlag(item.talkgroup)} TG ${item.talkgroup} · ${item.name}`;
+    const copy = document.createElement("span");
+    const title = document.createElement("strong");
+    title.textContent = `${brandmeisterFlag(item.talkgroup)} TG ${item.talkgroup} · ${item.name}`;
+    const participant = document.createElement("small");
+    const identity = [item.alias, item.source ? `DMR ${item.source}` : ""].filter(Boolean).join(" · ");
+    participant.textContent = item.active
+      ? `${t("Active now")} · ${identity || t("Talker identity not supplied")}`
+      : identity
+        ? `${t("Last heard")} · ${identity}`
+        : t("Waiting for activity");
+    copy.append(title, participant);
     label.append(checkbox, copy);
     const actions = document.createElement("span");
     actions.className = "library-actions";
@@ -1450,7 +1464,7 @@ function renderBrandmeisterTalkgroups(state = {}) {
       { channel_id: item.id },
     ));
     actions.append(remove);
-    row.append(label, actions);
+    row.append(activityIcon, label, actions);
     list.append(row);
   }
   byId("brandmeister-talkgroup-count").textContent = `${selectedBrandmeisterTalkgroups().length} / 5`;

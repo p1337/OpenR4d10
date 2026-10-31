@@ -410,6 +410,48 @@ class ServiceCatalog:
                 break
         return enabled
 
+    def _brandmeister_activity_rows(
+        self, state: dict[str, object] | None = None
+    ) -> list[dict[str, object]]:
+        state = state or self.brandmeister.snapshot()
+        raw_activity = state.get("activity")
+        activity_by_talkgroup: dict[int, dict[str, object]] = {}
+        if isinstance(raw_activity, list):
+            for item in raw_activity:
+                if not isinstance(item, dict):
+                    continue
+                talkgroup = item.get("talkgroup")
+                if isinstance(talkgroup, int) and not isinstance(talkgroup, bool):
+                    activity_by_talkgroup[talkgroup] = item
+        rows: list[dict[str, object]] = []
+        for channel in self.store.channels("brandmeister"):
+            metadata = channel.get("metadata")
+            metadata = metadata if isinstance(metadata, dict) else {}
+            talkgroup = metadata.get("talkgroup")
+            if (
+                metadata.get("enabled") is not True
+                or not isinstance(talkgroup, int)
+                or isinstance(talkgroup, bool)
+            ):
+                continue
+            heard = activity_by_talkgroup.get(talkgroup, {})
+            source = heard.get("source")
+            rows.append(
+                {
+                    "talkgroup": talkgroup,
+                    "name": str(channel["name"]),
+                    "country_code": country_code(talkgroup),
+                    "active": heard.get("active") is True,
+                    "source": source if isinstance(source, int) and not isinstance(source, bool) else None,
+                    "alias": str(heard.get("alias") or "")[:80],
+                    "updated_at": str(heard.get("updated_at") or ""),
+                }
+            )
+            if len(rows) == 5:
+                break
+        rows.sort(key=lambda item: not bool(item["active"]))
+        return rows
+
     def _selected_brandmeister_channel(self) -> dict[str, object] | None:
         channels = self.store.channels("brandmeister")
         if not channels:
@@ -921,6 +963,11 @@ class ServiceCatalog:
                     "active": int(item["id"]) == self.active_ambient_scene_id,
                 }
             )
+        brandmeister_state = self.brandmeister.snapshot()
+        brandmeister_activity = self._brandmeister_activity_rows(brandmeister_state)
+        activity_by_talkgroup = {
+            int(item["talkgroup"]): item for item in brandmeister_activity
+        }
         brandmeister_channels = []
         for channel, item in enumerate(self.store.channels("brandmeister"), start=1):
             metadata = item.get("metadata")
@@ -928,8 +975,7 @@ class ServiceCatalog:
             talkgroup = metadata.get("talkgroup")
             if not isinstance(talkgroup, int) or isinstance(talkgroup, bool):
                 continue
-            brandmeister_channels.append(
-                {
+            public_channel = {
                     "id": int(item["id"]),
                     "talkgroup": talkgroup,
                     "name": str(item["name"]),
@@ -939,7 +985,8 @@ class ServiceCatalog:
                     "channel": channel,
                     "selected": talkgroup == self.selected_brandmeister_talkgroup,
                 }
-            )
+            public_channel.update(activity_by_talkgroup.get(talkgroup, {}))
+            brandmeister_channels.append(public_channel)
         webcam_channels = []
         cached_cameras = self.content_state.get("cameras")
         cached_cameras = cached_cameras if isinstance(cached_cameras, dict) else {}
@@ -1023,10 +1070,11 @@ class ServiceCatalog:
                 "limits": {"saved": 100, "frame_bytes": CameraSnapshot.MAX_BYTES},
             },
             "brandmeister": {
-                **self.brandmeister.snapshot(),
+                **brandmeister_state,
                 "selected_channel_id": self.selected_brandmeister_channel_id,
                 "selected_talkgroup": self.selected_brandmeister_talkgroup,
                 "channels": brandmeister_channels,
+                "activity_rows": brandmeister_activity,
                 "limits": {"saved": 30, "enabled": 5},
             },
             "media": media,
@@ -2402,6 +2450,7 @@ class ServiceCatalog:
             catalog_entries = self._brandmeister_catalog_entries(allow_network=False)
             catalog_talkgroups = [int(item["talkgroup"]) for item in catalog_entries]
             listening = status in {"connecting", "listening", "call", "reconnecting"}
+            activity_rows = self._brandmeister_activity_rows(state)
             return {
                 "service": "DMR",
                 "station": f"TG {active_talkgroup}" if isinstance(active_talkgroup, int) else "BrandMeister",
@@ -2422,6 +2471,7 @@ class ServiceCatalog:
                 ),
                 "channel_label": str(selected_talkgroup) if selected_talkgroup is not None else "--",
                 "flag_code": country_code(active_talkgroup) if isinstance(active_talkgroup, int) else None,
+                "activity_rows": activity_rows,
             }
         service_label = {
             "webradio": "RADIO",
