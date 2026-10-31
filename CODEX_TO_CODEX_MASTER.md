@@ -1089,6 +1089,11 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Neustart und Update wiederverwendet; bei noch nicht fertigem Cache bleibt die
   geprüfte öffentliche Quelle als Übergang verfügbar. Die Binärdateien werden
   nicht in jedes GitHub-Release eingebettet.
+- Ein realer Pi-Test von 0.10.47 zeigte, dass die erste Fassung ihre
+  Cache-Sperre fälschlich während des langsamen Netzdownloads hielt. Dadurch
+  konnte Play auf die Hintergrundarbeit warten. Ab 0.10.48 liegt der gesamte
+  Download ausdrücklich außerhalb der kurzen Dateisperre: Bedienung und
+  URL-Fallback bleiben sofort verfügbar, während die Offline-Datei entsteht.
 - Robert verlangt echten BrandMeister-Hörempfang nach dem Vorbild der offiziellen
   HoseLine-Seite und übernimmt ausdrücklich die Verantwortung für die direkte
   Browserintegration. Der verifizierte Fallback-Pfad ist

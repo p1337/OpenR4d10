@@ -144,14 +144,19 @@ class AmbientAudioCache:
                     self._verified[target] = (stat.st_size, stat.st_mtime_ns)
                     return target
                 target.unlink(missing_ok=True)
-            payload, _content_type = self.fetcher.fetch(
-                url,
-                max_bytes=self.MAX_BYTES,
-                accepted_types=("audio/ogg", "application/ogg", "audio/*"),
-                timeout=600.0,
-            )
-            if hashlib.sha256(payload).hexdigest() != checksum:
-                raise ContentError("ambient audio checksum does not match")
+        payload, _content_type = self.fetcher.fetch(
+            url,
+            max_bytes=self.MAX_BYTES,
+            accepted_types=("audio/ogg", "application/ogg", "audio/*"),
+            timeout=600.0,
+        )
+        if hashlib.sha256(payload).hexdigest() != checksum:
+            raise ContentError("ambient audio checksum does not match")
+        with self._lock:
+            if target.is_file() and self._file_sha256(target) == checksum:
+                stat = target.stat()
+                self._verified[target] = (stat.st_size, stat.st_mtime_ns)
+                return target
             self.cache_root.mkdir(parents=True, exist_ok=True, mode=0o750)
             temporary = target.with_name(
                 f".{target.name}.{os.getpid()}.{threading.get_ident()}.part"

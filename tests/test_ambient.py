@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 import tempfile
+import threading
+import time
 import unittest
 
 from PIL import Image
@@ -107,6 +109,34 @@ class AmbientPresetTests(unittest.TestCase):
                     "https://example.org/forest.ogg",
                     "0" * 64,
                 )
+
+    def test_background_download_never_blocks_cache_fallback_lookup(self) -> None:
+        payload = b"OggS" + b"slow" * 32
+        started = threading.Event()
+        release = threading.Event()
+
+        class SlowFetcher:
+            def fetch(self, url, *, max_bytes, accepted_types, timeout):
+                started.set()
+                release.wait(2)
+                return payload, "audio/ogg"
+
+        checksum = hashlib.sha256(payload).hexdigest()
+        with tempfile.TemporaryDirectory() as raw:
+            cache = AmbientAudioCache(Path(raw).resolve(), SlowFetcher())
+            worker = threading.Thread(
+                target=cache.ensure,
+                args=("cafe", "https://example.org/cafe.ogg", checksum),
+            )
+            worker.start()
+            self.assertTrue(started.wait(1))
+            before = time.monotonic()
+            self.assertIsNone(cache.cached("cafe", checksum))
+            self.assertLess(time.monotonic() - before, 0.25)
+            release.set()
+            worker.join(2)
+            self.assertFalse(worker.is_alive())
+            self.assertEqual(cache.cached("cafe", checksum).read_bytes(), payload)
 
     def test_each_preset_has_a_readable_bundled_square_artwork(self) -> None:
         for item in AMBIENT_PRESETS:
