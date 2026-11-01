@@ -864,7 +864,7 @@ class OpenR4d10App:
             elif recorder_semantic_event:
                 self.render_recorder_once()
             else:
-                self.render_once()
+                self.render_interaction_once(new_service)
             snapshot = getattr(self.display, "snapshot", None)
             if callable(snapshot):
                 device_state = snapshot()

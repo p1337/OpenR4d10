@@ -354,7 +354,9 @@ and one final cached-telemetry frame is presented. Debouncing or coalescing may
 bound event pressure, but it must preserve the resulting rotary distance.
 Resolved media actions use that same rule: Play/Pause, channel and volume
 mutate ordered display state without presenting a stale preliminary full frame,
-then publish exactly one authoritative result frame.
+then publish exactly one authoritative result frame from cached receiver,
+network, power and system telemetry. They never wait for synchronous telemetry
+collection; periodic refresh owns that work.
 Periodic frames also carry the interaction generation captured before their
 overlay work. If an input transaction starts or finishes before publication,
 that stale periodic frame is discarded. The resolved interaction frame itself

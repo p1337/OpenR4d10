@@ -390,10 +390,16 @@ class AppTests(unittest.TestCase):
                 receiver=SystemTelemetry(),
                 services=services,
             )
-
-            paused = app.control(
-                {"action": "device_input", "control": "right_press"}
-            )
+            app._last_receiver_telemetry = {"service": "RADIO"}
+            app._last_power_telemetry = {}
+            with patch.object(
+                app,
+                "render_once",
+                side_effect=AssertionError("media input requested live telemetry"),
+            ):
+                paused = app.control(
+                    {"action": "device_input", "control": "right_press"}
+                )
             menu = app.control(
                 {
                     "action": "device_input",

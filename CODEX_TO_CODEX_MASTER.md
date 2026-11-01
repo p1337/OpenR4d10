@@ -3651,6 +3651,11 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   nur zustandsseitig. Erst danach wird genau ein endgültiges Vollbild
   übertragen. Ein zusätzliches, bereits überholtes Vorab-Bild verdoppelt auf
   dem realen SPI-Panel die Eingabelatenz und ist verboten.
+- Das eine endgültige Interaktionsbild verwendet die zuletzt gecachte
+  Empfänger-, WLAN-, Batterie- und Systemtelemetrie. Eine Play/Pause-, Kanal-
+  oder Lautstärketaste darf niemals erst synchrone `nmcli`-, I2C- oder andere
+  normale Telemetrieabfragen ausführen; diese bleiben im periodischen
+  Hintergrundpfad.
 - Raspberry Pi OS Trixie liefert auf dem realen Zielgerät mpv 0.40. Dessen
   `--video`-Schalter akzeptiert `auto`, `no` oder eine Spur-ID, aber nicht
   `yes`. Der zentrale Player muss deshalb `--video=auto` verwenden; ein
