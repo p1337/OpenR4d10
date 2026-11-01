@@ -8,6 +8,20 @@ Simulation oder Antwort zum OpenR4d10-Projekt erfolgt.**
 
 Diese Datei ist die zentrale, fortlaufend gepflegte Projektwahrheit.
 
+### Harte globale Display-Lesbarkeitsregel
+
+Die aktuelle Batterie-Prozentanzeige verwendet im nativen 240-x-280-Renderer
+`_font(9, bold=True)`. **Neun Pixel TrueType-Schriftgröße ist deshalb ab sofort
+die absolute Mindestgröße jedes sichtbaren Textes auf dem physischen Display.**
+Kein Dienst, Plugin, Menü, Hinweis, Status, Credit, Kürzel oder dynamischer Text
+darf mit `_font(8)`, `_font(7)` oder kleiner gerendert werden. Der gemeinsame
+Font-Loader erzwingt mindestens 9 Pixel auch für zukünftige Module. Wichtige
+Hinweise und Aktionen müssen größer als dieses Minimum sein; bloßes Abschneiden
+oder Verkleinern unter 9 Pixel ist keine zulässige Layoutlösung. Jeder Release
+mit Displayänderungen muss automatisiert prüfen, dass kein gezeichneter Text
+unter dieser Batterie-Referenzgröße liegt, und die echte 240-x-280-Ausgabe
+zusätzlich visuell kontrollieren.
+
 Sobald Robert eine neue Erkenntnis, Korrektur, Hardwareangabe, Abmessung,
 Bedienregel, Designentscheidung oder Funktionsanforderung nennt, muss die
 arbeitende Codex-Instanz:
@@ -287,9 +301,9 @@ die Höhe der einzelnen Felder gleichzeitig etwas kleiner. In Untermenüs dürfe
 die Achsen kontextabhängig anders belegt werden; die Felder müssen dies sofort
 anzeigen.
 
-Auf dem physischen 240-x-280-Display gilt für neu eingeführte Beschriftungen
-eine harte Lesbarkeitsgrenze: keine reguläre Information wird kleiner als der
-SSID-/WLAN-Text gezeichnet. Wichtige Werte wie der Batterie-Prozentwert werden
+Auf dem physischen 240-x-280-Display gilt die am Dateianfang festgelegte harte
+Lesbarkeitsgrenze von mindestens 9 Pixel TrueType-Schriftgröße für ausnahmslos
+jeden sichtbaren Text. Wichtige Werte wie der Batterie-Prozentwert werden
 mindestens in dieser Größe und fett gesetzt. Mikroschrift nur zum Unterbringen
 zusätzlicher Daten ist ausdrücklich unzulässig.
 

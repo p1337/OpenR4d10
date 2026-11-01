@@ -111,6 +111,10 @@ fallback), larger values and a larger time without a date. The radio body does
 not repeat the selected service or a written playback state; playback remains
 visible through the button icon and actual media state. The old bottom status/
 brand strip is removed and its space belongs to the larger station artwork.
+The shared `_font()` boundary clamps every requested native-display font to the
+battery percentage reference of 9 TrueType pixels. Service renderers and future
+plugins cannot opt into smaller text to solve a layout problem; important
+instructions must use a larger size and layouts must instead trim or reflow.
 Each localized control label and its larger value are positioned from their
 actual font bounding boxes so their visible glyph tops align exactly in both
 header rows. The two halves are mirrored: labels precede values on the left,

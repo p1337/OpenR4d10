@@ -17,6 +17,7 @@ from openr4d10.device_ui import (
     DeviceUiState,
     HEIGHT,
     MAIN_MENU_ITEMS,
+    MIN_DEVICE_FONT_PX,
     PLAY_GREEN,
     SERVICES,
     WIDTH,
@@ -139,6 +140,31 @@ class DeviceUiTests(unittest.TestCase):
             [8, 221],
         )
 
+    def test_every_native_display_font_is_at_least_battery_reference_size(self) -> None:
+        self.assertEqual(MIN_DEVICE_FONT_PX, 9)
+        self.assertGreaterEqual(getattr(_font(1), "size", 0), MIN_DEVICE_FONT_PX)
+        sizes = []
+        original_text = ImageDraw.ImageDraw.text
+
+        def capture_text(draw, xy, text, *args, **kwargs):
+            font = kwargs.get("font")
+            if font is None and len(args) > 1:
+                font = args[1]
+            sizes.append(getattr(font, "size", 0))
+            return original_text(draw, xy, text, *args, **kwargs)
+
+        with patch.object(ImageDraw.ImageDraw, "text", capture_text):
+            for service in SERVICES:
+                render_device_ui(
+                    DeviceUiState(
+                        service_index=SERVICES.index(service),
+                        battery_percent=87,
+                    )
+                )
+            render_device_ui(DeviceUiState(menu_open=True, menu_kind="main_menu"))
+        self.assertTrue(sizes)
+        self.assertGreaterEqual(min(sizes), MIN_DEVICE_FONT_PX)
+
     def test_header_controls_and_network_text_use_requested_larger_fonts(self) -> None:
         sizes = {}
         positions = {}
@@ -160,8 +186,8 @@ class DeviceUiTests(unittest.TestCase):
             render_device_ui(state)
         self.assertEqual(sizes["LAU"], 12)
         self.assertEqual(sizes["30%"], 14)
-        self.assertEqual(sizes["p1337"], 8)
-        self.assertEqual(sizes["192.168.1.64"], 8)
+        self.assertEqual(sizes["p1337"], 9)
+        self.assertEqual(sizes["192.168.1.64"], 9)
         self.assertGreaterEqual(sizes["87%"], sizes["p1337"])
         measure = ImageDraw.Draw(Image.new("RGB", (100, 100)))
         for label, value in (("LAU", "30%"), ("SQL", "5"), ("KAN", "001"), ("DST", "SYSTEM")):
@@ -590,7 +616,7 @@ class DeviceUiTests(unittest.TestCase):
         )
         with patch.object(ImageDraw.ImageDraw, "text", capture_text):
             image = render_device_ui(state)
-        hints = [item for item in captured if item[0] == "Przytrzymaj PTT, aby nagrywać"]
+        hints = [item for item in captured if item[0] == "Trzymaj PTT, aby nagrywać"]
         self.assertEqual(len(hints), 1)
         self.assertEqual(hints[0][2], 12)
         self.assertLess(hints[0][1][1], 130)

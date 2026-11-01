@@ -255,8 +255,10 @@ during radio or microphone recording; continuous recording pulses red. Real
 Play actions are green, while Pause and Stop remain in the accent color. It has
 no crisp border line and no disable switch. Media, weather and camera
 images use the same 43-pixel corner radius as the panel. Device text is never
-introduced below the SSID text size; battery percentage is at least that size
-and bold. Menu selection and PTT indicators remain independent functional cues.
+introduced below the battery percentage's exact 9-pixel TrueType reference
+size; the shared font loader clamps every native-display font to at least 9
+pixels, and important actions use larger type. Battery percentage remains bold.
+Menu selection and PTT indicators remain independent functional cues.
 
 Until the physical encoders are delivered, the **Virtuelle Encoder** panel in
 the same dashboard controls the real Whisplay immediately. Its volume, squelch,

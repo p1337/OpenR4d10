@@ -37,6 +37,7 @@ MAIN_MENU_ITEMS = (
 )
 FONT_REGULAR = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
 FONT_BOLD = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
+MIN_DEVICE_FONT_PX = 9
 DISPLAY_TEXT = {
     "en": {
         "controls": ("VOL", "SQL", "CH", "SRV"),
@@ -193,7 +194,7 @@ DISPLAY_TEXT = {
         "select_talkgroups_play": "Wybierz grupy i naciśnij GRAJ",
         "recording_controls": "Sterowanie nagrywaniem",
         "voice_recorder": "Dyktafon",
-        "voice_hold": "Przytrzymaj PTT, aby nagrywać",
+        "voice_hold": "Trzymaj PTT, aby nagrywać",
         "voice_recording": "Nagrywanie",
         "voice_continuous": "Nagrywanie ciągłe",
         "voice_paused": "Nagrywanie wstrzymane",
@@ -821,6 +822,7 @@ class DeviceUiState:
 
 
 def _font(size: int, *, bold: bool = False) -> ImageFont.ImageFont:
+    size = max(MIN_DEVICE_FONT_PX, size)
     path = FONT_BOLD if bold else FONT_REGULAR
     fallback = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
     for candidate in (str(path), fallback):
@@ -1419,9 +1421,10 @@ def _draw_voice_recorder(
     status_color = (255, 86, 86) if state.recording else state.accent
     if state.recording:
         draw.ellipse((14, content_top + 31, 22, content_top + 39), fill=status_color)
+    status_x = 27 if state.recording else 14
     draw.text(
-        (27 if state.recording else 14, content_top + 28),
-        _fit_text(draw, status, status_font, 198),
+        (status_x, content_top + 28),
+        _fit_text(draw, status, status_font, 226 - status_x),
         font=status_font,
         fill=status_color,
     )
