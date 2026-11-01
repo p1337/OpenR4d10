@@ -69,6 +69,13 @@ the installer report exactly which adapters still need configuration.
   buffered beginning; optional continuous capture splits on title metadata,
   suppresses duplicates and stores `Media/Music/Artist/Artist - Song.mp3`;
   microphone recordings remain separate below `Media/VoiceRecorder/JJMMTT`
+- editable current voice take with exclusive audio ownership: opening
+  VoiceRecorder immediately stops radio, podcasts/local media, Ambient layers
+  and BrandMeister; the two left axes provide 0.1-second fine seek and
+  start/end jumps, the upper right axis seeks by one second, and the right
+  press plays or pauses from the cursor; recording from an earlier cursor
+  replaces only the covered interval and preserves the untouched tail;
+  recorder playback is fixed at 100% and restores the prior service volume on exit
 - silent ICY title lookup in the radio view before audible Play, with localized
   non-technical fallback text when a station supplies no title
 - simple recorded-music player with favorites, `My Soundmix`, shuffle,
@@ -93,6 +100,17 @@ the installer report exactly which adapters still need configuration.
   the five active TGs to replace;
   no account password or user token
 - standard-library-only test suite and GitHub Actions CI
+
+Project terminology is strict: **PTT always means the separate physical
+Whisplay hardware button on BCM17**. Held Backspace is only its browser
+simulation. Encoder presses and drawn display controls are never PTT.
+
+The long-term module contract requires every service, including current
+built-ins, to live in its own Git-visible module directory with its own
+manifest, entry point, tests and complete service README. This is a staged
+extraction of the existing implementation behind the same core broker, not a
+parallel rewrite; the current monolithic service catalog remains the migration
+source of truth until each extraction is regression-tested.
 
 Hardware-specific integration still pending:
 

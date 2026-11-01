@@ -316,7 +316,34 @@ class OpenR4d10App:
                     held_seconds=held_seconds,
                     active=False,
                 )
-        if self.services is not None and event.control == Control.LEFT_OUTER:
+        if (
+            self.services is not None
+            and event.control == Control.LEFT_INNER
+            and not menu_open
+            and selected_service == "REC"
+        ):
+            media_result = self.services.control(
+                {"action": "voice_recorder_boundary", "end": event.steps > 0}
+            )
+        elif (
+            self.services is not None
+            and event.control == Control.RIGHT_OUTER
+            and not menu_open
+            and selected_service == "REC"
+        ):
+            media_result = self.services.control(
+                {"action": "voice_recorder_seek", "delta_ms": event.steps * 1000}
+            )
+        elif (
+            self.services is not None
+            and event.control == Control.LEFT_OUTER
+            and not menu_open
+            and selected_service == "REC"
+        ):
+            media_result = self.services.control(
+                {"action": "voice_recorder_seek", "delta_ms": event.steps * 100}
+            )
+        elif self.services is not None and event.control == Control.LEFT_OUTER:
             media_result = self.services.control(
                 {"action": "volume_step", "steps": event.steps}
             )
@@ -448,6 +475,8 @@ class OpenR4d10App:
                 action = "ambient_toggle"
             elif selected_service == "DMR":
                 action = "brandmeister_toggle"
+            elif selected_service == "REC":
+                action = "voice_recorder_play_toggle"
             else:
                 action = None
             if action is not None:

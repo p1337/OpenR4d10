@@ -1152,6 +1152,65 @@ class AppTests(unittest.TestCase):
             ],
         )
 
+    def test_voice_recorder_encoders_seek_boundaries_and_play_from_cursor(self) -> None:
+        class InputDisplay:
+            def render(self, _frame) -> None:
+                pass
+
+            def snapshot(self):
+                return {"service": "REC", "menu_open": False}
+
+            def apply_input(self, _event):
+                return self.snapshot()
+
+        class Services:
+            active_service = "recorder"
+
+            def __init__(self) -> None:
+                self.requests = []
+
+            def control(self, request):
+                self.requests.append(request)
+                return {"recording": {"state": "paused"}}
+
+            def receiver_overlay(self, view_service=None):
+                return {"service": view_service or "REC", "playing": False}
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=InputDisplay(),
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,
+            )
+            app.control({"action": "device_input", "control": "right_outer", "steps": -2})
+            app.control({"action": "device_input", "control": "left_outer", "steps": 1})
+            app.control({"action": "device_input", "control": "left_inner", "steps": -1})
+            app.control({"action": "device_input", "control": "left_inner", "steps": 1})
+            app.control({"action": "device_input", "control": "right_press"})
+
+        self.assertEqual(
+            services.requests,
+            [
+                {"action": "voice_recorder_seek", "delta_ms": -2000},
+                {"action": "voice_recorder_seek", "delta_ms": 100},
+                {"action": "voice_recorder_boundary", "end": False},
+                {"action": "voice_recorder_boundary", "end": True},
+                {"action": "voice_recorder_play_toggle"},
+            ],
+        )
+
     def test_application_unit_provides_display_handoff_runtime(self) -> None:
         unit = (
             Path(__file__).resolve().parents[1]

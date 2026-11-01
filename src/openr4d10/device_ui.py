@@ -41,6 +41,7 @@ DISPLAY_TEXT = {
     "en": {
         "controls": ("VOL", "SQL", "CH", "SRV"),
         "dmr_controls": ("VOL", "JMP", "TG", "SRV"),
+        "rec_controls": ("0.1", "EDGE", "1S", "SRV"),
         "dmr_on": "ON",
         "dmr_off": "OFF",
         "menu": "MENU",
@@ -97,6 +98,7 @@ DISPLAY_TEXT = {
     "de": {
         "controls": ("LAU", "SQL", "KAN", "DST"),
         "dmr_controls": ("LAU", "SPR", "TG", "DST"),
+        "rec_controls": ("0.1", "RAND", "1S", "DST"),
         "dmr_on": "AN",
         "dmr_off": "AUS",
         "menu": "MENÜ",
@@ -153,6 +155,7 @@ DISPLAY_TEXT = {
     "pl": {
         "controls": ("GŁO", "SQL", "KAN", "USŁ"),
         "dmr_controls": ("GŁO", "SKK", "TG", "USŁ"),
+        "rec_controls": ("0.1", "KR", "1S", "USŁ"),
         "dmr_on": "WŁ",
         "dmr_off": "WYŁ",
         "menu": "MENU",
@@ -209,6 +212,7 @@ DISPLAY_TEXT = {
     "fr": {
         "controls": ("VOL", "SQL", "CAN", "SRV"),
         "dmr_controls": ("VOL", "SAU", "TG", "SRV"),
+        "rec_controls": ("0.1", "BORD", "1S", "SRV"),
         "dmr_on": "ON",
         "dmr_off": "OFF",
         "menu": "MENU",
@@ -265,6 +269,7 @@ DISPLAY_TEXT = {
     "es": {
         "controls": ("VOL", "SQL", "CAN", "SRV"),
         "dmr_controls": ("VOL", "SAL", "TG", "SRV"),
+        "rec_controls": ("0.1", "BOR", "1S", "SRV"),
         "dmr_on": "ON",
         "dmr_off": "OFF",
         "menu": "MENÚ",
@@ -380,6 +385,8 @@ class DeviceUiState:
     recorder_timeline: list[list[int]] = field(default_factory=list)
     recorder_continuous: bool = False
     recorder_output: str | None = None
+    recorder_position_ms: int = 0
+    recorder_duration_ms: int = 0
     title: str = "System online"
     subtitle: str = "Receiver ready"
     playing: bool = False
@@ -445,6 +452,8 @@ class DeviceUiState:
             "recorder_timeline": [list(item) for item in self.recorder_timeline],
             "recorder_continuous": self.recorder_continuous,
             "recorder_output": self.recorder_output,
+            "recorder_position_ms": self.recorder_position_ms,
+            "recorder_duration_ms": self.recorder_duration_ms,
             "audio_active": self.audio_active,
             "accent_color": "#{:02X}{:02X}{:02X}".format(*self.accent),
         }
@@ -491,9 +500,9 @@ class DeviceUiState:
         self.menu_return_subtitle = None
 
     def apply(self, event: InputEvent) -> None:
-        if event.control == Control.LEFT_OUTER:
+        if event.control == Control.LEFT_OUTER and self.service != "REC":
             self.volume = max(0, min(100, self.volume + event.steps * 10))
-        elif event.control == Control.LEFT_INNER and not (
+        elif event.control == Control.LEFT_INNER and self.service != "REC" and not (
             self.menu_open and self.menu_kind == "ambient_layers"
         ):
             self.squelch = max(0, min(9, self.squelch + event.steps))
@@ -503,7 +512,7 @@ class DeviceUiState:
                     0,
                     min(len(MAIN_MENU_ITEMS) - 1, self.menu_selection + event.steps),
                 )
-            elif not self.menu_open:
+            elif not self.menu_open and self.service != "REC":
                 self.channel = max(1, min(999, self.channel + event.steps))
         elif event.control == Control.RIGHT_INNER:
             self.service_index = (self.service_index + event.steps) % len(SERVICES)
@@ -757,6 +766,18 @@ class DeviceUiState:
         self.recorder_continuous = receiver.get("continuous") is True
         output = receiver.get("output")
         self.recorder_output = str(output)[:128] if isinstance(output, str) else None
+        position_ms = receiver.get("position_ms")
+        duration_ms = receiver.get("duration_ms")
+        self.recorder_position_ms = (
+            max(0, int(position_ms))
+            if isinstance(position_ms, int) and not isinstance(position_ms, bool)
+            else 0
+        )
+        self.recorder_duration_ms = (
+            max(0, int(duration_ms))
+            if isinstance(duration_ms, int) and not isinstance(duration_ms, bool)
+            else 0
+        )
         self.recorder_timeline = []
         timeline = receiver.get("timeline")
         if isinstance(timeline, list):
@@ -1378,8 +1399,8 @@ def _draw_voice_recorder(
     content_top: int,
 ) -> None:
     title_font = _font(17, bold=True)
-    small_font = _font(9, bold=True)
-    hint_font = _font(8)
+    status_font = _font(12, bold=True)
+    time_font = _font(10, bold=True)
     draw.text(
         (13, content_top + 5),
         _fit_text(draw, str(text["voice_recorder"]), title_font, 212),
@@ -1400,18 +1421,20 @@ def _draw_voice_recorder(
         draw.ellipse((14, content_top + 31, 22, content_top + 39), fill=status_color)
     draw.text(
         (27 if state.recording else 14, content_top + 28),
-        _fit_text(draw, status, small_font, 198),
-        font=small_font,
+        _fit_text(draw, status, status_font, 198),
+        font=status_font,
         fill=status_color,
     )
+    position = state.recorder_position_ms / 1000.0
+    duration = state.recorder_duration_ms / 1000.0
     draw.text(
-        (14, content_top + 43),
-        _fit_text(draw, str(text["voice_mics"]), hint_font, 212),
-        font=hint_font,
-        fill=(156, 171, 174),
+        (14, content_top + 46),
+        f"{position:05.1f} / {duration:05.1f} s",
+        font=time_font,
+        fill=(190, 202, 205),
     )
 
-    left, top, right, bottom = 10, content_top + 59, 229, HEIGHT - 12
+    left, top, right, bottom = 10, content_top + 62, 229, HEIGHT - 12
     middle = (top + bottom) // 2
     draw.rounded_rectangle(
         (left, top, right, bottom),
@@ -1422,13 +1445,13 @@ def _draw_voice_recorder(
     )
     draw.line((left + 6, middle, right - 6, middle), fill=(70, 86, 90), width=1)
     samples = state.recorder_timeline[-96:]
-    if not samples:
-        draw.text(
-            (left + 14, middle - 5),
-            _fit_text(draw, str(text["voice_hold"]), hint_font, 180),
-            font=hint_font,
-            fill=(105, 123, 127),
+    if state.recorder_duration_ms > 0:
+        cursor_fraction = min(
+            1.0, state.recorder_position_ms / state.recorder_duration_ms
         )
+        cursor_x = round(left + 6 + (right - left - 12) * cursor_fraction)
+        draw.line((cursor_x, top + 4, cursor_x, bottom - 4), fill=state.accent, width=2)
+    if not samples:
         return
     usable_width = right - left - 14
     step = usable_width / max(1, len(samples) - 1)
@@ -1450,15 +1473,19 @@ def render_device_ui(
     draw = ImageDraw.Draw(image)
     accent = state.accent
     text = _display_text(state.language)
-    controls = text["dmr_controls"] if state.service == "DMR" else text["controls"]
+    controls = (
+        text["dmr_controls"]
+        if state.service == "DMR"
+        else text["rec_controls"]
+        if state.service == "REC"
+        else text["controls"]
+    )
     assert isinstance(controls, tuple)
     left_action = str(text["menu"])
     if state.menu_open:
         right_action = "OK"
-    elif state.service in {"RADIO", "AMBIENT", "DMR", "PLAYER"}:
+    elif state.service in {"RADIO", "AMBIENT", "DMR", "PLAYER", "REC"}:
         right_action = str(text["pause"] if state.playing else text["play"])
-    elif state.service == "REC":
-        right_action = "PTT"
     else:
         right_action = str(text["info"])
 
@@ -1469,7 +1496,7 @@ def render_device_ui(
     _vertical_label(image, left_action, 8, clockwise=False, header_height=header_height)
     right_action_color = (
         accent if state.playing else PLAY_GREEN
-        if state.service in {"RADIO", "AMBIENT", "DMR", "PLAYER"}
+        if state.service in {"RADIO", "AMBIENT", "DMR", "PLAYER", "REC"}
         else (135, 143, 148)
     )
     _vertical_label(
@@ -1485,7 +1512,7 @@ def render_device_ui(
         19,
         1,
         str(controls[0]),
-        f"{state.volume}%",
+        "±" if state.service == "REC" else f"{state.volume}%",
         accent,
         label_offset_x=3,
     )
@@ -1494,7 +1521,7 @@ def render_device_ui(
         19,
         20,
         str(controls[1]),
-        "25" if state.service == "DMR" else str(state.squelch),
+        "25" if state.service == "DMR" else "↔" if state.service == "REC" else str(state.squelch),
         accent,
         label_offset_x=3,
     )
@@ -1503,7 +1530,7 @@ def render_device_ui(
         122,
         1,
         str(controls[2]),
-        state.channel_label if state.service == "DMR" and state.channel_label else f"{state.channel:03d}",
+        state.channel_label if state.service in {"DMR", "REC"} and state.channel_label else f"{state.channel:03d}",
         accent,
         mirrored=True,
     )

@@ -93,6 +93,13 @@ class ProcessBoundaryTests(unittest.TestCase):
             self.assertIn(["playlist-next", "force"], commands)
             self.assertIn(["playlist-prev", "force"], commands)
 
+    def test_mpv_uses_exact_absolute_seek_for_voice_playback(self) -> None:
+        commands = []
+        engine = MpvEngine(Path("/usr/bin/mpv"))
+        engine._command = lambda command: commands.append(command) or {}
+        engine.seek_absolute(1.2)
+        self.assertEqual(commands, [["seek", 1.2, "absolute", "exact"]])
+
     def test_recorder_builds_argument_array_and_redacts_source_status(self) -> None:
         calls = []
 
@@ -171,6 +178,40 @@ class ProcessBoundaryTests(unittest.TestCase):
             self.assertEqual(recovered.read_bytes(), b"recoverable")
             self.assertFalse(pending.exists())
 
+    def test_voice_recovery_replays_pending_overwrite_manifest(self) -> None:
+        commands = []
+
+        def edit_runner(command):
+            commands.append(command)
+            Path(command[-1]).write_bytes(b"recovered-edit")
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            pending = (
+                root
+                / "media"
+                / "VoiceRecorder"
+                / "261101"
+                / ".pending-261101_082159_VoiceRecorder"
+            )
+            pending.mkdir(parents=True)
+            (pending / "working.mp3").write_bytes(b"old")
+            (pending / "segment-000001.mp3").write_bytes(b"new")
+            (pending / "edit.json").write_text(
+                '{"version":1,"position_ms":2000,"duration_ms":5000,'
+                '"recording_start_ms":2000,"active_segment":"segment-000001.mp3"}',
+                encoding="utf-8",
+            )
+            StreamRecorder(
+                root / "recordings",
+                voice_root=root / "media" / "VoiceRecorder",
+                edit_runner=edit_runner,
+            )
+            recovered = pending.parent / "261101_082159_VoiceRecorder.mp3"
+            self.assertEqual(recovered.read_bytes(), b"recovered-edit")
+            self.assertTrue(commands)
+            self.assertFalse(pending.exists())
+
     def test_voice_level_metadata_keeps_left_and_right_channels_separate(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw).resolve()
@@ -184,3 +225,45 @@ class ProcessBoundaryTests(unittest.TestCase):
             timeline = recorder.voice_snapshot()["timeline"]
             self.assertEqual(len(timeline), 1)
             self.assertLess(timeline[0][0], timeline[0][1])
+
+    def test_voice_cursor_boundaries_and_overwrite_preserve_the_unreached_tail(self) -> None:
+        commands = []
+
+        def edit_runner(command):
+            commands.append(command)
+            Path(command[-1]).write_bytes(b"edited")
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            recorder = StreamRecorder(
+                root / "recordings",
+                voice_root=root / "media" / "VoiceRecorder",
+                edit_runner=edit_runner,
+            )
+            recorder._new_voice_session()
+            assert recorder._voice_working is not None
+            assert recorder._voice_session_dir is not None
+            recorder._voice_working.write_bytes(b"old-audio")
+            recorder._voice_duration_ms = 5000
+            recorder._voice_cursor_ms = 2500
+
+            self.assertEqual(recorder.voice_seek(-100)["position_ms"], 2400)
+            self.assertEqual(recorder.voice_boundary(end=False)["position_ms"], 0)
+            self.assertEqual(recorder.voice_boundary(end=True)["position_ms"], 5000)
+            recorder.voice_set_position(2000)
+
+            segment = recorder._voice_session_dir / "segment-000001.mp3"
+            segment.write_bytes(b"replacement")
+            recorder._voice_active_segment = segment
+            recorder._voice_recording_start_ms = 2000
+            recorder._commit_voice_segment(1000)
+
+            snapshot = recorder.voice_snapshot()
+            self.assertEqual(snapshot["position_ms"], 3000)
+            self.assertEqual(snapshot["duration_ms"], 5000)
+            self.assertEqual(recorder._voice_working.read_bytes(), b"edited")
+            command = commands[0]
+            filter_graph = command[command.index("-filter_complex") + 1]
+            self.assertIn("atrim=start=0:end=2.000", filter_graph)
+            self.assertIn("atrim=start=3.000", filter_graph)
+            self.assertIn("concat=n=3", filter_graph)

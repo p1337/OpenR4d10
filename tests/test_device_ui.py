@@ -574,6 +574,30 @@ class DeviceUiTests(unittest.TestCase):
         self.assertIn("Dyktafon", captured)
         self.assertNotIn("Rejestrator głosu", captured)
 
+    def test_voice_hint_is_large_once_above_the_timeline_and_cursor_is_visible(self) -> None:
+        captured = []
+        original_text = ImageDraw.ImageDraw.text
+
+        def capture_text(draw, xy, text, *args, **kwargs):
+            captured.append((str(text), xy, getattr(kwargs.get("font"), "size", None)))
+            return original_text(draw, xy, text, *args, **kwargs)
+
+        state = DeviceUiState(
+            service_index=SERVICES.index("REC"),
+            language="pl",
+            recorder_position_ms=1200,
+            recorder_duration_ms=3000,
+        )
+        with patch.object(ImageDraw.ImageDraw, "text", capture_text):
+            image = render_device_ui(state)
+        hints = [item for item in captured if item[0] == "Przytrzymaj PTT, aby nagrywać"]
+        self.assertEqual(len(hints), 1)
+        self.assertEqual(hints[0][2], 12)
+        self.assertLess(hints[0][1][1], 130)
+        self.assertIn("GRAJ", [item[0] for item in captured])
+        self.assertNotIn("PTT", [item[0] for item in captured])
+        self.assertNotEqual(image.getpixel((99, 190)), (7, 17, 20))
+
     def test_global_audio_playback_turns_shared_glow_green(self) -> None:
         state = DeviceUiState(
             service_index=SERVICES.index("WEATHER"),

@@ -516,6 +516,12 @@ Browserstream und Recorder verteilen können.
 
 ## 9. Spracheingabe, PTT und Vorlesen
 
+**Globale Begriffsfestlegung:** Wenn Robert `PTT` sagt, meint er immer den
+separaten physischen Whisplay-Hardwaretaster auf BCM17. Backspace ist nur die
+Browser-Simulation genau dieses Tasters. Weder ein Encoder-Druck noch eine
+gezeichnete Displayfläche darf als PTT bezeichnet oder behandelt werden.
+Diese Definition ist in jeder späteren PTT-Anforderung mitzulesen.
+
 Der vorhandene physische PTT-/Displaybutton erhält folgende Zusatzfunktion:
 
 - Doppelklick aktiviert die deutsche Spracheingabe,
@@ -553,6 +559,16 @@ Jedes Paket enthält mindestens:
 - Datenbankschema und Migrationen,
 - Updatequelle,
 - Prüfsumme beziehungsweise Signaturinformation.
+
+Auch die heute noch im Core zusammengefassten eingebauten Dienste werden in
+einer kontrollierten Architektur-Migration zu eigenständigen, im Git sichtbaren
+Modulverzeichnissen überführt. **Jeder einzelne Dienst** erhält mindestens ein
+eigenes Manifest, einen klaren Einstiegspunkt, Tests und eine eigene vollständige
+`README.md` mit Zweck, Bedienung, Datenhaltung, Berechtigungen, Abhängigkeiten,
+Sicherheitsgrenze und Diagnose. Die Migration darf keine zweite parallele
+Implementierung erzeugen: zuerst werden bestehende Codepfade, APIs und Speicher-
+verträge erfasst, dann wird ein Dienst nach dem anderen unter unverändertem
+Core-Broker-Vertrag herausgelöst und durch Regressionstests abgesichert.
 
 Benötigt ein Dienst einen Token oder API-Schlüssel, muss seine Konfiguration:
 
@@ -3010,3 +3026,45 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Audioausgabe sofort: mpv-basierte Streams, Radio-Ringspeicher,
   Ambient-Zusatzlagen und BrandMeister. Erst danach darf Mikrofonaufnahme
   beginnen.
+
+### 2026-11-01 – Positionsbearbeitung in der Sprachaufzeichnung
+
+- Bereits das Öffnen von `Dyktafon`/`Sprachaufzeichnung` beendet weiterhin
+  synchron und vor jeder weiteren Recorderaktion sämtliche Streamingquellen:
+  BrandMeister, Ambient-Grundton und -Zusatzlagen, Radio-Ringspeicher sowie den
+  gemeinsamen mpv-Player. Die Recorderansicht darf niemals parallel zu einem
+  fremden Stream starten.
+- Eine pausierte aktuelle Sprachaufnahme besitzt einen sichtbaren Zeitcursor.
+  Der rechte äußere Encoder verschiebt ihn pro Rastung um exakt eine Sekunde:
+  gegen den Uhrzeigersinn zurück, im Uhrzeigersinn vor. Der linke äußere
+  Encoder übernimmt im Recorder die anschließend ausdrücklich zugeordnete
+  Feinjustierung um 0,1 Sekunden pro Rastung und ist dort deshalb nicht die
+  Lautstärke. Der rechte innere Encoder bleibt die notwendige Dienstwahl und
+  wird nicht doppelt belegt.
+- Der linke innere Encoder springt im Recorder richtungsabhängig sofort an
+  eine Grenze: gegen den Uhrzeigersinn zum Anfang, im Uhrzeigersinn zum Ende.
+  Der rechte Druck startet die aktuelle Aufnahme ab dem Cursor beziehungsweise
+  pausiert ihre Wiedergabe. Anfangswiedergabe ist dadurch nach einem Sprung auf
+  null ohne Browser möglich.
+- Die vertikale rechte Randbeschriftung bezeichnet ausschließlich den rechten
+  Encoder-Druck und lautet im Recorder deshalb lokalisiert `PLAY`/`PAUSE`
+  (`GRAJ`/`PAUZA` auf Polnisch), niemals `PTT`. PTT ist der separate reale
+  Whisplay-Hardwaretaster beziehungsweise dessen Backspace-Simulation und
+  bleibt allein für Aufnahmehalten/Doppelklick zuständig.
+- Die Wiedergabe im Sprachrecorder verwendet immer 100 Prozent Lautstärke; der
+  linke äußere Encoder bleibt dort ausschließlich die 0,1-Sekunden-
+  Feinpositionierung. Beim Verlassen wird die zuvor für andere Audiodienste
+  gültige Lautstärke wiederhergestellt, damit Radio oder Ambient nicht
+  unbeabsichtigt mit Recorder-Maximalpegel starten.
+- Beginnt PTT bei einem Cursor vor dem bisherigen Ende, überschreibt die neue
+  Mikrofonaufnahme genau den zeitlich überdeckten Abschnitt. Der davor liegende
+  Teil und ein durch die neue Aufnahme nicht erreichter Rest danach bleiben
+  erhalten. Arbeitsdatei und Bearbeitungsmetadaten bleiben bis zum atomaren
+  Abschluss im absturzsicheren Pending-Verzeichnis.
+- Positionsänderungen sind während laufender Mikrofonaufnahme gesperrt. Vor
+  einer neuen Aufnahme endet eine interne Recorder-Wiedergabe; fremde Streams
+  werden dadurch nicht wieder gestartet.
+- Der lokalisierte Aufnahmehinweis steht mindestens in der Größe der
+  Statusinformationen in einem eigenen Bereich oberhalb der Timeline. Er darf
+  weder als winzige Schrift noch ein zweites Mal mitten in der Audiospur
+  erscheinen. Cursor, Gesamtdauer und Wiedergabestatus bleiben lesbar.

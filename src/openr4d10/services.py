@@ -232,6 +232,8 @@ class ServiceCatalog:
         self.active_preset_id: str | None = None
         self.active_station_id: int | None = None
         self.active_weather_channel_id: int | None = None
+        self._voice_playback_active = False
+        self._voice_previous_volume: int | None = None
         self.selected_ambient_scene_id: int | None = None
         self.active_ambient_scene_id: int | None = None
         self.selected_ambient_layer_id = AMBIENT_LAYER_IDS[0]
@@ -787,9 +789,17 @@ class ServiceCatalog:
     def _open_voice_recorder(self) -> dict[str, object]:
         """Give microphone capture exclusive ownership and silence playback."""
         self._require_enabled("recorder")
+        if self.active_service != "recorder" and self._voice_previous_volume is None:
+            self._voice_previous_volume = int(self.player.state.volume)
         self.brandmeister.stop()
         self._stop_ambient_layers()
         self.player.stop()
+        volume_setter = getattr(self.player, "set_volume", None)
+        if callable(volume_setter):
+            volume_setter(100)
+        else:
+            self.player.state.volume = 100
+        self._voice_playback_active = False
         if self.radio_buffer is not None:
             self.radio_buffer.stop(flush=True)
         self.active_service = "recorder"
@@ -799,6 +809,22 @@ class ServiceCatalog:
         self.active_ambient_scene_id = None
         snapshot = getattr(self.recorder, "voice_snapshot", None)
         return snapshot() if callable(snapshot) else self.recorder.state.as_dict()
+
+    def _sync_voice_playback_position(self) -> None:
+        if not self._voice_playback_active:
+            return
+        position_reader = getattr(self.player, "position_seconds", None)
+        position = position_reader() if callable(position_reader) else None
+        setter = getattr(self.recorder, "voice_set_position", None)
+        if isinstance(position, (int, float)) and not isinstance(position, bool) and callable(setter):
+            setter(round(float(position) * 1000))
+
+    def _stop_voice_playback(self, *, sync: bool = True) -> None:
+        if sync:
+            self._sync_voice_playback_position()
+        if self._voice_playback_active:
+            self.player.stop()
+        self._voice_playback_active = False
 
     def _upgrade_germany_weather_default(self) -> None:
         """Change only the untouched seeded Germany channel; never recreate it."""
@@ -1791,6 +1817,7 @@ class ServiceCatalog:
             self._require_enabled("recorder")
             if self.active_service != "recorder":
                 self._open_voice_recorder()
+            self._stop_voice_playback()
             start = getattr(self.recorder, "voice_start", None)
             if not callable(start):
                 raise RuntimeError("voice recording is unavailable")
@@ -1804,12 +1831,61 @@ class ServiceCatalog:
             if not callable(pause):
                 raise RuntimeError("voice recording is unavailable")
             return {"recording": pause()}
+        elif action == "voice_recorder_seek":
+            self._require_enabled("recorder")
+            delta_ms = request.get("delta_ms")
+            if isinstance(delta_ms, bool) or not isinstance(delta_ms, int):
+                raise ValueError("voice recorder seek requires integer delta_ms")
+            self._stop_voice_playback()
+            seek = getattr(self.recorder, "voice_seek", None)
+            if not callable(seek):
+                raise RuntimeError("voice recording seek is unavailable")
+            return {"recording": seek(delta_ms)}
+        elif action == "voice_recorder_boundary":
+            self._require_enabled("recorder")
+            end = request.get("end")
+            if not isinstance(end, bool):
+                raise ValueError("voice recorder boundary requires boolean end")
+            self._stop_voice_playback()
+            boundary = getattr(self.recorder, "voice_boundary", None)
+            if not callable(boundary):
+                raise RuntimeError("voice recording navigation is unavailable")
+            return {"recording": boundary(end=end)}
+        elif action == "voice_recorder_play_toggle":
+            self._require_enabled("recorder")
+            if self.active_service != "recorder":
+                self._open_voice_recorder()
+            if self._voice_playback_active and self.player.state.state == "playing":
+                self._sync_voice_playback_position()
+                return {"playback": self.player.toggle_pause()}
+            if self._voice_playback_active and self.player.state.state == "paused":
+                return {"playback": self.player.toggle_pause()}
+            path_reader = getattr(self.recorder, "voice_playback_path", None)
+            path = path_reader() if callable(path_reader) else None
+            if not isinstance(path, Path):
+                raise ValueError("record something before playback")
+            voice = self.recorder.voice_snapshot()
+            self.player.load(str(path))
+            seek = getattr(self.player, "seek_absolute", None)
+            if callable(seek):
+                seek(int(voice.get("position_ms") or 0) / 1000.0)
+            self._voice_playback_active = True
+            return {"playback": self.player.state.as_dict()}
         elif action == "voice_recorder_close":
+            self._stop_voice_playback()
             finalize = getattr(self.recorder, "voice_finalize", None)
             if not callable(finalize):
                 raise RuntimeError("voice recording is unavailable")
             recording = finalize()
             self.scan_media()
+            if self._voice_previous_volume is not None:
+                restore_volume = self._voice_previous_volume
+                self._voice_previous_volume = None
+                volume_setter = getattr(self.player, "set_volume", None)
+                if callable(volume_setter):
+                    volume_setter(restore_volume)
+                else:
+                    self.player.state.volume = restore_volume
             if self.active_service == "recorder":
                 self.active_service = "system"
             return {"recording": recording}
@@ -3516,6 +3592,7 @@ class ServiceCatalog:
                 "volume": playback.volume,
             }
         if requested == "REC" or self.active_service == "recorder":
+            self._sync_voice_playback_position()
             snapshot = getattr(self.recorder, "voice_snapshot", None)
             voice = (
                 snapshot()
@@ -3524,6 +3601,9 @@ class ServiceCatalog:
             )
             state = str(voice.get("state") or "stopped")
             continuous = voice.get("continuous") is True
+            voice_playing = (
+                self._voice_playback_active and self.player.state.state == "playing"
+            )
             title = (
                 "Continuous recording"
                 if state == "recording" and continuous
@@ -3538,12 +3618,15 @@ class ServiceCatalog:
                 "station": "Voice Recorder",
                 "title": title,
                 "subtitle": "Right microphone above · left microphone below",
-                "playing": False,
-                "audio_active": False,
+                "playing": voice_playing,
+                "audio_active": voice_playing,
                 "recording": state == "recording",
                 "continuous": continuous,
                 "timeline": voice.get("timeline") or [],
                 "output": voice.get("output"),
+                "position_ms": voice.get("position_ms") or 0,
+                "duration_ms": voice.get("duration_ms") or 0,
+                "channel_label": f"{int(voice.get('position_ms') or 0) / 1000:.1f}",
                 "volume": playback.volume,
             }
         if playback.state not in {"playing", "paused"}:

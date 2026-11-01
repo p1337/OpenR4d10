@@ -1369,6 +1369,43 @@ class ServiceCatalogTests(unittest.TestCase):
             def as_dict(self):
                 return {"state": self.state, "volume": self.volume}
 
+        class Brandmeister:
+            def __init__(self) -> None:
+                self.stops = 0
+
+            def stop(self):
+                self.stops += 1
+                return {"status": "stopped", "volume": 30}
+
+            def snapshot(self):
+                return {"status": "stopped", "volume": 30}
+
+            def close(self):
+                pass
+
+        class Buffer:
+            def __init__(self) -> None:
+                self.stops = []
+
+            def stop(self, *, flush=False):
+                self.stops.append(flush)
+
+            def snapshot(self):
+                return {"state": "stopped"}
+
+            def set_continuous(self, _enabled):
+                return self.snapshot()
+
+            def close(self):
+                pass
+
+        class AmbientLayer:
+            def __init__(self) -> None:
+                self.closed = False
+
+            def close(self):
+                self.closed = True
+
         class Player:
             def __init__(self) -> None:
                 self.state = State()
@@ -1422,20 +1459,35 @@ class ServiceCatalogTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             player = Player()
             recorder = Recorder()
+            brandmeister = Brandmeister()
+            buffer = Buffer()
+            layer = AmbientLayer()
             catalog = ServiceCatalog(
-                Path(raw).resolve(), player=player, recorder=recorder
+                Path(raw).resolve(),
+                player=player,
+                recorder=recorder,
+                brandmeister=brandmeister,  # type: ignore[arg-type]
+                radio_buffer=buffer,  # type: ignore[arg-type]
             )
+            catalog._ambient_layer_players["test"] = layer  # type: ignore[assignment]
             try:
                 catalog.control({"action": "voice_recorder_open"})
+                open_volume = player.state.volume
                 catalog.control({"action": "voice_recorder_hold"})
                 catalog.control({"action": "voice_recorder_pause"})
                 catalog.control({"action": "voice_recorder_continuous"})
                 overlay = catalog.receiver_overlay("REC")
                 catalog.control({"action": "voice_recorder_close"})
+                restored_volume = player.state.volume
             finally:
                 catalog.close()
 
         self.assertEqual(player.stops, 1)
+        self.assertEqual(brandmeister.stops, 1)
+        self.assertEqual(buffer.stops, [True])
+        self.assertTrue(layer.closed)
+        self.assertEqual(open_volume, 100)
+        self.assertEqual(restored_volume, 30)
         self.assertEqual(overlay["service"], "REC")
         self.assertTrue(overlay["recording"])
         self.assertTrue(overlay["continuous"])

@@ -258,6 +258,21 @@ loads favorite recordings in random order with an endless playlist; the all-
 recordings action shuffles once. Previous, next, favorite and confirmed-delete
 operations use stable database IDs. Start volume is always 30 percent.
 
+The microphone VoiceRecorder is an explicit exclusive audio owner. Entering
+its view first stops BrandMeister, every Ambient layer, the common mpv source
+and the ICY radio buffer. Its pending directory contains an atomically updated
+edit manifest plus one working MP3. The logical cursor is moved in one-second
+steps by `right_outer`, in 0.1-second fine steps by `left_outer`, or directly
+to start/end by `left_inner`; `right_press` uses exact absolute mpv seek and
+toggles playback from that cursor. A later PTT capture uses ffmpeg through an
+argument-only boundary to splice the new stereo segment over the covered
+interval while preserving the prefix and any unreached suffix. The manifest
+and captured segment remain recoverable until the working MP3 is replaced.
+Leaving the service finalizes that working file in the fixed
+`Media/VoiceRecorder/JJMMTT` tree. Recorder playback temporarily owns a fixed
+100-percent player level; its entry remembers and its exit restores the prior
+global service volume.
+
 Physical media surfaces use one shared asymmetric mask: 12-pixel upper corners,
 43-pixel lower corners matching the panel, and equal minimal side/bottom
 margins. This applies to station artwork and visual service media rather than

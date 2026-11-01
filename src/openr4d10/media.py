@@ -13,6 +13,7 @@ import signal
 import socket
 import subprocess
 import threading
+import time
 from typing import Any, Callable
 from urllib.parse import SplitResult, urlsplit, urlunsplit
 
@@ -234,6 +235,29 @@ class MpvEngine:
             self.state.state = "paused" if self.state.paused else "playing"
             return self.state.as_dict()
 
+    def property(self, name: str) -> Any:
+        if not re.fullmatch(r"[a-z0-9-]{1,64}", name):
+            raise ValueError("invalid mpv property")
+        with self._lock:
+            return self._command(["get_property", name]).get("data")
+
+    def seek_absolute(self, seconds: float) -> dict[str, Any]:
+        if isinstance(seconds, bool) or not isinstance(seconds, (int, float)):
+            raise ValueError("seek position must be numeric")
+        position = max(0.0, float(seconds))
+        with self._lock:
+            self._command(["seek", position, "absolute", "exact"])
+            return self.state.as_dict()
+
+    def position_seconds(self) -> float | None:
+        try:
+            value = self.property("time-pos")
+        except (OSError, json.JSONDecodeError, MediaError):
+            return None
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return max(0.0, float(value))
+
     def set_volume(self, volume: int) -> dict[str, Any]:
         if isinstance(volume, bool) or not isinstance(volume, int) or not 0 <= volume <= 100:
             raise ValueError("volume must be an integer from 0 to 100")
@@ -284,12 +308,15 @@ class RecordingState:
     continuous: bool = False
     session_active: bool = False
     timeline: list[list[int]] = field(default_factory=list)
+    position_ms: int = 0
+    duration_ms: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
 PopenFactory = Callable[..., subprocess.Popen[bytes]]
+VoiceEditRunner = Callable[[list[str]], None]
 
 
 class StreamRecorder:
@@ -303,6 +330,7 @@ class StreamRecorder:
         voice_root: Path | None = None,
         capture_device: str = "whisplaysound",
         popen: PopenFactory = subprocess.Popen,
+        edit_runner: VoiceEditRunner | None = None,
     ) -> None:
         if not recordings_root.is_absolute() or not _is_absolute_target_path(executable):
             raise ValueError("recorder paths must be absolute")
@@ -316,16 +344,64 @@ class StreamRecorder:
             raise ValueError("invalid ALSA capture device")
         self.capture_device = capture_device
         self.popen = popen
+        self.edit_runner = edit_runner or self._run_voice_edit
         self.process: subprocess.Popen[bytes] | None = None
         self.state = RecordingState()
         self._voice_session_dir: Path | None = None
         self._voice_output: Path | None = None
         self._voice_segment_index = 0
+        self._voice_working: Path | None = None
+        self._voice_active_segment: Path | None = None
+        self._voice_recording_started: float | None = None
+        self._voice_recording_start_ms = 0
+        self._voice_cursor_ms = 0
+        self._voice_duration_ms = 0
         self._voice_timeline: deque[list[int]] = deque(maxlen=96)
         self._voice_levels: dict[int, int] = {1: 0, 2: 0}
         self._voice_stats_thread: threading.Thread | None = None
         self._voice_lock = threading.RLock()
         self._recover_voice_sessions()
+
+    @staticmethod
+    def _run_voice_edit(command: list[str]) -> None:
+        try:
+            subprocess.run(
+                command,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True,
+                timeout=120,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise MediaError(f"cannot edit voice recording: {exc}") from exc
+
+    def _probe_audio_duration_ms(self, source: Path) -> int:
+        ffprobe = self.executable.with_name("ffprobe")
+        try:
+            result = subprocess.run(
+                [
+                    _target_path_string(ffprobe),
+                    "-v",
+                    "error",
+                    "-show_entries",
+                    "format=duration",
+                    "-of",
+                    "default=noprint_wrappers=1:nokey=1",
+                    str(source),
+                ],
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=15,
+            )
+            return max(1, round(float(result.stdout.strip()) * 1000))
+        except (OSError, ValueError, subprocess.SubprocessError):
+            # Voice segments are fixed 160 kbit/s MP3. The bounded estimate is
+            # only a last-resort crash recovery value when ffprobe cannot read
+            # a partially closed file.
+            return max(1, round(source.stat().st_size / 20))
 
     def command_line(self, source: str, output: Path) -> list[str]:
         return [
@@ -419,8 +495,183 @@ class StreamRecorder:
         self._voice_session_dir = pending
         self._voice_output = output
         self._voice_segment_index = 0
+        self._voice_working = pending / "working.mp3"
+        self._voice_active_segment = None
+        self._voice_recording_started = None
+        self._voice_recording_start_ms = 0
+        self._voice_cursor_ms = 0
+        self._voice_duration_ms = 0
         self._voice_timeline.clear()
         self._voice_levels = {1: 0, 2: 0}
+        self._persist_voice_manifest()
+
+    def _voice_manifest_path(self) -> Path | None:
+        if self._voice_session_dir is None:
+            return None
+        return self._voice_session_dir / "edit.json"
+
+    def _persist_voice_manifest(self) -> None:
+        target = self._voice_manifest_path()
+        if target is None:
+            return
+        payload = {
+            "version": 1,
+            "position_ms": self._voice_cursor_ms,
+            "duration_ms": self._voice_duration_ms,
+            "recording_start_ms": self._voice_recording_start_ms,
+            "active_segment": (
+                self._voice_active_segment.name
+                if self._voice_active_segment is not None
+                else None
+            ),
+        }
+        temporary = target.with_suffix(".json.tmp")
+        temporary.write_text(
+            json.dumps(payload, separators=(",", ":")), encoding="utf-8"
+        )
+        temporary.replace(target)
+
+    def voice_seek(self, delta_ms: int) -> dict[str, Any]:
+        if isinstance(delta_ms, bool) or not isinstance(delta_ms, int):
+            raise ValueError("voice seek delta must be an integer")
+        with self._voice_lock:
+            if self.process is not None and self.process.poll() is None:
+                raise MediaError("pause recording before changing position")
+            self._voice_cursor_ms = max(
+                0, min(self._voice_duration_ms, self._voice_cursor_ms + delta_ms)
+            )
+            self.state.position_ms = self._voice_cursor_ms
+            self.state.duration_ms = self._voice_duration_ms
+            self._persist_voice_manifest()
+            return self.state.as_dict()
+
+    def voice_boundary(self, *, end: bool) -> dict[str, Any]:
+        with self._voice_lock:
+            if self.process is not None and self.process.poll() is None:
+                raise MediaError("pause recording before changing position")
+            self._voice_cursor_ms = self._voice_duration_ms if end else 0
+            self.state.position_ms = self._voice_cursor_ms
+            self.state.duration_ms = self._voice_duration_ms
+            self._persist_voice_manifest()
+            return self.state.as_dict()
+
+    def voice_set_position(self, position_ms: int) -> dict[str, Any]:
+        if isinstance(position_ms, bool) or not isinstance(position_ms, int):
+            raise ValueError("voice position must be an integer")
+        with self._voice_lock:
+            self._voice_cursor_ms = max(0, min(self._voice_duration_ms, position_ms))
+            self.state.position_ms = self._voice_cursor_ms
+            self.state.duration_ms = self._voice_duration_ms
+            self._persist_voice_manifest()
+            return self.state.as_dict()
+
+    def voice_playback_path(self) -> Path | None:
+        with self._voice_lock:
+            if self.process is not None and self.process.poll() is None:
+                return None
+            if self._voice_working is None or not self._voice_working.is_file():
+                return None
+            return self._voice_working
+
+    def _voice_edit_command(
+        self,
+        working: Path,
+        segment: Path,
+        output: Path,
+        *,
+        cursor_ms: int,
+        segment_ms: int,
+        previous_duration_ms: int,
+    ) -> list[str]:
+        cursor = cursor_ms / 1000.0
+        segment_duration = segment_ms / 1000.0
+        suffix_start = min(previous_duration_ms / 1000.0, cursor + segment_duration)
+        filters: list[str] = []
+        inputs: list[str] = []
+        if cursor_ms > 0:
+            filters.append(
+                f"[0:a]atrim=start=0:end={cursor:.3f},asetpts=PTS-STARTPTS[prefix]"
+            )
+            inputs.append("[prefix]")
+        filters.append("[1:a]asetpts=PTS-STARTPTS[new]")
+        inputs.append("[new]")
+        if cursor_ms + segment_ms < previous_duration_ms:
+            filters.append(
+                f"[0:a]atrim=start={suffix_start:.3f},asetpts=PTS-STARTPTS[suffix]"
+            )
+            inputs.append("[suffix]")
+        filters.append(f"{''.join(inputs)}concat=n={len(inputs)}:v=0:a=1[out]")
+        return [
+            _target_path_string(self.executable),
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "warning",
+            "-y",
+            "-i",
+            str(working),
+            "-i",
+            str(segment),
+            "-filter_complex",
+            ";".join(filters),
+            "-map",
+            "[out]",
+            "-c:a",
+            "libmp3lame",
+            "-b:a",
+            "160k",
+            "-vn",
+            str(output),
+        ]
+
+    def _commit_voice_segment(self, segment_ms: int) -> None:
+        segment = self._voice_active_segment
+        working = self._voice_working
+        if segment is None or working is None or not segment.is_file():
+            return
+        segment_ms = max(1, segment_ms)
+        start_ms = max(0, min(self._voice_duration_ms, self._voice_recording_start_ms))
+        if not working.exists():
+            segment.replace(working)
+            self._voice_duration_ms = segment_ms
+        elif start_ms >= self._voice_duration_ms:
+            temporary = working.with_suffix(".append.tmp")
+            with temporary.open("wb") as target:
+                for source_path in (working, segment):
+                    with source_path.open("rb") as source:
+                        while chunk := source.read(1024 * 1024):
+                            target.write(chunk)
+                target.flush()
+                os.fsync(target.fileno())
+            temporary.replace(working)
+            segment.unlink(missing_ok=True)
+            self._voice_duration_ms += segment_ms
+        else:
+            temporary = working.with_suffix(".edit.tmp.mp3")
+            command = self._voice_edit_command(
+                working,
+                segment,
+                temporary,
+                cursor_ms=start_ms,
+                segment_ms=segment_ms,
+                previous_duration_ms=self._voice_duration_ms,
+            )
+            self.edit_runner(command)
+            if not temporary.is_file() or temporary.stat().st_size == 0:
+                raise MediaError("voice edit did not create an output file")
+            temporary.replace(working)
+            segment.unlink(missing_ok=True)
+            self._voice_duration_ms = max(
+                self._voice_duration_ms, start_ms + segment_ms
+            )
+        self._voice_cursor_ms = min(
+            self._voice_duration_ms, start_ms + segment_ms
+        )
+        self._voice_active_segment = None
+        self._voice_recording_started = None
+        self.state.position_ms = self._voice_cursor_ms
+        self.state.duration_ms = self._voice_duration_ms
+        self._persist_voice_manifest()
 
     @staticmethod
     def _level_percent(raw: str) -> int:
@@ -478,6 +729,10 @@ class StreamRecorder:
             assert self._voice_output is not None
             self._voice_segment_index += 1
             segment = self._voice_session_dir / f"segment-{self._voice_segment_index:06d}.mp3"
+            self._voice_active_segment = segment
+            self._voice_recording_start_ms = self._voice_cursor_ms
+            self._voice_recording_started = time.monotonic()
+            self._persist_voice_manifest()
             try:
                 self.process = self.popen(
                     self.voice_command_line(segment),
@@ -488,6 +743,9 @@ class StreamRecorder:
                     start_new_session=True,
                 )
             except OSError as exc:
+                self._voice_active_segment = None
+                self._voice_recording_started = None
+                self._persist_voice_manifest()
                 self.state = RecordingState(
                     state="error", error=str(exc), mode="voice", session_active=True
                 )
@@ -500,6 +758,8 @@ class StreamRecorder:
                 continuous=continuous,
                 session_active=True,
                 timeline=list(self._voice_timeline),
+                position_ms=self._voice_cursor_ms,
+                duration_ms=self._voice_duration_ms,
             )
             self._voice_stats_thread = threading.Thread(
                 target=self._read_voice_levels,
@@ -527,16 +787,29 @@ class StreamRecorder:
 
     def voice_pause(self) -> dict[str, Any]:
         with self._voice_lock:
+            started = self._voice_recording_started
+            elapsed_ms = (
+                max(1, round((time.monotonic() - started) * 1000))
+                if started is not None
+                else 1
+            )
             self._stop_active_process()
+            if self._voice_active_segment is not None:
+                self._commit_voice_segment(elapsed_ms)
             self.state.state = "paused" if self._voice_session_dir is not None else "stopped"
             self.state.continuous = False
             self.state.session_active = self._voice_session_dir is not None
             self.state.timeline = list(self._voice_timeline)
+            self.state.position_ms = self._voice_cursor_ms
+            self.state.duration_ms = self._voice_duration_ms
             return self.state.as_dict()
 
     @staticmethod
     def _merge_voice_segments(session_dir: Path, output: Path) -> Path | None:
+        working = session_dir / "working.mp3"
         segments = [item for item in sorted(session_dir.glob("segment-*.mp3")) if item.stat().st_size]
+        if working.is_file() and working.stat().st_size:
+            segments.insert(0, working)
         if not segments:
             return None
         output.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
@@ -551,6 +824,8 @@ class StreamRecorder:
         temporary.replace(output)
         for segment in segments:
             segment.unlink(missing_ok=True)
+        (session_dir / "edit.json").unlink(missing_ok=True)
+        (session_dir / "edit.json.tmp").unlink(missing_ok=True)
         try:
             session_dir.rmdir()
         except OSError:
@@ -565,8 +840,41 @@ class StreamRecorder:
             if not re.fullmatch(r"\d{6}_\d{6}_VoiceRecorder", stem):
                 continue
             try:
+                manifest_path = session_dir / "edit.json"
+                working = session_dir / "working.mp3"
+                if manifest_path.is_file() and working.is_file():
+                    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                    active_name = manifest.get("active_segment")
+                    cursor_ms = manifest.get("recording_start_ms")
+                    duration_ms = manifest.get("duration_ms")
+                    if (
+                        isinstance(active_name, str)
+                        and re.fullmatch(r"segment-\d{6}\.mp3", active_name)
+                        and isinstance(cursor_ms, int)
+                        and not isinstance(cursor_ms, bool)
+                        and isinstance(duration_ms, int)
+                        and not isinstance(duration_ms, bool)
+                    ):
+                        segment = session_dir / active_name
+                        if segment.is_file() and segment.stat().st_size and cursor_ms < duration_ms:
+                            segment_ms = self._probe_audio_duration_ms(segment)
+                            temporary = working.with_suffix(".recover.tmp.mp3")
+                            self.edit_runner(
+                                self._voice_edit_command(
+                                    working,
+                                    segment,
+                                    temporary,
+                                    cursor_ms=max(0, cursor_ms),
+                                    segment_ms=segment_ms,
+                                    previous_duration_ms=max(0, duration_ms),
+                                )
+                            )
+                            if not temporary.is_file() or temporary.stat().st_size == 0:
+                                raise MediaError("voice recovery did not create an output file")
+                            temporary.replace(working)
+                            segment.unlink(missing_ok=True)
                 self._merge_voice_segments(session_dir, session_dir.parent / f"{stem}.mp3")
-            except OSError:
+            except (OSError, ValueError, json.JSONDecodeError, MediaError):
                 continue
 
     def voice_finalize(self) -> dict[str, Any]:
@@ -580,6 +888,12 @@ class StreamRecorder:
             self._voice_session_dir = None
             self._voice_output = None
             self._voice_segment_index = 0
+            self._voice_working = None
+            self._voice_active_segment = None
+            self._voice_recording_started = None
+            self._voice_recording_start_ms = 0
+            self._voice_cursor_ms = 0
+            self._voice_duration_ms = 0
             self.state = RecordingState(
                 state="stopped",
                 output=finalized.name if finalized is not None else None,
@@ -591,6 +905,8 @@ class StreamRecorder:
     def voice_snapshot(self) -> dict[str, Any]:
         with self._voice_lock:
             self.state.timeline = list(self._voice_timeline)
+            self.state.position_ms = self._voice_cursor_ms
+            self.state.duration_ms = self._voice_duration_ms
             return self.state.as_dict()
 
     def stop(self) -> dict[str, Any]:
