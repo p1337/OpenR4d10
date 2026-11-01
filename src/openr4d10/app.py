@@ -30,7 +30,7 @@ VOICE_DOUBLE_CLICK_SECONDS = 0.45
 VOICE_TAP_MAX_SECONDS = 0.35
 RECORDER_FRAME_INTERVAL_SECONDS = 0.1
 DMR_FRAME_INTERVAL_SECONDS = 0.1
-PLAYER_FRAME_INTERVAL_SECONDS = 0.1
+PLAYER_FRAME_INTERVAL_SECONDS = 0.04
 RECORDER_INTERACTION_QUIET_SECONDS = 0.2
 DMR_PTT_HOLD_SECONDS = 2.0
 
@@ -226,16 +226,24 @@ class OpenR4d10App:
         if callable(setter):
             setter(None)
 
-    def _refresh_device_video_frame(self) -> None:
+    def _refresh_device_video_frame(self) -> bool | None:
         if self.services is None:
-            return
+            return None
         provider = getattr(self.services, "device_video_frame", None)
+        presenter = getattr(self.display, "present_video_frame", None)
         setter = getattr(self.display, "set_video_frame", None)
-        if not callable(provider) or not callable(setter):
-            return
+        if not callable(provider):
+            return None
         payload = provider()
-        if payload is not None:
+        if payload is None:
+            return None
+        if callable(presenter):
+            presenter(payload)
+            return True
+        if callable(setter):
             setter(payload)
+            return False
+        return None
 
     def status_snapshot(self) -> dict[str, Any]:
         with self._status_lock:
@@ -811,6 +819,11 @@ class OpenR4d10App:
             # only the ordered UI mutation now and present one resolved frame
             # after that lifecycle work, never a stale intermediate frame.
             device_state = state_only_handler(event)
+        elif media_result is not None and callable(state_only_handler):
+            # The service action already resolved the authoritative playback,
+            # channel or volume state.  Mutate the ordered UI state without a
+            # stale full-panel transfer; render the resolved result once below.
+            device_state = state_only_handler(event)
         else:
             device_state = handler(event)
         new_service = (
@@ -1080,11 +1093,12 @@ class OpenR4d10App:
                                 )
                             frame_interval = RECORDER_FRAME_INTERVAL_SECONDS
                         else:
-                            self._refresh_device_video_frame()
-                            self.render_interaction_once(
-                                "PLAYER",
-                                periodic_generation=periodic_generation,
-                            )
+                            partially_presented = self._refresh_device_video_frame()
+                            if partially_presented is False:
+                                self.render_interaction_once(
+                                    "PLAYER",
+                                    periodic_generation=periodic_generation,
+                                )
                             frame_interval = PLAYER_FRAME_INTERVAL_SECONDS
                         delay = max(
                             0.0,

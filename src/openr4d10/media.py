@@ -132,7 +132,7 @@ class MpvEngine:
             "--idle=yes",
             "--video=auto",
             "--vo=null",
-            "--vo-null-fps=10",
+            "--vo-null-fps=25",
             "--video-sync=audio",
             "--screenshot-sw=yes",
             "--screenshot-high-bit-depth=no",

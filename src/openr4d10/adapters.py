@@ -31,6 +31,7 @@ from .whisplay import WhisplayError, WhisplayPanel
 LOG = logging.getLogger(__name__)
 DISPLAY_MIN_FRAME_INTERVAL_SECONDS = 0.1
 HOTSPOT_REFRESH_INTERVAL_SECONDS = 1.0
+VIDEO_REGION = (7, 105, 226, 168)
 
 
 class AdapterError(RuntimeError):
@@ -386,26 +387,56 @@ class WhisplayDisplay:
     def set_video_frame(self, payload: bytes | None) -> None:
         """Install one bounded transient mpv frame for the native compositor."""
 
-        with self._lock:
-            if payload is None:
+        if payload is None:
+            with self._lock:
                 self._video_frame = None
+            return
+        frame = self._decode_video_frame(payload)
+        with self._lock:
+            self._video_frame = frame
+
+    @staticmethod
+    def _decode_video_frame(payload: bytes) -> Image.Image:
+        if not isinstance(payload, bytes) or not 4 <= len(payload) <= 4 * 1024 * 1024:
+            raise ValueError("video frame must be a bounded JPEG byte string")
+        try:
+            with Image.open(BytesIO(payload)) as source:
+                source.load()
+                if (
+                    source.format != "JPEG"
+                    or source.width < 1
+                    or source.height < 1
+                    or source.width > 4096
+                    or source.height > 2160
+                ):
+                    raise ValueError("video frame dimensions are invalid")
+                return source.convert("RGB").copy()
+        except OSError as exc:
+            raise ValueError("video frame is not a valid JPEG") from exc
+
+    def present_video_frame(self, payload: bytes) -> None:
+        """Present only the moving media region, leaving the 10 FPS UI intact."""
+
+        frame = self._decode_video_frame(payload)
+        with self._lock:
+            if self.state.service != "PLAYER" or not self.state.video_active:
                 return
-            if not isinstance(payload, bytes) or not 4 <= len(payload) <= 4 * 1024 * 1024:
-                raise ValueError("video frame must be a bounded JPEG byte string")
-            try:
-                with Image.open(BytesIO(payload)) as source:
-                    source.load()
-                    if (
-                        source.format != "JPEG"
-                        or source.width < 1
-                        or source.height < 1
-                        or source.width > 4096
-                        or source.height > 2160
-                    ):
-                        raise ValueError("video frame dimensions are invalid")
-                    self._video_frame = source.convert("RGB").copy()
-            except OSError as exc:
-                raise ValueError("video frame is not a valid JPEG") from exc
+            self._video_frame = frame
+            image = self._render_image()
+            x, y, width, height = VIDEO_REGION
+            show_region = getattr(self.panel, "show_region", None)
+            if not callable(show_region):
+                self._show_state()
+                return
+            rgb565 = image_to_rgb565(image)
+            show_region(
+                self._rgb565_region(rgb565, x, y, width, height),
+                x,
+                y,
+                width,
+                height,
+            )
+            self._last_image = image
 
     def render(self, frame: Frame) -> None:
         # Keep the approved native animation visible until the first real UI

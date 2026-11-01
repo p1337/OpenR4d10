@@ -91,7 +91,9 @@ also deliberate device-focus requests: after the central player accepts the
 lowest available source, the application renders one resolved `PLAYER` frame.
 Audio mode keeps the metadata view. Video mode queues software screenshots from
 that same mpv process and composites the completed JPEG into the native frame
-at no more than 10 FPS. The one transient file lives under `/run/openr4d10`, is
+at no more than 25 FPS while video is actually playing. Only the 226 x 168 media
+region uses that partial-transfer path; normal full UI frames remain capped at
+10 FPS. The one transient file lives under `/run/openr4d10`, is
 bounded and removed after consumption; no video frame enters persistent state.
 Because mpv remains the sole decoder and clock, pause, resume and channel
 changes cannot drift between sound and picture. Search, selection and
@@ -329,13 +331,16 @@ adapter also caches the last image it actually presented; the browser preview
 encodes that cached frame without rerendering or holding the SPI lock through a
 second complete composition.
 
-All normal panel presentations share a 10 FPS ceiling. The adapter spaces frame
+All normal full-panel presentations share a 10 FPS ceiling. The adapter spaces frame
 starts by at least 100 ms while the recorder's normal timeline uses up to 10 Hz;
 only the small priority PTT glow regions bypass the full-frame cadence. Cached
 TrueType fonts and quantized compositor glow layers remove repeated filesystem
 and Gaussian-blur work. Browser key-repeat detents are coalesced in order before
 they enter the bounded device-input API, so the resulting rotation is preserved
 without creating an HTTP or display backlog.
+Running Mediathek video is the other explicit partial-update exception: only its
+226 x 168 media rectangle may run at up to 25 FPS. Pausing or leaving video mode
+stops that cadence immediately and never raises the full-panel limit.
 While a logical hardware or browser control is active, periodic recorder
 timeline frames yield their display slot. The resolved interaction frame still
 renders immediately; only the redundant periodic frame is skipped. After 200 ms
@@ -345,6 +350,9 @@ changes its ordered state under the display lock without transferring an
 intermediate panel image, application entry/exit lifecycle work is resolved,
 and one final cached-telemetry frame is presented. Debouncing or coalescing may
 bound event pressure, but it must preserve the resulting rotary distance.
+Resolved media actions use that same rule: Play/Pause, channel and volume
+mutate ordered display state without presenting a stale preliminary full frame,
+then publish exactly one authoritative result frame.
 Periodic frames also carry the interaction generation captured before their
 overlay work. If an input transaction starts or finishes before publication,
 that stale periodic frame is discarded. The resolved interaction frame itself

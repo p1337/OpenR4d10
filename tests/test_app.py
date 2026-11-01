@@ -5,12 +5,15 @@ import unittest
 from unittest.mock import patch
 
 from openr4d10.adapters import FileDisplay, SystemTelemetry, UnconfiguredTelemetry
-from openr4d10.app import OpenR4d10App
+from openr4d10.app import OpenR4d10App, PLAYER_FRAME_INTERVAL_SECONDS
 from openr4d10.config import AppConfig, WebConfig
 from openr4d10.input_events import Control, InputEvent
 
 
 class AppTests(unittest.TestCase):
+    def test_running_video_uses_a_dedicated_25_fps_partial_frame_clock(self) -> None:
+        self.assertEqual(PLAYER_FRAME_INTERVAL_SECONDS, 0.04)
+
     def test_device_language_restores_and_persists_through_app_control(self) -> None:
         class LanguageDisplay:
             def __init__(self) -> None:
@@ -331,12 +334,17 @@ class AppTests(unittest.TestCase):
         class InputDisplay:
             def __init__(self) -> None:
                 self.events = []
+                self.render_count = 0
 
             def render(self, _frame) -> None:
-                pass
+                self.render_count += 1
 
             def apply_input(self, event):
-                self.events.append(event)
+                self.events.append(("present", event))
+                return {"playing": False, "right_action": "PLAY"}
+
+            def apply_input_state(self, event):
+                self.events.append(("state", event))
                 return {"playing": False, "right_action": "PLAY"}
 
         class Services:
@@ -398,6 +406,9 @@ class AppTests(unittest.TestCase):
         self.assertEqual(paused["playback"]["state"], "paused")
         self.assertEqual(menu["device_ui"]["right_action"], "PLAY")
         self.assertEqual(len(display.events), 2)
+        self.assertEqual(display.events[0][0], "state")
+        self.assertEqual(display.events[1][0], "present")
+        self.assertEqual(display.render_count, 1)
 
     def test_volume_and_channel_inputs_route_to_real_media_controls(self) -> None:
         class InputDisplay:

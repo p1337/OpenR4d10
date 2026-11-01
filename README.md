@@ -124,7 +124,9 @@ the installer report exactly which adapters still need configuration.
   and the regional ARD broadcasters; current news, Tatort, documentary, science, Terra X and
   Harald-Lesch selections can be watched in the browser or explicitly played
   as audio-only or low-resolution synchronized video through the sole device
-  player; device playback focuses `PLAYER`, where the channel control cycles
+  player; while video is actually running, only its 226 x 168 media region may
+  update at up to 25 FPS, whereas every normal full UI frame remains capped at
+  10 FPS; device playback focuses `PLAYER`, where the channel control cycles
   the same result set without changing mode and the right press pauses/resumes
 - separate AmbientR4D10 audio service with ten license-documented café,
   nature, water, traffic, rain and night soundscapes, endless looping, up to
@@ -460,8 +462,10 @@ nature. Browser video follows one opaque, process-local redirect without proxyin
 large media through the Pi. Every result separately offers device audio and
 device video; both always choose the smallest available broadcaster
 representation. Device video takes its audio-synchronized frame from the same
-central mpv process, is capped at 10 FPS and uses only one transient JPEG below
-`/run/openr4d10`. Browsing and searching never interrupt current audio. Raw
+central mpv process and uses only one transient JPEG below `/run/openr4d10`.
+Only the moving media region may update at up to 25 FPS while video is playing;
+pause immediately returns to the normal 10-FPS full-UI ceiling. Browsing and
+searching never interrupt current audio. Raw
 stream and website URLs stay process-local and are not exposed by
 the status API. This integration does not bypass DRM, age gates, login or
 geoblocking. The exact catalog and limits are documented in

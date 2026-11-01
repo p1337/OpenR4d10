@@ -3555,7 +3555,10 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   kleinste noch verfügbare Senderfassung. Im Video-Modus stammen Bild und Ton
   aus demselben zentralen `MpvEngine`; ein zweiter Decoder, ein simulierter
   Video-Timer oder ein nur ungefähr synchron laufender Nebenprozess ist
-  verboten. Das SPI-Panel erhält höchstens zehn Bilder pro Sekunde. Die
+  verboten. Während Video tatsächlich läuft, darf ausschließlich der
+  226-x-168-Pixel-Medienbereich mit höchstens 25 FPS als SPI-Teilfläche
+  aktualisiert werden. Normale Vollbilder, Kopfzeile, Menüs, Recorder und DMR
+  bleiben bei höchstens 10 FPS. Die
   Einzelbilder werden ausschließlich flüchtig unter `/run/openr4d10` erzeugt,
   sofort in den zentralen Renderer übernommen und niemals als 10-Hz-Schreiblast
   auf der SD-Karte gespeichert. Pause, Fortsetzen, Sprung und Kanalwechsel
@@ -3624,21 +3627,27 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   entfernt; `/var/lib/openr4d10`, SQLite und die SD-Medienablage erhalten keine
   Videoframes. Fehlt oder verspätet sich ein Frame, bleibt das letzte gültige
   Bild stehen, ohne Ton oder Eingabe zu blockieren.
-- `PLAYER` erhält denselben 100-ms-Zeichenpfad wie Recorder und DMR, aber nur
-  solange eine im Video-Modus gestartete Mediathekfolge sichtbar ist und
-  tatsächlich läuft; Pause behält den letzten Frame ohne nutzlose 10-Hz-
-  Neuzeichnung. Der
+- `PLAYER` erhält bei tatsächlich laufendem Video einen eigenen 40-ms-Takt für
+  ausschließlich den Medienbereich; der normale 100-ms-Vollbildpfad von
+  Recorder, DMR und übriger UI bleibt unverändert. Pause behält den letzten
+  Frame ohne weitere Videoneuzeichnung. Der
   gewählte Audio-/Video-Modus bleibt auch beim Kanalwechsel derselben
   Ergebnisliste erhalten. Screenshot-Anforderungen werden
   ohne Warten in die bestehende mpv-IPC gestellt, damit Play/Pause, Encoder und
   Dienstwechsel weiterhin Vorrang haben. Vor Freigabe müssen auf dem realen Pi
-  A/V-Synchronität, höchstens 10 FPS, Eingabelatenz und fehlende dauerhafte
+  A/V-Synchronität, höchstens 25 Videoteilflächen-FPS, weiterhin höchstens 10
+  normale Vollbilder pro Sekunde, Eingabelatenz und fehlende dauerhafte
   Frame-Dateien geprüft werden; der exakte Commit benötigt danach vollständig
   grünes GitHub Actions.
 - Die zu jeder Screenshot-Anforderung eintreffende mpv-IPC-Antwort wird
   begrenzt und nicht blockierend aus demselben privaten Socket entfernt. Sie
   darf sich bei langer Videowiedergabe niemals bis zu einem vollen Socket-
   Puffer ansammeln und dadurch spätere Nutzereingaben verzögern.
+- Jede bereits im Dienstkern aufgelöste Medienaktion – insbesondere
+  Play/Pause, Lautstärke und Kanalwechsel – verändert die geordnete UI zunächst
+  nur zustandsseitig. Erst danach wird genau ein endgültiges Vollbild
+  übertragen. Ein zusätzliches, bereits überholtes Vorab-Bild verdoppelt auf
+  dem realen SPI-Panel die Eingabelatenz und ist verboten.
 - Raspberry Pi OS Trixie liefert auf dem realen Zielgerät mpv 0.40. Dessen
   `--video`-Schalter akzeptiert `auto`, `no` oder eine Spur-ID, aber nicht
   `yes`. Der zentrale Player muss deshalb `--video=auto` verwenden; ein

@@ -25,12 +25,14 @@ Die Gerätequelle wird immer in der Reihenfolge `url_video_low`, `url_video`,
 `url_video_hd` gewählt; HD wird auf dem 240-x-280-Gerät nie bevorzugt. Im
 Video-Modus bleibt mpv die einzige Bild-, Ton- und Zeitquelle. Seine
 Software-Screenshots werden ohne Warten über dieselbe private IPC angefordert,
-höchstens zehnmal pro Sekunde aus einer einzelnen JPEG-Datei unter
-`/run/openr4d10` übernommen und sofort gelöscht. Es gibt keinen zweiten
+bei laufendem Video höchstens 25-mal pro Sekunde aus einer einzelnen JPEG-Datei
+unter `/run/openr4d10` übernommen und sofort gelöscht. Nur der 226-x-168-Pixel-
+Medienbereich wird in diesem Takt per SPI übertragen; Kopfzeile, Status und alle
+anderen UI-Ansichten behalten die normale Vollbildgrenze von 10 FPS. Es gibt keinen zweiten
 ffmpeg-/mpv-Prozess und keine dauerhaften Videoframes unter `/var/lib`.
 Pausieren hält deshalb Bild und Ton gemeinsam an. Ein fehlender oder verspäteter
 Frame blockiert weder Ton noch Eingaben; der Renderer behält das letzte gültige
-Bild. Während Pause bleibt dieses Bild ohne nutzlose 10-Hz-Neuzeichnung stehen;
+Bild. Während Pause bleibt dieses Bild ohne nutzlose Neuzeichnung stehen;
 die ebenfalls asynchronen mpv-Antworten werden begrenzt und nicht blockierend
 aus dem privaten Steuerkanal entfernt.
 

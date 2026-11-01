@@ -987,6 +987,24 @@ class WhisplayDisplayTests(unittest.TestCase):
         self.assertIsNone(display._video_frame)
         display.close()
 
+    def test_running_video_updates_only_its_media_region(self) -> None:
+        panel = FakePanel()
+        display = WhisplayDisplay(panel=panel)  # type: ignore[arg-type]
+        display.state.service_index = SERVICES.index("PLAYER")
+        display.state.video_active = True
+        frame = BytesIO()
+        Image.new("RGB", (320, 180), (31, 61, 91)).save(frame, format="JPEG")
+
+        display.present_video_frame(frame.getvalue())
+
+        self.assertEqual(len(panel.frames), 0)
+        self.assertEqual(len(panel.regions), 1)
+        payload, x, y, width, height = panel.regions[0]
+        self.assertEqual((x, y, width, height), adapters.VIDEO_REGION)
+        self.assertEqual(len(payload), width * height * 2)
+        self.assertIsNotNone(display._last_image)
+        display.close()
+
     def test_priority_recorder_glow_uses_small_partial_updates(self) -> None:
         panel = FakePanel()
         display = WhisplayDisplay(panel=panel)  # type: ignore[arg-type]

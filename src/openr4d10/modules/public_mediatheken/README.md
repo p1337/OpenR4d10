@@ -11,7 +11,8 @@ prozesslokale, undurchsichtige Element-ID direkt öffnen. Der Raspberry Pi
 proxyt die große Videodatei nicht. Auf dem Gerät stehen getrennt Audio und
 Video bereit. Beide verwenden die kleinste Senderfassung und den zentralen
 `MpvEngine`; im Video-Modus stammt das Whisplaybild synchron aus genau diesem
-Prozess und bleibt auf 10 FPS begrenzt. Zugangsdaten, Stream-URLs und Website-
+Prozess. Nur sein Medienbereich darf als Teilflächenupdate bis 25 FPS laufen;
+normale Vollbilder bleiben auf 10 FPS begrenzt. Zugangsdaten, Stream-URLs und Website-
 URLs werden weder in SQLite noch im öffentlichen Status oder in Backups
 gespeichert. DRM, Anmeldung, Altersfreigabe und Geoblocking werden nicht
 umgangen.

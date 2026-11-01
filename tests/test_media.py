@@ -77,7 +77,7 @@ class ProcessBoundaryTests(unittest.TestCase):
         self.assertIn("--video=auto", command)
         self.assertNotIn("--video=yes", command)
         self.assertIn("--vo=null", command)
-        self.assertIn("--vo-null-fps=10", command)
+        self.assertIn("--vo-null-fps=25", command)
         self.assertIn("--video-sync=audio", command)
         self.assertIn("--screenshot-sw=yes", command)
         self.assertIn("--screenshot-jpeg-quality=45", command)

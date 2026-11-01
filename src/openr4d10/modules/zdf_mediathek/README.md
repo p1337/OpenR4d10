@@ -13,5 +13,6 @@ HTML5-Videoplayer angesehen werden; der Pi leitet nur zur geprüften öffentlich
 Quelle weiter. `Audio auf Gerät` und `Video auf Gerät` verwenden beide die
 kleinste verfügbare Senderfassung und denselben zentralen mpv-Prozess wie Radio
 und Podcasts. Nur der Video-Modus übergibt dessen synchrones aktuelles Bild mit
-höchstens 10 FPS an das Whisplay. Der vollständige Senderkatalog und seine
+höchstens 25 FPS als begrenztes Teilflächenupdate an das Whisplay; normale
+Vollbilder bleiben bei 10 FPS. Der vollständige Senderkatalog und seine
 Grenzen stehen in `docs/MEDIATHEK.md`.
