@@ -828,6 +828,16 @@ class ServiceCatalog:
             and callable(setter)
         ):
             setter(round(float(position) * 1000))
+            return
+        # A missing time position after a confirmed start is not a synthetic
+        # clock tick. Mpv records asynchronous EOF/output failures in its
+        # state; detach the Recorder playhead immediately so UI and ALSA stay
+        # one truth.
+        if str(getattr(self.player.state, "state", "stopped")) in {
+            "stopped",
+            "error",
+        }:
+            self._voice_playback_active = False
 
     def _stop_voice_playback(self, *, sync: bool = True) -> None:
         if sync:

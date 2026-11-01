@@ -1417,6 +1417,33 @@ class ServiceCatalogTests(unittest.TestCase):
             [400],
         )
 
+    def test_voice_playback_sync_stops_when_mpv_has_no_audio_position(self) -> None:
+        class State:
+            state = "stopped"
+
+        class Player:
+            state = State()
+
+            @staticmethod
+            def position_seconds():
+                return None
+
+        class Recorder:
+            followed_positions = []
+
+            def voice_follow_playback(self, position_ms):
+                self.followed_positions.append(position_ms)
+
+        catalog = object.__new__(ServiceCatalog)
+        catalog.player = Player()  # type: ignore[assignment]
+        catalog.recorder = Recorder()  # type: ignore[assignment]
+        catalog._voice_playback_active = True
+
+        catalog._sync_voice_playback_position()
+
+        self.assertFalse(catalog._voice_playback_active)
+        self.assertEqual(catalog.recorder.followed_positions, [])  # type: ignore[attr-defined]
+
     def test_voice_recorder_open_stops_playback_and_uses_one_resumable_session(self) -> None:
         class State:
             volume = 30

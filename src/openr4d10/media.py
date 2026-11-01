@@ -29,6 +29,7 @@ class MediaError(RuntimeError):
 
 
 MPV_IPC_TIMEOUT_SECONDS = 15.0
+MPV_LOCAL_START_TIMEOUT_SECONDS = 1.0
 
 
 def _is_absolute_target_path(path: Path) -> bool:
@@ -100,6 +101,7 @@ class MpvEngine:
         self._process: subprocess.Popen[bytes] | None = None
         self._ipc: socket.socket | None = None
         self._buffer = b""
+        self._events: deque[dict[str, Any]] = deque()
         self._request_id = 0
         self._lock = threading.Lock()
 
@@ -114,6 +116,8 @@ class MpvEngine:
             "--really-quiet",
             "--user-agent=OpenR4d10 (+https://github.com/p1337/OpenR4d10)",
             "--ao=alsa",
+            "--audio-device=alsa/whisplaysound",
+            "--audio-fallback-to-null=no",
             f"--volume={self.state.volume}",
             f"--input-ipc-client=fd://{ipc_fd}",
         ]
@@ -145,6 +149,7 @@ class MpvEngine:
         parent.settimeout(MPV_IPC_TIMEOUT_SECONDS)
         self._ipc = parent
         self._buffer = b""
+        self._events.clear()
 
     def _read_line(self) -> dict[str, Any]:
         if self._ipc is None:
@@ -172,11 +177,74 @@ class MpvEngine:
         self._ipc.sendall(payload)
         while True:
             response = self._read_line()
+            if isinstance(response.get("event"), str):
+                self._remember_event(response)
+                continue
             if response.get("request_id") != request_id:
                 continue
             if response.get("error") != "success":
                 raise MediaError(f"mpv command failed: {response.get('error', 'unknown')}")
             return response
+
+    def _remember_event(self, event: dict[str, Any]) -> None:
+        """Keep asynchronous mpv truth instead of silently discarding it."""
+
+        self._events.append(event)
+        if event.get("event") != "end-file":
+            return
+        reason = str(event.get("reason") or "stopped")
+        self.state.state = "stopped"
+        self.state.paused = False
+        if reason == "error":
+            detail = str(event.get("file_error") or event.get("error") or "unknown")
+            self.state.error = f"mpv playback failed: {detail}"
+
+    def _wait_for_audio_start(self) -> None:
+        """Wait for decoded output, rejecting delayed local-file failures."""
+
+        if self._ipc is None:
+            raise MediaError("mpv IPC is not connected")
+        deadline = time.monotonic() + MPV_LOCAL_START_TIMEOUT_SECONDS
+        previous_timeout = self._ipc.gettimeout()
+        started = False
+        loaded = False
+        try:
+            while time.monotonic() < deadline:
+                if self._events:
+                    event = self._events.popleft()
+                else:
+                    self._ipc.settimeout(max(0.001, deadline - time.monotonic()))
+                    try:
+                        event = self._read_line()
+                    except TimeoutError as exc:
+                        raise MediaError("mpv did not start local audio in time") from exc
+                    if not isinstance(event.get("event"), str):
+                        continue
+                name = event.get("event")
+                if name == "start-file":
+                    started = True
+                    loaded = False
+                elif started and name == "file-loaded":
+                    loaded = True
+                elif started and name == "end-file":
+                    self._remember_event(event)
+                    detail = str(
+                        event.get("file_error")
+                        or event.get("error")
+                        or event.get("reason")
+                        or "unknown"
+                    )
+                    raise MediaError(f"mpv could not play local audio: {detail}")
+                elif loaded and name == "playback-restart":
+                    output = self._command(["get_property", "audio-out-params"]).get(
+                        "data"
+                    )
+                    if not isinstance(output, dict) or not output:
+                        raise MediaError("mpv started without a real audio output")
+                    return
+            raise MediaError("mpv did not start local audio in time")
+        finally:
+            self._ipc.settimeout(previous_timeout)
 
     def load(self, source: str) -> dict[str, Any]:
         approved = validate_media_source(source, self.media_roots)
@@ -206,6 +274,7 @@ class MpvEngine:
         position = max(0.0, float(start_seconds))
         with self._lock:
             try:
+                self._events.clear()
                 self._command(
                     [
                         "loadfile",
@@ -215,6 +284,7 @@ class MpvEngine:
                         {"start": f"{position:.3f}"},
                     ]
                 )
+                self._wait_for_audio_start()
             except (OSError, json.JSONDecodeError, MediaError) as exc:
                 self.state.state = "error"
                 self.state.error = str(exc)

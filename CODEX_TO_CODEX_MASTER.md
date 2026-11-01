@@ -3326,3 +3326,23 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Persistiert wird an semantischen Grenzen wie Pause, Stopp oder manueller
   Positionsänderung. Tests müssen den atomaren Ladebefehl sowie mehrere
   aufeinanderfolgende, sichtbar ansteigende Wiedergabepositionen abdecken.
+
+### 2026-11-01 – Recorder-Playhead und ALSA sind eine untrennbare Wahrheit
+
+- Ein angenommener mpv-Steuerbefehl ist noch kein erfolgreicher Wiedergabestart.
+  `PLAY`, grüner Glow, `audio_active` und ein bewegter Recorder-Playhead dürfen
+  erst aktiv werden, wenn mpv die lokale Datei tatsächlich geladen und die
+  Audioausgabe gestartet hat. Ein verspätetes `end-file`/`file_error` darf
+  niemals als laufende Wiedergabe erscheinen.
+- Der weiße Recorder-Playhead folgt ausschließlich der realen mpv-Zeitposition
+  eines aktiven Audioausgangs. Gibt es keine reale Position beziehungsweise
+  endet oder scheitert die Audioausgabe, bleibt der Cursor stehen, der
+  Wiedergabezustand wird beendet und der Glow darf nicht grün bleiben. Eine
+  simulierte Zeitachse unabhängig von ALSA ist ausdrücklich verboten.
+- Der reale Gegencheck auf dem Whisplay muss vor Freigabe beide Seiten
+  gleichzeitig beweisen: `/proc/asound/card0/pcm0p/sub0/status` meldet während
+  der Recorderwiedergabe `RUNNING`, und der vom selben mpv-Prozess gelesene
+  Playhead steigt im 10-Hz-Takt. Ein bewegter Playhead allein ist keine
+  Abnahme. Radio auf demselben zentralen Player öffnet den Whisplay-ALSA-Pfad
+  bereits korrekt; eine Abweichung ist deshalb im Recorder-Datei-/Ladepfad zu
+  beheben und nicht mit einem zweiten Player zu umgehen.

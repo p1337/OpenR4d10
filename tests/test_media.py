@@ -7,6 +7,8 @@ from unittest.mock import Mock, patch
 
 from openr4d10.media import (
     MPV_IPC_TIMEOUT_SECONDS,
+    MPV_LOCAL_START_TIMEOUT_SECONDS,
+    MediaError,
     MpvEngine,
     StreamRecorder,
     public_source_label,
@@ -67,6 +69,8 @@ class ProcessBoundaryTests(unittest.TestCase):
         self.assertIn("--input-ipc-client=fd://17", command)
         self.assertNotIn("shell", " ".join(command))
         self.assertIn("--volume=30", command)
+        self.assertIn("--audio-device=alsa/whisplaysound", command)
+        self.assertIn("--audio-fallback-to-null=no", command)
         self.assertIn(
             "--user-agent=OpenR4d10 (+https://github.com/p1337/OpenR4d10)",
             command,
@@ -74,6 +78,7 @@ class ProcessBoundaryTests(unittest.TestCase):
 
     def test_mpv_network_open_timeout_is_bounded_for_long_ambient_sources(self) -> None:
         self.assertEqual(MPV_IPC_TIMEOUT_SECONDS, 15.0)
+        self.assertEqual(MPV_LOCAL_START_TIMEOUT_SECONDS, 1.0)
 
     def test_playlist_supports_shuffle_navigation_and_favorite_loop(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -109,6 +114,7 @@ class ProcessBoundaryTests(unittest.TestCase):
             commands = []
             engine = MpvEngine(Path("/usr/bin/mpv"), media_roots=(root,))
             engine._command = lambda command: commands.append(command) or {}
+            engine._wait_for_audio_start = lambda: None
 
             state = engine.load_at(str(voice), 1.2346)
 
@@ -118,6 +124,51 @@ class ProcessBoundaryTests(unittest.TestCase):
         )
         self.assertEqual(state["state"], "playing")
         self.assertFalse(state["paused"])
+
+    def test_local_audio_start_requires_loaded_playback_and_real_output(self) -> None:
+        engine = MpvEngine(Path("/usr/bin/mpv"))
+        ipc = Mock()
+        ipc.gettimeout.return_value = 15.0
+        engine._ipc = ipc
+        engine._events.extend(
+            (
+                {"event": "start-file"},
+                {"event": "file-loaded"},
+                {"event": "playback-restart"},
+            )
+        )
+        engine._command = Mock(
+            return_value={"data": {"format": "s16", "samplerate": 48000}}
+        )
+
+        engine._wait_for_audio_start()
+
+        engine._command.assert_called_once_with(
+            ["get_property", "audio-out-params"]
+        )
+        ipc.settimeout.assert_called_with(15.0)
+
+    def test_local_audio_start_rejects_delayed_file_error(self) -> None:
+        engine = MpvEngine(Path("/usr/bin/mpv"))
+        ipc = Mock()
+        ipc.gettimeout.return_value = 15.0
+        engine._ipc = ipc
+        engine._events.extend(
+            (
+                {"event": "start-file"},
+                {
+                    "event": "end-file",
+                    "reason": "error",
+                    "file_error": "loading failed",
+                },
+            )
+        )
+
+        with self.assertRaisesRegex(MediaError, "loading failed"):
+            engine._wait_for_audio_start()
+
+        self.assertEqual(engine.state.state, "stopped")
+        self.assertIn("loading failed", str(engine.state.error))
 
     def test_recorder_builds_argument_array_and_redacts_source_status(self) -> None:
         calls = []
