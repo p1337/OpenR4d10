@@ -110,6 +110,13 @@ MEDIATHEK_GROUP_STATUS_TEXT = {
     "fr": ("Médiathèque", "Chargement d’une vidéo aléatoire …", "Impossible de charger le groupe"),
     "es": ("Mediateca", "Cargando un vídeo aleatorio …", "No se pudo cargar el grupo"),
 }
+MEDIATHEK_PICKER_TEXT = {
+    "en": ("Choose", "Select a category"),
+    "de": ("Auswahl", "Kategorie auswählen"),
+    "pl": ("Wybór", "Wybierz kategorię"),
+    "fr": ("Sélection", "Choisir une catégorie"),
+    "es": ("Selección", "Elige una categoría"),
+}
 DISPLAY_BRIGHTNESS_KEY = "display.brightness_percent"
 DEFAULT_DISPLAY_BRIGHTNESS = 100
 AMBIENT_SOURCE_MIGRATION_KEY = "ambient.direct_sources_v1"
@@ -4038,12 +4045,20 @@ class ServiceCatalog:
         mediathek_status_text = MEDIATHEK_GROUP_STATUS_TEXT.get(
             self.display_language(), MEDIATHEK_GROUP_STATUS_TEXT["en"]
         )
+        mediathek_picker_text = MEDIATHEK_PICKER_TEXT.get(
+            self.display_language(), MEDIATHEK_PICKER_TEXT["en"]
+        )
         mediathek_group_overlay = {
             "mediathek_group_rows": group_rows,
             "mediathek_group_position": group_position,
             "mediathek_group_count": group_count,
             "mediathek_group_loading": self._mediathek_group_loading,
             "mediathek_group_error": self._mediathek_group_error is not None,
+        }
+        mediathek_picker_overlay = {
+            **mediathek_group_overlay,
+            "mediathek_group_picker": True,
+            "channel": group_position,
         }
         audio_active = (
             getattr(playback, "state", "stopped") == "playing"
@@ -4276,7 +4291,11 @@ class ServiceCatalog:
                 }
             defaults = {
                 "SYSTEM": ("OPENR4D10", "System online", "Receiver ready"),
-                "PLAYER": ("LOCAL MEDIA", "Local media", "Select media and press play"),
+                "PLAYER": (
+                    mediathek_picker_text[0],
+                    mediathek_picker_text[0],
+                    mediathek_picker_text[1],
+                ),
                 "DMR": ("DMR", "Digital radio", "Select a channel and press play"),
                 "REC": ("Voice Recorder", "Voice Recorder", "Hold PTT to record"),
             }
@@ -4304,7 +4323,7 @@ class ServiceCatalog:
                 "playing": False,
                 "audio_active": audio_active,
                 "volume": playback.volume,
-                **(mediathek_group_overlay if requested == "PLAYER" else {}),
+                **(mediathek_picker_overlay if requested == "PLAYER" else {}),
             }
         if requested == "REC" or self.active_service == "recorder":
             self._sync_voice_playback_position()
@@ -4347,14 +4366,14 @@ class ServiceCatalog:
         if playback.state not in {"playing", "paused"}:
             player_status = (
                 {
-                    "station": mediathek_status_text[0],
-                    "title": mediathek_status_text[0],
+                    "station": mediathek_picker_text[0],
+                    "title": mediathek_picker_text[0],
                     "subtitle": (
                         mediathek_status_text[1]
                         if self._mediathek_group_loading
                         else mediathek_status_text[2]
                         if self._mediathek_group_error is not None
-                        else "Select media and press play"
+                        else mediathek_picker_text[1]
                     ),
                 }
                 if requested == "PLAYER"
@@ -4366,7 +4385,7 @@ class ServiceCatalog:
                 "audio_active": audio_active,
                 "volume": playback.volume,
                 **player_status,
-                **(mediathek_group_overlay if requested == "PLAYER" else {}),
+                **(mediathek_picker_overlay if requested == "PLAYER" else {}),
             }
         selected = self._selected_preset() if self.active_service == "webradio" else None
         active_ambient_scene = (

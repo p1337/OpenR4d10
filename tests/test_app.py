@@ -991,6 +991,71 @@ class AppTests(unittest.TestCase):
 
         self.assertEqual(services.requests, [{"action": "brandmeister_toggle"}])
 
+    def test_idle_player_picker_rotates_groups_and_enter_selects_one(self) -> None:
+        class Display:
+            def render(self, _frame):
+                pass
+
+            def snapshot(self):
+                return {
+                    "service": "PLAYER",
+                    "menu_open": False,
+                    "mediathek_group_picker": True,
+                }
+
+            def apply_input(self, _event):
+                return self.snapshot()
+
+            apply_input_state = apply_input
+
+        class Services:
+            active_service = "system"
+
+            def __init__(self):
+                self.requests = []
+
+            def control(self, request):
+                self.requests.append(request)
+                return {"loading": request["action"] == "mediathek_group_select"}
+
+            def receiver_overlay(self, _view_service=None):
+                return {
+                    "service": "PLAYER",
+                    "station": "Auswahl",
+                    "playing": False,
+                    "audio_active": False,
+                    "mediathek_group_picker": True,
+                }
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=Display(),
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,
+            )
+            app.control({"action": "device_input", "control": "right_outer", "steps": 1})
+            app.control({"action": "device_input", "control": "right_press"})
+
+        self.assertEqual(
+            services.requests,
+            [
+                {"action": "mediathek_group_step", "steps": 1},
+                {"action": "mediathek_group_select"},
+            ],
+        )
+
     def test_ambient_quick_menu_routes_selection_toggle_and_layer_volume(self) -> None:
         class InputDisplay:
             def render(self, _frame) -> None:

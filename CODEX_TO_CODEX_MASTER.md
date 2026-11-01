@@ -3750,10 +3750,14 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 
 # Mediathek device groups
 
-- Physical Whisplay PTT held for two seconds in PLAYER opens a localized group
-  picker immediately. A short PTT release during active Mediathek playback
-  remains the favorite/bookmark action; a consumed long hold must never also
-  toggle the favorite.
+- Der noch inaktive `PLAYER` zeigt als normale Geräteansicht unmittelbar die
+  lokalisierte Gruppenauswahl. `LOCAL MEDIA`, `LM`, eine leere Medienkachel und
+  ein zwingender PTT-Zwischenschritt sind dort verboten. Rechter äußerer
+  Encoder bewegt die Markierung, rechter Druck startet die Gruppe.
+- Physical Whisplay PTT held for two seconds in PLAYER opens the same localized
+  group picker as an additional shortcut. A short PTT release during active
+  Mediathek playback remains the favorite/bookmark action; a consumed long hold
+  must never also toggle the favorite.
 - Groups are Favorites plus the curated browser search collections. Labels and
   search terms follow the device language. Selection and network lookup run
   outside the input/SPI thread, use a cancellable generation token, and start

@@ -585,6 +585,10 @@ class OpenR4d10App:
             if isinstance(current_ui, dict) and current_ui.get("menu_kind")
             else None
         )
+        mediathek_group_picker = (
+            isinstance(current_ui, dict)
+            and current_ui.get("mediathek_group_picker") is True
+        )
         selected_service = (
             str(current_ui.get("service"))
             if isinstance(current_ui, dict) and current_ui.get("service")
@@ -823,6 +827,16 @@ class OpenR4d10App:
             and event.control == Control.RIGHT_OUTER
             and not menu_open
             and selected_service == "PLAYER"
+            and mediathek_group_picker
+        ):
+            media_result = self.services.control(
+                {"action": "mediathek_group_step", "steps": event.steps}
+            )
+        elif (
+            self.services is not None
+            and event.control == Control.RIGHT_OUTER
+            and not menu_open
+            and selected_service == "PLAYER"
             and self.services.active_service in MEDIATHEK_SERVICE_IDS
         ):
             media_result = self.services.control(
@@ -846,6 +860,8 @@ class OpenR4d10App:
                 action = "brandmeister_toggle"
             elif selected_service == "REC":
                 action = "voice_recorder_play_toggle"
+            elif selected_service == "PLAYER" and mediathek_group_picker:
+                action = "mediathek_group_select"
             elif (
                 selected_service == "PLAYER"
                 and self.services.active_service in MEDIATHEK_SERVICE_IDS

@@ -124,19 +124,25 @@ Medien-URL in SQLite gespeichert. Ein PTT-Druck im Mediathek-Player setzt oder
 entfernt einen Favoriten mit einer Wiedereinstiegsstelle 15 Sekunden vor der
 aktuellen Position. Ungesehene Folgen bleiben in der Auswahl vorn; gesehene
 Folgen erscheinen zusätzlich im Archiv.
-# Device group navigation
+## Geräte-Gruppenauswahl
 
-Holding the physical Whisplay PTT button for two seconds while the PLAYER view
-is visible opens the Mediathek group picker immediately, without waiting for
-button release. The group list contains Favorites and the same curated search
-collections used by the browser. Labels and collection search terms follow the
-device language (`de`, `en`, `pl`, `fr`, or `es`). MediathekView does not expose
-a reliable language field, so the language-specific query is the enforceable
-filter; the approved broadcaster/channel allowlist remains unchanged.
+Wenn in `PLAYER` noch kein Medium läuft, ist die lokalisierte Gruppenauswahl
+direkt die normale Geräteansicht. Es gibt dort keinen vorgeschalteten
+`LOCAL MEDIA`-/`LM`-Platzhalter und keinen notwendigen PTT-Zwischenschritt. Der
+rechte äußere Encoder markiert Favoriten oder eine der kuratierten
+Suchsammlungen; der rechte Druck startet die markierte Gruppe. Ein zwei
+Sekunden gehaltener physischer Whisplay-PTT-Taster bleibt als alternativer
+Schnellzugriff auf dieselbe, nicht duplizierte Auswahl erhalten.
 
-Selecting a group queues its bounded network lookup on a worker thread, closes
-the picker immediately and keeps encoder/PTT input responsive. The first video
-and every subsequent channel step are randomized within the resolved result
-set. Favorites are reacquired by their stable saved title/content identity;
-expiring media URLs are never persisted. Leaving PLAYER cancels a pending group
-lookup before it may take audio/video ownership.
+Beschriftungen und Suchbegriffe folgen der Gerätesprache (`de`, `en`, `pl`,
+`fr` oder `es`). MediathekView stellt kein verlässliches Sprachfeld bereit;
+deshalb ist die sprachspezifische Suche der durchsetzbare Filter, während die
+freigegebene Senderliste unverändert bleibt.
+
+Die Auswahl stellt die begrenzte Netzabfrage in eine Worker-Queue und hält
+Encoder/PTT dadurch unmittelbar ansprechbar. Das erste Video und jeder weitere
+Kanalschritt werden aus der aufgelösten Ergebnismenge zufällig gewählt.
+Favoriten werden anhand ihrer stabil gespeicherten Titel-/Inhaltsidentität neu
+aufgelöst; ablaufende Medienadressen werden nie persistiert. Das Verlassen von
+`PLAYER` verwirft eine noch laufende Gruppenabfrage, bevor sie Audio oder Video
+übernehmen kann.

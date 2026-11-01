@@ -34,6 +34,26 @@ from openr4d10.whisplay import WhisplayPanel, _KernelPwmBacklight
 
 
 class DeviceUiTests(unittest.TestCase):
+    def test_idle_player_renders_localized_mediathek_picker_without_placeholder(self) -> None:
+        state = DeviceUiState(language="de", source="Auswahl")
+        state.service_index = SERVICES.index("PLAYER")
+        state.mediathek_group_picker = True
+        state.mediathek_group_rows = [
+            {"id": "favorites", "name": "Favoriten", "selected": True},
+            {"id": "latest", "name": "Neu", "selected": False},
+            {"id": "documentaries", "name": "Dokumentationen", "selected": False},
+        ]
+        state.mediathek_group_position = 1
+        state.mediathek_group_count = 10
+
+        drawn = self._drawn_text(state)
+
+        self.assertIn("Auswahl", drawn)
+        self.assertIn("Favoriten", drawn)
+        self.assertIn("Dokumentationen", drawn)
+        self.assertNotIn("LOCAL MEDIA", drawn)
+        self.assertNotIn("LM", drawn)
+
     def test_player_ptt_hold_opens_readable_mediathek_group_menu(self) -> None:
         state = DeviceUiState(language="de")
         state.service_index = SERVICES.index("PLAYER")

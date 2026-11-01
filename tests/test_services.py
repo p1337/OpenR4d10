@@ -882,6 +882,11 @@ class ServiceCatalogTests(unittest.TestCase):
             )
             try:
                 catalog.set_display_language("de")
+                idle = catalog.receiver_overlay("PLAYER")
+                self.assertEqual(idle["station"], "Auswahl")
+                self.assertEqual(idle["subtitle"], "Kategorie auswählen")
+                self.assertTrue(idle["mediathek_group_picker"])
+                self.assertEqual(idle["mediathek_group_rows"][0]["name"], "Favoriten")
                 groups = catalog.control({"action": "mediathek_group_menu_open"})
                 self.assertEqual(groups["groups"][0]["name"], "Favoriten")
                 catalog.control({"action": "mediathek_group_step", "steps": 3})

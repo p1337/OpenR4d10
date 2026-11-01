@@ -402,6 +402,7 @@ class DeviceUiState:
     mediathek_group_rows: list[dict[str, object]] = field(default_factory=list)
     mediathek_group_position: int = 0
     mediathek_group_count: int = 0
+    mediathek_group_picker: bool = False
     ambient_layer_rows: list[dict[str, object]] = field(default_factory=list)
     ambient_layer_position: int = 0
     ambient_layer_count: int = 0
@@ -478,6 +479,7 @@ class DeviceUiState:
             "mediathek_group_rows": [dict(item) for item in self.mediathek_group_rows],
             "mediathek_group_position": self.mediathek_group_position,
             "mediathek_group_count": self.mediathek_group_count,
+            "mediathek_group_picker": self.mediathek_group_picker,
             "ambient_layer_rows": [dict(item) for item in self.ambient_layer_rows],
             "ambient_layer_position": self.ambient_layer_position,
             "ambient_layer_count": self.ambient_layer_count,
@@ -801,6 +803,7 @@ class DeviceUiState:
             if isinstance(group_count, int) and not isinstance(group_count, bool)
             else 0
         )
+        self.mediathek_group_picker = receiver.get("mediathek_group_picker") is True
         if receiver.get("replacement_required") is True and self.menu_kind != "dmr_replace":
             self._open_menu("dmr_replace")
             self.title = "Replace talkgroup"
@@ -1745,6 +1748,8 @@ def render_device_ui(
     left_action = str(text["menu"])
     if state.menu_open:
         right_action = "OK"
+    elif state.service == "PLAYER" and state.mediathek_group_picker:
+        right_action = "OK"
     elif state.service in {"RADIO", "AMBIENT", "DMR", "PLAYER", "REC"}:
         right_action = str(text["pause"] if state.playing else text["play"])
     else:
@@ -1877,6 +1882,11 @@ def render_device_ui(
         strength=glow_strength,
     )
     draw = ImageDraw.Draw(image)
+
+    if state.service == "PLAYER" and state.mediathek_group_picker:
+        _draw_menu_heading(draw, state.source, content_top, accent)
+        _draw_mediathek_groups(draw, state, content_top)
+        return image.convert("RGB")
 
     if state.service == "REC":
         _draw_voice_recorder(draw, state, text, content_top)
