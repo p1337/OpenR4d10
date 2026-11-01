@@ -28,10 +28,11 @@ Die Gerätequelle wird immer in der Reihenfolge `url_video_low`, `url_video`,
 Video-Modus bleibt mpv die einzige Bild-, Ton- und Zeitquelle. Seine
 Software-Screenshots werden ohne Warten über dieselbe private IPC angefordert,
 bei laufendem Video höchstens 25-mal pro Sekunde aus einer einzelnen JPEG-Datei
-unter `/run/openr4d10` übernommen und sofort gelöscht. Nur der 226-x-168-Pixel-
-Medienbereich wird in diesem Takt per SPI übertragen; Kopfzeile, Status und alle
+unter `/run/openr4d10` übernommen und sofort gelöscht. Nur der 240-x-175-Pixel-
+Videobereich von x=0 bis x=239 und y=105 bis y=279 wird in diesem Takt per SPI
+übertragen; Kopfzeile, Status und alle
 anderen UI-Ansichten behalten die normale Vollbildgrenze von 10 FPS. Auch
-Skalierung, Maskierung und RGB565-Konvertierung bearbeiten pro Videoframe nur
+Skalierung und RGB565-Konvertierung bearbeiten pro Videoframe nur
 diese Teilfläche und rufen den vollständigen UI-Renderer nicht auf. Es gibt keinen zweiten
 ffmpeg-/mpv-Prozess und keine dauerhaften Videoframes unter `/var/lib`.
 Pausieren hält deshalb Bild und Ton gemeinsam an. Ein fehlender oder verspäteter
@@ -39,6 +40,11 @@ Frame blockiert weder Ton noch Eingaben; der Renderer behält das letzte gültig
 Bild. Während Pause bleibt dieses Bild ohne nutzlose Neuzeichnung stehen;
 die ebenfalls asynchronen mpv-Antworten werden begrenzt und nicht blockierend
 aus dem privaten Steuerkanal entfernt.
+
+Das laufende Video ist die einzige Medienausnahme ohne Seiten- und Unterrand.
+Es füllt die gesamte untere Displayfläche bis zur letzten Pixelzeile; ein
+mittiger Zuschnitt ist dafür beabsichtigt. Logos, Wetterbilder und andere
+Medien behalten die normale Maske und ihre Ränder.
 
 Beim Ersetzen eines laufenden Beitrags ordnet der Player jedes mpv-
 `start-file`/`end-file`-Paar über dessen `playlist_entry_id` zu. Ein verspätetes

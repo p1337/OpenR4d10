@@ -124,8 +124,9 @@ the installer report exactly which adapters still need configuration.
   and the regional ARD broadcasters; current news, Tatort, documentary, science, Terra X and
   Harald-Lesch selections can be watched in the browser or explicitly played
   as audio-only or low-resolution synchronized video through the sole device
-  player; while video is actually running, only its 226 x 168 media region may
-  update at up to 25 FPS, whereas every normal full UI frame remains capped at
+  player; while video is actually running, only its edge-to-edge 240 x 175
+  lower video region may update at up to 25 FPS, whereas every normal full UI
+  frame remains capped at
   10 FPS; device playback focuses `PLAYER`, where the channel control cycles
   the same result set without changing mode and the right press pauses/resumes
 - generation-safe mpv event handling: a delayed `end-file` from a replaced

@@ -18,7 +18,7 @@ import threading
 import time
 from typing import Any, Callable, Protocol
 
-from PIL import Image, ImageChops, ImageOps
+from PIL import Image, ImageOps
 
 from .ambient import AMBIENT_ARTWORK_ROOT, AMBIENT_BY_ID
 from .config import AdapterConfig, HardwareConfig
@@ -26,9 +26,9 @@ from .cpu_affinity import pin_current_thread_to_ui_core
 from .device_ui import (
     DISPLAY_TEXT,
     DeviceUiState,
+    VIDEO_REGION,
     image_region_to_rgb565,
     image_to_rgb565,
-    media_mask,
     render_device_ui,
 )
 from .input_events import Control, InputEvent
@@ -38,7 +38,6 @@ from .whisplay import WhisplayError, WhisplayPanel
 LOG = logging.getLogger(__name__)
 DISPLAY_MIN_FRAME_INTERVAL_SECONDS = 0.1
 HOTSPOT_REFRESH_INTERVAL_SECONDS = 1.0
-VIDEO_REGION = (7, 105, 226, 168)
 
 
 class AdapterError(RuntimeError):
@@ -430,27 +429,12 @@ class WhisplayDisplay:
                 return
             self._video_frame = frame
             x, y, width, height = VIDEO_REGION
-            region = (
-                self._last_image.crop((x, y, x + width, y + height))
-                if self._last_image is not None
-                else Image.new("RGB", (width, height), (4, 13, 16))
-            )
-            outer = media_mask((width, height))
-            region.paste((0, 0, 0), (0, 0, width, height), outer)
-            inner_shape = media_mask((width - 2, height - 2))
-            inner = Image.new("L", (width, height), 0)
-            inner.paste(inner_shape, (1, 1))
-            border = ImageChops.subtract(outer, inner)
-            region.paste((75, 92, 96), (0, 0, width, height), border)
-            tile_size = (width - 2, height - 2)
-            tile = ImageOps.contain(
+            region = ImageOps.fit(
                 frame,
-                tile_size,
+                (width, height),
                 method=Image.Resampling.BILINEAR,
+                centering=(0.5, 0.5),
             )
-            tile_x = 1 + (tile_size[0] - tile.width) // 2
-            tile_y = 1 + (tile_size[1] - tile.height) // 2
-            region.paste(tile, (tile_x, tile_y))
             show_region = getattr(self.panel, "show_region", None)
             if not callable(show_region):
                 image = self._last_image.copy() if self._last_image is not None else self._render_image()

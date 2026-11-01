@@ -21,6 +21,7 @@ HEIGHT = 280
 DISPLAY_CORNER_RADIUS = 43
 MEDIA_TOP_RADIUS = 12
 MEDIA_MARGIN = 7
+VIDEO_REGION = (0, 105, WIDTH, HEIGHT - 105)
 PLAYER_GLOW_STRENGTH = 1.3
 DEFAULT_ACCENT = (253, 184, 19)
 PLAY_GREEN = (54, 209, 126)
@@ -1871,60 +1872,64 @@ def render_device_ui(
         _outline_media_shape(image, weather_bounds, (75, 92, 96))
         return image.convert("RGB")
 
-    # Radio/player artwork spans the content width. ImageOps.fit deliberately
-    # crops the lower edge instead of squeezing a square logo into a side tile.
-    media_bounds = (
-        MEDIA_MARGIN,
-        content_top + 42,
-        WIDTH - 1 - MEDIA_MARGIN,
-        HEIGHT - 1 - MEDIA_MARGIN,
-    )
-    tile_xy = (media_bounds[0] + 1, media_bounds[1] + 1)
-    tile_size = (
-        media_bounds[2] - media_bounds[0] - 1,
-        media_bounds[3] - media_bounds[1] - 1,
-    )
     if artwork is not None and state.video_active:
-        _fill_media_shape(image, media_bounds, (0, 0, 0))
-        tile = ImageOps.contain(
-            artwork.convert("RGB"),
-            tile_size,
-            method=Image.Resampling.BILINEAR,
-        )
-        video_x = tile_xy[0] + (tile_size[0] - tile.width) // 2
-        video_y = tile_xy[1] + (tile_size[1] - tile.height) // 2
-        image.paste(tile, (video_x, video_y))
-    elif artwork is not None:
+        # Mediathek video is the sole edge-to-edge media exception. Fill the
+        # complete lower panel, accepting a centered crop instead of letterbox
+        # bars, and leave every other media mask unchanged.
+        video_x, video_y, video_width, video_height = VIDEO_REGION
         tile = ImageOps.fit(
             artwork.convert("RGB"),
-            tile_size,
-            method=Image.Resampling.LANCZOS,
-            centering=(0.5, 0.35),
+            (video_width, video_height),
+            method=Image.Resampling.BILINEAR,
+            centering=(0.5, 0.5),
         )
-        mask = media_mask(tile_size)
-        image.paste(tile, tile_xy, mask)
-    elif state.service == "DMR":
-        _fill_media_shape(image, media_bounds, (13, 31, 35))
-        flag_bounds = (
-            media_bounds[0] + 23,
-            media_bounds[1] + 35,
-            media_bounds[2] - 23,
-            media_bounds[1] + 102,
-        )
-        _draw_country_flag(draw, flag_bounds, state.flag_code or "TG")
-        draw.rounded_rectangle(flag_bounds, radius=5, outline=(210, 218, 220), width=2)
+        image.paste(tile, (video_x, video_y))
     else:
-        _fill_media_shape(image, media_bounds, (13, 31, 35))
-        initials = "".join(part[:1] for part in state.source.split()[:2]).upper() or "OR"
-        initials_font = _font(34, bold=True)
-        bounds = draw.textbbox((0, 0), initials, font=initials_font)
-        draw.text(
-            (120 - (bounds[2] - bounds[0]) / 2, content_top + 125 - (bounds[3] - bounds[1]) / 2),
-            initials,
-            font=initials_font,
-            fill=accent,
+        # Radio/player artwork spans the content width. ImageOps.fit
+        # deliberately crops the lower edge instead of squeezing a square logo
+        # into a side tile.
+        media_bounds = (
+            MEDIA_MARGIN,
+            content_top + 42,
+            WIDTH - 1 - MEDIA_MARGIN,
+            HEIGHT - 1 - MEDIA_MARGIN,
         )
-    _outline_media_shape(image, media_bounds, (75, 92, 96))
+        tile_xy = (media_bounds[0] + 1, media_bounds[1] + 1)
+        tile_size = (
+            media_bounds[2] - media_bounds[0] - 1,
+            media_bounds[3] - media_bounds[1] - 1,
+        )
+        if artwork is not None:
+            tile = ImageOps.fit(
+                artwork.convert("RGB"),
+                tile_size,
+                method=Image.Resampling.LANCZOS,
+                centering=(0.5, 0.35),
+            )
+            mask = media_mask(tile_size)
+            image.paste(tile, tile_xy, mask)
+        elif state.service == "DMR":
+            _fill_media_shape(image, media_bounds, (13, 31, 35))
+            flag_bounds = (
+                media_bounds[0] + 23,
+                media_bounds[1] + 35,
+                media_bounds[2] - 23,
+                media_bounds[1] + 102,
+            )
+            _draw_country_flag(draw, flag_bounds, state.flag_code or "TG")
+            draw.rounded_rectangle(flag_bounds, radius=5, outline=(210, 218, 220), width=2)
+        else:
+            _fill_media_shape(image, media_bounds, (13, 31, 35))
+            initials = "".join(part[:1] for part in state.source.split()[:2]).upper() or "OR"
+            initials_font = _font(34, bold=True)
+            bounds = draw.textbbox((0, 0), initials, font=initials_font)
+            draw.text(
+                (120 - (bounds[2] - bounds[0]) / 2, content_top + 125 - (bounds[3] - bounds[1]) / 2),
+                initials,
+                font=initials_font,
+                fill=accent,
+            )
+        _outline_media_shape(image, media_bounds, (75, 92, 96))
 
     title = (
         state.title

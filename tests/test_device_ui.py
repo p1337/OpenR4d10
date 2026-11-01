@@ -112,7 +112,7 @@ class DeviceUiTests(unittest.TestCase):
         self.assertEqual(image.getpixel((140, 240)), (220, 20, 40))
         self.assertEqual(image.getpixel((220, 240)), (220, 20, 40))
 
-    def test_mediathek_video_is_contained_without_cropping(self) -> None:
+    def test_mediathek_video_fills_full_width_and_bottom_edge(self) -> None:
         state = DeviceUiState(
             source="ARD-alpha",
             service_index=SERVICES.index("PLAYER"),
@@ -120,15 +120,15 @@ class DeviceUiTests(unittest.TestCase):
             video_active=True,
         )
         frame = Image.new("RGB", (320, 180), (16, 32, 48))
-        ImageDraw.Draw(frame).rectangle((0, 0, 31, 179), fill=(220, 20, 40))
-        ImageDraw.Draw(frame).rectangle((288, 0, 319, 179), fill=(20, 80, 220))
 
         image = render_device_ui(state, frame)
 
+        self.assertEqual(adapters.VIDEO_REGION, (0, 105, 240, 175))
+        self.assertEqual(image.getpixel((0, 105)), (16, 32, 48))
+        self.assertEqual(image.getpixel((239, 105)), (16, 32, 48))
         self.assertEqual(image.getpixel((120, 180)), (16, 32, 48))
-        self.assertEqual(image.getpixel((20, 180)), (220, 20, 40))
-        self.assertEqual(image.getpixel((220, 180)), (20, 80, 220))
-        self.assertEqual(image.getpixel((120, 112)), (0, 0, 0))
+        self.assertEqual(image.getpixel((0, 279)), (16, 32, 48))
+        self.assertEqual(image.getpixel((239, 279)), (16, 32, 48))
 
     def test_media_uses_tight_equal_margins_and_smaller_top_corners(self) -> None:
         color = (220, 20, 40)

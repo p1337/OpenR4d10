@@ -3556,7 +3556,7 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   aus demselben zentralen `MpvEngine`; ein zweiter Decoder, ein simulierter
   Video-Timer oder ein nur ungefähr synchron laufender Nebenprozess ist
   verboten. Während Video tatsächlich läuft, darf ausschließlich der
-  226-x-168-Pixel-Medienbereich mit höchstens 25 FPS als SPI-Teilfläche
+  240-x-175-Pixel-Videobereich mit höchstens 25 FPS als SPI-Teilfläche
   aktualisiert werden. Normale Vollbilder, Kopfzeile, Menüs, Recorder und DMR
   bleiben bei höchstens 10 FPS. Der Videotakt darf weder den vollständigen
   UI-Renderer noch die vollständige 240-x-280-RGB565-Konvertierung aufrufen;
@@ -3691,3 +3691,20 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Ende“ abbilden und beweisen, dass der neue Stream weiter als `playing`
   gemeldet wird. Die Abnahme auf dem Pi muss anschließend Status,
   Bildbewegung und laufende ALSA-Ausgabe gemeinsam prüfen.
+
+### 2026-11-01 – Mediathekvideo nutzt die volle untere Displayfläche
+
+- Ausschließlich ein tatsächlich aktives Mediathekvideo ist eine bewusste
+  Ausnahme von den allgemeinen Medienrändern und Medienrundungen. Unterhalb
+  des Metadatenbereichs beginnt seine Teilfläche bei y=105, verwendet die
+  komplette Displaybreite von 240 Pixeln und reicht ohne Seiten- oder
+  Unterrand bis einschließlich zur letzten Displayzeile y=279.
+- Das Video füllt diese 240-x-175-Pixel-Fläche vollständig. Dafür ist ein
+  mittiger Zuschnitt zulässig und jetzt ausdrücklich gewünscht; die ältere
+  Letterbox-/`contain`-Vorgabe ohne Zuschnitt ist für Mediathekvideo aufgehoben.
+  Radio-Logos, Wetterbilder, Kameras, Ambientgrafiken und andere Medien behalten
+  ihre bisherigen engen Ränder, Masken und Rundungen unverändert.
+- Vollbildrenderer und schneller 25-FPS-Teilupdatepfad müssen exakt dieselben
+  Koordinaten und dieselbe `fit`-Skalierung verwenden. Ein Regressionstest muss
+  Video an x=0, x=239 und y=279 nachweisen und gleichzeitig belegen, dass der
+  normale Radio-Medienrand weiterhin besteht.

@@ -91,8 +91,9 @@ also deliberate device-focus requests: after the central player accepts the
 lowest available source, the application renders one resolved `PLAYER` frame.
 Audio mode keeps the metadata view. Video mode queues software screenshots from
 that same mpv process and composites the completed JPEG into the native frame
-at no more than 25 FPS while video is actually playing. Only the 226 x 168 media
-region uses that partial-transfer path; normal full UI frames remain capped at
+at no more than 25 FPS while video is actually playing. Only the edge-to-edge
+240 x 175 lower video region uses that partial-transfer path; normal full UI
+frames remain capped at
 10 FPS. The one transient file lives under `/run/openr4d10`, is
 bounded and removed after consumption; no video frame enters persistent state.
 Because mpv remains the sole decoder and clock, pause, resume and channel
@@ -349,10 +350,11 @@ and Gaussian-blur work. Browser key-repeat detents are coalesced in order before
 they enter the bounded device-input API, so the resulting rotation is preserved
 without creating an HTTP or display backlog.
 Running Mediathek video is the other explicit partial-update exception: only its
-226 x 168 media rectangle may run at up to 25 FPS. Pausing or leaving video mode
+240 x 175 rectangle from `(0, 105)` through the physical bottom edge may run at
+up to 25 FPS. Pausing or leaving video mode
 stops that cadence immediately and never raises the full-panel limit. Each such
 frame bypasses both the complete UI renderer and complete 240 x 280 RGB565
-conversion; scaling, masking, conversion and SPI transfer are region-only.
+conversion; scaling, conversion and SPI transfer are region-only.
 While a logical hardware or browser control is active, periodic recorder
 timeline frames yield their display slot. The resolved interaction frame still
 renders immediately; only the redundant periodic frame is skipped. After 200 ms
