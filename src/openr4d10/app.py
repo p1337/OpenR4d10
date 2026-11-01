@@ -628,6 +628,12 @@ class OpenR4d10App:
                 Control.RIGHT_PRESS,
             }
         )
+        state_only_handler = getattr(self.display, "apply_input_state", None)
+        service_navigation_event = (
+            event.control == Control.RIGHT_INNER
+            and not menu_open
+            and callable(state_only_handler)
+        )
         if recorder_ptt_event:
             # Audio edges must never wait for the physical full-frame SPI path.
             # The priority renderer below paints only the glow asynchronously.
@@ -648,6 +654,11 @@ class OpenR4d10App:
             # apply_input() here would transfer one stale full frame before the
             # resolved recorder frame and doubles cursor latency.
             device_state = current_ui if isinstance(current_ui, dict) else {}
+        elif service_navigation_event:
+            # Service entry/exit may stop audio or prepare the recorder.  Apply
+            # only the ordered UI mutation now and present one resolved frame
+            # after that lifecycle work, never a stale intermediate frame.
+            device_state = state_only_handler(event)
         else:
             device_state = handler(event)
         new_service = (
@@ -655,7 +666,8 @@ class OpenR4d10App:
             if isinstance(device_state, dict) and device_state.get("service")
             else selected_service
         )
-        if self.services is not None and new_service != selected_service:
+        service_changed = new_service != selected_service
+        if self.services is not None and service_changed:
             if selected_service == "RADIO":
                 self._radio_last_release_at = None
                 self._radio_ignore_release = False
@@ -673,8 +685,12 @@ class OpenR4d10App:
                     {"action": "voice_recorder_open"}
                 )
         self._view_initialized = True
-        if media_result is not None and not recorder_ptt_event:
-            if recorder_semantic_event:
+        if not recorder_ptt_event and (
+            media_result is not None or (service_navigation_event and service_changed)
+        ):
+            if service_navigation_event and service_changed:
+                self.render_interaction_once(new_service)
+            elif recorder_semantic_event:
                 self.render_recorder_once()
             else:
                 self.render_once()
@@ -776,11 +792,16 @@ class OpenR4d10App:
     def render_recorder_once(self) -> None:
         """Refresh the recorder without putting telemetry/network work in its path."""
 
+        self.render_interaction_once("REC")
+
+    def render_interaction_once(self, view_service: str) -> None:
+        """Resolve one interactive view from cached telemetry and repaint once."""
+
         if self.services is None or not self._last_receiver_telemetry:
             self.render_once()
             return
         receiver = dict(self._last_receiver_telemetry)
-        receiver.update(self.services.receiver_overlay("REC"))
+        receiver.update(self.services.receiver_overlay(view_service))
         self._publish(
             dashboard_frame(
                 self.config.title,

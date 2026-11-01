@@ -392,6 +392,18 @@ class WhisplayDisplay:
             self._show_state()
             return self._public_state()
 
+    def apply_input_state(self, event: InputEvent) -> dict[str, object]:
+        """Apply input state without presenting an intermediate full frame.
+
+        The application uses this only when it must resolve service lifecycle
+        work before the one final frame can be composed.  Keeping the mutation
+        under the display lock preserves input ordering without paying for a
+        stale SPI transfer.
+        """
+        with self._lock:
+            self.state.apply(event)
+            return self._public_state()
+
     def set_brightness(self, brightness_percent: int) -> None:
         with self._lock:
             try:

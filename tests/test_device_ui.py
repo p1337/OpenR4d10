@@ -1061,6 +1061,16 @@ class WhisplayDisplayTests(unittest.TestCase):
         self.assertEqual(len(panel.frames), 2)
         display.close()
 
+    def test_state_only_input_does_not_present_an_intermediate_frame(self) -> None:
+        panel = FakePanel()
+        display = WhisplayDisplay(panel=panel)  # type: ignore[arg-type]
+        display.render(Frame(screen="dashboard", title="OpenR4d10"))
+        state = display.apply_input_state(InputEvent(Control.RIGHT_INNER, steps=1))
+        self.assertEqual(state["service"], "RADIO")
+        self.assertEqual(display.snapshot()["service"], "RADIO")
+        self.assertEqual(len(panel.frames), 1)
+        display.close()
+
     def test_native_screen_preview_uses_same_renderer(self) -> None:
         panel = FakePanel()
         display = WhisplayDisplay(panel=panel)  # type: ignore[arg-type]

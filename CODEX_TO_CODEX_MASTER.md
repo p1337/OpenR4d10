@@ -3274,3 +3274,14 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   aktiv nachlaufen, setzt ausschließlich der entbehrliche Timeline-Refresh
   kurz aus. Nach 200 ms Eingaberuhe läuft er automatisch weiter. Die
   resultierende Position selbst und das Eingabeframe werden niemals verworfen.
+- Eine weitere reale Messung zeigte für den Wechsel in `REC` ungefähr 528 ms.
+  Ursache war erneut ein vermeidbares Zwischenbild: Die Dienstachse zeichnete
+  zuerst den noch nicht aufgelösten UI-Zustand und nach Dienst-Eintritt oder
+  -Austritt ein zweites Vollbild. Dienstwechsel ändern deshalb den geordneten
+  Displayzustand unter Lock ohne SPI-Transfer, führen danach die vorhandene
+  Lifecycle-Aktion aus und zeichnen genau ein endgültiges Bild mit gecachter
+  Telemetrie. Eintritt und Austritt sind am Pi getrennt gegen die 300-ms-Grenze
+  zu messen.
+- Debouncing und Coalescing dürfen Eingabedruck begrenzen, aber niemals den
+  resultierenden Drehweg, die Reihenfolge oder eine PTT-Flanke verlieren. Sie
+  sind Rückstauschutz und kein Ersatz für einen schnellen aufgelösten Pfad.

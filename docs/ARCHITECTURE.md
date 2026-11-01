@@ -314,6 +314,11 @@ While a logical hardware or browser control is active, periodic recorder
 timeline frames yield their display slot. The resolved interaction frame still
 renders immediately; only the redundant periodic frame is skipped. After 200 ms
 without another input edge/detent, deadline-based timeline rendering resumes.
+Service-axis navigation follows the same one-frame rule: the native adapter
+changes its ordered state under the display lock without transferring an
+intermediate panel image, application entry/exit lifecycle work is resolved,
+and one final cached-telemetry frame is presented. Debouncing or coalescing may
+bound event pressure, but it must preserve the resulting rotary distance.
 
 On the verified four-core Pi Zero 2 W, CPU affinity gives background work
 (including ffmpeg/mpv and the level parser) cores 0–1, native UI/SPI core 2 and

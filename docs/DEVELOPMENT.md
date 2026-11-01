@@ -87,6 +87,12 @@ The real-device stress check must include at least fifteen consecutive recorder
 detents. Periodic timeline rendering must yield during the interaction and
 resume after 200 ms of quiet; a late-series rise to 300 ms or more is a failed
 release even when isolated first-step latency is acceptable.
+Service navigation has an additional one-frame regression: the optimized
+Whisplay path may call `apply_input_state()` once and render the resolved target
+once, but must not call the presentation-producing `apply_input()` first.
+Measure service entry and exit separately on the Pi; a result at or above the
+same 300 ms gate blocks release. Input debouncing may combine pressure only
+when it retains ordering and the complete logical movement.
 
 ## Release gate and device provenance
 

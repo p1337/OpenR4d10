@@ -831,6 +831,84 @@ class AppTests(unittest.TestCase):
         self.assertEqual(services.requests, [])
         self.assertEqual(services.overlay_views, ["WEATHER"])
 
+    def test_service_navigation_uses_one_resolved_cached_frame(self) -> None:
+        class InputDisplay:
+            def __init__(self) -> None:
+                self.service = "RADIO"
+                self.state_only_calls = 0
+                self.presentation_calls = 0
+                self.render_calls = 0
+
+            def snapshot(self):
+                return {"service": self.service, "menu_open": False}
+
+            def apply_input_state(self, event):
+                self.state_only_calls += 1
+                self.assert_navigation(event)
+                self.service = "REC"
+                return self.snapshot()
+
+            def apply_input(self, _event):
+                self.presentation_calls += 1
+                raise AssertionError("service navigation drew a stale frame")
+
+            def render(self, frame):
+                self.render_calls += 1
+                receiver = frame.fields.get("receiver", {})
+                self.service = str(receiver.get("service") or self.service)
+
+            @staticmethod
+            def assert_navigation(event):
+                if event.control != Control.RIGHT_INNER:
+                    raise AssertionError("unexpected control")
+
+        class Services:
+            active_service = "webradio"
+
+            def __init__(self) -> None:
+                self.requests = []
+                self.overlay_views = []
+
+            def control(self, request):
+                self.requests.append(request)
+                return {"recording": {"state": "paused"}}
+
+            def receiver_overlay(self, view_service=None):
+                self.overlay_views.append(view_service)
+                return {"service": view_service, "station": "Voice Recorder"}
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            display = InputDisplay()
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=display,  # type: ignore[arg-type]
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,  # type: ignore[arg-type]
+            )
+            app._last_receiver_telemetry = {"hostname": "OpenR4d10"}
+            app._last_power_telemetry = {"battery_percent": 90}
+            result = app.control(
+                {"action": "device_input", "control": "right_inner", "steps": 5}
+            )
+
+        self.assertEqual(result["device_ui"]["service"], "REC")
+        self.assertEqual(display.state_only_calls, 1)
+        self.assertEqual(display.presentation_calls, 0)
+        self.assertEqual(display.render_calls, 1)
+        self.assertEqual(services.requests, [{"action": "voice_recorder_open"}])
+        self.assertEqual(services.overlay_views, ["REC"])
+
     def test_enter_starts_radio_when_radio_ui_is_selected_and_player_stopped(self) -> None:
         class InputDisplay:
             def render(self, _frame) -> None:
