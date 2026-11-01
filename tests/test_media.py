@@ -170,6 +170,19 @@ class ProcessBoundaryTests(unittest.TestCase):
         engine.seek_absolute(1.2)
         self.assertEqual(commands, [["seek", 1.2, "absolute", "exact"]])
 
+    def test_load_enables_video_only_when_explicitly_requested(self) -> None:
+        engine = MpvEngine(Path("/usr/bin/mpv"))
+        commands = []
+        engine._command = lambda command: commands.append(command) or {}
+
+        engine.load("https://media.example/audio.mp3")
+        engine.load("https://media.example/video.mp4", video_enabled=True)
+
+        self.assertEqual(commands[0], ["set_property", "vid", "no"])
+        self.assertEqual(commands[4], ["set_property", "vid", "auto"])
+        with self.assertRaises(ValueError):
+            engine.load("https://media.example/video.mp4", video_enabled=1)
+
     def test_mpv_load_at_sets_initial_position_in_one_atomic_command(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw).resolve()

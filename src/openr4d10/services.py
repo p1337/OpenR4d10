@@ -3196,7 +3196,7 @@ class ServiceCatalog:
             self.radio_buffer.stop(flush=True)
         self._stop_brandmeister_for_audio_owner()
         self._stop_ambient_layers()
-        self.player.load(source)
+        self.player.load(source, video_enabled=selected_mode == "video")
         self.active_service = item.service_id
         self.active_preset_id = None
         self.active_station_id = None

@@ -3615,6 +3615,11 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Ergebniszeile bietet `Audio auf Gerät` für die sparsame Tonwiedergabe mit
   Titelansicht und `Video auf Gerät` für echtes Video plus Ton auf dem
   physischen Whisplay. Keine der beiden Möglichkeiten darf die andere ersetzen.
+- `Audio auf Gerät` deaktiviert im zentralen mpv die Videospur tatsächlich mit
+  `vid=no`; bloß kein Bild zu zeichnen, während mpv weiter Video dekodiert, ist
+  kein Audiomodus. `Video auf Gerät` setzt für genau diesen Ladeweg `vid=auto`.
+  Radio, Podcasts, Ambient und sonstige Audioquellen bleiben standardmäßig
+  videodeaktiviert.
 - Der bereits vorhandene Qualitätsvorrang bleibt hart: `url_video_low` wird
   immer vor `url_video` und `url_video_hd` gewählt. Ist die Low-Fassung nicht
   vorhanden, wird ausschließlich die kleinste vom Index noch angebotene

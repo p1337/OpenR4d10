@@ -9,10 +9,12 @@ Sendungen und bietet drei ausdrücklich getrennte Wiedergabewege:
   Browsers.
 - **Audio auf Gerät** übergibt die kleinste verfügbare Senderfassung an den
   einen zentralen `MpvEngine`; das Whisplay wechselt nach erfolgreichem Start
-  in `PLAYER` und zeigt Sender, Titel, Ergebnisposition und Status.
+  in `PLAYER` und zeigt Sender, Titel, Ergebnisposition und Status. mpv erhält
+  dabei ausdrücklich `vid=no`, sodass keine Videospur im Hintergrund dekodiert
+  wird.
 - **Video auf Gerät** verwendet dieselbe kleinste Fassung und denselben
   `MpvEngine`, zeigt aber zusätzlich das wirklich wiedergegebene Videobild auf
-  dem Whisplay.
+  dem Whisplay und aktiviert dafür genau bei diesem Ladeweg `vid=auto`.
 
 In dieser Geräteansicht schaltet der rechte äußere Encoder beziehungsweise
 Pfeil hoch/runter zyklisch durch die Ergebnisse derselben Suche und startet den

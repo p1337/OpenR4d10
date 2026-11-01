@@ -423,11 +423,16 @@ class MpvEngine:
         finally:
             self._ipc.settimeout(previous_timeout)
 
-    def load(self, source: str) -> dict[str, Any]:
+    def load(self, source: str, *, video_enabled: bool = False) -> dict[str, Any]:
+        if not isinstance(video_enabled, bool):
+            raise ValueError("video_enabled must be a boolean")
         approved = validate_media_source(source, self.media_roots)
         self._reset_video_capture()
         with self._lock:
             try:
+                self._command(
+                    ["set_property", "vid", "auto" if video_enabled else "no"]
+                )
                 self._command(["set_property", "loop-playlist", "no"])
                 self._command(["loadfile", approved, "replace"])
                 self._command(["set_property", "pause", False])

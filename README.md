@@ -470,6 +470,9 @@ stream and website URLs stay process-local and are not exposed by
 the status API. This integration does not bypass DRM, age gates, login or
 geoblocking. The exact catalog and limits are documented in
 [`docs/MEDIATHEK.md`](docs/MEDIATHEK.md).
+Device audio explicitly disables mpv video decoding; device video enables it
+only for that selected load. Radio, podcasts and other audio sources keep video
+decoding off.
 
 The **AmbientR4D10** tab is an independent audio service, not a radio-station
 group or a third-party branded clone. Its ten built-in soundscapes are fetched

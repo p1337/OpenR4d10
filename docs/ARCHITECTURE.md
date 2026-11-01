@@ -101,6 +101,10 @@ browser-only video remain presentation-neutral. While that Mediathek source
 owns the player, `right_outer` cycles and immediately loads entries from the
 same cached result set without changing the selected audio/video mode, and
 `right_press` uses the existing real pause path.
+Audio device playback explicitly sets mpv's `vid` property to `no`; video
+device playback sets it to `auto`. All other audio-source loads default to
+`vid=no`, so hiding the device picture can never leave an unused video decoder
+running.
 
 The same router maps each `left_outer` detent to a bounded ten-percentage-point
 change of the real mpv volume and `right_outer` to cyclic selection in the

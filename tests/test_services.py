@@ -506,9 +506,11 @@ class ServiceCatalogTests(unittest.TestCase):
             def __init__(self):
                 self.state = State()
                 self.loaded = None
+                self.video_enabled = None
 
-            def load(self, source):
+            def load(self, source, *, video_enabled=False):
                 self.loaded = source
+                self.video_enabled = video_enabled
                 self.state.state = "playing"
 
             def stop(self):
@@ -588,9 +590,11 @@ class ServiceCatalogTests(unittest.TestCase):
             def __init__(self):
                 self.state = State()
                 self.loaded = None
+                self.video_enabled = None
 
-            def load(self, source):
+            def load(self, source, *, video_enabled=False):
                 self.loaded = source
+                self.video_enabled = video_enabled
                 self.state.state = "playing"
 
             def stop(self):
@@ -695,6 +699,7 @@ class ServiceCatalogTests(unittest.TestCase):
                 })
                 playing = catalog.snapshot()
                 self.assertEqual(player.loaded, "https://media.example.test/video.mp4")
+                self.assertTrue(player.video_enabled)
                 self.assertEqual(playing["active_service"], "ard_mediathek")
                 self.assertEqual(playing["mediathek"]["active_item"]["title"], "Der Test")
                 self.assertEqual(playing["mediathek"]["active_provider"], "ard")
@@ -733,6 +738,7 @@ class ServiceCatalogTests(unittest.TestCase):
                 })
                 self.assertFalse(catalog.receiver_overlay("PLAYER")["video_active"])
                 self.assertIsNone(catalog.device_video_frame())
+                self.assertFalse(player.video_enabled)
                 service_states = {entry["service_id"]: entry for entry in playing["items"]}
                 self.assertEqual(service_states["ard_mediathek"]["readiness"], "ready")
                 self.assertEqual(service_states["zdf_mediathek"]["readiness"], "ready")
