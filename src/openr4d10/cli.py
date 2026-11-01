@@ -117,6 +117,7 @@ def main(argv: list[str] | None = None) -> int:
     services = (
         ServiceCatalog(
             app_config.state_directory,
+            runtime_directory=app_config.runtime_directory,
             adapter_directory=app_config.service_adapter_directory,
         )
         if args.command == "run"

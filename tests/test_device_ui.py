@@ -112,6 +112,24 @@ class DeviceUiTests(unittest.TestCase):
         self.assertEqual(image.getpixel((140, 240)), (220, 20, 40))
         self.assertEqual(image.getpixel((220, 240)), (220, 20, 40))
 
+    def test_mediathek_video_is_contained_without_cropping(self) -> None:
+        state = DeviceUiState(
+            source="ARD-alpha",
+            service_index=SERVICES.index("PLAYER"),
+            playing=True,
+            video_active=True,
+        )
+        frame = Image.new("RGB", (320, 180), (16, 32, 48))
+        ImageDraw.Draw(frame).rectangle((0, 0, 31, 179), fill=(220, 20, 40))
+        ImageDraw.Draw(frame).rectangle((288, 0, 319, 179), fill=(20, 80, 220))
+
+        image = render_device_ui(state, frame)
+
+        self.assertEqual(image.getpixel((120, 180)), (16, 32, 48))
+        self.assertEqual(image.getpixel((20, 180)), (220, 20, 40))
+        self.assertEqual(image.getpixel((220, 180)), (20, 80, 220))
+        self.assertEqual(image.getpixel((120, 112)), (0, 0, 0))
+
     def test_media_uses_tight_equal_margins_and_smaller_top_corners(self) -> None:
         color = (220, 20, 40)
         image = render_device_ui(
@@ -950,6 +968,23 @@ class WhisplayDisplayTests(unittest.TestCase):
 
         self.assertTrue(first.startswith(b"\x89PNG\r\n\x1a\n"))
         self.assertEqual(first, second)
+        display.close()
+
+    def test_transient_video_frame_reaches_same_native_renderer(self) -> None:
+        panel = FakePanel()
+        display = WhisplayDisplay(panel=panel)  # type: ignore[arg-type]
+        frame = BytesIO()
+        Image.new("RGB", (320, 180), (31, 61, 91)).save(frame, format="JPEG")
+        display.set_video_frame(frame.getvalue())
+        display.state.service_index = SERVICES.index("PLAYER")
+        display.state.video_active = True
+
+        image = display._render_image()
+
+        pixel = image.getpixel((120, 180))
+        self.assertTrue(all(abs(a - b) <= 3 for a, b in zip(pixel, (31, 61, 91))))
+        display.set_video_frame(None)
+        self.assertIsNone(display._video_frame)
         display.close()
 
     def test_priority_recorder_glow_uses_small_partial_updates(self) -> None:

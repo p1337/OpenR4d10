@@ -596,6 +596,9 @@ class ServiceCatalogTests(unittest.TestCase):
             def stop(self):
                 self.state.state = "stopped"
 
+            def video_frame(self):
+                return b"synchronized-video-frame"
+
             def close(self):
                 pass
 
@@ -688,12 +691,24 @@ class ServiceCatalogTests(unittest.TestCase):
                     "action": "mediathek_play",
                     "provider": "ard",
                     "item_id": item["item_id"],
+                    "mode": "video",
                 })
                 playing = catalog.snapshot()
                 self.assertEqual(player.loaded, "https://media.example.test/video.mp4")
                 self.assertEqual(playing["active_service"], "ard_mediathek")
                 self.assertEqual(playing["mediathek"]["active_item"]["title"], "Der Test")
                 self.assertEqual(playing["mediathek"]["active_provider"], "ard")
+                self.assertEqual(playing["mediathek"]["playback_mode"], "video")
+                self.assertTrue(catalog.receiver_overlay("PLAYER")["video_active"])
+                self.assertTrue(catalog.mediathek_video_refresh_active())
+                self.assertEqual(
+                    catalog.device_video_frame(), b"synchronized-video-frame"
+                )
+                player.state.paused = True
+                player.state.state = "paused"
+                self.assertFalse(catalog.mediathek_video_refresh_active())
+                player.state.paused = False
+                player.state.state = "playing"
                 self.assertEqual(catalog.receiver_overlay("PLAYER")["channel"], 1)
                 catalog.control({
                     "action": "mediathek_search",
@@ -702,8 +717,22 @@ class ServiceCatalogTests(unittest.TestCase):
                 })
                 stepped = catalog.control({"action": "mediathek_step", "steps": 1})
                 self.assertEqual(stepped["item_id"], "89abcdef0123456789abcdef")
+                self.assertEqual(stepped["mode"], "video")
                 self.assertEqual(player.loaded, "https://media.example.test/video-2.mp4")
                 self.assertEqual(catalog.receiver_overlay("PLAYER")["channel"], 2)
+                catalog.control({
+                    "action": "mediathek_search",
+                    "provider": "ard",
+                    "query": "Wissen",
+                })
+                catalog.control({
+                    "action": "mediathek_play",
+                    "provider": "ard",
+                    "item_id": "89abcdef0123456789abcdef",
+                    "mode": "audio",
+                })
+                self.assertFalse(catalog.receiver_overlay("PLAYER")["video_active"])
+                self.assertIsNone(catalog.device_video_frame())
                 service_states = {entry["service_id"]: entry for entry in playing["items"]}
                 self.assertEqual(service_states["ard_mediathek"]["readiness"], "ready")
                 self.assertEqual(service_states["zdf_mediathek"]["readiness"], "ready")

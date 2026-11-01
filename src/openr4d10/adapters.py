@@ -162,6 +162,7 @@ class WhisplayDisplay:
         self._priority_recording = False
         self._priority_continuous = False
         self._last_image: Image.Image | None = None
+        self._video_frame: Image.Image | None = None
         self._last_frame_started_at = 0.0
         self._next_hotspot_refresh_at = 0.0
 
@@ -340,6 +341,12 @@ class WhisplayDisplay:
     def _render_image(self) -> Image.Image:
         artwork = None
         if (
+            self.state.service == "PLAYER"
+            and self.state.video_active
+            and self._video_frame is not None
+        ):
+            artwork = self._video_frame.copy()
+        elif (
             self.artwork_cache_root is not None
             and self.state.image_file is not None
             and re.fullmatch(
@@ -375,6 +382,30 @@ class WhisplayDisplay:
             except OSError:
                 artwork = None
         return render_device_ui(self.state, artwork)
+
+    def set_video_frame(self, payload: bytes | None) -> None:
+        """Install one bounded transient mpv frame for the native compositor."""
+
+        with self._lock:
+            if payload is None:
+                self._video_frame = None
+                return
+            if not isinstance(payload, bytes) or not 4 <= len(payload) <= 4 * 1024 * 1024:
+                raise ValueError("video frame must be a bounded JPEG byte string")
+            try:
+                with Image.open(BytesIO(payload)) as source:
+                    source.load()
+                    if (
+                        source.format != "JPEG"
+                        or source.width < 1
+                        or source.height < 1
+                        or source.width > 4096
+                        or source.height > 2160
+                    ):
+                        raise ValueError("video frame dimensions are invalid")
+                    self._video_frame = source.convert("RGB").copy()
+            except OSError as exc:
+                raise ValueError("video frame is not a valid JPEG") from exc
 
     def render(self, frame: Frame) -> None:
         # Keep the approved native animation visible until the first real UI

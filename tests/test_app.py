@@ -959,6 +959,7 @@ class AppTests(unittest.TestCase):
                 "action": "mediathek_play",
                 "provider": "all",
                 "item_id": "0123456789abcdef01234567",
+                "mode": "video",
             })
             stepped = app.control({
                 "action": "device_input",
@@ -980,6 +981,7 @@ class AppTests(unittest.TestCase):
                     "action": "mediathek_play",
                     "provider": "all",
                     "item_id": "0123456789abcdef01234567",
+                    "mode": "video",
                 },
                 {"action": "mediathek_step", "steps": 1},
                 {"action": "pause"},

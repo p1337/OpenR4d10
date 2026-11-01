@@ -3,23 +3,36 @@
 ## Nutzerfunktion
 
 Der Browser-Tab **Mediatheken** durchsucht aktuelle öffentlich-rechtliche
-Sendungen und bietet zwei ausdrücklich getrennte Wiedergabewege:
+Sendungen und bietet drei ausdrücklich getrennte Wiedergabewege:
 
 - **Im Browser ansehen** verwendet das HTML5-Videoelement des verbundenen
   Browsers.
-- **Auf Gerät abspielen** übergibt eine bandbreitenärmere verfügbare Fassung an
-  den einen zentralen `MpvEngine`; das Whisplay wechselt nach erfolgreichem
-  Start in `PLAYER` und zeigt Sender, Titel, Ergebnisposition und Status.
+- **Audio auf Gerät** übergibt die kleinste verfügbare Senderfassung an den
+  einen zentralen `MpvEngine`; das Whisplay wechselt nach erfolgreichem Start
+  in `PLAYER` und zeigt Sender, Titel, Ergebnisposition und Status.
+- **Video auf Gerät** verwendet dieselbe kleinste Fassung und denselben
+  `MpvEngine`, zeigt aber zusätzlich das wirklich wiedergegebene Videobild auf
+  dem Whisplay.
 
 In dieser Geräteansicht schaltet der rechte äußere Encoder beziehungsweise
 Pfeil hoch/runter zyklisch durch die Ergebnisse derselben Suche und startet den
 gewählten Beitrag unmittelbar. Der rechte Druck beziehungsweise Enter
-pausiert oder setzt die reale Wiedergabe fort. Katalogsuche, Auswahl und
-**Im Browser ansehen** verändern die Geräteansicht nicht.
+pausiert oder setzt die reale Wiedergabe fort. Der gewählte Audio-/Video-Modus
+bleibt beim Wechsel erhalten. Katalogsuche, Auswahl und **Im Browser ansehen**
+verändern die Geräteansicht nicht.
 
-Das SPI-Display spielt noch kein bewegtes Video. Diese Grenze bleibt bestehen,
-bis Dekodierung, Audio-Synchronität, 10-FPS-Ausgabe und Eingabelatenz auf dem
-realen Pi Zero 2 W gemessen wurden.
+Die Gerätequelle wird immer in der Reihenfolge `url_video_low`, `url_video`,
+`url_video_hd` gewählt; HD wird auf dem 240-x-280-Gerät nie bevorzugt. Im
+Video-Modus bleibt mpv die einzige Bild-, Ton- und Zeitquelle. Seine
+Software-Screenshots werden ohne Warten über dieselbe private IPC angefordert,
+höchstens zehnmal pro Sekunde aus einer einzelnen JPEG-Datei unter
+`/run/openr4d10` übernommen und sofort gelöscht. Es gibt keinen zweiten
+ffmpeg-/mpv-Prozess und keine dauerhaften Videoframes unter `/var/lib`.
+Pausieren hält deshalb Bild und Ton gemeinsam an. Ein fehlender oder verspäteter
+Frame blockiert weder Ton noch Eingaben; der Renderer behält das letzte gültige
+Bild. Während Pause bleibt dieses Bild ohne nutzlose 10-Hz-Neuzeichnung stehen;
+die ebenfalls asynchronen mpv-Antworten werden begrenzt und nicht blockierend
+aus dem privaten Steuerkanal entfernt.
 
 ## Katalog und Sender
 
@@ -60,6 +73,8 @@ die thematisch gegliederten [ARTE-Dokumentationen](https://www.arte.tv/de/videos
   großen Arbeitsspeicher-Cache wiederverwendet;
 - Rohadressen bleiben prozesslokal und erscheinen nicht in Status, SQLite oder
   Backups;
+- der öffentliche Zustand enthält nur den aktiven Modus `audio` oder `video`,
+  niemals die Gerätequelle;
 - der lokale Videoendpunkt nimmt nur eine 24-stellige, bereits gecachte ID an
   und antwortet mit einer nicht cachebaren Weiterleitung; der Pi puffert oder
   proxyt keine große Videodatei;

@@ -8,11 +8,13 @@ Module; Suche und Wiedergabe verwenden trotzdem denselben Adapter und Player.
 
 Die Browseransicht kann eine geprüfte öffentliche Videoquelle über eine
 prozesslokale, undurchsichtige Element-ID direkt öffnen. Der Raspberry Pi
-proxyt die große Videodatei nicht. Auf dem Gerät verwendet die ausdrückliche
-Wiedergabe den zentralen `MpvEngine` und zeigt Metadaten. Zugangsdaten, Stream-
-URLs und Website-URLs werden weder in SQLite noch im öffentlichen Status oder
-in Backups gespeichert. DRM, Anmeldung, Altersfreigabe und Geoblocking werden
-nicht umgangen.
+proxyt die große Videodatei nicht. Auf dem Gerät stehen getrennt Audio und
+Video bereit. Beide verwenden die kleinste Senderfassung und den zentralen
+`MpvEngine`; im Video-Modus stammt das Whisplaybild synchron aus genau diesem
+Prozess und bleibt auf 10 FPS begrenzt. Zugangsdaten, Stream-URLs und Website-
+URLs werden weder in SQLite noch im öffentlichen Status oder in Backups
+gespeichert. DRM, Anmeldung, Altersfreigabe und Geoblocking werden nicht
+umgangen.
 
 Diagnose: Dienstbereitschaft erfordert das vorhandene `mpv`; Katalogfehler
 erscheinen als begrenzte Suchfehlermeldung. Die Quelle, Senderwerte, Limits und

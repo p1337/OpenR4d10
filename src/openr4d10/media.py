@@ -10,8 +10,10 @@ import math
 import os
 from pathlib import Path
 import re
+import select
 import signal
 import socket
+import stat
 import subprocess
 import threading
 import time
@@ -30,6 +32,8 @@ class MediaError(RuntimeError):
 
 MPV_IPC_TIMEOUT_SECONDS = 15.0
 MPV_LOCAL_START_TIMEOUT_SECONDS = 1.0
+MPV_VIDEO_FRAME_MAX_BYTES = 4 * 1024 * 1024
+MPV_VIDEO_FRAME_TIMEOUT_SECONDS = 0.5
 
 
 def _is_absolute_target_path(path: Path) -> bool:
@@ -92,11 +96,15 @@ class MpvEngine:
         self,
         executable: Path = Path("/usr/bin/mpv"),
         media_roots: tuple[Path, ...] = (Path("/var/lib/openr4d10/media"),),
+        runtime_directory: Path = Path("/run/openr4d10"),
     ) -> None:
         if not _is_absolute_target_path(executable):
             raise ValueError("mpv executable must be absolute")
+        if not _is_absolute_target_path(runtime_directory):
+            raise ValueError("mpv runtime directory must be absolute")
         self.executable = executable
         self.media_roots = media_roots
+        self.runtime_directory = runtime_directory
         self.state = PlaybackState()
         self._process: subprocess.Popen[bytes] | None = None
         self._ipc: socket.socket | None = None
@@ -104,13 +112,33 @@ class MpvEngine:
         self._events: deque[dict[str, Any]] = deque()
         self._request_id = 0
         self._lock = threading.Lock()
+        self._video_capture_lock = threading.Lock()
+        self._video_capture_generation = 0
+        self._video_capture_prefix = f"mpv-video-{os.getpid()}-{id(self):x}"
+        self._video_capture_path = self._new_video_capture_path()
+        self._stale_video_capture_paths: set[Path] = set()
+        self._video_capture_pending = False
+        self._video_capture_started_at = 0.0
+
+    def _new_video_capture_path(self) -> Path:
+        return self.runtime_directory / (
+            f"{self._video_capture_prefix}-{self._video_capture_generation}.jpg"
+        )
 
     def command_line(self, ipc_fd: int) -> list[str]:
         return [
             _target_path_string(self.executable),
             "--no-config",
             "--idle=yes",
-            "--no-video",
+            "--video=yes",
+            "--vo=null",
+            "--vo-null-fps=10",
+            "--video-sync=audio",
+            "--screenshot-sw=yes",
+            "--screenshot-high-bit-depth=no",
+            "--screenshot-jpeg-quality=45",
+            "--sws-fast=yes",
+            "--sws-scaler=fast-bilinear",
             "--audio-display=no",
             "--terminal=no",
             "--really-quiet",
@@ -150,6 +178,155 @@ class MpvEngine:
         self._ipc = parent
         self._buffer = b""
         self._events.clear()
+
+    def _reset_video_capture(self) -> None:
+        """Forget one transient frame without touching persistent media."""
+
+        with self._video_capture_lock:
+            self._stale_video_capture_paths.add(self._video_capture_path)
+            self._video_capture_generation += 1
+            self._video_capture_path = self._new_video_capture_path()
+            self._video_capture_pending = False
+            self._video_capture_started_at = 0.0
+            self._cleanup_stale_video_captures()
+
+    def _cleanup_stale_video_captures(self) -> None:
+        """Remove old generations, including files completed after a reset."""
+
+        for path in self._stale_video_capture_paths:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+    def _request_video_capture(self) -> None:
+        """Queue a screenshot without waiting behind display or input work."""
+
+        if not self._lock.acquire(blocking=False):
+            return
+        try:
+            if (
+                self._process is None
+                or self._process.poll() is not None
+                or self._ipc is None
+            ):
+                return
+            self.runtime_directory.mkdir(parents=True, exist_ok=True)
+            self._cleanup_stale_video_captures()
+            try:
+                self._video_capture_path.unlink(missing_ok=True)
+            except OSError:
+                return
+            self._request_id += 1
+            payload = json.dumps(
+                {
+                    "command": [
+                        "screenshot-to-file",
+                        _target_path_string(self._video_capture_path),
+                        "video",
+                    ],
+                    "request_id": self._request_id,
+                },
+                separators=(",", ":"),
+            ).encode("utf-8") + b"\n"
+            self._ipc.sendall(payload)
+            self._video_capture_pending = True
+            self._video_capture_started_at = time.monotonic()
+        except OSError:
+            self._video_capture_pending = False
+            self._video_capture_started_at = 0.0
+        finally:
+            self._lock.release()
+
+    def _consume_video_capture(self) -> bytes | None:
+        path = self._video_capture_path
+        try:
+            descriptor = os.open(
+                path,
+                os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+            )
+        except OSError:
+            return None
+        try:
+            metadata = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(metadata.st_mode)
+                or metadata.st_size < 4
+                or metadata.st_size > MPV_VIDEO_FRAME_MAX_BYTES
+            ):
+                return None
+            payload = os.read(descriptor, metadata.st_size + 1)
+            if (
+                len(payload) != metadata.st_size
+                or not payload.startswith(b"\xff\xd8")
+                or not payload.endswith(b"\xff\xd9")
+            ):
+                return None
+            return payload
+        finally:
+            os.close(descriptor)
+
+    def _drain_video_capture_responses(self) -> None:
+        """Consume ready screenshot replies without ever waiting for mpv."""
+
+        if not self._lock.acquire(blocking=False):
+            return
+        try:
+            ipc = self._ipc
+            if not isinstance(ipc, socket.socket):
+                return
+            readable, _, _ = select.select((ipc,), (), (), 0.0)
+            if not readable:
+                return
+            try:
+                chunk = ipc.recv(65536)
+            except (BlockingIOError, TimeoutError, OSError):
+                return
+            if not chunk:
+                return
+            self._buffer += chunk
+            while b"\n" in self._buffer:
+                line, self._buffer = self._buffer.split(b"\n", 1)
+                try:
+                    value = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(value, dict) and isinstance(value.get("event"), str):
+                    self._remember_event(value)
+        finally:
+            self._lock.release()
+
+    def video_frame(self) -> bytes | None:
+        """Return the latest real mpv frame and queue at most one successor.
+
+        The screenshot is generated by the same mpv process that owns audio,
+        so its timestamp is the actual A/V clock.  The single JPEG lives only
+        in the runtime tmpfs and is never written to persistent state.
+        """
+
+        with self._video_capture_lock:
+            frame = None
+            if self._video_capture_pending:
+                frame = self._consume_video_capture()
+                expired = (
+                    time.monotonic() - self._video_capture_started_at
+                    >= MPV_VIDEO_FRAME_TIMEOUT_SECONDS
+                )
+                if frame is not None or expired:
+                    self._video_capture_pending = False
+                    self._video_capture_started_at = 0.0
+                    try:
+                        self._video_capture_path.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+                    self._drain_video_capture_responses()
+            if (
+                not self._video_capture_pending
+                and self.state.state == "playing"
+                and not self.state.paused
+            ):
+                self._request_video_capture()
+            return frame
 
     def _read_line(self) -> dict[str, Any]:
         if self._ipc is None:
@@ -248,6 +425,7 @@ class MpvEngine:
 
     def load(self, source: str) -> dict[str, Any]:
         approved = validate_media_source(source, self.media_roots)
+        self._reset_video_capture()
         with self._lock:
             try:
                 self._command(["set_property", "loop-playlist", "no"])
@@ -273,6 +451,7 @@ class MpvEngine:
         ):
             raise ValueError("start position must be a finite number")
         approved = validate_media_source(source, self.media_roots)
+        self._reset_video_capture()
         position = max(0.0, float(start_seconds))
         with self._lock:
             try:
@@ -309,6 +488,7 @@ class MpvEngine:
         if not sources:
             raise ValueError("playlist requires at least one media source")
         approved = [validate_media_source(item, self.media_roots) for item in sources]
+        self._reset_video_capture()
         with self._lock:
             try:
                 self._command(["loadfile", approved[0], "replace"])
@@ -381,6 +561,7 @@ class MpvEngine:
             return self.state.as_dict()
 
     def stop(self) -> dict[str, Any]:
+        self._reset_video_capture()
         with self._lock:
             if self._process is not None and self._process.poll() is None:
                 self._command(["stop"])
@@ -390,6 +571,7 @@ class MpvEngine:
             return self.state.as_dict()
 
     def close(self) -> None:
+        self._reset_video_capture()
         with self._lock:
             if self._ipc is not None:
                 try:

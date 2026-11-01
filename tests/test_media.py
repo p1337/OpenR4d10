@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
+import socket
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
@@ -71,10 +73,70 @@ class ProcessBoundaryTests(unittest.TestCase):
         self.assertIn("--volume=30", command)
         self.assertIn("--audio-device=alsa/whisplaysound", command)
         self.assertIn("--audio-fallback-to-null=no", command)
+        self.assertNotIn("--no-video", command)
+        self.assertIn("--vo=null", command)
+        self.assertIn("--vo-null-fps=10", command)
+        self.assertIn("--video-sync=audio", command)
+        self.assertIn("--screenshot-sw=yes", command)
+        self.assertIn("--screenshot-jpeg-quality=45", command)
         self.assertIn(
             "--user-agent=OpenR4d10 (+https://github.com/p1337/OpenR4d10)",
             command,
         )
+
+    def test_video_frame_uses_one_nonblocking_runtime_screenshot(self) -> None:
+        class Ipc:
+            def __init__(self):
+                self.payloads = []
+
+            def sendall(self, payload):
+                self.payloads.append(payload)
+
+        with tempfile.TemporaryDirectory() as raw:
+            runtime = Path(raw).resolve()
+            engine = MpvEngine(
+                Path("/usr/bin/mpv"),
+                runtime_directory=runtime,
+            )
+            engine._process = FakeProcess()
+            engine._ipc = Ipc()  # type: ignore[assignment]
+            engine.state.state = "playing"
+
+            self.assertIsNone(engine.video_frame())
+            self.assertEqual(len(engine._ipc.payloads), 1)  # type: ignore[union-attr]
+            request = json.loads(engine._ipc.payloads[0])  # type: ignore[union-attr]
+            self.assertEqual(request["command"][0], "screenshot-to-file")
+            self.assertEqual(request["command"][2], "video")
+            self.assertTrue(
+                Path(request["command"][1]).is_relative_to(runtime)
+            )
+
+            payload = b"\xff\xd8same-player-frame\xff\xd9"
+            engine._video_capture_path.write_bytes(payload)
+            engine.state.paused = True
+            frame = engine.video_frame()
+
+            self.assertEqual(frame, payload)
+            self.assertEqual(len(engine._ipc.payloads), 1)  # type: ignore[union-attr]
+            self.assertFalse(engine._video_capture_path.exists())
+
+    def test_video_screenshot_replies_are_drained_without_blocking(self) -> None:
+        engine = MpvEngine(Path("/usr/bin/mpv"))
+        local, remote = socket.socketpair()
+        try:
+            engine._ipc = local
+            remote.sendall(
+                b'{"request_id":1,"error":"success"}\n'
+                b'{"event":"end-file","reason":"eof"}\n'
+            )
+
+            engine._drain_video_capture_responses()
+
+            self.assertEqual(engine._buffer, b"")
+            self.assertEqual(engine.state.state, "stopped")
+        finally:
+            local.close()
+            remote.close()
 
     def test_mpv_network_open_timeout_is_bounded_for_long_ambient_sources(self) -> None:
         self.assertEqual(MPV_IPC_TIMEOUT_SECONDS, 15.0)

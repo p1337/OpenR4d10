@@ -3548,12 +3548,19 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   SQLite und Backups ausgeschlossen. `Auf Gerät abspielen` verwendet weiterhin
   genau den zentralen `MpvEngine` und eine bandbreitenärmere verfügbare
   Senderfassung.
-- Das reale Whisplay zeigt für Mediatheken weiterhin Titel, Sender und
-  Wiedergabestatus und spielt den Audiopfad. Eine bewegte 240-x-280-
-  Videowiedergabe auf dem SPI-Panel wird erst aktiviert, wenn Dekodierung,
-  10-FPS-Ausgabe, Audio-Synchronität und Eingabelatenz auf dem realen Pi Zero 2 W
-  gemessen wurden. Browser-Video darf nicht als bereits bestätigtes
-  Whisplay-Video ausgegeben werden.
+- Die Ergebniszeile bietet zwei gleichwertige ausdrückliche Geräteaktionen:
+  `Audio auf Gerät` startet nur die Tonspur und behält die sparsame Titelansicht;
+  `Video auf Gerät` startet Bild und Ton in der vorhandenen `PLAYER`-Ansicht.
+  Beide wählen verbindlich zuerst `url_video_low` und nur bei deren Fehlen die
+  kleinste noch verfügbare Senderfassung. Im Video-Modus stammen Bild und Ton
+  aus demselben zentralen `MpvEngine`; ein zweiter Decoder, ein simulierter
+  Video-Timer oder ein nur ungefähr synchron laufender Nebenprozess ist
+  verboten. Das SPI-Panel erhält höchstens zehn Bilder pro Sekunde. Die
+  Einzelbilder werden ausschließlich flüchtig unter `/run/openr4d10` erzeugt,
+  sofort in den zentralen Renderer übernommen und niemals als 10-Hz-Schreiblast
+  auf der SD-Karte gespeichert. Pause, Fortsetzen, Sprung und Kanalwechsel
+  verändern Bild und Ton gemeinsam und behalten den gewählten Audio-/Video-
+  Modus. Browser-Video bleibt ein getrennter HTML5-Ausgabeweg.
 - Die Umsetzung wird in drei ausdrücklichen Optimierungsrunden abgenommen:
   erstens Quellenabdeckung, Dubletten und aktuelle Inhalte; zweitens kompakte
   Bedienung, verständliche Namen und fünfsprachige Browsertexte; drittens
@@ -3595,3 +3602,40 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Hintergrund laufen, aber weder `DeviceUiState.service` noch die sichtbare
   Ansicht zurücksetzen. Diese Sperre gilt für alle periodischen Dienstframes,
   nicht nur als DMR-Sonderfall.
+
+### 2026-11-01 – Mediathekvideo auf dem Whisplay in Minimalauflösung
+
+- Robert verlangt für Mediathekinhalte ausdrücklich beide Gerätewege. Jede
+  Ergebniszeile bietet `Audio auf Gerät` für die sparsame Tonwiedergabe mit
+  Titelansicht und `Video auf Gerät` für echtes Video plus Ton auf dem
+  physischen Whisplay. Keine der beiden Möglichkeiten darf die andere ersetzen.
+- Der bereits vorhandene Qualitätsvorrang bleibt hart: `url_video_low` wird
+  immer vor `url_video` und `url_video_hd` gewählt. Ist die Low-Fassung nicht
+  vorhanden, wird ausschließlich die kleinste vom Index noch angebotene
+  Fassung verwendet; OpenR4d10 darf für das 240-x-280-Panel nie absichtlich HD
+  bevorzugen.
+- Der eine zentrale mpv-Prozess bleibt alleinige Wiedergabe- und Zeitquelle.
+  Er dekodiert Video mit audio-geführter Synchronität und liefert höchstens
+  zehnmal pro Sekunde einen Software-Screenshot des aktuell wirklich
+  wiedergegebenen Frames. Es gibt keinen zweiten ffmpeg-/mpv-Player und keinen
+  unabhängigen Bild-Playhead.
+- Der Bildaustausch benutzt genau eine flüchtige, überschriebene JPEG-Datei pro
+  laufendem Capture unter `/run/openr4d10`. Sie wird begrenzt gelesen und sofort
+  entfernt; `/var/lib/openr4d10`, SQLite und die SD-Medienablage erhalten keine
+  Videoframes. Fehlt oder verspätet sich ein Frame, bleibt das letzte gültige
+  Bild stehen, ohne Ton oder Eingabe zu blockieren.
+- `PLAYER` erhält denselben 100-ms-Zeichenpfad wie Recorder und DMR, aber nur
+  solange eine im Video-Modus gestartete Mediathekfolge sichtbar ist und
+  tatsächlich läuft; Pause behält den letzten Frame ohne nutzlose 10-Hz-
+  Neuzeichnung. Der
+  gewählte Audio-/Video-Modus bleibt auch beim Kanalwechsel derselben
+  Ergebnisliste erhalten. Screenshot-Anforderungen werden
+  ohne Warten in die bestehende mpv-IPC gestellt, damit Play/Pause, Encoder und
+  Dienstwechsel weiterhin Vorrang haben. Vor Freigabe müssen auf dem realen Pi
+  A/V-Synchronität, höchstens 10 FPS, Eingabelatenz und fehlende dauerhafte
+  Frame-Dateien geprüft werden; der exakte Commit benötigt danach vollständig
+  grünes GitHub Actions.
+- Die zu jeder Screenshot-Anforderung eintreffende mpv-IPC-Antwort wird
+  begrenzt und nicht blockierend aus demselben privaten Socket entfernt. Sie
+  darf sich bei langer Videowiedergabe niemals bis zu einem vollen Socket-
+  Puffer ansammeln und dadurch spätere Nutzereingaben verzögern.

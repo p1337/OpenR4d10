@@ -86,12 +86,19 @@ loaded audio source. Periodic rendering requests a view-specific overlay and
 must never copy the audio owner back into the service selector. Weather open,
 step and refresh operations update only weather selection/cache state. A new
 audio source replaces the old one only through an explicit play operation.
-The explicit Mediathek `Play on device` command is also a deliberate device
-focus request: after the central player accepts the source, the application
-renders one resolved `PLAYER` frame. Search, selection and browser-only video
-remain presentation-neutral. While that Mediathek source owns the player,
-`right_outer` cycles and immediately loads entries from the same cached result
-set, and `right_press` uses the existing real pause path.
+The explicit Mediathek `Audio on device` and `Video on device` commands are
+also deliberate device-focus requests: after the central player accepts the
+lowest available source, the application renders one resolved `PLAYER` frame.
+Audio mode keeps the metadata view. Video mode queues software screenshots from
+that same mpv process and composites the completed JPEG into the native frame
+at no more than 10 FPS. The one transient file lives under `/run/openr4d10`, is
+bounded and removed after consumption; no video frame enters persistent state.
+Because mpv remains the sole decoder and clock, pause, resume and channel
+changes cannot drift between sound and picture. Search, selection and
+browser-only video remain presentation-neutral. While that Mediathek source
+owns the player, `right_outer` cycles and immediately loads entries from the
+same cached result set without changing the selected audio/video mode, and
+`right_press` uses the existing real pause path.
 
 The same router maps each `left_outer` detent to a bounded ten-percentage-point
 change of the real mpv volume and `right_outer` to cyclic selection in the
@@ -236,7 +243,10 @@ disabling an active media module stops its current playback or recording.
 
 `MpvEngine` starts lazily and controls mpv through an inherited Unix socket
 using the documented JSON IPC. It disables user configuration and terminal
-input. `StreamRecorder` invokes ffmpeg through an argument array with
+input. Video decoding uses the headless `vo=null` output with audio-clock
+synchronization. The physical renderer asks for a software JPEG screenshot
+asynchronously; this reuses mpv's actual current frame instead of introducing a
+second decoder or synthetic clock. `StreamRecorder` invokes ffmpeg through an argument array with
 `shell=False` semantics and writes 64-kbit/s Opus below the state directory.
 Network URLs are limited to HTTP(S), reject embedded credentials and are
 redacted before appearing in status. Local media must resolve below the

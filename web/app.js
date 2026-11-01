@@ -912,14 +912,24 @@ function renderMediathek(catalog) {
     watch.className = "library-play play-action";
     watch.textContent = t("Watch in browser");
     watch.addEventListener("click", () => watchMediathekItem(item));
-    const devicePlay = document.createElement("button");
-    devicePlay.type = "button";
-    devicePlay.textContent = t("Play on device");
-    devicePlay.addEventListener("click", () => mediathekCommand("mediathek_play", {
+    const deviceAudio = document.createElement("button");
+    deviceAudio.type = "button";
+    deviceAudio.textContent = t("Audio on device");
+    deviceAudio.addEventListener("click", () => mediathekCommand("mediathek_play", {
       provider: mediathekProvider,
       item_id: item.item_id,
+      mode: "audio",
     }));
-    actions.append(watch, devicePlay);
+    const deviceVideo = document.createElement("button");
+    deviceVideo.type = "button";
+    deviceVideo.className = "library-play play-action";
+    deviceVideo.textContent = t("Video on device");
+    deviceVideo.addEventListener("click", () => mediathekCommand("mediathek_play", {
+      provider: mediathekProvider,
+      item_id: item.item_id,
+      mode: "video",
+    }));
+    actions.append(watch, deviceAudio, deviceVideo);
     row.addEventListener("click", (event) => {
       if (event.target.closest("button")) return;
       mediathekCommand("mediathek_select", { provider: mediathekProvider, item_id: item.item_id });
@@ -988,7 +998,9 @@ async function mediathekCommand(action, extra = {}) {
     output.textContent = Number.isInteger(payload.result_count)
       ? t("{{count}} Mediathek results loaded.", { count: payload.result_count })
       : action === "mediathek_play"
-        ? t("Mediathek item is playing.")
+        ? extra.mode === "video"
+          ? t("Mediathek video is playing on the device.")
+          : t("Mediathek audio is playing on the device.")
         : t("Mediathek selection saved.");
     await refresh();
     return payload;

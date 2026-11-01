@@ -400,6 +400,7 @@ class DeviceUiState:
     subtitle: str = "Receiver ready"
     playing: bool = False
     audio_active: bool = False
+    video_active: bool = False
     recording: bool = False
     menu_open: bool = False
     menu_kind: str | None = None
@@ -464,6 +465,7 @@ class DeviceUiState:
             "recorder_position_ms": self.recorder_position_ms,
             "recorder_duration_ms": self.recorder_duration_ms,
             "audio_active": self.audio_active,
+            "video_active": self.video_active,
             "accent_color": "#{:02X}{:02X}{:02X}".format(*self.accent),
         }
 
@@ -778,6 +780,7 @@ class DeviceUiState:
         self.ip_address = str(receiver.get("ip_address") or "--")[:15]
         self.playing = bool(receiver.get("playing", self.playing))
         self.audio_active = bool(receiver.get("audio_active", self.playing))
+        self.video_active = receiver.get("video_active") is True
         self.right_action = "PAUSE" if self.playing else "PLAY"
         self.recording = bool(receiver.get("recording", False))
         self.recorder_continuous = receiver.get("continuous") is True
@@ -1881,7 +1884,17 @@ def render_device_ui(
         media_bounds[2] - media_bounds[0] - 1,
         media_bounds[3] - media_bounds[1] - 1,
     )
-    if artwork is not None:
+    if artwork is not None and state.video_active:
+        _fill_media_shape(image, media_bounds, (0, 0, 0))
+        tile = ImageOps.contain(
+            artwork.convert("RGB"),
+            tile_size,
+            method=Image.Resampling.BILINEAR,
+        )
+        video_x = tile_xy[0] + (tile_size[0] - tile.width) // 2
+        video_y = tile_xy[1] + (tile_size[1] - tile.height) // 2
+        image.paste(tile, (video_x, video_y))
+    elif artwork is not None:
         tile = ImageOps.fit(
             artwork.convert("RGB"),
             tile_size,

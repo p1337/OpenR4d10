@@ -30,6 +30,7 @@ VOICE_DOUBLE_CLICK_SECONDS = 0.45
 VOICE_TAP_MAX_SECONDS = 0.35
 RECORDER_FRAME_INTERVAL_SECONDS = 0.1
 DMR_FRAME_INTERVAL_SECONDS = 0.1
+PLAYER_FRAME_INTERVAL_SECONDS = 0.1
 RECORDER_INTERACTION_QUIET_SECONDS = 0.2
 DMR_PTT_HOLD_SECONDS = 2.0
 
@@ -220,6 +221,22 @@ class OpenR4d10App:
             self._latest_frame = frame.as_dict()
         self.display.render(frame)
 
+    def _clear_device_video_frame(self) -> None:
+        setter = getattr(self.display, "set_video_frame", None)
+        if callable(setter):
+            setter(None)
+
+    def _refresh_device_video_frame(self) -> None:
+        if self.services is None:
+            return
+        provider = getattr(self.services, "device_video_frame", None)
+        setter = getattr(self.display, "set_video_frame", None)
+        if not callable(provider) or not callable(setter):
+            return
+        payload = provider()
+        if payload is not None:
+            setter(payload)
+
     def status_snapshot(self) -> dict[str, Any]:
         with self._status_lock:
             frame = dict(self._latest_frame)
@@ -341,6 +358,7 @@ class OpenR4d10App:
                     self._interaction_generation += 1
                     try:
                         result = self.services.control(request)
+                        self._clear_device_video_frame()
                         self.render_interaction_once("PLAYER")
                         snapshot = getattr(self.display, "snapshot", None)
                         if callable(snapshot):
@@ -349,7 +367,10 @@ class OpenR4d10App:
                     finally:
                         self._last_device_input_at = time.perf_counter()
                         self._interaction_generation += 1
-            return self.services.control(request)
+            result = self.services.control(request)
+            if request.get("action") == "stop":
+                self._clear_device_video_frame()
+            return result
 
         raw_control = request.get("control")
         try:
@@ -616,6 +637,7 @@ class OpenR4d10App:
             media_result = self.services.control(
                 {"action": "mediathek_step", "steps": event.steps}
             )
+            self._clear_device_video_frame()
         elif (
             event.control == Control.RIGHT_PRESS
             and event.held_seconds < 2.0
@@ -798,6 +820,8 @@ class OpenR4d10App:
         )
         service_changed = new_service != selected_service
         if self.services is not None and service_changed:
+            if selected_service == "PLAYER":
+                self._clear_device_video_frame()
             if selected_service == "DMR":
                 self._ptt_pressed_at = None
                 self._dmr_hold_triggered = False
@@ -1029,8 +1053,17 @@ class OpenR4d10App:
                         if isinstance(context, dict)
                         else ""
                     )
+                    video_refresh_active = getattr(
+                        self.services, "mediathek_video_refresh_active", lambda: False
+                    )() if self.services is not None else False
                     if (
-                        interactive_service in {"REC", "DMR"}
+                        (
+                            interactive_service in {"REC", "DMR"}
+                            or (
+                                interactive_service == "PLAYER"
+                                and video_refresh_active
+                            )
+                        )
                         and self._last_receiver_telemetry
                     ):
                         if interactive_service == "DMR":
@@ -1039,13 +1072,20 @@ class OpenR4d10App:
                                 periodic_generation=periodic_generation,
                             )
                             frame_interval = DMR_FRAME_INTERVAL_SECONDS
-                        else:
+                        elif interactive_service == "REC":
                             if not self._recorder_interaction_active():
                                 self.render_interaction_once(
                                     "REC",
                                     periodic_generation=periodic_generation,
                                 )
                             frame_interval = RECORDER_FRAME_INTERVAL_SECONDS
+                        else:
+                            self._refresh_device_video_frame()
+                            self.render_interaction_once(
+                                "PLAYER",
+                                periodic_generation=periodic_generation,
+                            )
+                            frame_interval = PLAYER_FRAME_INTERVAL_SECONDS
                         delay = max(
                             0.0,
                             frame_interval - (time.monotonic() - cycle_started),

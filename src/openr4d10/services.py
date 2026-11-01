@@ -160,6 +160,7 @@ class ServiceCatalog:
         self,
         state_directory: Path,
         *,
+        runtime_directory: Path = Path("/run/openr4d10"),
         executable_lookup: ExecutableLookup = shutil.which,
         player: MpvEngine | None = None,
         recorder: StreamRecorder | None = None,
@@ -184,7 +185,10 @@ class ServiceCatalog:
         self.media_root = state_directory / "media"
         self.music_root = self.media_root / "Music"
         self.cover_root = state_directory / "cache" / "track-covers"
-        self.player = player or MpvEngine(media_roots=(self.media_root,))
+        self.player = player or MpvEngine(
+            media_roots=(self.media_root,),
+            runtime_directory=runtime_directory,
+        )
         self.recorder = recorder or StreamRecorder(
             state_directory / "recordings",
             media_roots=(self.media_root,),
@@ -240,6 +244,7 @@ class ServiceCatalog:
         self._active_mediathek_provider: str | None = None
         self._active_mediathek_results: tuple[MediathekEntry, ...] = ()
         self._active_mediathek_item: dict[str, object] | None = None
+        self._active_mediathek_mode = "audio"
         external_ids = {
             item.service_id
             for item in BUILTIN_SERVICES
@@ -1737,6 +1742,11 @@ class ServiceCatalog:
                     if self.active_service in MEDIATHEK_SERVICE_IDS
                     else None
                 ),
+                "playback_mode": (
+                    self._active_mediathek_mode
+                    if self.active_service in MEDIATHEK_SERVICE_IDS
+                    else None
+                ),
                 "limits": {
                     "results_per_provider": MediathekCatalog.MAX_RESULTS,
                     "response_bytes": MediathekCatalog.MAX_RESPONSE_BYTES,
@@ -1865,6 +1875,7 @@ class ServiceCatalog:
             self.active_station_id = None
             self._active_podcast_episode = None
             self.active_ambient_scene_id = None
+            self._active_mediathek_mode = "audio"
         elif action == "volume":
             value = request.get("value")
             if self.active_service == "brandmeister":
@@ -2806,10 +2817,13 @@ class ServiceCatalog:
         elif action == "mediathek_play":
             provider = request.get("provider")
             item_id = request.get("item_id")
+            mode = request.get("mode", "audio")
             if not isinstance(provider, str) or provider not in self._mediathek_results:
                 raise ValueError("mediathek_play requires a known provider")
             if not isinstance(item_id, str):
                 raise ValueError("mediathek_play requires an item id")
+            if mode not in {"audio", "video"}:
+                raise ValueError("mediathek_play mode must be audio or video")
             item = next(
                 (
                     candidate
@@ -2824,10 +2838,12 @@ class ServiceCatalog:
                 provider,
                 item,
                 result_set=self._mediathek_results[provider],
+                mode=mode,
             )
             return {
                 "provider": provider,
                 "item_id": item_id,
+                "mode": mode,
                 "playback": self.player.state.as_dict(),
             }
         elif action == "mediathek_step":
@@ -2866,6 +2882,7 @@ class ServiceCatalog:
             return {
                 "provider": provider,
                 "item_id": item.item_id,
+                "mode": self._active_mediathek_mode,
                 "playback": self.player.state.as_dict(),
             }
         elif action == "adapter_call":
@@ -3165,8 +3182,13 @@ class ServiceCatalog:
         item: MediathekEntry,
         *,
         result_set: list[MediathekEntry] | None = None,
+        mode: str | None = None,
     ) -> None:
-        """Load one cached Mediathek result through the sole audio owner."""
+        """Load one cached result through the sole synchronized A/V owner."""
+
+        selected_mode = self._active_mediathek_mode if mode is None else mode
+        if selected_mode not in {"audio", "video"}:
+            raise ValueError("Mediathek mode must be audio or video")
 
         self._require_enabled(item.service_id)
         source = validate_media_source(item.source_url, (self.media_root,))
@@ -3185,6 +3207,30 @@ class ServiceCatalog:
         if result_set is not None:
             self._active_mediathek_results = tuple(result_set)
         self._active_mediathek_item = item.public()
+        self._active_mediathek_mode = selected_mode
+
+    def device_video_frame(self) -> bytes | None:
+        """Poll one synchronized frame only for Mediathek video mode."""
+
+        if not self.mediathek_video_enabled():
+            return None
+        provider = getattr(self.player, "video_frame", None)
+        return provider() if callable(provider) else None
+
+    def mediathek_video_enabled(self) -> bool:
+        return (
+            self.active_service in MEDIATHEK_SERVICE_IDS
+            and self._active_mediathek_mode == "video"
+        )
+
+    def mediathek_video_refresh_active(self) -> bool:
+        """Return whether a visible video needs another timed device frame."""
+
+        return (
+            self.mediathek_video_enabled()
+            and self.player.state.state == "playing"
+            and not self.player.state.paused
+        )
 
     def _active_mediathek_position(self) -> int | None:
         provider = self._active_mediathek_provider
@@ -3984,6 +4030,10 @@ class ServiceCatalog:
             "subtitle": track_line,
             "playing": not playback.paused,
             "audio_active": audio_active,
+            "video_active": (
+                self.active_service in MEDIATHEK_SERVICE_IDS
+                and self._active_mediathek_mode == "video"
+            ),
             "recording": (
                 self.recorder.state.state == "recording" or buffered_recording
             ),
