@@ -396,6 +396,14 @@ is decoded and re-encoded to a maximum 256 x 256 JPEG in the private cache, and
 falls back to a browser-generated initials tile when retrieval fails. Current
 sources and their review references are recorded in `PRESETS.md`.
 
+The browser presents that one model through two radio sub-tabs rather than two
+simultaneously long lists. Shared custom-add, metadata search, language and
+category controls sit above both tabs. Creating a custom station or activating
+an inactive preset appends it to the persistent personal order and selects the
+active tab; no second catalog state exists in JavaScript or SQLite. The generic
+direct-URL player is intentionally not exposed on the radio page, while the
+core's checked playback path remains available to other service adapters.
+
 The debug navigation overview is versioned in `MENU_TREE.md`. It is not served
 by the web application and is not a visible device-menu item.
 

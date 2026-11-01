@@ -15,6 +15,7 @@ let serviceSearchQuery = "";
 let stationSearchQuery = "";
 let stationLanguageFilter = "";
 let stationCategoryFilter = "";
+let stationLibraryView = "active";
 let podcastSearchQuery = "";
 let brandmeisterTalkgroups = [];
 let brandmeisterCatalog = [];
@@ -554,6 +555,15 @@ function stationRow(station, actions) {
   return row;
 }
 
+function selectStationLibraryView(view) {
+  stationLibraryView = view === "catalog" ? "catalog" : "active";
+  const active = stationLibraryView === "active";
+  byId("station-active-tab").setAttribute("aria-selected", active ? "true" : "false");
+  byId("station-catalog-tab").setAttribute("aria-selected", active ? "false" : "true");
+  byId("station-active-panel").hidden = !active;
+  byId("station-catalog-panel").hidden = active;
+}
+
 function renderLibrary(catalog) {
   const stations = Array.isArray(catalog?.stations) ? catalog.stations : [];
   const presets = Array.isArray(catalog?.presets?.stations) ? catalog.presets.stations : [];
@@ -611,8 +621,15 @@ function renderLibrary(catalog) {
   for (const preset of available) {
     const actions = document.createElement("span");
     actions.className = "library-actions";
-    const activate = libraryButton(t("Activate"), "preset_save", { preset_id: preset.preset_id });
+    const activate = document.createElement("button");
+    activate.type = "button";
+    activate.textContent = t("Activate");
     activate.classList.add("library-play");
+    activate.addEventListener("click", async () => {
+      if (await sendControl("preset_save", { preset_id: preset.preset_id })) {
+        selectStationLibraryView("active");
+      }
+    });
     actions.append(activate);
     catalogList.append(stationRow(preset, actions));
   }
@@ -623,6 +640,7 @@ function renderLibrary(catalog) {
     row.textContent = t(totalAvailable ? "No stations match these filters." : "All catalog stations are active.");
     catalogList.append(row);
   }
+  selectStationLibraryView(stationLibraryView);
 
   const media = Array.isArray(catalog?.media) ? catalog.media : [];
   const mediaList = byId("media-list");
@@ -1133,8 +1151,10 @@ async function sendControl(action, extra = {}) {
       output.textContent = `${payload.playback?.state || "stopped"} · ${payload.recording?.state || "stopped"}`;
     }
     await refresh();
+    return true;
   } catch (error) {
     output.textContent = t("Error: {{message}}", { message: error.message });
+    return false;
   }
 }
 
@@ -1379,19 +1399,22 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden) setPttInput(false);
 });
 
-byId("media-control").addEventListener("submit", (event) => {
-  event.preventDefault();
-  sendControl("play", { source: byId("media-source").value, service_id: "webradio" });
-});
-
 byId("station-control").addEventListener("submit", async (event) => {
   event.preventDefault();
-  await sendControl("station_add", {
+  const saved = await sendControl("station_add", {
     name: byId("station-name").value,
     source: byId("station-url").value,
   });
-  event.currentTarget.reset();
+  if (saved) {
+    byId("station-name").value = "";
+    byId("station-url").value = "";
+    selectStationLibraryView("active");
+  }
 });
+
+for (const button of document.querySelectorAll("[data-station-view]")) {
+  button.addEventListener("click", () => selectStationLibraryView(button.dataset.stationView));
+}
 
 byId("station-search").addEventListener("input", (event) => {
   stationSearchQuery = event.currentTarget.value;

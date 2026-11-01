@@ -91,7 +91,7 @@ the installer report exactly which adapters still need configuration.
   non-technical fallback text when a station supplies no title
 - simple recorded-music player with favorites, `My Soundmix`, shuffle,
   previous/next, optional cover cache and confirmed deletion
-- curated 41-station radio catalog across eight languages with local artwork,
+- curated 46-station radio catalog across eight languages with local artwork,
   persistent active/disabled selection, search and language/category filters
 - persistent podcast subscriptions with bounded RSS/Atom episode loading,
   search and playback through the existing audio owner
@@ -385,7 +385,7 @@ menu entry.
 
 The personal list initially includes SWR3, sunshine live, Deutschlandfunk,
 RMF FM, Radio ZET, BBC World Service, DIE NEUE 107.7, AFN The Eagle,
-ROCK ANTENNE and ROCK FM. A separate inactive catalog expands this to 41
+ROCK ANTENNE and ROCK FM. A separate inactive catalog expands this to 46
 reviewed stations with at least five each in German, English, Polish, French,
 Spanish, Italian, Dutch and Portuguese. Activating a catalog row moves it into
 the persistent personal list; updates do not activate new stations or restore
@@ -395,6 +395,15 @@ addresses and their review references are documented in
 [`docs/PRESETS.md`](docs/PRESETS.md). Station artwork is fetched only from the
 reviewed list, size-limited, decoded and locally re-encoded as JPEG. If a logo
 is unavailable, the dashboard keeps working and displays a text tile instead.
+
+The browser radio manager keeps the existing add form, shared full-metadata
+search and language/category filters above two compact sub-tabs. **Active
+stations** contains the persistent personal order; **Add stations** contains
+only inactive reviewed presets. A newly entered custom station and an activated
+catalog station are appended to the personal order and immediately open the
+active tab. The Polish inactive catalog additionally contains Radio GRA Toruń,
+Polskie Radio Dwójka, Polskie Radio Trójka, Radio 357 and Radio Nowy Świat;
+religious stations are intentionally not included.
 
 The **Podcasts** tab accepts a public RSS/Atom podcast-feed address, stores the
 subscription in the same non-secret SQLite state, loads at most 50 playable

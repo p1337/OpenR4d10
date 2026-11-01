@@ -10,13 +10,18 @@ that library; removing it makes it available in the catalog again. The seed
 marker is permanent, so user reordering and deletion survive restarts and
 updates. A later source-catalog addition never activates itself.
 
-The complete 41-station set was reviewed on 2026-10-31. Every configured
+The original 41-station set was reviewed on 2026-10-31. Every configured
 stream produced a decodable audio stream with ffprobe during that review, and
 all 41 artwork locations returned decodable image content (temporary Wikimedia
 rate limiting remains a normal cache retry condition). Broadcasters may change
 public endpoints, formats or availability. A preset update must be checked
 against the broadcaster or clearly responsible delivery domain, exercised with
 the actual player/parser, and committed together with this document.
+
+On 2026-11-01 the five additional Polish entries below were tested with the
+real Raspberry Pi Zero 2 W `ffprobe`: Radio GRA, Radio 357 and Radio Nowy Świat
+decoded as MP3; Dwójka and Trójka decoded as AAC/HLS. Their five artwork URLs
+were independently downloaded, decoded and dimension-checked with Pillow.
 
 ## Radio
 
@@ -41,14 +46,14 @@ reference are the adjacent fields of the corresponding `RadioPreset` in
 | Language | Inactive catalog stations | Primary review family |
 |---|---|---|
 | English (`en`) | BBC Radio 2, BBC Radio 3, BBC Radio 4 | [BBC Sounds live radio](https://www.bbc.co.uk/sounds) and BBC/Akamai delivery |
-| Polish (`pl`) | Polskie Radio Jedynka, Polskie Radio Czwórka, Polskie Radio 24 | [Polskie Radio player](https://player.polskieradio.pl/) and Polskie Radio delivery |
+| Polish (`pl`) | Polskie Radio Jedynka, Polskie Radio Czwórka, Polskie Radio 24, Radio GRA Toruń, Polskie Radio Dwójka, Polskie Radio Trójka, Radio 357, Radio Nowy Świat | [Polskie Radio player](https://player.polskieradio.pl/), [Radio GRA](https://gra.fm/), [Radio 357 stream documentation](https://radio357.pl/faq/ogolne/jak-sluchac-radia-357/) and [Radio Nowy Świat stream documentation](https://nowyswiat.online/jak-nas-sluchac) |
 | French (`fr`) | France Inter, franceinfo, France Culture, FIP, France Musique | [Radio France](https://www.radiofrance.fr/) and franceinfo |
 | Spanish (`es`) | RNE Radio Nacional, RNE Radio Clásica, RNE Radio 3, RNE Radio 5, RNE Radio Exterior | [RTVE radio live](https://www.rtve.es/play/videos/directo/radio-en-directo/) |
 | Italian (`it`) | Rai Radio 1, Rai Radio 2, Rai Radio 3, Rai Isoradio, Radio 24 | [Radio Rai](https://www.radiocorrieretv.rai.it/radio-rai/) and Radio 24 |
 | Dutch (`nl`) | NPO Radio 1, NPO Radio 2, NPO 3FM, NPO Klassiek, NPO Radio 5 | [NPO Luister & Radio](https://npo.nl/service/npo-luister-en-radio) |
 | Portuguese (`pt`) | RTP Antena 1, RTP Antena 2, RTP Antena 3, TSF Rádio Notícias, Rádio Observador | [RTP live radio](https://www.rtp.pt/), [TSF](https://www.tsf.pt/) and [Observador](https://observador.pt/radio/) |
 
-Together with the defaults this yields German 6, English 5, Polish 5, French
+Together with the defaults this yields German 6, English 5, Polish 10, French
 5, Spanish 5, Italian 5, Dutch 5 and Portuguese 5. Category metadata is also
 reviewed catalog data. It includes music styles, news, talk, culture, sport and
 explicit `science`/`technology` labels where the broadcaster's programme remit

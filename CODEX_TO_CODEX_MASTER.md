@@ -3161,3 +3161,29 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Erst ein danach weiterhin nicht erreichbarer Webdienst lässt das Update
   fehlschlagen; ein erfolgreicher später Start darf nicht mehr um wenige
   Sekunden verpasst werden.
+
+### 2026-11-01 – Getrennte Radio-Reiter und erweiterter polnischer Katalog
+
+- Die Browser-Radioseite zeigt keine freie `Direkte Audioquelle` mehr. Die
+  echten Aktionen Play/Pause, Stop, `Dieses Lied behalten` und fortlaufende
+  Aufnahme bleiben unverändert sichtbar. Das argumentgeprüfte Core-Playback
+  bleibt für andere interne Dienste erhalten; entfernt wird ausschließlich die
+  verwirrende freie URL-Eingabe dieser Radioseite.
+- Die bestehende persistente persönliche Senderliste und der kuratierte
+  inaktive Katalog werden im Browser in zwei Reiter getrennt: `Aktive Sender`
+  und `Sender hinzufügen`. Suchfeld, Sprachfilter, Kategoriefilter sowie die
+  Maske für einen eigenen Sender stehen oberhalb der Reiter und gelten daher
+  in beiden Ansichten. Es entstehen keine zweite Datenbank und keine parallele
+  Radioverwaltung.
+- Ein selbst angelegter Sender ist sofort aktiv, wird am Ende der persönlichen
+  Reihenfolge gespeichert und öffnet den Reiter `Aktive Sender`. Wird ein
+  kuratierter Katalogsender aktiviert, wird er ebenfalls updatefest ans Ende
+  der persönlichen Liste kopiert und der Browser wechselt sofort zum aktiven
+  Reiter. Deaktivieren verschiebt einen kuratierten Sender wieder in den
+  verfügbaren Katalog; eigene Sender werden wie bisher gelöscht.
+- Der zunächst inaktive polnische Katalog erhält `Radio GRA Toruń`, `Polskie
+  Radio Dwójka`, `Polskie Radio Trójka`, `Radio 357` und `Radio Nowy Świat`.
+  Radio Maryja und andere religiöse Sender werden ausdrücklich nicht
+  aufgenommen. Die fünf Streams wurden am realen Pi mit `ffprobe` als
+  dekodierbares MP3 beziehungsweise AAC geprüft; offizielle Senderseiten
+  dokumentieren die verantwortlichen Player beziehungsweise Direktstreams.

@@ -269,8 +269,12 @@ The default seed is deliberately limited to the ten entries whose
 `default_enabled` flag is true. Tests must count at least five catalog entries
 for each supported catalog language, prove that a new database activates only
 those ten, and prove that deleting one does not recreate it. Browser tests must
-require one active list, one inactive catalog list, search, language and
-category controls, and the `preset_save` activation path.
+require one active list, one inactive catalog list behind two accessible
+sub-tabs, shared add/search/language/category controls, and the `preset_save`
+activation path. Successful custom creation and preset activation must select
+the active tab without resetting the shared filters. The radio page does not
+render the generic direct-source URL input; its Play/Pause, Stop, current-song
+retention and continuous-capture controls remain available.
 
 Podcast regressions use bounded local XML fixtures. They must cover RSS/Atom
 audio-enclosure parsing, the 50-episode limit, persistent `podcasts` channels,

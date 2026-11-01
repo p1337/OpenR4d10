@@ -326,8 +326,14 @@ kbd { display: inline-block; min-width: 24px; padding: 3px 6px; border: 1px soli
 .library-heading { align-items: center; display: flex; justify-content: space-between; gap: 12px; }
 .catalog-toolbar { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(140px, .35fr) minmax(140px, .35fr); gap: 8px; margin: 16px 0; }
 .catalog-heading { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 16px; }
-.station-catalog-list { max-height: 620px; overflow: auto; padding-right: 3px; }
-.station-catalog-list li[data-language] { border-left: 2px solid color-mix(in srgb, var(--cyan) 55%, transparent); }
+.station-library-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+.station-library-tabs button { align-items: center; display: flex; justify-content: space-between; gap: 10px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: rgba(255, 255, 255, .025); cursor: pointer; }
+.station-library-tabs button[aria-selected="true"] { border-color: color-mix(in srgb, var(--accent) 65%, var(--line)); color: #071011; background: var(--accent); font-weight: 800; }
+.station-library-tabs button span:last-child { font-variant-numeric: tabular-nums; }
+.station-library-panel[hidden] { display: none; }
+.station-library-panel .services-note { margin: 12px 2px 0; }
+.station-list-scroll { max-height: 620px; overflow: auto; padding-right: 3px; }
+.station-list-scroll li[data-language] { border-left: 2px solid color-mix(in srgb, var(--cyan) 55%, transparent); }
 .podcast-layout { display: grid; grid-template-columns: minmax(260px, .42fr) minmax(360px, 1fr); gap: 12px; margin-top: 12px; }
 .podcast-subscription-list small, .podcast-episode-list small { display: block; color: var(--muted); margin-top: 4px; }
 .podcast-episode-list li { align-items: flex-start; }
@@ -492,6 +498,7 @@ footer { justify-content: space-between; gap: 20px; padding: 32px 4px 0; color: 
   .service-row-actions { grid-column: 1 / -1; justify-content: flex-end; }
   .content-controls { grid-template-columns: 1fr; }
   .catalog-toolbar { grid-template-columns: 1fr; }
+  .station-library-tabs { grid-template-columns: 1fr; }
   .weather-viewer { min-height: 310px; }
   .weather-viewer img, .weather-viewer > div { min-height: 270px; height: 270px; }
   .weather-channel-fields { grid-template-columns: 1fr; }

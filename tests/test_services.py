@@ -362,7 +362,18 @@ class ServiceCatalogTests(unittest.TestCase):
                 catalog.close()
         station_ids = {item["preset_id"] for item in presets["stations"]}
         self.assertEqual(station_ids, set(RADIO_BY_ID))
+        self.assertEqual(len(station_ids), 46)
         self.assertTrue({"swr3", "sunshine_live", "deutschlandfunk", "rmf_fm", "radio_zet", "bbc_world"}.issubset(station_ids))
+        self.assertTrue(
+            {
+                "radio_gra_torun",
+                "polskie_radio_2",
+                "polskie_radio_3",
+                "radio_357",
+                "radio_nowy_swiat",
+            }.issubset(station_ids)
+        )
+        self.assertFalse(any("maryja" in item.casefold() for item in station_ids))
         for item in presets["stations"]:
             self.assertNotIn("stream_url", item)
             self.assertNotIn("artwork_url", item)
@@ -382,6 +393,14 @@ class ServiceCatalogTests(unittest.TestCase):
         self.assertEqual(set(language_counts), {"de", "en", "pl", "fr", "es", "it", "nl", "pt"})
         self.assertTrue(all(count >= 5 for count in language_counts.values()))
         self.assertEqual(sum(item.default_enabled for item in RADIO_BY_ID.values()), 10)
+        for preset_id in (
+            "radio_gra_torun",
+            "polskie_radio_2",
+            "polskie_radio_3",
+            "radio_357",
+            "radio_nowy_swiat",
+        ):
+            self.assertFalse(RADIO_BY_ID[preset_id].default_enabled)
         for item in FEED_BY_ID.values():
             parsed = urlsplit(item.feed_url)
             self.assertEqual(parsed.scheme, "https")
