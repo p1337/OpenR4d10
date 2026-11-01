@@ -29,6 +29,7 @@ LOG = logging.getLogger(__name__)
 VOICE_DOUBLE_CLICK_SECONDS = 0.45
 VOICE_TAP_MAX_SECONDS = 0.35
 RECORDER_FRAME_INTERVAL_SECONDS = 0.1
+RECORDER_INTERACTION_QUIET_SECONDS = 0.2
 
 
 class OpenR4d10App:
@@ -59,6 +60,7 @@ class OpenR4d10App:
         )
         self.stop_event = threading.Event()
         self._device_input_lock = threading.Lock()
+        self._last_device_input_at = 0.0
         self._status_lock = threading.Lock()
         self._view_initialized = False
         self._pending_initial_view_overlay: dict[str, object] | None = None
@@ -101,6 +103,7 @@ class OpenR4d10App:
         handler = getattr(self.display, "apply_input", None)
         if not callable(handler):
             raise RuntimeError("the configured display does not accept device input")
+        self._last_device_input_at = time.perf_counter()
         with self._device_input_lock:
             return self._apply_device_event(event, handler)
 
@@ -108,6 +111,12 @@ class OpenR4d10App:
         if signum is not None:
             LOG.info("Received signal %s; stopping", signum)
         self.stop_event.set()
+
+    def _recorder_interaction_active(self) -> bool:
+        return (
+            time.perf_counter() - self._last_device_input_at
+            < RECORDER_INTERACTION_QUIET_SECONDS
+        )
 
     def install_signal_handlers(self) -> None:
         signal.signal(signal.SIGTERM, self.request_stop)
@@ -285,6 +294,7 @@ class OpenR4d10App:
             held_seconds=held_seconds,
             active=raw_active if control == Control.PTT else None,
         )
+        self._last_device_input_at = time.perf_counter()
         with self._device_input_lock:
             return self._apply_device_event(event, handler)
 
@@ -830,7 +840,8 @@ class OpenR4d10App:
                         and context.get("service") == "REC"
                         and self._last_receiver_telemetry
                     ):
-                        self.render_recorder_once()
+                        if not self._recorder_interaction_active():
+                            self.render_recorder_once()
                         delay = max(
                             0.0,
                             RECORDER_FRAME_INTERVAL_SECONDS

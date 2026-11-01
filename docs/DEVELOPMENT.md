@@ -83,6 +83,10 @@ capped at 10 FPS, and the intended input-to-visible-response target is 100 ms;
 and quantized glow caches plus ordered browser detent coalescing. Never solve
 backpressure by dropping the resulting rotary distance: combine adjacent steps
 within the API's bounded `-10..10` range and send any remainder next.
+The real-device stress check must include at least fifteen consecutive recorder
+detents. Periodic timeline rendering must yield during the interaction and
+resume after 200 ms of quiet; a late-series rise to 300 ms or more is a failed
+release even when isolated first-step latency is acceptable.
 
 ## Release gate and device provenance
 

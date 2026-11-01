@@ -3267,3 +3267,10 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   realen Pi zu messen. Wird eine vermeidbare Schwachstelle gefunden, ist sie
   vor der Freigabe zu beseitigen; zusätzliche CPU-Kerne rechtfertigen niemals
   blockierende Arbeit im Eingabepfad.
+- Die Messung von 0.10.74 zeigte bei einer Folge schneller Recorder-Schritte
+  zunächst 103–170 ms, durch Konkurrenz mit der periodischen 10-Hz-Timeline
+  später jedoch erneut 325–465 ms. Daher haben Eingabeframes Vorrang vor
+  periodischen Recorderframes: Solange Encoder, Taste oder Browserbedienung
+  aktiv nachlaufen, setzt ausschließlich der entbehrliche Timeline-Refresh
+  kurz aus. Nach 200 ms Eingaberuhe läuft er automatisch weiter. Die
+  resultierende Position selbst und das Eingabeframe werden niemals verworfen.

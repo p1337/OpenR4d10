@@ -1304,6 +1304,10 @@ class AppTests(unittest.TestCase):
         )
         self.assertEqual(display.apply_calls, 0)
         self.assertEqual(display.render_calls, 5)
+        with patch("openr4d10.app.time.perf_counter", return_value=app._last_device_input_at + 0.1):
+            self.assertTrue(app._recorder_interaction_active())
+        with patch("openr4d10.app.time.perf_counter", return_value=app._last_device_input_at + 0.21):
+            self.assertFalse(app._recorder_interaction_active())
 
     def test_application_unit_provides_display_handoff_runtime(self) -> None:
         unit = (

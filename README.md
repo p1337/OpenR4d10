@@ -93,6 +93,9 @@ the installer report exactly which adapters still need configuration.
 - shared interaction-performance contract: normal panel presentation is capped
   at 10 FPS, fonts and quantized glow layers are cached, adjacent browser rotary
   repeats are coalesced in order, and 300 ms user-input latency blocks release
+- device input owns display slots while controls are active; expendable
+  periodic recorder frames resume after 200 ms of input quiet instead of
+  competing with or delaying the requested cursor frame
 - verified Pi Zero 2 W CPU placement uses all four cores by role: two for
   background/audio/web work, one for the fluid native UI and waveform, and one
   for BCM17 plus future measured encoder input; other platforms keep their

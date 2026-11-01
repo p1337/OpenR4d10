@@ -310,6 +310,10 @@ TrueType fonts and quantized compositor glow layers remove repeated filesystem
 and Gaussian-blur work. Browser key-repeat detents are coalesced in order before
 they enter the bounded device-input API, so the resulting rotation is preserved
 without creating an HTTP or display backlog.
+While a logical hardware or browser control is active, periodic recorder
+timeline frames yield their display slot. The resolved interaction frame still
+renders immediately; only the redundant periodic frame is skipped. After 200 ms
+without another input edge/detent, deadline-based timeline rendering resumes.
 
 On the verified four-core Pi Zero 2 W, CPU affinity gives background work
 (including ffmpeg/mpv and the level parser) cores 0–1, native UI/SPI core 2 and
