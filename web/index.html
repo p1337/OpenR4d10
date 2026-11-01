@@ -162,17 +162,23 @@
         <section class="tab-panel" role="tabpanel" data-tab-panel="mediathek" hidden>
           <section class="panel services-panel" aria-labelledby="mediathek-title">
             <div class="panel-heading"><div><p class="eyebrow" data-i18n="PUBLIC MEDIA LIBRARIES">PUBLIC MEDIA LIBRARIES</p><h1 class="tab-title" id="mediathek-title" data-i18n="Programs &amp; episodes">Programs &amp; episodes</h1></div><span class="version" data-i18n="No login">No login</span></div>
-            <p class="services-note" data-i18n="Searches public broadcaster catalogs. Playing an item takes over the central player; browsing does not interrupt current audio.">Searches public broadcaster catalogs. Playing an item takes over the central player; browsing does not interrupt current audio.</p>
+            <p class="services-note" data-i18n="Search current public broadcaster programs. Watch video in this browser or explicitly send the audio to the device.">Search current public broadcaster programs. Watch video in this browser or explicitly send the audio to the device.</p>
             <form class="content-control" id="mediathek-search-form">
-              <div class="station-library-tabs" role="tablist" aria-label="Media library provider" data-i18n-aria-label="Media library provider">
-                <button id="mediathek-ard-tab" type="button" role="tab" aria-selected="true" data-mediathek-provider="ard"><span>ARD</span><span id="mediathek-ard-count">0</span></button>
-                <button id="mediathek-zdf-tab" type="button" role="tab" aria-selected="false" data-mediathek-provider="zdf"><span>ZDF</span><span id="mediathek-zdf-count">0</span></button>
+              <div class="mediathek-toolbar">
+                <label for="mediathek-provider" data-i18n="Broadcaster">Broadcaster</label>
+                <select id="mediathek-provider" aria-label="Media library provider" data-i18n-aria-label="Media library provider"><option value="all" data-i18n="All media libraries">All media libraries</option></select>
               </div>
+              <div id="mediathek-collections" class="mediathek-collections" aria-label="Current selections" data-i18n-aria-label="Current selections"></div>
               <label for="mediathek-search" data-i18n="Search programs, topics and descriptions">Search programs, topics and descriptions</label>
               <div class="media-source-row"><input id="mediathek-search" type="search" maxlength="120" placeholder="News, documentary, science …" data-i18n-placeholder="News, documentary, science …" autocomplete="off"><button type="submit" data-i18n="Search">Search</button></div>
-              <div class="media-actions" aria-label="Mediathek playback controls" data-i18n-aria-label="Mediathek playback controls"><button type="button" data-mediathek-action="pause" data-i18n="Play / Pause">Play / Pause</button><button type="button" class="accent-action" data-mediathek-action="stop" data-i18n="Stop">Stop</button></div>
-              <output id="mediathek-status" aria-live="polite" data-i18n="Choose ARD or ZDF and start a search.">Choose ARD or ZDF and start a search.</output>
+              <div class="media-actions" aria-label="Device playback controls" data-i18n-aria-label="Device playback controls"><button type="button" data-mediathek-action="pause" data-i18n="Device play / pause">Device play / pause</button><button type="button" class="accent-action" data-mediathek-action="stop" data-i18n="Stop device playback">Stop device playback</button></div>
+              <output id="mediathek-status" aria-live="polite" data-i18n="Choose a current selection or search the catalogs.">Choose a current selection or search the catalogs.</output>
             </form>
+            <section id="mediathek-browser-player" class="mediathek-browser-player" aria-labelledby="mediathek-browser-title" hidden>
+              <div class="library-heading"><strong id="mediathek-browser-title" data-i18n="Browser video">Browser video</strong><button type="button" id="mediathek-browser-close" class="accent-action" data-i18n="Close video">Close video</button></div>
+              <video id="mediathek-video" controls playsinline preload="metadata"></video>
+              <p id="mediathek-video-meta"></p>
+            </section>
             <div class="library-heading"><strong data-i18n="Results">Results</strong><span id="mediathek-result-count">0</span></div>
             <ul id="mediathek-result-list" class="library-list mediathek-result-list"></ul>
           </section>

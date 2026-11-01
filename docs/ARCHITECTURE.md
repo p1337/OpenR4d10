@@ -403,14 +403,21 @@ the previous audio owner, while browsing subscriptions does not. Persistent
 feed URLs with query strings are rejected to prevent signed/private tokens from
 entering SQLite and portable backups.
 
-`MediathekCatalog` performs credential-free ARD/ZDF search through one bounded
-MediathekViewWeb JSON request: POST only, HTTPS only, ten-second timeout,
-2 MiB response ceiling and 30 results. Private-address, local and credentialed
-sources are rejected. The private result cache retains the broadcaster stream
-and website URLs; public snapshots expose only an opaque item id, provider,
-channel, topic, title, description, duration and timestamp. Explicit Play
-resolves that opaque id and loads the source into the central `MpvEngine`.
-Search, provider switching and selection do not change audio ownership.
+`MediathekCatalog` performs credential-free search across a fixed German public
+broadcaster catalog through one bounded MediathekViewWeb JSON request: POST
+only, HTTPS only, ten-second timeout, 2 MiB response ceiling and 30 public
+results. An all-broadcaster query may inspect at most 120 raw rows before exact
+channel filtering. Exact matching prevents short names such as `SR` from also
+accepting `SRF`. A bounded 16-entry, five-minute memory cache avoids repeated
+network waits for the same current selection. Private-address, local and
+credentialed sources are rejected. The private result cache retains a lower-
+bandwidth device source, the preferred browser-video source and the broadcaster
+website URL; public snapshots expose only an opaque item id, provider, channel,
+topic, title, description, duration and timestamp. Explicit device Play resolves
+that opaque id into the central `MpvEngine`. The local browser-video route
+accepts only the same cached ID and returns a no-store redirect instead of
+proxying media through the Pi. Search, provider switching, selection and browser
+video do not change device audio ownership. See `MEDIATHEK.md`.
 
 AmbientR4D10 stores its ordered scene library in the existing generic
 `channels` table under the `ambient` service ID. Built-in definitions in

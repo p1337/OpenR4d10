@@ -19,6 +19,7 @@ StatusProvider = Callable[[], dict[str, Any]]
 ControlProvider = Callable[[dict[str, object]], dict[str, object]]
 ContentProvider = Callable[[str], tuple[str, bytes] | None]
 ScreenProvider = Callable[[], bytes | None]
+RedirectProvider = Callable[[str], str | None]
 
 STATIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
@@ -36,6 +37,7 @@ class _DashboardHandler(BaseHTTPRequestHandler):
     control_provider: ControlProvider | None = None
     content_provider: ContentProvider | None = None
     screen_provider: ScreenProvider | None = None
+    redirect_provider: RedirectProvider | None = None
     server_version = "OpenR4d10"
     sys_version = ""
     protocol_version = "HTTP/1.1"
@@ -50,7 +52,7 @@ class _DashboardHandler(BaseHTTPRequestHandler):
         self.send_header(
             "Content-Security-Policy",
             "default-src 'self'; connect-src 'self' wss://hose.brandmeister.network; img-src 'self'; "
-            "style-src 'self'; script-src 'self'; frame-ancestors 'none'",
+            "media-src 'self' https:; style-src 'self'; script-src 'self'; frame-ancestors 'none'",
         )
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
@@ -127,6 +129,19 @@ class _DashboardHandler(BaseHTTPRequestHandler):
             return
         self._send(200, "image/png", payload)
 
+    def _serve_redirect(self, name: str) -> None:
+        target = self.redirect_provider(name) if self.redirect_provider is not None else None
+        if target is None:
+            self._send(404, "text/plain; charset=utf-8", b"Not found\n")
+            return
+        self.send_response(302)
+        self.send_header("Location", target)
+        self.send_header("Content-Length", "0")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
         path = urlsplit(self.path).path
         if path == "/api/status":
@@ -143,6 +158,8 @@ class _DashboardHandler(BaseHTTPRequestHandler):
             self._serve_content(f"ambient-art/{path.rsplit('/', 1)[-1]}")
         elif re.fullmatch(r"/api/media-cover/\d{1,10}", path):
             self._serve_content(f"media-cover/{path.rsplit('/', 1)[-1]}")
+        elif re.fullmatch(r"/api/mediathek-video/[a-f0-9]{24}", path):
+            self._serve_redirect(f"mediathek-video/{path.rsplit('/', 1)[-1]}")
         elif re.fullmatch(
             r"/api/weather-frame/weather-[a-z][a-z0-9_-]{1,63}-\d{8}T\d{6}Z\.jpg",
             path,
@@ -187,6 +204,7 @@ class WebServer:
         control_provider: ControlProvider | None = None,
         content_provider: ContentProvider | None = None,
         screen_provider: ScreenProvider | None = None,
+        redirect_provider: RedirectProvider | None = None,
     ) -> None:
         handler = type(
             "DashboardHandler",
@@ -197,6 +215,7 @@ class WebServer:
                 "control_provider": staticmethod(control_provider) if control_provider else None,
                 "content_provider": staticmethod(content_provider) if content_provider else None,
                 "screen_provider": staticmethod(screen_provider) if screen_provider else None,
+                "redirect_provider": staticmethod(redirect_provider) if redirect_provider else None,
             },
         )
         self._server = _LowLatencyHTTPServer((host, port), handler)

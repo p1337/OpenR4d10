@@ -611,7 +611,7 @@ class ServiceCatalogTests(unittest.TestCase):
 
                 self.request = (provider, query)
                 return [MediathekEntry(
-                    item_id="item-1",
+                    item_id="0123456789abcdef01234567",
                     provider="ARD",
                     service_id="ard_mediathek",
                     channel="ARD",
@@ -644,6 +644,17 @@ class ServiceCatalogTests(unittest.TestCase):
                 self.assertEqual(result["result_count"], 1)
                 self.assertNotIn("source_url", item)
                 self.assertNotIn("website_url", item)
+                self.assertIn("all", snapshot["mediathek"]["providers"])
+                self.assertGreaterEqual(len(snapshot["mediathek"]["provider_catalog"]), 18)
+                self.assertTrue(any(
+                    collection["collection_id"] == "harald_lesch"
+                    for collection in snapshot["mediathek"]["collections"]
+                ))
+                self.assertEqual(
+                    catalog.content_redirect(f"mediathek-video/{item['item_id']}"),
+                    "https://media.example.test/video.mp4",
+                )
+                self.assertIsNone(catalog.content_redirect("mediathek-video/not-an-id"))
                 catalog.control({
                     "action": "mediathek_play",
                     "provider": "ard",
@@ -678,7 +689,7 @@ class ServiceCatalogTests(unittest.TestCase):
         expected = {
             "brandmeister", "webradio", "local_media", "recorder", "mumble",
             "discord", "telegram", "webcam", "rss", "youtube_audio",
-            "spotify", "ard_mediathek", "zdf_mediathek", "remote_sdr",
+            "spotify", "ard_mediathek", "zdf_mediathek", "public_mediatheken", "remote_sdr",
             "speech", "codex_remote", "anker_solix",
         }
         self.assertTrue(expected.issubset(items))

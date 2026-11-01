@@ -166,6 +166,12 @@ class WebTests(unittest.TestCase):
         self.assertIn('"podcast_play"', script)
         self.assertIn('id="mediathek-search-form"', html)
         self.assertIn('id="mediathek-result-list"', html)
+        self.assertIn('id="mediathek-provider"', html)
+        self.assertIn('id="mediathek-collections"', html)
+        self.assertIn('id="mediathek-video"', html)
+        self.assertIn("/api/mediathek-video/", script)
+        self.assertIn('t("Watch in browser")', script)
+        self.assertIn('t("Play on device")', script)
         self.assertIn('"mediathek_search"', script)
         self.assertIn('"mediathek_play"', script)
         self.assertIn('id="service-search" type="search"', html)
@@ -247,6 +253,9 @@ class WebTests(unittest.TestCase):
                 }
                 else None,
                 lambda: b"native-png",
+                lambda name: "https://media.example/program.mp4"
+                if name == "mediathek-video/0123456789abcdef01234567"
+                else None,
             )
             server.start()
             try:
@@ -294,6 +303,19 @@ class WebTests(unittest.TestCase):
                 with urlopen(f"http://{host}:{port}/api/device-screen.png", timeout=2) as response:
                     self.assertEqual(response.headers["Content-Type"], "image/png")
                     self.assertEqual(response.read(), b"native-png")
+                connection = HTTPConnection(host, port, timeout=2)
+                try:
+                    connection.request("GET", "/api/mediathek-video/0123456789abcdef01234567")
+                    redirect = connection.getresponse()
+                    self.assertEqual(redirect.status, 302)
+                    self.assertEqual(
+                        redirect.headers["Location"],
+                        "https://media.example/program.mp4",
+                    )
+                    self.assertEqual(redirect.headers["Cache-Control"], "no-store")
+                    redirect.read()
+                finally:
+                    connection.close()
             finally:
                 server.stop()
 

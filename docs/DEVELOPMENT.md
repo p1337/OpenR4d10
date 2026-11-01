@@ -161,6 +161,8 @@ files in `web/` plus the following endpoints:
 - `/api/camera/<camera-id>` — locally re-encoded frame from a persistent
   Snapshot, MJPEG or RTSP camera entry
 - `/api/radio-art/<preset-id>` — bounded, locally re-encoded preset artwork
+- `/api/mediathek-video/<opaque-item-id>` — no-store redirect to the preferred
+  already validated public broadcaster video; never accepts a URL
 - `/api/device-screen.png` — exact current native 240 × 280 renderer output
 - `/api/weather-frame/<validated-cache-name>` — locally decoded and re-encoded
   DWD satellite frame; remote WMS URLs are never browser image URLs

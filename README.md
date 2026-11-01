@@ -119,6 +119,11 @@ the installer report exactly which adapters still need configuration.
   persistent active/disabled selection, search and language/category filters
 - persistent podcast subscriptions with bounded RSS/Atom episode loading,
   search and playback through the existing audio owner
+- one bounded German public Mediathek catalog covering ARD, ZDF, ZDFinfo,
+  ZDFneo, 3sat, ARTE, phoenix, ARD alpha, tagesschau24, ONE, Deutsche Welle
+  and the regional ARD broadcasters; current news, Tatort, documentary, science, Terra X and
+  Harald-Lesch selections can be watched in the browser or explicitly played
+  through the device audio owner
 - separate AmbientR4D10 audio service with ten license-documented café,
   nature, water, traffic, rain and night soundscapes, endless looping, up to
   two subtle additive sound layers, persistent favorite mixes and a sortable
@@ -445,13 +450,17 @@ enclosure URLs are not returned by the status API. Feeds with embedded
 credentials or persistent query strings are refused so signed/private feed
 tokens cannot accidentally enter backups or public state.
 
-The **Mediatheques** tab provides credential-free ARD and ZDF catalog search
-through the bounded MediathekViewWeb index. It returns at most 30 recent
-results per provider and plays the selected public broadcaster source through
-the same central mpv process used by the other audio services. Browsing and
-searching never interrupt current audio; explicit Play takes ownership. Raw
-stream and website URLs stay process-local and are not exposed by the status
-API. This integration does not bypass DRM, age gates, login or geoblocking.
+The **Mediatheques** tab provides credential-free catalog search for ARD, ZDF
+and the German public documentary, information and regional broadcasters
+through the bounded MediathekViewWeb index. Compact current selections cover
+news, Tatort/crime, documentaries, science, Terra X, Harald Lesch, history and
+nature. Browser video follows one opaque, process-local redirect without proxying the
+large media through the Pi; explicit device playback uses the same central mpv
+process as other audio services. Browsing and searching never interrupt current
+audio. Raw stream and website URLs stay process-local and are not exposed by
+the status API. This integration does not bypass DRM, age gates, login or
+geoblocking. The exact catalog and limits are documented in
+[`docs/MEDIATHEK.md`](docs/MEDIATHEK.md).
 
 The **AmbientR4D10** tab is an independent audio service, not a radio-station
 group or a third-party branded clone. Its ten built-in soundscapes are fetched

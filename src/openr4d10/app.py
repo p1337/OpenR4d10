@@ -925,6 +925,7 @@ class OpenR4d10App:
                     self.control,
                     self.services.content_asset if self.services is not None else None,
                     self.device_screen,
+                    self.services.content_redirect if self.services is not None else None,
                 )
                 self._web_server.start()
                 LOG.info(

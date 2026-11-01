@@ -59,7 +59,10 @@ MEDIA_EXTENSIONS = {
 }
 DEFAULT_ENABLED_SERVICES = {
     "system", "webradio", "weather", "ambient", "local_media", "recorder", "rss", "podcasts", "webcam", "brandmeister",
-    "ard_mediathek", "zdf_mediathek",
+    "ard_mediathek", "zdf_mediathek", "public_mediatheken",
+}
+MEDIATHEK_SERVICE_IDS = {
+    "ard_mediathek", "zdf_mediathek", "public_mediatheken",
 }
 DISPLAY_BRIGHTNESS_KEY = "display.brightness_percent"
 DEFAULT_DISPLAY_BRIGHTNESS = 100
@@ -143,6 +146,7 @@ BUILTIN_SERVICES = (
     ServiceManifest("spotify", "Spotify", "media", "Spotify Connect through a user-configured compatible client", ("playback",), "external", requires_credentials=True, credential_hint="Use the user's own eligible Spotify account locally."),
     ServiceManifest("ard_mediathek", "ARD Mediathek", "media", "Officially accessible ARD audio and media", ("catalog", "playback"), "process", ("mpv",)),
     ServiceManifest("zdf_mediathek", "ZDF Mediathek", "media", "Officially accessible ZDF audio and media", ("catalog", "playback"), "process", ("mpv",)),
+    ServiceManifest("public_mediatheken", "Public Mediatheques", "media", "German public documentary, information and regional media libraries", ("catalog", "playback", "video"), "process", ("mpv",)),
     ServiceManifest("international_media", "International Media", "media", "Configured public broadcasters and news sources", ("catalog", "playback"), "external"),
     ServiceManifest("speech", "Speech", "accessibility", "Offline German dictation, commands and read-aloud", ("stt", "tts"), "external"),
     ServiceManifest("bluetooth_audio", "Bluetooth Audio", "audio", "Bluetooth audio and HID routing", ("playback", "hid"), "external"),
@@ -220,12 +224,19 @@ class ServiceCatalog:
         self._podcast_cache: dict[int, dict[str, object]] = {}
         self._active_podcast_subscription_id: int | None = None
         self._active_podcast_episode: dict[str, object] | None = None
+        mediathek_provider_ids = [
+            str(provider["provider_id"])
+            for provider in MediathekCatalog.providers()
+        ]
         self._mediathek_results: dict[str, list[MediathekEntry]] = {
-            "ard": [],
-            "zdf": [],
+            provider_id: [] for provider_id in mediathek_provider_ids
         }
-        self._mediathek_queries = {"ard": "", "zdf": ""}
-        self._mediathek_selected: dict[str, str | None] = {"ard": None, "zdf": None}
+        self._mediathek_queries = {
+            provider_id: "" for provider_id in mediathek_provider_ids
+        }
+        self._mediathek_selected: dict[str, str | None] = {
+            provider_id: None for provider_id in mediathek_provider_ids
+        }
         self._active_mediathek_item: dict[str, object] | None = None
         external_ids = {
             item.service_id
@@ -1664,7 +1675,7 @@ class ServiceCatalog:
                 }
             )
         mediathek_providers = {}
-        for provider in ("ard", "zdf"):
+        for provider in self._mediathek_results:
             results = self._mediathek_results[provider]
             mediathek_providers[provider] = {
                 "query": self._mediathek_queries[provider],
@@ -1712,9 +1723,11 @@ class ServiceCatalog:
             },
             "mediathek": {
                 "providers": mediathek_providers,
+                "provider_catalog": MediathekCatalog.providers(),
+                "collections": MediathekCatalog.collections(),
                 "active_item": (
                     self._active_mediathek_item
-                    if self.active_service in {"ard_mediathek", "zdf_mediathek"}
+                    if self.active_service in MEDIATHEK_SERVICE_IDS
                     else None
                 ),
                 "limits": {
@@ -1810,6 +1823,7 @@ class ServiceCatalog:
             allowed = {
                 "webradio", "local_media", "remote_sdr",
                 "youtube_audio", "spotify", "ard_mediathek", "zdf_mediathek",
+                "public_mediatheken",
                 "international_media",
             }
             if not isinstance(service_id, str) or service_id not in allowed:
@@ -2752,11 +2766,11 @@ class ServiceCatalog:
         elif action == "mediathek_search":
             provider = request.get("provider")
             query = request.get("query", "")
-            if not isinstance(provider, str) or provider not in {"ard", "zdf"}:
-                raise ValueError("mediathek_search requires provider ard or zdf")
+            if not isinstance(provider, str) or provider not in self._mediathek_results:
+                raise ValueError("mediathek_search requires a known provider")
             if not isinstance(query, str):
                 raise ValueError("mediathek_search requires a text query")
-            service_id = f"{provider}_mediathek"
+            service_id = MediathekCatalog.provider(provider).service_id
             self._require_enabled(service_id)
             results = self.mediathek_catalog.search(provider, query)
             self._mediathek_results[provider] = results
@@ -2772,8 +2786,8 @@ class ServiceCatalog:
         elif action == "mediathek_select":
             provider = request.get("provider")
             item_id = request.get("item_id")
-            if not isinstance(provider, str) or provider not in {"ard", "zdf"}:
-                raise ValueError("mediathek_select requires provider ard or zdf")
+            if not isinstance(provider, str) or provider not in self._mediathek_results:
+                raise ValueError("mediathek_select requires a known provider")
             if not isinstance(item_id, str):
                 raise ValueError("mediathek_select requires an item id")
             if not any(
@@ -2785,12 +2799,10 @@ class ServiceCatalog:
         elif action == "mediathek_play":
             provider = request.get("provider")
             item_id = request.get("item_id")
-            if not isinstance(provider, str) or provider not in {"ard", "zdf"}:
-                raise ValueError("mediathek_play requires provider ard or zdf")
+            if not isinstance(provider, str) or provider not in self._mediathek_results:
+                raise ValueError("mediathek_play requires a known provider")
             if not isinstance(item_id, str):
                 raise ValueError("mediathek_play requires an item id")
-            service_id = f"{provider}_mediathek"
-            self._require_enabled(service_id)
             item = next(
                 (
                     candidate
@@ -2801,6 +2813,8 @@ class ServiceCatalog:
             )
             if item is None:
                 raise ValueError("Mediathek item was not found; search again")
+            service_id = item.service_id
+            self._require_enabled(service_id)
             source = validate_media_source(item.source_url, (self.media_root,))
             if self.radio_buffer is not None:
                 self.radio_buffer.stop(flush=True)
@@ -3518,6 +3532,19 @@ class ServiceCatalog:
         except OSError:
             return None
 
+    def content_redirect(self, path: str) -> str | None:
+        """Resolve one opaque, process-local content id to a reviewed public URL."""
+
+        match = re.fullmatch(r"mediathek-video/([a-f0-9]{24})", path)
+        if match is None:
+            return None
+        item_id = match.group(1)
+        for results in self._mediathek_results.values():
+            for item in results:
+                if item.item_id == item_id:
+                    return item.browser_url or item.source_url
+        return None
+
     def receiver_overlay(self, view_service: str | None = None) -> dict[str, object]:
         """Return metadata for the selected view without changing audio ownership."""
         requested = str(view_service or "").upper()
@@ -3719,6 +3746,7 @@ class ServiceCatalog:
             "spotify": "PLAYER",
             "ard_mediathek": "PLAYER",
             "zdf_mediathek": "PLAYER",
+            "public_mediatheken": "PLAYER",
             "international_media": "PLAYER",
             "podcasts": "PLAYER",
             "ambient": "AMBIENT",
@@ -3829,7 +3857,7 @@ class ServiceCatalog:
             else str(self._active_podcast_episode["podcast"])
             if self.active_service == "podcasts" and self._active_podcast_episode is not None
             else str(self._active_mediathek_item["channel"])
-            if self.active_service in {"ard_mediathek", "zdf_mediathek"}
+            if self.active_service in MEDIATHEK_SERVICE_IDS
             and self._active_mediathek_item is not None
             else playback.source or self.active_service
         )
@@ -3847,7 +3875,7 @@ class ServiceCatalog:
         elif self.active_service == "podcasts" and self._active_podcast_episode is not None:
             track_line = str(self._active_podcast_episode["title"])
         elif (
-            self.active_service in {"ard_mediathek", "zdf_mediathek"}
+            self.active_service in MEDIATHEK_SERVICE_IDS
             and self._active_mediathek_item is not None
         ):
             track_line = str(self._active_mediathek_item["title"])

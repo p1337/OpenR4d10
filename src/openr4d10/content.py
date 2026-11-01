@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 import hashlib
@@ -91,14 +92,86 @@ class BoundedFetcher:
 
 
 MEDIATHEKVIEW_QUERY_URL = "https://mediathekviewweb.de/api/query"
+
+
+@dataclass(frozen=True, slots=True)
+class MediathekProvider:
+    provider_id: str
+    service_id: str
+    label: str
+    channel_query: str | None
+    accepted_channels: tuple[str, ...]
+
+    def public(self) -> dict[str, object]:
+        return {
+            "provider_id": self.provider_id,
+            "label": self.label,
+            "service_id": self.service_id,
+        }
+
+
+GERMAN_MEDIATHEK_CHANNELS = (
+    "ARD", "ZDF", "ZDFinfo", "ZDFneo", "3Sat", "ARTE.DE", "PHOENIX",
+    "ARD-alpha", "tagesschau24", "ONE", "BR", "HR", "MDR", "NDR",
+    "RBB", "SR", "SWR", "WDR", "DW",
+)
+
+
+def _mediathek_provider(
+    provider_id: str,
+    label: str,
+    channel: str,
+    *,
+    service_id: str = "public_mediatheken",
+) -> MediathekProvider:
+    return MediathekProvider(provider_id, service_id, label, channel, (channel,))
+
+
 MEDIATHEK_PROVIDERS = {
-    "ard": ("ard_mediathek", "ARD", "ARD"),
-    "zdf": ("zdf_mediathek", "ZDF", "ZDF"),
+    "all": MediathekProvider(
+        "all", "public_mediatheken", "Alle Mediatheken", None,
+        GERMAN_MEDIATHEK_CHANNELS,
+    ),
+    "ard": _mediathek_provider("ard", "ARD", "ARD", service_id="ard_mediathek"),
+    "zdf": MediathekProvider(
+        "zdf", "zdf_mediathek", "ZDF", "ZDF", ("ZDF", "ZDFinfo", "ZDFneo"),
+    ),
+    "zdfinfo": _mediathek_provider("zdfinfo", "ZDFinfo", "ZDFinfo"),
+    "zdfneo": _mediathek_provider("zdfneo", "ZDFneo", "ZDFneo"),
+    "3sat": _mediathek_provider("3sat", "3sat", "3Sat"),
+    "arte": _mediathek_provider("arte", "ARTE", "ARTE.DE"),
+    "phoenix": _mediathek_provider("phoenix", "phoenix", "PHOENIX"),
+    "ard_alpha": _mediathek_provider("ard_alpha", "ARD alpha", "ARD-alpha"),
+    "tagesschau24": _mediathek_provider("tagesschau24", "tagesschau24", "tagesschau24"),
+    "one": _mediathek_provider("one", "ONE", "ONE"),
+    "br": _mediathek_provider("br", "BR", "BR"),
+    "hr": _mediathek_provider("hr", "hr", "HR"),
+    "mdr": _mediathek_provider("mdr", "MDR", "MDR"),
+    "ndr": _mediathek_provider("ndr", "NDR", "NDR"),
+    "rbb": _mediathek_provider("rbb", "rbb", "RBB"),
+    "sr": _mediathek_provider("sr", "SR", "SR"),
+    "swr": _mediathek_provider("swr", "SWR", "SWR"),
+    "wdr": _mediathek_provider("wdr", "WDR", "WDR"),
+    "dw": _mediathek_provider("dw", "Deutsche Welle", "DW"),
 }
+
+MEDIATHEK_COLLECTIONS = (
+    {"collection_id": "latest", "label": "New", "provider": "all", "query": ""},
+    {"collection_id": "news", "label": "News", "provider": "all", "query": "Nachrichten"},
+    {"collection_id": "tatort", "label": "Tatort & crime", "provider": "all", "query": "Tatort"},
+    {"collection_id": "documentaries", "label": "Documentaries", "provider": "all", "query": "Dokumentation"},
+    {"collection_id": "science", "label": "Science", "provider": "all", "query": "Wissenschaft"},
+    {"collection_id": "terra_x", "label": "Terra X", "provider": "all", "query": "Terra X"},
+    {"collection_id": "harald_lesch", "label": "Harald Lesch", "provider": "all", "query": "Harald Lesch"},
+    {"collection_id": "history", "label": "History", "provider": "all", "query": "Geschichte"},
+    {"collection_id": "nature", "label": "Nature", "provider": "all", "query": "Natur"},
+)
 
 
 def _public_stream_url(value: object) -> str | None:
     if not isinstance(value, str):
+        return None
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
         return None
     try:
         approved = validate_content_url(value)
@@ -133,6 +206,7 @@ class MediathekEntry:
     timestamp: int
     source_url: str
     website_url: str
+    browser_url: str = ""
 
     def public(self) -> dict[str, object]:
         return {
@@ -152,10 +226,32 @@ class MediathekCatalog:
     """Bounded, credential-free search over the public MediathekView index."""
 
     MAX_RESULTS = 30
+    MAX_QUERY_RESULTS = 120
     MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+    CACHE_TTL_SECONDS = 300
+    MAX_CACHE_ENTRIES = 16
 
     def __init__(self, fetcher: BoundedFetcher | None = None) -> None:
         self.fetcher = fetcher or BoundedFetcher()
+        self._cache: OrderedDict[
+            tuple[str, str], tuple[float, tuple[MediathekEntry, ...]]
+        ] = OrderedDict()
+        self._cache_lock = threading.Lock()
+
+    @staticmethod
+    def providers() -> list[dict[str, object]]:
+        return [provider.public() for provider in MEDIATHEK_PROVIDERS.values()]
+
+    @staticmethod
+    def collections() -> list[dict[str, str]]:
+        return [dict(collection) for collection in MEDIATHEK_COLLECTIONS]
+
+    @staticmethod
+    def provider(provider: str) -> MediathekProvider:
+        provider_config = MEDIATHEK_PROVIDERS.get(str(provider).casefold())
+        if provider_config is None:
+            raise ValueError("unknown Mediathek provider")
+        return provider_config
 
     @staticmethod
     def _text(value: object, limit: int) -> str:
@@ -177,7 +273,9 @@ class MediathekCatalog:
         provider_config = MEDIATHEK_PROVIDERS.get(provider_key)
         if provider_config is None:
             raise ValueError("unknown Mediathek provider")
-        service_id, provider_label, _channel_query = provider_config
+        accepted_channels = {
+            channel.casefold() for channel in provider_config.accepted_channels
+        }
         try:
             document = json.loads(payload)
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -187,10 +285,19 @@ class MediathekCatalog:
         if not isinstance(raw_items, list):
             raise ContentError("Mediathek response has no result list")
         entries: list[MediathekEntry] = []
-        for raw in raw_items[: cls.MAX_RESULTS]:
+        seen_sources: set[str] = set()
+        for raw in raw_items[: cls.MAX_QUERY_RESULTS]:
             if not isinstance(raw, dict):
                 continue
             source_url = next(
+                (
+                    approved
+                    for key in ("url_video_low", "url_video", "url_video_hd")
+                    if (approved := _public_stream_url(raw.get(key))) is not None
+                ),
+                None,
+            )
+            browser_url = next(
                 (
                     approved
                     for key in ("url_video_hd", "url_video", "url_video_low")
@@ -199,21 +306,24 @@ class MediathekCatalog:
                 None,
             )
             website_url = _public_stream_url(raw.get("url_website"))
-            if source_url is None or website_url is None:
+            if source_url is None or browser_url is None or website_url is None:
                 continue
             channel = cls._text(raw.get("channel"), 80)
-            if provider_key == "zdf" and "zdf" not in channel.casefold():
+            if channel.casefold() not in accepted_channels:
+                continue
+            if website_url in seen_sources:
                 continue
             title = cls._text(raw.get("title"), 240)
             if not title:
                 continue
+            seen_sources.add(website_url)
             identity = f"{provider_key}\0{website_url}\0{source_url}"
             entries.append(
                 MediathekEntry(
                     item_id=hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24],
-                    provider=provider_label,
-                    service_id=service_id,
-                    channel=channel or provider_label,
+                    provider=provider_config.label,
+                    service_id=provider_config.service_id,
+                    channel=channel or provider_config.label,
                     topic=cls._text(raw.get("topic"), 160),
                     title=title,
                     description=cls._text(raw.get("description"), 800),
@@ -221,20 +331,32 @@ class MediathekCatalog:
                     timestamp=cls._bounded_integer(raw.get("timestamp"), 4_102_444_800),
                     source_url=source_url,
                     website_url=website_url,
+                    browser_url=browser_url,
                 )
             )
+            if len(entries) >= cls.MAX_RESULTS:
+                break
         return entries
 
     def search(self, provider: str, query: str) -> list[MediathekEntry]:
         provider_key = str(provider).casefold()
-        provider_config = MEDIATHEK_PROVIDERS.get(provider_key)
-        if provider_config is None:
-            raise ValueError("unknown Mediathek provider")
-        _service_id, _provider_label, channel_query = provider_config
+        provider_config = self.provider(provider_key)
         clean_query = self._text(query, 120)
-        queries: list[dict[str, object]] = [
-            {"fields": ["channel"], "query": channel_query},
-        ]
+        cache_key = (provider_key, clean_query.casefold())
+        now = time.monotonic()
+        with self._cache_lock:
+            cached = self._cache.get(cache_key)
+            if cached is not None and now - cached[0] < self.CACHE_TTL_SECONDS:
+                self._cache.move_to_end(cache_key)
+                return list(cached[1])
+            if cached is not None:
+                self._cache.pop(cache_key, None)
+        queries: list[dict[str, object]] = []
+        if provider_config.channel_query is not None:
+            queries.append({
+                "fields": ["channel"],
+                "query": provider_config.channel_query,
+            })
         if clean_query:
             queries.insert(
                 0,
@@ -250,7 +372,11 @@ class MediathekCatalog:
                 "sortOrder": "desc",
                 "future": False,
                 "offset": 0,
-                "size": self.MAX_RESULTS,
+                "size": (
+                    self.MAX_QUERY_RESULTS
+                    if provider_config.channel_query is None
+                    else self.MAX_RESULTS
+                ),
             },
             ensure_ascii=False,
             separators=(",", ":"),
@@ -264,7 +390,13 @@ class MediathekCatalog:
             body=body,
             headers={"Content-Type": "application/json"},
         )
-        return self.parse(provider_key, payload)
+        entries = self.parse(provider_key, payload)
+        with self._cache_lock:
+            self._cache[cache_key] = (now, tuple(entries))
+            self._cache.move_to_end(cache_key)
+            while len(self._cache) > self.MAX_CACHE_ENTRIES:
+                self._cache.popitem(last=False)
+        return entries
 
 
 class AmbientAudioCache:

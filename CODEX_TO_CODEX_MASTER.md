@@ -3517,3 +3517,46 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 - Auf dem Gerät erscheint die ausgewählte Mediathekfolge in der vorhandenen
   `PLAYER`-Ansicht. Titel, Anbieter und Wiedergabestatus stammen aus demselben
   Zustand wie im Browser; Play/Pause/Stopp bleiben die zentralen Aktionen.
+
+### 2026-11-01 – Deutscher Mediathekenkatalog, aktuelle Themen und Browser-Video
+
+- Der vorhandene gemeinsame Mediathekadapter wird erweitert und nicht durch
+  einen parallelen Player ersetzt. Neben ARD und ZDF umfasst seine feste,
+  geprüfte Senderauswahl die deutschen öffentlich-rechtlichen Informations-,
+  Kultur- und Dokumentationsangebote `ZDFinfo`, `ZDFneo`, `3Sat`, `ARTE.DE`,
+  `PHOENIX`, `ARD-alpha`, `tagesschau24`, `ONE` sowie BR, HR, MDR, NDR, RBB,
+  SR, SWR, WDR und Deutsche Welle (`DW`). Sendernamen werden gegen die tatsächlich vom
+  MediathekViewWeb-Index gelieferten Kanalwerte geprüft; eine unscharfe
+  Teilzeichenfolge wie `SR`, die auch `SRF` treffen würde, genügt nicht.
+- Die Browseransicht erhält eine kompakte Senderauswahl und dynamische
+  Themen-Schnellwahlen. Mindestens vorhanden sind `Neu`, `Nachrichten`,
+  `Tatort & Krimi`, `Dokus`, `Wissenschaft`, `Terra X`, `Harald Lesch`,
+  `Geschichte` und `Natur`. Dies sind nachvollziehbare Suchprofile, keine
+  redaktionell erfundenen Empfehlungen. Ergebnisse werden nach dem echten
+  Veröffentlichungszeitpunkt absteigend geladen; Titel, Datum, Sender, Thema,
+  Beschreibung und Dauer bleiben sichtbar.
+- Eine leere Suche bedeutet beim ausgewählten Sender `Neu` und lädt dessen
+  aktuelle Einträge. Die senderübergreifende Auswahl ist auf die vorgenannten
+  deutschen Kanäle begrenzt. Abrufe bleiben HTTPS-only, größen-, zeit- und
+  ergebnisbegrenzt, werden für kurze Zeit pro Suchprofil im Arbeitsspeicher
+  wiederverwendet und umgehen weder DRM noch Anmeldung, Altersfreigabe,
+  Geoblocking oder andere Zugriffsbeschränkungen.
+- `Im Browser ansehen` verwendet das native HTML5-Videoelement und eine kurze
+  lokale, undurchsichtige Element-ID. Der Pi leitet den Browser nur zur bereits
+  geprüften öffentlichen Senderquelle weiter und proxyt keine großen
+  Videodateien durch seinen Arbeitsspeicher. Rohadressen bleiben aus Status,
+  SQLite und Backups ausgeschlossen. `Auf Gerät abspielen` verwendet weiterhin
+  genau den zentralen `MpvEngine` und eine bandbreitenärmere verfügbare
+  Senderfassung.
+- Das reale Whisplay zeigt für Mediatheken weiterhin Titel, Sender und
+  Wiedergabestatus und spielt den Audiopfad. Eine bewegte 240-x-280-
+  Videowiedergabe auf dem SPI-Panel wird erst aktiviert, wenn Dekodierung,
+  10-FPS-Ausgabe, Audio-Synchronität und Eingabelatenz auf dem realen Pi Zero 2 W
+  gemessen wurden. Browser-Video darf nicht als bereits bestätigtes
+  Whisplay-Video ausgegeben werden.
+- Die Umsetzung wird in drei ausdrücklichen Optimierungsrunden abgenommen:
+  erstens Quellenabdeckung, Dubletten und aktuelle Inhalte; zweitens kompakte
+  Bedienung, verständliche Namen und fünfsprachige Browsertexte; drittens
+  Cache, Bandbreite, Fehlerfälle und die bestehende Eingabe-/Audioleistung.
+  Freigabe und Pi-Update bleiben an den vollständig grünen GitHub-Lauf des
+  exakten Commits gebunden.

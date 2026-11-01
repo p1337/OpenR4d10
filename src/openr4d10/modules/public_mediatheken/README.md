@@ -1,0 +1,19 @@
+# Deutsche öffentliche Mediatheken
+
+Dieses Modul erweitert den gemeinsamen, begrenzten MediathekViewWeb-Katalog um
+deutsche Informations-, Kultur-, Dokumentations- und Regionalangebote. Es
+umfasst ZDFinfo, ZDFneo, 3sat, ARTE, phoenix, ARD alpha, tagesschau24, ONE sowie
+BR, HR, MDR, NDR, rbb, SR, SWR, WDR und Deutsche Welle. ARD und ZDF behalten ihre eigenen
+Module; Suche und Wiedergabe verwenden trotzdem denselben Adapter und Player.
+
+Die Browseransicht kann eine geprüfte öffentliche Videoquelle über eine
+prozesslokale, undurchsichtige Element-ID direkt öffnen. Der Raspberry Pi
+proxyt die große Videodatei nicht. Auf dem Gerät verwendet die ausdrückliche
+Wiedergabe den zentralen `MpvEngine` und zeigt Metadaten. Zugangsdaten, Stream-
+URLs und Website-URLs werden weder in SQLite noch im öffentlichen Status oder
+in Backups gespeichert. DRM, Anmeldung, Altersfreigabe und Geoblocking werden
+nicht umgangen.
+
+Diagnose: Dienstbereitschaft erfordert das vorhandene `mpv`; Katalogfehler
+erscheinen als begrenzte Suchfehlermeldung. Die Quelle, Senderwerte, Limits und
+Browser-/Gerätegrenze sind in `docs/MEDIATHEK.md` dokumentiert.

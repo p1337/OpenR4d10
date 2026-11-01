@@ -82,6 +82,54 @@ class ContentTests(unittest.TestCase):
         self.assertEqual(request["queries"][0]["query"], "Weltall")
         self.assertEqual(request["queries"][1]["query"], "ZDF")
 
+    def test_mediathek_all_scope_filters_exact_channels_caches_and_splits_video_quality(self) -> None:
+        calls = []
+        payload = json.dumps({
+            "result": {
+                "results": [
+                    {
+                        "channel": "SRF",
+                        "title": "Must not match SR",
+                        "url_video": "https://media.example/srf.mp4",
+                        "url_website": "https://www.srf.ch/play/tv/test",
+                    },
+                    {
+                        "channel": "SR",
+                        "title": "Must reject a control character in redirect targets",
+                        "url_video": "https://media.example/bad.mp4\r\nX-Test: bad",
+                        "url_website": "https://www.ardmediathek.de/video/bad",
+                    },
+                    {
+                        "channel": "SR",
+                        "topic": "Dokumentation",
+                        "title": "Saarland Wissen",
+                        "timestamp": 1793520000,
+                        "url_video_low": "https://media.example/sr-low.mp4",
+                        "url_video": "https://media.example/sr.mp4",
+                        "url_video_hd": "https://media.example/sr-hd.mp4",
+                        "url_website": "https://www.ardmediathek.de/video/sr-test",
+                    },
+                ]
+            }
+        }).encode()
+
+        class Fetcher:
+            def fetch(self, url, **kwargs):
+                calls.append((url, kwargs))
+                return payload, "application/json"
+
+        catalog = MediathekCatalog(Fetcher())
+        first = catalog.search("all", "Wissen")
+        second = catalog.search("all", "Wissen")
+        self.assertEqual([item.channel for item in first], ["SR"])
+        self.assertEqual(first[0].source_url, "https://media.example/sr-low.mp4")
+        self.assertEqual(first[0].browser_url, "https://media.example/sr-hd.mp4")
+        self.assertEqual(second, first)
+        self.assertEqual(len(calls), 1)
+        request = json.loads(calls[0][1]["body"])
+        self.assertEqual(request["size"], MediathekCatalog.MAX_QUERY_RESULTS)
+        self.assertEqual(len(request["queries"]), 1)
+
     def test_track_artwork_uses_high_score_release_and_reencodes_cover(self) -> None:
         raw = BytesIO()
         Image.new("RGB", (600, 600), (80, 20, 120)).save(raw, format="PNG")

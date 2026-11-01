@@ -6,3 +6,9 @@ OpenR4d10-Player. Es benötigt weder Konto noch Zugangsdaten.
 
 Die Ergebnisliste enthält keine Streamadressen. Suche und Antwortgröße sind
 begrenzt; DRM, Geoblocking und Altersfreigaben werden nicht umgangen.
+
+Im Browser kann ein gewählter Beitrag über eine undurchsichtige lokale ID im
+HTML5-Videoplayer angesehen werden; der Pi leitet nur zur geprüften öffentlichen
+Quelle weiter. `Auf Gerät abspielen` nutzt denselben zentralen Audio-Player wie
+Radio und Podcasts. Der vollständige Senderkatalog und seine Grenzen stehen in
+`docs/MEDIATHEK.md`.

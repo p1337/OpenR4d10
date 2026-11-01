@@ -17,7 +17,8 @@ let stationLanguageFilter = "";
 let stationCategoryFilter = "";
 let stationLibraryView = "active";
 let podcastSearchQuery = "";
-let mediathekProvider = "ard";
+let mediathekProvider = "all";
+let mediathekInitialLoadPending = false;
 let brandmeisterTalkgroups = [];
 let brandmeisterCatalog = [];
 let brandmeisterCatalogQuery = "";
@@ -117,6 +118,7 @@ function activateTab(name) {
     panel.hidden = panel.dataset.tabPanel !== name;
   }
   if (name === "weather") ensureWeatherFrames();
+  if (name === "mediathek") ensureMediathekResults();
 }
 
 for (const button of document.querySelectorAll("[data-tab]")) {
@@ -315,8 +317,13 @@ function renderServices(catalog) {
 
 function renderPlaybackActions(playback) {
   const running = playback.state === "playing" && playback.paused !== true;
-  for (const button of document.querySelectorAll('[data-action="pause"], [data-music-action="pause"], [data-mediathek-action="pause"]')) {
+  for (const button of document.querySelectorAll('[data-action="pause"], [data-music-action="pause"]')) {
     button.textContent = t(running ? "Pause" : "Play");
+    button.classList.toggle("play-action", !running);
+    button.classList.toggle("accent-action", running);
+  }
+  for (const button of document.querySelectorAll('[data-mediathek-action="pause"]')) {
+    button.textContent = t(running ? "Pause device playback" : "Play on device");
     button.classList.toggle("play-action", !running);
     button.classList.toggle("accent-action", running);
   }
@@ -816,11 +823,18 @@ function mediathekDuration(seconds) {
     : `${minutes}:${String(rest).padStart(2, "0")}`;
 }
 
+function mediathekPublished(timestamp) {
+  const value = Number(timestamp);
+  if (!Number.isFinite(value) || value <= 0) return "";
+  return new Date(value * 1000).toLocaleDateString(currentLocale, {
+    day: "2-digit", month: "2-digit", year: "numeric",
+  });
+}
+
 function selectMediathekProvider(provider) {
-  mediathekProvider = provider === "zdf" ? "zdf" : "ard";
-  for (const button of document.querySelectorAll("[data-mediathek-provider]")) {
-    button.setAttribute("aria-selected", button.dataset.mediathekProvider === mediathekProvider ? "true" : "false");
-  }
+  const providers = latestStatus?.services?.mediathek?.providers || {};
+  mediathekProvider = Object.hasOwn(providers, provider) ? provider : "all";
+  byId("mediathek-provider").value = mediathekProvider;
   const state = latestStatus?.services?.mediathek?.providers?.[mediathekProvider];
   byId("mediathek-search").value = state?.query || "";
   if (latestStatus?.services) renderMediathek(latestStatus.services);
@@ -829,10 +843,47 @@ function selectMediathekProvider(provider) {
 function renderMediathek(catalog) {
   const mediathek = catalog?.mediathek || {};
   const providers = mediathek.providers || {};
-  const ardResults = Array.isArray(providers.ard?.results) ? providers.ard.results : [];
-  const zdfResults = Array.isArray(providers.zdf?.results) ? providers.zdf.results : [];
-  setText("mediathek-ard-count", ardResults.length);
-  setText("mediathek-zdf-count", zdfResults.length);
+  const providerSelect = byId("mediathek-provider");
+  const providerCatalog = Array.isArray(mediathek.provider_catalog) ? mediathek.provider_catalog : [];
+  const providerSignature = `${currentLocale}|${providerCatalog.map((item) => `${item.provider_id}:${item.label}`).join("|")}`;
+  if (providerSelect.dataset.signature !== providerSignature) {
+    providerSelect.replaceChildren();
+    for (const provider of providerCatalog) {
+      const option = document.createElement("option");
+      option.value = provider.provider_id;
+      option.textContent = provider.provider_id === "all" ? t("All media libraries") : provider.label;
+      providerSelect.append(option);
+    }
+    providerSelect.dataset.signature = providerSignature;
+  }
+  if (!Object.hasOwn(providers, mediathekProvider)) mediathekProvider = "all";
+  providerSelect.value = mediathekProvider;
+
+  const collectionList = byId("mediathek-collections");
+  collectionList.replaceChildren();
+  for (const collection of Array.isArray(mediathek.collections) ? mediathek.collections : []) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = t(collection.label);
+    button.setAttribute(
+      "aria-pressed",
+      collection.provider === mediathekProvider
+        && collection.query === (providers[mediathekProvider]?.query || "")
+        ? "true"
+        : "false",
+    );
+    button.addEventListener("click", async () => {
+      mediathekProvider = collection.provider;
+      providerSelect.value = mediathekProvider;
+      byId("mediathek-search").value = collection.query;
+      await mediathekCommand("mediathek_search", {
+        provider: collection.provider,
+        query: collection.query,
+      });
+    });
+    collectionList.append(button);
+  }
+
   const providerState = providers[mediathekProvider] || {};
   const results = Array.isArray(providerState.results) ? providerState.results : [];
   const list = byId("mediathek-result-list");
@@ -845,21 +896,30 @@ function renderMediathek(catalog) {
     const title = document.createElement("strong");
     title.textContent = item.title;
     const detail = document.createElement("small");
-    detail.textContent = [item.channel, item.topic, mediathekDuration(item.duration_seconds)].filter(Boolean).join(" · ");
+    detail.textContent = [
+      item.channel,
+      item.topic,
+      mediathekPublished(item.timestamp),
+      mediathekDuration(item.duration_seconds),
+    ].filter(Boolean).join(" · ");
     const description = document.createElement("p");
     description.textContent = item.description;
     copy.append(title, detail, description);
     const actions = document.createElement("span");
     actions.className = "library-actions";
-    const play = document.createElement("button");
-    play.type = "button";
-    play.className = "library-play play-action";
-    play.textContent = t("Play");
-    play.addEventListener("click", () => mediathekCommand("mediathek_play", {
+    const watch = document.createElement("button");
+    watch.type = "button";
+    watch.className = "library-play play-action";
+    watch.textContent = t("Watch in browser");
+    watch.addEventListener("click", () => watchMediathekItem(item));
+    const devicePlay = document.createElement("button");
+    devicePlay.type = "button";
+    devicePlay.textContent = t("Play on device");
+    devicePlay.addEventListener("click", () => mediathekCommand("mediathek_play", {
       provider: mediathekProvider,
       item_id: item.item_id,
     }));
-    actions.append(play);
+    actions.append(watch, devicePlay);
     row.addEventListener("click", (event) => {
       if (event.target.closest("button")) return;
       mediathekCommand("mediathek_select", { provider: mediathekProvider, item_id: item.item_id });
@@ -872,6 +932,45 @@ function renderMediathek(catalog) {
     const row = document.createElement("li");
     row.textContent = t("No Mediathek results loaded yet.");
     list.append(row);
+  }
+}
+
+async function watchMediathekItem(item) {
+  const selected = await mediathekCommand("mediathek_select", {
+    provider: mediathekProvider,
+    item_id: item.item_id,
+  });
+  if (!selected) return;
+  const player = byId("mediathek-browser-player");
+  const video = byId("mediathek-video");
+  player.hidden = false;
+  video.src = `/api/mediathek-video/${encodeURIComponent(item.item_id)}`;
+  setText("mediathek-video-meta", [item.channel, item.topic, item.title].filter(Boolean).join(" · "));
+  player.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  try {
+    await video.play();
+    setText("mediathek-status", t("Mediathek video is playing in this browser."));
+  } catch (_error) {
+    setText("mediathek-status", t("Press play in the video player to start."));
+  }
+}
+
+function closeMediathekVideo() {
+  const video = byId("mediathek-video");
+  video.pause();
+  video.removeAttribute("src");
+  video.load();
+  byId("mediathek-browser-player").hidden = true;
+}
+
+async function ensureMediathekResults() {
+  const state = latestStatus?.services?.mediathek?.providers?.all;
+  if (!latestStatus || mediathekInitialLoadPending || (Array.isArray(state?.results) && state.results.length)) return;
+  mediathekInitialLoadPending = true;
+  try {
+    await mediathekCommand("mediathek_search", { provider: "all", query: "" });
+  } finally {
+    mediathekInitialLoadPending = false;
   }
 }
 
@@ -892,8 +991,10 @@ async function mediathekCommand(action, extra = {}) {
         ? t("Mediathek item is playing.")
         : t("Mediathek selection saved.");
     await refresh();
+    return payload;
   } catch (error) {
     output.textContent = t("Error: {{message}}", { message: error.message });
+    return null;
   }
 }
 
@@ -1578,9 +1679,7 @@ byId("podcast-subscribe-form").addEventListener("submit", async (event) => {
   event.currentTarget.reset();
 });
 
-for (const button of document.querySelectorAll("[data-mediathek-provider]")) {
-  button.addEventListener("click", () => selectMediathekProvider(button.dataset.mediathekProvider));
-}
+byId("mediathek-provider").addEventListener("change", (event) => selectMediathekProvider(event.currentTarget.value));
 
 byId("mediathek-search-form").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -1593,6 +1692,10 @@ byId("mediathek-search-form").addEventListener("submit", async (event) => {
 for (const button of document.querySelectorAll("[data-mediathek-action]")) {
   button.addEventListener("click", () => sendControl(button.dataset.mediathekAction));
 }
+byId("mediathek-browser-close").addEventListener("click", closeMediathekVideo);
+byId("mediathek-video").addEventListener("error", () => {
+  setText("mediathek-status", t("This program cannot be played in the browser."));
+});
 
 byId("ambient-scene-form").addEventListener("submit", async (event) => {
   event.preventDefault();
