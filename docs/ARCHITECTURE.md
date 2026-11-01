@@ -145,7 +145,10 @@ player branch entirely and paints the localized heading plus the documented
 ten-item settings list. The right outer encoder moves only the bounded menu
 selection, and a short right press opens the selected page instead of reaching
 media controls. Logical `HOME`, produced by a released short PiSugar power-
-button press or Browser Space, opens the main menu from every service. The left
+button press or Browser Space, opens the main menu from every service. PiSugar's
+separate Custom button reuses the serialized input path: single tap emits
+`RIGHT_OUTER +1`, double tap emits `RIGHT_PRESS`, and long tap emits
+`RIGHT_INNER +1`. The left
 encoder press has no global action and remains available for later service use.
 Menu history stays inside `DeviceUiState`; an active PTT press
 returns one level unless the current semantic frame explicitly declares a
@@ -225,14 +228,17 @@ appearance store. The closed player edge glow is a permanent part of that
 renderer, not a stored option. A stale `ui.screen_border_enabled` row from
 0.10.26 through 0.10.28 is ignored.
 
-The built-in `pisugar3` power backend is a narrow read-only I2C boundary. It
+The built-in `pisugar3` power backend is a narrow I2C boundary. It
 opens `/dev/i2c-1`, selects the documented `0x57` controller, verifies version
 `3` and application mode `0x0F`, and then reads calculated capacity register
 `0x2A` through the manufacturer's SMBus byte-data transaction. Split raw
 write/read transactions are forbidden because the real controller returns the
 version byte again after their STOP condition. The adapter exposes only model,
-ready state and bounded percentage. Controller writes and an additional
-PiSugar network service are intentionally absent.
+ready state and bounded percentage. Telemetry and power-button reads remain
+read-only. The sole write path acknowledges classified Custom-button events in
+tap register `0x08` with the manufacturer's write-enable sequence; charging,
+RTC, watchdog, shutdown and power state are never changed. An additional
+PiSugar network service remains intentionally absent.
 
 ## Service catalog
 

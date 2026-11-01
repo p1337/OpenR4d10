@@ -602,15 +602,16 @@ class _I2cSmbusRequest(ctypes.Structure):
 
 
 class PiSugar3Telemetry:
-    """Read the documented PiSugar 3 battery percentage over I2C.
+    """Read PiSugar 3 telemetry and its two documented hardware buttons.
 
-    The adapter deliberately reads only the identity/mode registers and the
-    calculated battery percentage. It never changes charging, RTC, shutdown or
-    any other controller state.
+    Telemetry and the power-button level remain read-only.  The custom button's
+    latched tap event is acknowledged through the vendor-documented tap
+    register sequence; charging, RTC, watchdog and shutdown state are untouched.
     """
 
     I2C_SLAVE = 0x0703
     I2C_SMBUS = 0x0720
+    I2C_SMBUS_WRITE = 0
     I2C_SMBUS_READ = 1
     I2C_SMBUS_BYTE_DATA = 2
     ADDRESS = 0x57
@@ -619,6 +620,11 @@ class PiSugar3Telemetry:
     CAPACITY_REGISTER = 0x2A
     STATUS_REGISTER = 0x02
     POWER_BUTTON_MASK = 0x01
+    TAP_REGISTER = 0x08
+    TAP_MASK = 0x03
+    WRITE_ENABLE_REGISTER = 0x0B
+    WRITE_ENABLE_VALUE = 0x29
+    TAP_EVENTS = {1: "single", 2: "double", 3: "long"}
     VERSION_PISUGAR3 = 0x03
     MODE_APPLICATION = 0x0F
     POWER_BUTTON_POLL_SECONDS = 0.02
@@ -629,6 +635,8 @@ class PiSugar3Telemetry:
         self.device = device
         self._lock = threading.Lock()
         self._power_button_callback: Callable[[], object] | None = None
+        self._custom_button_callback: Callable[[str], object] | None = None
+        self._custom_button_initialized = False
         self._power_button_stop = threading.Event()
         self._power_button_thread: threading.Thread | None = None
         self._power_button_available = False
@@ -653,6 +661,41 @@ class PiSugar3Telemetry:
             error = ctypes.get_errno()
             raise OSError(error, os.strerror(error))
         return int(data.byte)
+
+    @classmethod
+    def _write_register(cls, fd: int, register: int, value: int) -> None:
+        """Write one byte through the same SMBus byte-data transaction."""
+
+        data = _I2cSmbusData()
+        data.byte = value & 0xFF
+        request = _I2cSmbusRequest(
+            cls.I2C_SMBUS_WRITE,
+            register,
+            cls.I2C_SMBUS_BYTE_DATA,
+            ctypes.pointer(data),
+        )
+        libc = ctypes.CDLL(None, use_errno=True)
+        ioctl = libc.ioctl
+        ioctl.argtypes = (ctypes.c_int, ctypes.c_ulong, ctypes.c_void_p)
+        ioctl.restype = ctypes.c_int
+        if ioctl(fd, cls.I2C_SMBUS, ctypes.byref(request)) < 0:
+            error = ctypes.get_errno()
+            raise OSError(error, os.strerror(error))
+
+    @classmethod
+    def _consume_custom_button_tap(cls, fd: int) -> str | None:
+        """Return and acknowledge one manufacturer-classified tap event."""
+
+        raw = cls._register(fd, cls.TAP_REGISTER)
+        event = cls.TAP_EVENTS.get(raw & cls.TAP_MASK)
+        if event is None:
+            return None
+        cls._write_register(fd, cls.WRITE_ENABLE_REGISTER, cls.WRITE_ENABLE_VALUE)
+        try:
+            cls._write_register(fd, cls.TAP_REGISTER, raw & ~cls.TAP_MASK)
+        finally:
+            cls._write_register(fd, cls.WRITE_ENABLE_REGISTER, 0)
+        return event
 
     def read(self) -> Mapping[str, Any]:
         try:
@@ -694,7 +737,22 @@ class PiSugar3Telemetry:
         """Emit only a released short press; PiSugar retains every long press."""
 
         self._power_button_callback = callback
-        if callback is None:
+        self._sync_button_monitor()
+
+    def set_custom_button_callback(
+        self, callback: Callable[[str], object] | None
+    ) -> None:
+        """Emit the PiSugar-classified single, double and long tap events."""
+
+        self._custom_button_callback = callback
+        self._custom_button_initialized = False
+        self._sync_button_monitor()
+
+    def _sync_button_monitor(self) -> None:
+        if (
+            self._power_button_callback is None
+            and self._custom_button_callback is None
+        ):
             self._stop_power_button_monitor()
             return
         thread = self._power_button_thread
@@ -702,8 +760,8 @@ class PiSugar3Telemetry:
             return
         self._power_button_stop.clear()
         self._power_button_thread = threading.Thread(
-            target=self._monitor_power_button,
-            name="openr4d10-pisugar-power-button",
+            target=self._monitor_buttons,
+            name="openr4d10-pisugar-buttons",
             daemon=True,
         )
         self._power_button_thread.start()
@@ -746,8 +804,8 @@ class PiSugar3Telemetry:
         self._power_button_last_state = False
         self._power_button_pressed_at = None
 
-    def _monitor_power_button(self) -> None:
-        """Read the documented PiSugar 3 power-button bit without any writes."""
+    def _monitor_buttons(self) -> None:
+        """Monitor the power level and consume classified custom-button taps."""
 
         pin_current_thread_to_input_core()
         try:
@@ -772,27 +830,48 @@ class PiSugar3Telemetry:
                         self._register(fd, self.STATUS_REGISTER)
                         & self.POWER_BUTTON_MASK
                     )
+                    if self._custom_button_callback is not None:
+                        # Discard a stale event from before this monitor started.
+                        self._consume_custom_button_tap(fd)
+                        self._custom_button_initialized = True
                 self._reset_power_button_state()
                 self._observe_power_button(pressed, time.monotonic())
 
                 while not self._power_button_stop.wait(
                     self.POWER_BUTTON_POLL_SECONDS
                 ):
+                    tap: str | None = None
                     with self._lock:
                         pressed = bool(
                             self._register(fd, self.STATUS_REGISTER)
                             & self.POWER_BUTTON_MASK
                         )
+                        if self._custom_button_callback is not None:
+                            pending_tap = self._consume_custom_button_tap(fd)
+                            if self._custom_button_initialized:
+                                tap = pending_tap
+                            else:
+                                # A callback attached after the monitor opened
+                                # must not replay a previously latched gesture.
+                                self._custom_button_initialized = True
                     if not self._observe_power_button(pressed, time.monotonic()):
-                        continue
-                    callback = self._power_button_callback
+                        callback = None
+                    else:
+                        callback = self._power_button_callback
                     if callback is not None:
                         try:
                             callback()
                         except Exception:
                             LOG.exception("PiSugar power-button input failed")
+                    custom_callback = self._custom_button_callback
+                    if tap is not None and custom_callback is not None:
+                        try:
+                            custom_callback(tap)
+                        except Exception:
+                            LOG.exception("PiSugar custom-button input failed")
             except (AdapterError, OSError):
                 self._reset_power_button_state()
+                self._custom_button_initialized = False
                 self._power_button_stop.wait(self.POWER_BUTTON_RETRY_SECONDS)
             finally:
                 if fd is not None:
@@ -805,9 +884,11 @@ class PiSugar3Telemetry:
             thread.join(timeout=0.5)
         self._power_button_thread = None
         self._reset_power_button_state()
+        self._custom_button_initialized = False
 
     def close(self) -> None:
         self._power_button_callback = None
+        self._custom_button_callback = None
         self._stop_power_button_monitor()
 
 

@@ -52,6 +52,9 @@ OpenR4d10 folgt in jedem Dienst demselben Grundmuster:
 | Whisplay-Hardwaretaste | PTT-Kontext; in Menüs immer zurück | `Backspace` halten |
 | PiSugar-Powertaste, kurz | globales Hauptmenü | Leertaste |
 | PiSugar-Powertaste, lang | PiSugar schaltet das Gerät aus | keine Simulation |
+| PiSugar-Custom, einmal | oberes rechtes Drehen: nächster Kanal/Eintrag | Pfeil runter |
+| PiSugar-Custom, doppelt | rechter Encoder-Druck: auswählen/Play/Pause | `Enter` |
+| PiSugar-Custom, lang | unteres rechtes Drehen: nächster Dienst | Pfeil rechts |
 
 Die Begriffe *außen* und *innen* beziehen sich auf die beiden koaxialen
 Drehachsen jedes Doppelencoders, nicht auf zwei getrennte Knöpfe. Im Display
@@ -65,6 +68,8 @@ ergibt; die sichtbaren Kürzel müssen diese Abweichung sofort zeigen.
 - eine Whisplay-Hardwaretaste auf BCM17 – das ist immer die mit **PTT**
   bezeichnete Taste;
 - eine PiSugar-3-Powertaste für Hauptmenü und Ausschalten;
+- einen PiSugar-3-Custom-Taster als Ein-Tasten-Ersatz für Kanal vor,
+  rechten Encoder-Druck und Dienst vor;
 - 240 × 280 Pixel Whisplay-LCD mit regelbarer Hintergrundbeleuchtung;
 - zwei Whisplay-Mikrofone;
 - ein eingebauter 8-Ohm-/1-W-Lautsprecher;

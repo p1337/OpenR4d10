@@ -242,6 +242,10 @@ Der globale Hauptmenüzugang liegt auf einem kurzen Druck der separaten
 PiSugar-3-Powertaste. Ein langer Druck wird von OpenR4d10 vollständig ignoriert
 und bleibt der PiSugar-Ein-/Ausschaltlogik vorbehalten. Die physische
 Whisplay-Taste bleibt ausschließlich die kontextabhängige Hardware-PTT-Taste.
+Der separate PiSugar-Custom-Taster bildet drei bereits vom PiSugar klassifizierte
+Gesten auf vorhandene Eingaben ab: einmal kurz ist `right_outer +1` (oberes
+rechtes Drehen/Kanal vor), doppelt ist `right_press`, lang ist `right_inner +1`
+(unteres rechtes Drehen/Dienst vor).
 
 Die ausgewählte Geräteansicht und der tatsächlich laufende Audioplayer sind
 zwei getrennte Zustände. Das Drehen des Dienstreglers navigiert ausschließlich
@@ -3792,6 +3796,22 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Einstellungsbelegung und bleibt bewusst frei. Rechter Druck bleibt
   Auswahl/Play beziehungsweise langes Quick-Menü; die Whisplay-Hardwaretaste
   bleibt PTT.
+
+### 2026-11-01 – PiSugar-Custom-Taster ersetzt drei rechte Bediengesten
+
+- Der „andere“ kleine PiSugar-Taster ist der vom Hersteller bezeichnete
+  Custom-/Tap-Taster, nicht Power, Reset oder die Whisplay-PTT-Taste.
+- Einmal kurz drücken entspricht exakt einer positiven Rastung des oberen
+  rechten Kanal-/Listeneingangs (`right_outer +1`). Doppelklick entspricht dem
+  Druck auf den rechten Encoder (`right_press`). Langes Drücken entspricht
+  exakt einer positiven Rastung des unteren rechten Diensteingangs
+  (`right_inner +1`). Es entstehen keine parallelen Navigationsregeln.
+- PiSugar 3 klassifiziert diese drei Gesten selbst in Register `0x08` als
+  Single=1, Double=2 und Long=3. OpenR4d10 liest das verriegelte Ereignis auf
+  dem bestehenden Eingabekern und quittiert ausschließlich dessen zwei
+  Ereignisbits mit der Herstellersequenz über Write-Enable-Register `0x0B`.
+  Lade-, RTC-, Watchdog-, Shutdown- und Powerzustand bleiben unverändert; ein
+  PiSugar-Webserver oder Shell-Hook wird dafür nicht installiert.
 
 ### 2026-11-01 – Einheitliches Bedienhandbuch und Hardwaregrafiken
 

@@ -341,7 +341,7 @@ stereo capture and encoding path; a supervised left/right capsule tap test is
 still required before treating the physical capsule-to-channel order as an
 independent hardware measurement.
 
-## PiSugar 3 percentage telemetry and power button
+## PiSugar 3 percentage telemetry and buttons
 
 The physically reported pack is the 1200-mAh PiSugar 3 for the Pi Zero family.
 The official
@@ -383,9 +383,19 @@ The resulting default input contract is:
 
 - PiSugar power button, short press: open the global main menu;
 - PiSugar power button, long hold: no OpenR4d10 action; PiSugar retains power control;
+- PiSugar Custom button, single tap: one positive `right_outer` step (next channel/list entry);
+- PiSugar Custom button, double tap: `right_press` (select/play/pause);
+- PiSugar Custom button, long tap: one positive `right_inner` step (next service);
 - Whisplay BCM17 button: physical PTT;
 - left encoder press: deliberately unassigned for later service use;
 - right encoder press: select/play, with its existing long-press quick menu.
+
+The manufacturer classifies Custom-button taps in register `0x08` (`1` single,
+`2` double, `3` long). OpenR4d10 reads that latched value on the existing input
+thread and acknowledges only its low two event bits through the documented
+`0x0B = 0x29` write-enable sequence before returning `0x0B` to zero. This is
+the sole PiSugar controller write in the input adapter. It does not configure a
+shell action and never changes charging, RTC, watchdog, shutdown or power state.
 
 ## Still deliberately unknown
 

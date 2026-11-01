@@ -11,6 +11,60 @@ from openr4d10.input_events import Control, InputEvent
 
 
 class AppTests(unittest.TestCase):
+    def test_pisugar_custom_button_reuses_the_right_encoder_events(self) -> None:
+        class InputDisplay:
+            def apply_input(self, _event):
+                return {}
+
+            def render(self, _frame):
+                pass
+
+        class Power:
+            def __init__(self):
+                self.custom_callback = None
+
+            def set_custom_button_callback(self, callback):
+                self.custom_callback = callback
+
+            def read(self):
+                return {"state": "ready", "battery_percent": 80}
+
+            def close(self):
+                pass
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            display = InputDisplay()
+            power = Power()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=display,  # type: ignore[arg-type]
+                power=power,  # type: ignore[arg-type]
+                receiver=UnconfiguredTelemetry("receiver"),
+            )
+            self.assertIsNotNone(power.custom_callback)
+            with patch.object(app, "_apply_hardware_input", return_value={}) as apply:
+                power.custom_callback("single")
+                power.custom_callback("double")
+                power.custom_callback("long")
+            self.assertEqual(
+                [entry.args[0] for entry in apply.call_args_list],
+                [
+                    InputEvent(Control.RIGHT_OUTER, steps=1),
+                    InputEvent(Control.RIGHT_PRESS),
+                    InputEvent(Control.RIGHT_INNER, steps=1),
+                ],
+            )
+            app.close()
+
     def test_pisugar_short_power_button_opens_main_menu(self) -> None:
         class InputDisplay:
             def __init__(self):

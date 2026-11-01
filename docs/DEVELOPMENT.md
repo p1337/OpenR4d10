@@ -482,8 +482,12 @@ implementation until the existing adapter boundary has been evaluated first.
 PiSugar 3 power-button tests must preserve the read-only status-register
 contract: an initial level creates no event, a released press up to 0.6 seconds
 creates exactly one logical `HOME`, and every longer hold plus its release
-creates none. No test or implementation may enable watchdog, soft shutdown or
-write a PiSugar register as a side effect of menu input.
+creates none. Custom-button tests must preserve the manufacturer's `0x08` tap
+codes and map single/double/long to `RIGHT_OUTER +1`, `RIGHT_PRESS`, and
+`RIGHT_INNER +1`. Only acknowledgement of those two tap bits may use the
+documented temporary write-enable sequence. No test or implementation may
+enable watchdog, soft shutdown or change another PiSugar register as a side
+effect of input.
 # DMR boot and Mediathek device regression rules
 
 Tests must fail if the real `run` path calls

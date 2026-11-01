@@ -112,11 +112,26 @@ class OpenR4d10App:
         power_button_setter = getattr(self.power, "set_power_button_callback", None)
         if callable(power_button_setter):
             power_button_setter(self._apply_power_button_short)
+        custom_button_setter = getattr(self.power, "set_custom_button_callback", None)
+        if callable(custom_button_setter):
+            custom_button_setter(self._apply_custom_button_tap)
 
     def _apply_power_button_short(self) -> dict[str, object]:
         """Route one released PiSugar short press to the global main menu."""
 
         return self._apply_hardware_input(InputEvent(Control.HOME))
+
+    def _apply_custom_button_tap(self, tap: str) -> dict[str, object]:
+        """Map the PiSugar custom button onto the existing right controls."""
+
+        event = {
+            "single": InputEvent(Control.RIGHT_OUTER, steps=1),
+            "double": InputEvent(Control.RIGHT_PRESS),
+            "long": InputEvent(Control.RIGHT_INNER, steps=1),
+        }.get(tap)
+        if event is None:
+            return {}
+        return self._apply_hardware_input(event)
 
     def _apply_hardware_input(self, event: InputEvent) -> dict[str, object]:
         """Route physical controls through the same serialized application path."""
@@ -1301,6 +1316,9 @@ class OpenR4d10App:
         power_button_setter = getattr(self.power, "set_power_button_callback", None)
         if callable(power_button_setter):
             power_button_setter(None)
+        custom_button_setter = getattr(self.power, "set_custom_button_callback", None)
+        if callable(custom_button_setter):
+            custom_button_setter(None)
         close_power = getattr(self.power, "close", None)
         if callable(close_power):
             close_power()

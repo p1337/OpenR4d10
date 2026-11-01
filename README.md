@@ -39,6 +39,9 @@ the installer report exactly which adapters still need configuration.
 - read-only PiSugar 3 power-button input: one complete short press opens the
   main menu, while a press held beyond 0.6 seconds is discarded by OpenR4d10
   and remains exclusively under the PiSugar power controller
+- PiSugar 3 Custom button through the manufacturer's classified tap register:
+  single tap advances the upper-right channel/list control, double tap performs
+  the right encoder press, and long tap advances the lower-right service control
 - native 240 x 280 physical UI with the agreed four-axis encoder layout
 - real Whisplay button on physical pin 11 / BCM17 routed to the logical PTT and
   menu-back path with active-high debouncing
@@ -296,6 +299,13 @@ in status register `0x02`. It emits Home after a released press of at most
 0.6 seconds; longer holds produce no application event and therefore retain
 the PiSugar's normal power-off behavior. It never changes watchdog or
 controller configuration.
+
+The same monitor consumes the PiSugar 3 Custom button's already classified tap
+event from manufacturer register `0x08`: single, double and long map to one
+positive `right_outer` step, `right_press`, and one positive `right_inner` step
+respectively. Only the two event bits are acknowledged with the manufacturer's
+write-enable sequence; charging, RTC, watchdog, shutdown and power-button state
+remain untouched. No PiSugar web service or shell action is installed.
 
 The **Einstellungen → Display** panel changes the physical Whisplay backlight
 immediately from 0 through 100 percent. The value is stored in the existing

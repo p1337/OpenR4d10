@@ -115,6 +115,74 @@ class AdapterTests(unittest.TestCase):
         raw_write.assert_not_called()
         raw_read.assert_not_called()
 
+    def test_pisugar3_custom_button_consumes_vendor_tap_codes(self) -> None:
+        expected = {1: "single", 2: "double", 3: "long"}
+        for raw, event in expected.items():
+            with (
+                self.subTest(raw=raw),
+                patch.object(PiSugar3Telemetry, "_register", return_value=raw),
+                patch.object(PiSugar3Telemetry, "_write_register") as write,
+            ):
+                self.assertEqual(
+                    PiSugar3Telemetry._consume_custom_button_tap(17), event
+                )
+                self.assertEqual(
+                    write.call_args_list,
+                    [
+                        unittest.mock.call(17, 0x0B, 0x29),
+                        unittest.mock.call(17, 0x08, 0),
+                        unittest.mock.call(17, 0x0B, 0),
+                    ],
+                )
+
+    def test_pisugar3_write_register_uses_smbus_byte_data(self) -> None:
+        calls: list[tuple[int, int, int, int, int, int]] = []
+
+        class FakeIoctl:
+            argtypes = None
+            restype = None
+
+            def __call__(self, fd: int, operation: int, pointer: object) -> int:
+                request = pointer._obj  # type: ignore[attr-defined]
+                calls.append(
+                    (
+                        fd,
+                        operation,
+                        request.read_write,
+                        request.command,
+                        request.size,
+                        request.data.contents.byte,
+                    )
+                )
+                return 0
+
+        with patch(
+            "openr4d10.adapters.ctypes.CDLL",
+            return_value=SimpleNamespace(ioctl=FakeIoctl()),
+        ):
+            PiSugar3Telemetry._write_register(17, 0x08, 0xFC)
+        self.assertEqual(
+            calls,
+            [
+                (
+                    17,
+                    PiSugar3Telemetry.I2C_SMBUS,
+                    PiSugar3Telemetry.I2C_SMBUS_WRITE,
+                    0x08,
+                    PiSugar3Telemetry.I2C_SMBUS_BYTE_DATA,
+                    0xFC,
+                )
+            ],
+        )
+
+    def test_pisugar3_custom_button_does_not_write_without_an_event(self) -> None:
+        with (
+            patch.object(PiSugar3Telemetry, "_register", return_value=0),
+            patch.object(PiSugar3Telemetry, "_write_register") as write,
+        ):
+            self.assertIsNone(PiSugar3Telemetry._consume_custom_button_tap(17))
+        write.assert_not_called()
+
     def test_pisugar3_rejects_an_unverified_device_identity(self) -> None:
         with (
             patch.dict(sys.modules, {"fcntl": SimpleNamespace(ioctl=Mock())}),
