@@ -422,6 +422,10 @@ alias and G.711 µ-law packet shapes. Browser controls and physical encoder
 events mutate the same SQLite rows. A separate bounded daily cache of the
 official public talkgroup-name endpoint supplies search metadata without
 placing thousands of catalog rows into every status snapshot.
+The right-docked menu-back badge owns its central interior through the physical
+panel edge. DMR country and replacement position counters are aligned to a
+separate right edge at x=178, as is the Ambient layer counter, so list metadata
+can never be composited over the filled back-arrow glyph.
 The application measures the DMR PTT press centrally: release before two
 seconds toggles the selected TG, while one cancellable timer opens the country
 filter over the cached catalog exactly at the two-second threshold without

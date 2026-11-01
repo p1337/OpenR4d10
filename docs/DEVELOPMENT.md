@@ -57,6 +57,10 @@ require the mirrored right-side order and one common right label edge. The
 VoiceRecorder additionally uses `MIN/MAX` for its boundary axis and one fixed
 x=90 value column for both yellow left-axis values; tests measure a minimum
 six-pixel clearance from each label.
+DMR country and replacement menu tests compare the central x=198..239,
+y=70..93 back-badge crop with the generic menu badge. This pixel comparison
+must remain identical even when a list position such as `1/5` is visible;
+checking only that the counter text was emitted cannot detect an overlap.
 
 Recorder performance regressions must prove that a PTT press/release does not
 call the normal display snapshot, `apply_input()` redraw or `render_once()`

@@ -9,7 +9,7 @@ import time
 import unittest
 from unittest.mock import Mock, call, patch
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageChops, ImageDraw
 
 from openr4d10 import adapters
 from openr4d10.adapters import WhisplayDisplay
@@ -350,6 +350,17 @@ class DeviceUiTests(unittest.TestCase):
         self.assertIn("LÄNDER", drawn)
         self.assertIn("Deutschland", drawn)
         self.assertIn("2/8", drawn)
+        generic_menu = render_device_ui(
+            DeviceUiState(menu_open=True, menu_kind="main_menu", language="de")
+        )
+        country_menu = render_device_ui(state)
+        back_badge = (198, 70, 240, 94)
+        self.assertIsNone(
+            ImageChops.difference(
+                generic_menu.crop(back_badge),
+                country_menu.crop(back_badge),
+            ).getbbox()
+        )
 
         state.update_from_frame(
             Frame(
@@ -379,6 +390,13 @@ class DeviceUiTests(unittest.TestCase):
         self.assertIn("TG ERSETZEN?", drawn)
         self.assertIn("TG 91  Worldwide", drawn)
         self.assertIn("1/5", drawn)
+        replacement_menu = render_device_ui(state)
+        self.assertIsNone(
+            ImageChops.difference(
+                generic_menu.crop(back_badge),
+                replacement_menu.crop(back_badge),
+            ).getbbox()
+        )
 
     def test_date_and_redundant_player_text_are_not_rendered(self) -> None:
         first = DeviceUiState(

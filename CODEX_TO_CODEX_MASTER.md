@@ -3400,3 +3400,14 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 - Timer, Hardwaretaste und Browser-Simulation laufen weiterhin durch denselben
   serialisierten Eingabepfad. Eine zweite GPIO-Auswertung oder ein paralleler
   DMR-Menüzustand ist verboten.
+
+### 2026-11-01 – DMR-Menüzähler bleibt außerhalb der Zurück-Taste
+
+- Der Positionszähler einer Menüliste, insbesondere der Ambient-,
+  DMR-Länder- und TG-Ersetzungsliste, darf niemals in das rechts angedockte
+  PTT-Zurück-Tastenfeld hineinragen. Der sichtbare Button enthält im
+  Ruhezustand ausschließlich das gefüllte Pfeil-Icon; `1/5` oder ein anderer
+  Listenzähler gehört vollständig links daneben.
+- Die zentrale Innenfläche des Zurück-Tastenfelds samt Pfeil wird gegen beide
+  DMR-Menütypen getestet. Eine rein textuelle Inhaltsprüfung reicht für diese
+  Geometrie-Regression nicht aus.

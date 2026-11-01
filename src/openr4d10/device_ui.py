@@ -23,6 +23,8 @@ MEDIA_MARGIN = 7
 PLAYER_GLOW_STRENGTH = 1.3
 DEFAULT_ACCENT = (253, 184, 19)
 PLAY_GREEN = (54, 209, 126)
+MENU_EDGE_BADGE_LEFT = 188
+MENU_COUNTER_RIGHT = 178
 _RGB565_RED_HIGH = [value & 0xF8 for value in range(256)]
 _RGB565_GREEN_HIGH = [value >> 5 for value in range(256)]
 _RGB565_GREEN_LOW = [(value & 0x1C) << 3 for value in range(256)]
@@ -1011,7 +1013,7 @@ def _draw_back_or_ptt(
     ptt_active: bool,
     content_top: int,
 ) -> None:
-    badge_left = 188
+    badge_left = MENU_EDGE_BADGE_LEFT
     badge_top = content_top + 5
     badge_right = WIDTH + 8
     badge_bottom = badge_top + 30
@@ -1224,7 +1226,12 @@ def _draw_ambient_layers(
         else "--"
     )
     count_width = draw.textbbox((0, 0), count, font=count_font)[2]
-    draw.text((224 - count_width, content_top + 14), count, font=count_font, fill=state.accent)
+    draw.text(
+        (MENU_COUNTER_RIGHT - count_width, content_top + 14),
+        count,
+        font=count_font,
+        fill=state.accent,
+    )
     row_top = content_top + 35
     name_font = _font(11, bold=True)
     state_font = _font(8, bold=True)
@@ -1274,7 +1281,12 @@ def _draw_dmr_countries(
         else "--"
     )
     count_width = draw.textbbox((0, 0), count, font=count_font)[2]
-    draw.text((224 - count_width, content_top + 14), count, font=count_font, fill=state.accent)
+    draw.text(
+        (MENU_COUNTER_RIGHT - count_width, content_top + 14),
+        count,
+        font=count_font,
+        fill=state.accent,
+    )
     name_font = _font(12, bold=True)
     code_font = _font(9, bold=True)
     for index, item in enumerate(state.dmr_country_rows[:5]):
@@ -1307,7 +1319,12 @@ def _draw_dmr_replacements(
         else "--"
     )
     count_width = draw.textbbox((0, 0), count, font=count_font)[2]
-    draw.text((224 - count_width, content_top + 14), count, font=count_font, fill=state.accent)
+    draw.text(
+        (MENU_COUNTER_RIGHT - count_width, content_top + 14),
+        count,
+        font=count_font,
+        fill=state.accent,
+    )
     name_font = _font(10, bold=True)
     detail_font = _font(8, bold=True)
     for index, item in enumerate(state.dmr_replacement_rows[:5]):
