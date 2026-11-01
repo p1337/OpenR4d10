@@ -3123,6 +3123,10 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Wellenformelementen gezeichnet und liegt dadurch sichtbar über der Spur.
   Nach dem Pausieren steht er an der tatsächlichen Aufnahme-/Cursorposition;
   der rechte Druck kann die Wiedergabe genau dort starten.
+- Während echter Recorder-Wiedergabe ist der zentrale Glow grün und der weiße
+  Playhead folgt der von mpv gemeldeten Audioposition im flüssigen Recorder-
+  Takt. Pausieren hält ihn an der exakten Position; eine bloß angenommene oder
+  nur optisch weiterlaufende Zeit ist unzulässig.
 - Während der Recorder sichtbar ist, wird die Timeline flüssig in einem
   eigenen begrenzten Takt aktualisiert. Audioaufnahme und beide PTT-Flanken
   haben dennoch absolute Priorität vor Vollbild-SPI, Telemetrie, Netz- und

@@ -1361,6 +1361,27 @@ class ServiceCatalogTests(unittest.TestCase):
             finally:
                 catalog.close()
 
+    def test_voice_playback_sync_moves_the_recorder_playhead(self) -> None:
+        class Player:
+            def position_seconds(self):
+                return 2.375
+
+        class Recorder:
+            def __init__(self) -> None:
+                self.positions = []
+
+            def voice_set_position(self, position_ms):
+                self.positions.append(position_ms)
+
+        catalog = object.__new__(ServiceCatalog)
+        catalog.player = Player()  # type: ignore[assignment]
+        catalog.recorder = Recorder()  # type: ignore[assignment]
+        catalog._voice_playback_active = True
+
+        catalog._sync_voice_playback_position()
+
+        self.assertEqual(catalog.recorder.positions, [2375])  # type: ignore[attr-defined]
+
     def test_voice_recorder_open_stops_playback_and_uses_one_resumable_session(self) -> None:
         class State:
             volume = 30

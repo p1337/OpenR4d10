@@ -286,6 +286,9 @@ cached telemetry. Network, SSID and power reads are excluded from those fast
 frames. The playhead is a white two-pixel overlay drawn after every stereo bar,
 so it remains visible at the live end and at a paused seek position. Segment
 duration is probed from the closed audio file instead of trusting wall time.
+During recorder playback the 5 Hz overlay reads mpv's actual absolute position,
+moves that same playhead and uses the central green audio-active glow; pausing
+leaves the cursor at the last reported position.
 
 On the verified four-core Pi Zero 2 W, CPU affinity gives background work
 (including ffmpeg/mpv and the level parser) cores 0–1, native UI/SPI core 2 and
