@@ -3560,3 +3560,23 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Cache, Bandbreite, Fehlerfälle und die bestehende Eingabe-/Audioleistung.
   Freigabe und Pi-Update bleiben an den vollständig grünen GitHub-Lauf des
   exakten Commits gebunden.
+
+### 2026-11-01 – Gerätefokus und Kanalbedienung nach Mediathek-Play
+
+- Ein ausdrückliches `Auf Gerät abspielen` ist neben der Audioübernahme auch
+  eine eindeutige Geräteaktion: Nach erfolgreichem Laden wechselt die native
+  Whisplay-Ansicht sofort in die vorhandene `PLAYER`-Ansicht und zeigt Sender,
+  Titel, Ergebnisposition und Wiedergabestatus. Sie darf nicht in der zuvor
+  sichtbaren DMR- oder Wetteransicht verbleiben. Bloßes Suchen, Filtern,
+  Markieren oder `Im Browser ansehen` verändert die Geräteansicht weiterhin
+  nicht.
+- Solange eine Mediathekfolge den zentralen Player besitzt und `PLAYER`
+  sichtbar ist, schaltet der rechte äußere Encoder beziehungsweise Pfeil
+  hoch/runter zyklisch durch genau die Ergebnisliste und Suchauswahl, aus der
+  die laufende Folge gestartet wurde. Der neu gewählte Beitrag wird unmittelbar
+  über denselben `MpvEngine` geladen; es entsteht kein zweiter Player und keine
+  zweite Ergebnisliste.
+- Ein kurzer rechter Druck beziehungsweise Enter pausiert oder setzt die reale
+  Mediathek-Wiedergabe fort. Die Geräte-Kanalnummer entspricht der sichtbaren
+  einsbasierten Position in der aktiven Ergebnisliste. Die Bedienung muss
+  weiterhin über denselben serialisierten Eingabe- und Ein-Frame-Pfad laufen.

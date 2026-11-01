@@ -610,19 +610,48 @@ class ServiceCatalogTests(unittest.TestCase):
                 from openr4d10.content import MediathekEntry
 
                 self.request = (provider, query)
-                return [MediathekEntry(
-                    item_id="0123456789abcdef01234567",
-                    provider="ARD",
-                    service_id="ard_mediathek",
-                    channel="ARD",
-                    topic="Wissen",
-                    title="Der Test",
-                    description="Öffentlicher Beitrag",
-                    duration_seconds=600,
-                    timestamp=1793520000,
-                    source_url="https://media.example.test/video.mp4",
-                    website_url="https://www.ardmediathek.de/video/test",
-                )]
+                if query == "Neu":
+                    return [MediathekEntry(
+                        item_id="fedcba9876543210fedcba98",
+                        provider="ARD",
+                        service_id="ard_mediathek",
+                        channel="ARD",
+                        topic="Neu",
+                        title="Neue andere Suche",
+                        description="Darf die laufende Ergebnisliste nicht ersetzen",
+                        duration_seconds=300,
+                        timestamp=1793530000,
+                        source_url="https://media.example.test/new-search.mp4",
+                        website_url="https://www.ardmediathek.de/video/new-search",
+                    )]
+                return [
+                    MediathekEntry(
+                        item_id="0123456789abcdef01234567",
+                        provider="ARD",
+                        service_id="ard_mediathek",
+                        channel="ARD",
+                        topic="Wissen",
+                        title="Der Test",
+                        description="Öffentlicher Beitrag",
+                        duration_seconds=600,
+                        timestamp=1793520000,
+                        source_url="https://media.example.test/video.mp4",
+                        website_url="https://www.ardmediathek.de/video/test",
+                    ),
+                    MediathekEntry(
+                        item_id="89abcdef0123456789abcdef",
+                        provider="ARD",
+                        service_id="ard_mediathek",
+                        channel="ARD",
+                        topic="Wissen",
+                        title="Der zweite Test",
+                        description="Zweiter öffentlicher Beitrag",
+                        duration_seconds=900,
+                        timestamp=1793510000,
+                        source_url="https://media.example.test/video-2.mp4",
+                        website_url="https://www.ardmediathek.de/video/test-2",
+                    ),
+                ]
 
         with tempfile.TemporaryDirectory() as raw:
             player = Player()
@@ -641,7 +670,7 @@ class ServiceCatalogTests(unittest.TestCase):
                 })
                 snapshot = catalog.snapshot()
                 item = snapshot["mediathek"]["providers"]["ard"]["results"][0]
-                self.assertEqual(result["result_count"], 1)
+                self.assertEqual(result["result_count"], 2)
                 self.assertNotIn("source_url", item)
                 self.assertNotIn("website_url", item)
                 self.assertIn("all", snapshot["mediathek"]["providers"])
@@ -664,6 +693,17 @@ class ServiceCatalogTests(unittest.TestCase):
                 self.assertEqual(player.loaded, "https://media.example.test/video.mp4")
                 self.assertEqual(playing["active_service"], "ard_mediathek")
                 self.assertEqual(playing["mediathek"]["active_item"]["title"], "Der Test")
+                self.assertEqual(playing["mediathek"]["active_provider"], "ard")
+                self.assertEqual(catalog.receiver_overlay("PLAYER")["channel"], 1)
+                catalog.control({
+                    "action": "mediathek_search",
+                    "provider": "ard",
+                    "query": "Neu",
+                })
+                stepped = catalog.control({"action": "mediathek_step", "steps": 1})
+                self.assertEqual(stepped["item_id"], "89abcdef0123456789abcdef")
+                self.assertEqual(player.loaded, "https://media.example.test/video-2.mp4")
+                self.assertEqual(catalog.receiver_overlay("PLAYER")["channel"], 2)
                 service_states = {entry["service_id"]: entry for entry in playing["items"]}
                 self.assertEqual(service_states["ard_mediathek"]["readiness"], "ready")
                 self.assertEqual(service_states["zdf_mediathek"]["readiness"], "ready")

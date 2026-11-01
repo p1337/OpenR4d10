@@ -237,6 +237,8 @@ class ServiceCatalog:
         self._mediathek_selected: dict[str, str | None] = {
             provider_id: None for provider_id in mediathek_provider_ids
         }
+        self._active_mediathek_provider: str | None = None
+        self._active_mediathek_results: tuple[MediathekEntry, ...] = ()
         self._active_mediathek_item: dict[str, object] | None = None
         external_ids = {
             item.service_id
@@ -1725,6 +1727,11 @@ class ServiceCatalog:
                 "providers": mediathek_providers,
                 "provider_catalog": MediathekCatalog.providers(),
                 "collections": MediathekCatalog.collections(),
+                "active_provider": (
+                    self._active_mediathek_provider
+                    if self.active_service in MEDIATHEK_SERVICE_IDS
+                    else None
+                ),
                 "active_item": (
                     self._active_mediathek_item
                     if self.active_service in MEDIATHEK_SERVICE_IDS
@@ -2813,24 +2820,52 @@ class ServiceCatalog:
             )
             if item is None:
                 raise ValueError("Mediathek item was not found; search again")
-            service_id = item.service_id
-            self._require_enabled(service_id)
-            source = validate_media_source(item.source_url, (self.media_root,))
-            if self.radio_buffer is not None:
-                self.radio_buffer.stop(flush=True)
-            self._stop_brandmeister_for_audio_owner()
-            self._stop_ambient_layers()
-            self.player.load(source)
-            self.active_service = service_id
-            self.active_preset_id = None
-            self.active_station_id = None
-            self.active_ambient_scene_id = None
-            self._active_podcast_episode = None
-            self._mediathek_selected[provider] = item_id
-            self._active_mediathek_item = item.public()
+            self._play_mediathek_item(
+                provider,
+                item,
+                result_set=self._mediathek_results[provider],
+            )
             return {
                 "provider": provider,
                 "item_id": item_id,
+                "playback": self.player.state.as_dict(),
+            }
+        elif action == "mediathek_step":
+            steps = request.get("steps")
+            if (
+                isinstance(steps, bool)
+                or not isinstance(steps, int)
+                or steps == 0
+                or abs(steps) > 10
+            ):
+                raise ValueError(
+                    "Mediathek steps must be between -10 and 10, excluding zero"
+                )
+            provider = self._active_mediathek_provider
+            active_item = self._active_mediathek_item
+            if (
+                self.active_service not in MEDIATHEK_SERVICE_IDS
+                or provider not in self._mediathek_results
+                or active_item is None
+            ):
+                raise ValueError("no active Mediathek result list")
+            results = self._active_mediathek_results
+            if not results:
+                raise ValueError("the active Mediathek result list is empty")
+            active_item_id = str(active_item.get("item_id") or "")
+            current = next(
+                (
+                    index
+                    for index, candidate in enumerate(results)
+                    if candidate.item_id == active_item_id
+                ),
+                0,
+            )
+            item = results[(current + steps) % len(results)]
+            self._play_mediathek_item(provider, item)
+            return {
+                "provider": provider,
+                "item_id": item.item_id,
                 "playback": self.player.state.as_dict(),
             }
         elif action == "adapter_call":
@@ -3123,6 +3158,50 @@ class ServiceCatalog:
         self.active_station_id = None
         self._active_podcast_episode = None
         self._sync_ambient_layers(restart=True)
+
+    def _play_mediathek_item(
+        self,
+        provider: str,
+        item: MediathekEntry,
+        *,
+        result_set: list[MediathekEntry] | None = None,
+    ) -> None:
+        """Load one cached Mediathek result through the sole audio owner."""
+
+        self._require_enabled(item.service_id)
+        source = validate_media_source(item.source_url, (self.media_root,))
+        if self.radio_buffer is not None:
+            self.radio_buffer.stop(flush=True)
+        self._stop_brandmeister_for_audio_owner()
+        self._stop_ambient_layers()
+        self.player.load(source)
+        self.active_service = item.service_id
+        self.active_preset_id = None
+        self.active_station_id = None
+        self.active_ambient_scene_id = None
+        self._active_podcast_episode = None
+        self._mediathek_selected[provider] = item.item_id
+        self._active_mediathek_provider = provider
+        if result_set is not None:
+            self._active_mediathek_results = tuple(result_set)
+        self._active_mediathek_item = item.public()
+
+    def _active_mediathek_position(self) -> int | None:
+        provider = self._active_mediathek_provider
+        active_item = self._active_mediathek_item
+        if provider not in self._mediathek_results or active_item is None:
+            return None
+        active_item_id = str(active_item.get("item_id") or "")
+        return next(
+            (
+                index
+                for index, item in enumerate(
+                    self._active_mediathek_results, start=1
+                )
+                if item.item_id == active_item_id
+            ),
+            None,
+        )
 
     def _cache_builtin_ambient_audio(self) -> None:
         for preset in AMBIENT_PRESETS:
@@ -3927,6 +4006,8 @@ class ServiceCatalog:
                     None,
                 )
                 if self.active_service == "ambient"
+                else self._active_mediathek_position()
+                if self.active_service in MEDIATHEK_SERVICE_IDS
                 else None
             ),
             "layer_rows": self._ambient_layer_rows() if service_label == "AMBIENT" else [],

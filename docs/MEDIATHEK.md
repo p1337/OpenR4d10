@@ -8,7 +8,14 @@ Sendungen und bietet zwei ausdrücklich getrennte Wiedergabewege:
 - **Im Browser ansehen** verwendet das HTML5-Videoelement des verbundenen
   Browsers.
 - **Auf Gerät abspielen** übergibt eine bandbreitenärmere verfügbare Fassung an
-  den einen zentralen `MpvEngine`; das Whisplay zeigt Sender, Titel und Status.
+  den einen zentralen `MpvEngine`; das Whisplay wechselt nach erfolgreichem
+  Start in `PLAYER` und zeigt Sender, Titel, Ergebnisposition und Status.
+
+In dieser Geräteansicht schaltet der rechte äußere Encoder beziehungsweise
+Pfeil hoch/runter zyklisch durch die Ergebnisse derselben Suche und startet den
+gewählten Beitrag unmittelbar. Der rechte Druck beziehungsweise Enter
+pausiert oder setzt die reale Wiedergabe fort. Katalogsuche, Auswahl und
+**Im Browser ansehen** verändern die Geräteansicht nicht.
 
 Das SPI-Display spielt noch kein bewegtes Video. Diese Grenze bleibt bestehen,
 bis Dekodierung, Audio-Synchronität, 10-FPS-Ausgabe und Eingabelatenz auf dem

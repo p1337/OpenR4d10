@@ -18,7 +18,7 @@ from .cpu_affinity import (
 )
 from .input_events import Control, InputEvent
 from .models import Frame
-from .services import ServiceCatalog
+from .services import MEDIATHEK_SERVICE_IDS, ServiceCatalog
 from .updates import UpdateController
 from .wifi import WifiRepairController
 from .ui import dashboard_frame
@@ -323,6 +323,14 @@ class OpenR4d10App:
         if request.get("action") != "device_input":
             if self.services is None:
                 raise RuntimeError("service control is unavailable")
+            if request.get("action") == "mediathek_play":
+                with self._device_input_lock:
+                    result = self.services.control(request)
+                    self.render_interaction_once("PLAYER")
+                    snapshot = getattr(self.display, "snapshot", None)
+                    if callable(snapshot):
+                        result["device_ui"] = snapshot()
+                    return result
             return self.services.control(request)
 
         raw_control = request.get("control")
@@ -402,6 +410,9 @@ class OpenR4d10App:
                 "ambient": "AMBIENT",
                 "local_media": "PLAYER",
                 "podcasts": "PLAYER",
+                "ard_mediathek": "PLAYER",
+                "zdf_mediathek": "PLAYER",
+                "public_mediatheken": "PLAYER",
                 "brandmeister": "DMR",
                 "recorder": "REC",
             }.get(getattr(self.services, "active_service", "system"), "SYSTEM")
@@ -573,6 +584,16 @@ class OpenR4d10App:
                 {"action": "brandmeister_step", "steps": event.steps}
             )
         elif (
+            self.services is not None
+            and event.control == Control.RIGHT_OUTER
+            and not menu_open
+            and selected_service == "PLAYER"
+            and self.services.active_service in MEDIATHEK_SERVICE_IDS
+        ):
+            media_result = self.services.control(
+                {"action": "mediathek_step", "steps": event.steps}
+            )
+        elif (
             event.control == Control.RIGHT_PRESS
             and event.held_seconds < 2.0
             and not menu_open
@@ -589,6 +610,11 @@ class OpenR4d10App:
                 action = "brandmeister_toggle"
             elif selected_service == "REC":
                 action = "voice_recorder_play_toggle"
+            elif (
+                selected_service == "PLAYER"
+                and self.services.active_service in MEDIATHEK_SERVICE_IDS
+            ):
+                action = "pause"
             else:
                 action = None
             if action is not None:

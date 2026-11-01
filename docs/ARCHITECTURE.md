@@ -86,6 +86,12 @@ loaded audio source. Periodic rendering requests a view-specific overlay and
 must never copy the audio owner back into the service selector. Weather open,
 step and refresh operations update only weather selection/cache state. A new
 audio source replaces the old one only through an explicit play operation.
+The explicit Mediathek `Play on device` command is also a deliberate device
+focus request: after the central player accepts the source, the application
+renders one resolved `PLAYER` frame. Search, selection and browser-only video
+remain presentation-neutral. While that Mediathek source owns the player,
+`right_outer` cycles and immediately loads entries from the same cached result
+set, and `right_press` uses the existing real pause path.
 
 The same router maps each `left_outer` detent to a bounded ten-percentage-point
 change of the real mpv volume and `right_outer` to cyclic selection in the
@@ -417,7 +423,10 @@ topic, title, description, duration and timestamp. Explicit device Play resolves
 that opaque id into the central `MpvEngine`. The local browser-video route
 accepts only the same cached ID and returns a no-store redirect instead of
 proxying media through the Pi. Search, provider switching, selection and browser
-video do not change device audio ownership. See `MEDIATHEK.md`.
+video do not change device audio ownership or device focus. Explicit device
+play stores the originating provider/result identity, focuses `PLAYER` and
+exposes the one-based result position so physical/browser channel input can
+cycle the same bounded list. See `MEDIATHEK.md`.
 
 AmbientR4D10 stores its ordered scene library in the existing generic
 `channels` table under the `ambient` service ID. Built-in definitions in

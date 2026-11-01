@@ -893,6 +893,99 @@ class AppTests(unittest.TestCase):
         self.assertEqual(services.requests, [])
         self.assertEqual(services.overlay_views, ["WEATHER"])
 
+    def test_web_mediathek_play_focuses_player_and_device_controls_same_results(self) -> None:
+        class InputDisplay:
+            def __init__(self) -> None:
+                self.service = "DMR"
+
+            def render(self, frame) -> None:
+                receiver = frame.fields.get("receiver", {})
+                self.service = str(receiver.get("service") or self.service)
+
+            def snapshot(self):
+                return {"service": self.service, "menu_open": False}
+
+            def apply_input(self, _event):
+                return self.snapshot()
+
+        class Services:
+            active_service = "brandmeister"
+
+            def __init__(self) -> None:
+                self.requests = []
+
+            def control(self, request):
+                self.requests.append(request)
+                if request["action"] in {"mediathek_play", "mediathek_step"}:
+                    self.active_service = "public_mediatheken"
+                return {
+                    "playback": {"state": "playing", "paused": False},
+                    "provider": "all",
+                    "item_id": "0123456789abcdef01234567",
+                }
+
+            def receiver_overlay(self, view_service=None):
+                return {
+                    "service": view_service,
+                    "station": "ARD-alpha",
+                    "title": "Warum fällt der Mond nicht auf die Erde?",
+                    "playing": True,
+                    "channel": 1,
+                }
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            display = InputDisplay()
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=display,  # type: ignore[arg-type]
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,  # type: ignore[arg-type]
+            )
+            app._last_receiver_telemetry = {"hostname": "OpenR4d10"}
+            app._last_power_telemetry = {"battery_percent": 90}
+
+            played = app.control({
+                "action": "mediathek_play",
+                "provider": "all",
+                "item_id": "0123456789abcdef01234567",
+            })
+            stepped = app.control({
+                "action": "device_input",
+                "control": "right_outer",
+                "steps": 1,
+            })
+            paused = app.control({
+                "action": "device_input",
+                "control": "right_press",
+            })
+
+        self.assertEqual(played["device_ui"]["service"], "PLAYER")
+        self.assertEqual(stepped["device_ui"]["service"], "PLAYER")
+        self.assertEqual(paused["device_ui"]["service"], "PLAYER")
+        self.assertEqual(
+            services.requests,
+            [
+                {
+                    "action": "mediathek_play",
+                    "provider": "all",
+                    "item_id": "0123456789abcdef01234567",
+                },
+                {"action": "mediathek_step", "steps": 1},
+                {"action": "pause"},
+            ],
+        )
+
     def test_service_navigation_uses_one_resolved_cached_frame(self) -> None:
         class InputDisplay:
             def __init__(self) -> None:

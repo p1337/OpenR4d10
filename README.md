@@ -123,7 +123,8 @@ the installer report exactly which adapters still need configuration.
   ZDFneo, 3sat, ARTE, phoenix, ARD alpha, tagesschau24, ONE, Deutsche Welle
   and the regional ARD broadcasters; current news, Tatort, documentary, science, Terra X and
   Harald-Lesch selections can be watched in the browser or explicitly played
-  through the device audio owner
+  through the device audio owner; device playback focuses `PLAYER`, where the
+  channel control cycles the same result set and the right press pauses/resumes
 - separate AmbientR4D10 audio service with ten license-documented café,
   nature, water, traffic, rain and night soundscapes, endless looping, up to
   two subtle additive sound layers, persistent favorite mixes and a sortable

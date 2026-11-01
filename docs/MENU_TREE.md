@@ -14,6 +14,8 @@ Normalansicht
 │  ├─ Satellit Deutschland
 │  └─ Europa
 ├─ PLAYER
+│  ├─ Mediathek: vorheriger/nächster Suchtreffer (CH / Pfeil hoch-runter)
+│  ├─ Mediathek: Play/Pause (rechter Klick / Enter)
 │  ├─ Aufnahmen
 │  ├─ Favoriten
 │  ├─ Mein Soundmix (Favoriten, Shuffle, Endlosschleife)
@@ -47,3 +49,6 @@ Audio läuft bei einem Wechsel zu einer visuellen Ansicht weiter. Erst `Play`
 auf einer anderen Audioquelle ersetzt die aktuelle Quelle. Die zuletzt
 verwendete sinnvolle Dienstansicht wird gespeichert; `SYSTEM` wird nicht als
 künstliche Medienansicht verwendet.
+
+Ein ausdrückliches **Auf Gerät abspielen** in der Mediathek fokussiert die
+Geräteansicht auf `PLAYER`. Reines Suchen oder Browser-Video tut das nicht.
