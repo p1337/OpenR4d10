@@ -140,6 +140,40 @@ class ProcessBoundaryTests(unittest.TestCase):
             local.close()
             remote.close()
 
+    def test_stale_end_file_cannot_stop_newer_playlist_entry(self) -> None:
+        engine = MpvEngine(Path("/usr/bin/mpv"))
+        engine.state.state = "playing"
+
+        engine._remember_event(
+            {"event": "start-file", "playlist_entry_id": 22}
+        )
+        engine._remember_event(
+            {
+                "event": "end-file",
+                "playlist_entry_id": 21,
+                "reason": "stop",
+            }
+        )
+
+        self.assertEqual(engine.state.state, "playing")
+        self.assertEqual(engine._active_playlist_entry_id, 22)
+        self.assertFalse(
+            any(
+                event.get("playlist_entry_id") == 21
+                for event in engine._events
+            )
+        )
+
+        engine._remember_event(
+            {
+                "event": "end-file",
+                "playlist_entry_id": 22,
+                "reason": "eof",
+            }
+        )
+        self.assertEqual(engine.state.state, "stopped")
+        self.assertIsNone(engine._active_playlist_entry_id)
+
     def test_mpv_network_open_timeout_is_bounded_for_long_ambient_sources(self) -> None:
         self.assertEqual(MPV_IPC_TIMEOUT_SECONDS, 15.0)
         self.assertEqual(MPV_LOCAL_START_TIMEOUT_SECONDS, 1.0)

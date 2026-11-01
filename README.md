@@ -128,6 +128,8 @@ the installer report exactly which adapters still need configuration.
   update at up to 25 FPS, whereas every normal full UI frame remains capped at
   10 FPS; device playback focuses `PLAYER`, where the channel control cycles
   the same result set without changing mode and the right press pauses/resumes
+- generation-safe mpv event handling: a delayed `end-file` from a replaced
+  Mediathek item cannot mark the newer, already running item as stopped
 - separate AmbientR4D10 audio service with ten license-documented café,
   nature, water, traffic, rain and night soundscapes, endless looping, up to
   two subtle additive sound layers, persistent favorite mixes and a sortable

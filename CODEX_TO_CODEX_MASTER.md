@@ -3667,3 +3667,21 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Vertragstest verbietet das syntaktisch naheliegende, auf dem Pi aber fatal
   ungültige `--video=yes`. Diese Zielsyntax ist vor jeder Freigabe zusätzlich
   mit dem wirklich installierten mpv zu prüfen.
+
+### 2026-11-01 – Verspätete mpv-Endereignisse dürfen neue Medien nicht stoppen
+
+- Beim Ersetzen einer bereits laufenden Mediathekquelle kann mpv das
+  `end-file`-Ereignis der alten Playlistposition erst ausliefern, nachdem die
+  neue Position schon gestartet wurde. Dieses verspätete Ereignis darf weder
+  den neuen Python-Wiedergabezustand auf `stopped` setzen noch den 25-FPS-
+  Videopfad abschalten, während Bild und Ton real weiterlaufen.
+- Der zentrale `MpvEngine` verfolgt deshalb die von mpv gelieferten
+  `playlist_entry_id`-Werte aus `start-file` und `end-file`. Nur ein
+  Endereignis der aktuellsten gestarteten Playlistposition darf den sichtbaren
+  Wiedergabezustand beenden; ein Endereignis einer ersetzten älteren Position
+  wird als veraltet verworfen. Für ältere Testdoubles ohne ID bleibt das
+  bisherige Verhalten erhalten.
+- Ein Regressionstest muss die reale Reihenfolge „neuer Start, danach altes
+  Ende“ abbilden und beweisen, dass der neue Stream weiter als `playing`
+  gemeldet wird. Die Abnahme auf dem Pi muss anschließend Status,
+  Bildbewegung und laufende ALSA-Ausgabe gemeinsam prüfen.

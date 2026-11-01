@@ -111,6 +111,7 @@ class MpvEngine:
         self._buffer = b""
         self._events: deque[dict[str, Any]] = deque()
         self._request_id = 0
+        self._active_playlist_entry_id: int | None = None
         self._lock = threading.Lock()
         self._video_capture_lock = threading.Lock()
         self._video_capture_generation = 0
@@ -366,9 +367,26 @@ class MpvEngine:
     def _remember_event(self, event: dict[str, Any]) -> None:
         """Keep asynchronous mpv truth instead of silently discarding it."""
 
-        self._events.append(event)
-        if event.get("event") != "end-file":
+        name = event.get("event")
+        entry_id = event.get("playlist_entry_id")
+        if isinstance(entry_id, bool) or not isinstance(entry_id, int):
+            entry_id = None
+        if name == "start-file":
+            if entry_id is not None:
+                self._active_playlist_entry_id = entry_id
+            self._events.append(event)
             return
+        if name != "end-file":
+            self._events.append(event)
+            return
+        if (
+            entry_id is not None
+            and self._active_playlist_entry_id is not None
+            and entry_id != self._active_playlist_entry_id
+        ):
+            return
+        self._events.append(event)
+        self._active_playlist_entry_id = None
         reason = str(event.get("reason") or "stopped")
         self.state.state = "stopped"
         self.state.paused = False

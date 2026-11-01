@@ -254,6 +254,9 @@ synchronization. The physical renderer asks for a software JPEG screenshot
 asynchronously; this reuses mpv's actual current frame instead of introducing a
 second decoder or synthetic clock. `StreamRecorder` invokes ffmpeg through an argument array with
 `shell=False` semantics and writes 64-kbit/s Opus below the state directory.
+The engine associates asynchronous `start-file` and `end-file` events by mpv's
+`playlist_entry_id`; an end event from a replaced entry cannot overwrite the
+state of the newer entry that is already playing.
 Network URLs are limited to HTTP(S), reject embedded credentials and are
 redacted before appearing in status. Local media must resolve below the
 approved media directory.

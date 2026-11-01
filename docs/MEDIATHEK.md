@@ -40,6 +40,12 @@ Bild. Während Pause bleibt dieses Bild ohne nutzlose Neuzeichnung stehen;
 die ebenfalls asynchronen mpv-Antworten werden begrenzt und nicht blockierend
 aus dem privaten Steuerkanal entfernt.
 
+Beim Ersetzen eines laufenden Beitrags ordnet der Player jedes mpv-
+`start-file`/`end-file`-Paar über dessen `playlist_entry_id` zu. Ein verspätetes
+Endereignis der vorherigen Quelle darf dadurch den bereits laufenden neuen
+Beitrag nicht mehr fälschlich als gestoppt melden oder dessen Videotakt
+abschalten.
+
 Auf Raspberry Pi OS Trixie wird die Videospur mit dem dort tatsächlich
 unterstützten mpv-0.40-Wert `--video=auto` aktiviert. `--video=yes` ist auf
 diesem Ziel ungültig und wird durch einen Vertragstest ausgeschlossen.
