@@ -1,0 +1,7 @@
+id = "zdf_mediathek"
+name = "ZDF Mediathek"
+version = 1
+entry = "openr4d10.modules.zdf_mediathek"
+implementation = "process"
+capabilities = ["catalog", "playback"]
+requires = ["mpv"]

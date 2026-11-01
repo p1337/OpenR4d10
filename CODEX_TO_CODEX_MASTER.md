@@ -3490,3 +3490,30 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 - Ein Installer-Vertragstest muss diese vollständige Kette prüfen und jede
   erneute Warmup-Abhängigkeit von `multi-user.target` ablehnen. Ein grüner CI-
   Stand ohne diese statische Zyklusprüfung reicht nicht als Freigabe.
+
+### 2026-11-01 – ARD und ZDF werden echte öffentliche Mediathekplayer
+
+- `KONFIGURATION NÖTIG` darf bei ARD- und ZDF-Mediathek nicht länger einen
+  fehlenden externen Adapter vortäuschen. Beide Angebote sind
+  zugangsdatenfreie, native Katalogdienste und werden erst dann als `BEREIT`
+  gemeldet, wenn die vorhandene Implementierung Suche, Ergebniswahl und
+  Wiedergabe über den einen zentralen `MpvEngine` tatsächlich bereitstellt.
+- Der Browser erhält einen eigenen kompakten Reiter `Mediatheken` mit
+  Anbieterauswahl, begrenzter Suche, Ergebnisliste sowie Play/Pause/Stopp. Es
+  entsteht kein zweiter Medienplayer und kein Kartenraster. Die öffentliche
+  Status-API enthält Titel, Sender, Thema, Dauer und Auswahlzustand, aber nie
+  die internen Streamadressen.
+- Die Suche verwendet die dokumentierte, schlüssellose MediathekViewWeb-
+  Abfrage als Index für öffentlich zugängliche Senderinhalte. Ergebniszahl,
+  Antwortgröße, Zeitlimit und erlaubte HTTPS-Ziele bleiben strikt begrenzt;
+  die Wiedergabe lädt anschließend ausschließlich die vom Index gelieferte
+  öffentliche Senderquelle. DRM, Altersfreigaben, Geoblocking, Anmeldung und
+  sonstige Zugangssperren werden weder umgangen noch als automatisch
+  bestätigt behandelt.
+- ARD und ZDF bleiben getrennte Dienstmodule und besitzen jeweils Manifest,
+  README und Tests, teilen sich aber genau einen Katalogadapter. Ein explizites
+  Play übernimmt wie bei Podcasts den Audioausgang; bloßes Öffnen, Suchen oder
+  Markieren einer Folge unterbricht einen bereits laufenden Audiodienst nicht.
+- Auf dem Gerät erscheint die ausgewählte Mediathekfolge in der vorhandenen
+  `PLAYER`-Ansicht. Titel, Anbieter und Wiedergabestatus stammen aus demselben
+  Zustand wie im Browser; Play/Pause/Stopp bleiben die zentralen Aktionen.

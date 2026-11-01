@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from email.message import Message
 from io import BytesIO
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -15,6 +16,7 @@ from openr4d10.content import (
     DWD_RADAR_GIF_URL,
     DwdSatelliteFrames,
     FeedReader,
+    MediathekCatalog,
     PodcastReader,
     PresetArtwork,
     TrackArtwork,
@@ -40,6 +42,46 @@ class FakeResponse:
 
 
 class ContentTests(unittest.TestCase):
+    def test_mediathek_catalog_posts_bounded_query_and_rejects_private_sources(self) -> None:
+        calls = []
+        payload = json.dumps({
+            "result": {
+                "results": [
+                    {
+                        "channel": "ZDFinfo",
+                        "topic": "Wissen",
+                        "title": "Universum",
+                        "description": "Eine Dokumentation",
+                        "duration": 2700,
+                        "timestamp": 1793520000,
+                        "url_video_hd": "https://cdn.zdf.example/universum.mp4",
+                        "url_website": "https://www.zdf.de/dokus/universum-100.html",
+                    },
+                    {
+                        "channel": "ZDF",
+                        "title": "Unsafe",
+                        "url_video": "https://127.0.0.1/private.mp4",
+                        "url_website": "https://www.zdf.de/unsafe.html",
+                    },
+                ]
+            }
+        }).encode()
+
+        class Fetcher:
+            def fetch(self, url, **kwargs):
+                calls.append((url, kwargs))
+                return payload, "application/json"
+
+        results = MediathekCatalog(Fetcher()).search("zdf", "Weltall")
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].channel, "ZDFinfo")
+        self.assertNotIn("source_url", results[0].public())
+        self.assertEqual(calls[0][1]["method"], "POST")
+        request = json.loads(calls[0][1]["body"])
+        self.assertEqual(request["size"], 30)
+        self.assertEqual(request["queries"][0]["query"], "Weltall")
+        self.assertEqual(request["queries"][1]["query"], "ZDF")
+
     def test_track_artwork_uses_high_score_release_and_reencodes_cover(self) -> None:
         raw = BytesIO()
         Image.new("RGB", (600, 600), (80, 20, 120)).save(raw, format="PNG")

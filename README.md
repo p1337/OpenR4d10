@@ -445,6 +445,14 @@ enclosure URLs are not returned by the status API. Feeds with embedded
 credentials or persistent query strings are refused so signed/private feed
 tokens cannot accidentally enter backups or public state.
 
+The **Mediatheques** tab provides credential-free ARD and ZDF catalog search
+through the bounded MediathekViewWeb index. It returns at most 30 recent
+results per provider and plays the selected public broadcaster source through
+the same central mpv process used by the other audio services. Browsing and
+searching never interrupt current audio; explicit Play takes ownership. Raw
+stream and website URLs stay process-local and are not exposed by the status
+API. This integration does not bypass DRM, age gates, login or geoblocking.
+
 The **AmbientR4D10** tab is an independent audio service, not a radio-station
 group or a third-party branded clone. Its ten built-in soundscapes are fetched
 once from reviewed public CC sources, checksum-verified into the protected

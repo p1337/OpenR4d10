@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 import hashlib
 from html import unescape
+import ipaddress
 from io import BytesIO
 import json
 import os
@@ -51,14 +52,22 @@ class BoundedFetcher:
         max_bytes: int,
         accepted_types: tuple[str, ...],
         timeout: float = 8.0,
+        method: str = "GET",
+        body: bytes | None = None,
+        headers: dict[str, str] | None = None,
     ) -> tuple[bytes, str]:
         approved = validate_content_url(url)
+        request_headers = {
+            "User-Agent": "OpenR4d10 (+https://github.com/p1337/OpenR4d10)",
+            "Accept": ", ".join(accepted_types),
+        }
+        if headers:
+            request_headers.update(headers)
         request = Request(
             approved,
-            headers={
-                "User-Agent": "OpenR4d10 (+https://github.com/p1337/OpenR4d10)",
-                "Accept": ", ".join(accepted_types),
-            },
+            data=body,
+            headers=request_headers,
+            method=method,
         )
         try:
             with self.opener(request, timeout=timeout) as response:
@@ -79,6 +88,183 @@ class BoundedFetcher:
         if len(payload) > max_bytes:
             raise ContentError("remote content exceeds the size limit")
         return payload, content_type
+
+
+MEDIATHEKVIEW_QUERY_URL = "https://mediathekviewweb.de/api/query"
+MEDIATHEK_PROVIDERS = {
+    "ard": ("ard_mediathek", "ARD", "ARD"),
+    "zdf": ("zdf_mediathek", "ZDF", "ZDF"),
+}
+
+
+def _public_stream_url(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        approved = validate_content_url(value)
+    except ValueError:
+        return None
+    parsed = urlsplit(approved)
+    if parsed.scheme != "https" or parsed.hostname is None:
+        return None
+    hostname = parsed.hostname.casefold().rstrip(".")
+    if hostname == "localhost" or hostname.endswith((".local", ".localhost")):
+        return None
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        pass
+    else:
+        if not address.is_global:
+            return None
+    return approved
+
+
+@dataclass(frozen=True, slots=True)
+class MediathekEntry:
+    item_id: str
+    provider: str
+    service_id: str
+    channel: str
+    topic: str
+    title: str
+    description: str
+    duration_seconds: int
+    timestamp: int
+    source_url: str
+    website_url: str
+
+    def public(self) -> dict[str, object]:
+        return {
+            "item_id": self.item_id,
+            "provider": self.provider,
+            "service_id": self.service_id,
+            "channel": self.channel,
+            "topic": self.topic,
+            "title": self.title,
+            "description": self.description,
+            "duration_seconds": self.duration_seconds,
+            "timestamp": self.timestamp,
+        }
+
+
+class MediathekCatalog:
+    """Bounded, credential-free search over the public MediathekView index."""
+
+    MAX_RESULTS = 30
+    MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+
+    def __init__(self, fetcher: BoundedFetcher | None = None) -> None:
+        self.fetcher = fetcher or BoundedFetcher()
+
+    @staticmethod
+    def _text(value: object, limit: int) -> str:
+        return _plain_text(value if isinstance(value, str) else "", limit)
+
+    @staticmethod
+    def _bounded_integer(value: object, maximum: int) -> int:
+        if isinstance(value, bool):
+            return 0
+        try:
+            parsed = int(value or 0)
+        except (TypeError, ValueError, OverflowError):
+            return 0
+        return max(0, min(parsed, maximum))
+
+    @classmethod
+    def parse(cls, provider: str, payload: bytes) -> list[MediathekEntry]:
+        provider_key = str(provider).casefold()
+        provider_config = MEDIATHEK_PROVIDERS.get(provider_key)
+        if provider_config is None:
+            raise ValueError("unknown Mediathek provider")
+        service_id, provider_label, _channel_query = provider_config
+        try:
+            document = json.loads(payload)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ContentError(f"invalid Mediathek response: {exc}") from exc
+        result = document.get("result") if isinstance(document, dict) else None
+        raw_items = result.get("results") if isinstance(result, dict) else None
+        if not isinstance(raw_items, list):
+            raise ContentError("Mediathek response has no result list")
+        entries: list[MediathekEntry] = []
+        for raw in raw_items[: cls.MAX_RESULTS]:
+            if not isinstance(raw, dict):
+                continue
+            source_url = next(
+                (
+                    approved
+                    for key in ("url_video_hd", "url_video", "url_video_low")
+                    if (approved := _public_stream_url(raw.get(key))) is not None
+                ),
+                None,
+            )
+            website_url = _public_stream_url(raw.get("url_website"))
+            if source_url is None or website_url is None:
+                continue
+            channel = cls._text(raw.get("channel"), 80)
+            if provider_key == "zdf" and "zdf" not in channel.casefold():
+                continue
+            title = cls._text(raw.get("title"), 240)
+            if not title:
+                continue
+            identity = f"{provider_key}\0{website_url}\0{source_url}"
+            entries.append(
+                MediathekEntry(
+                    item_id=hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24],
+                    provider=provider_label,
+                    service_id=service_id,
+                    channel=channel or provider_label,
+                    topic=cls._text(raw.get("topic"), 160),
+                    title=title,
+                    description=cls._text(raw.get("description"), 800),
+                    duration_seconds=cls._bounded_integer(raw.get("duration"), 86_400),
+                    timestamp=cls._bounded_integer(raw.get("timestamp"), 4_102_444_800),
+                    source_url=source_url,
+                    website_url=website_url,
+                )
+            )
+        return entries
+
+    def search(self, provider: str, query: str) -> list[MediathekEntry]:
+        provider_key = str(provider).casefold()
+        provider_config = MEDIATHEK_PROVIDERS.get(provider_key)
+        if provider_config is None:
+            raise ValueError("unknown Mediathek provider")
+        _service_id, _provider_label, channel_query = provider_config
+        clean_query = self._text(query, 120)
+        queries: list[dict[str, object]] = [
+            {"fields": ["channel"], "query": channel_query},
+        ]
+        if clean_query:
+            queries.insert(
+                0,
+                {
+                    "fields": ["title", "topic", "description"],
+                    "query": clean_query,
+                },
+            )
+        body = json.dumps(
+            {
+                "queries": queries,
+                "sortBy": "timestamp",
+                "sortOrder": "desc",
+                "future": False,
+                "offset": 0,
+                "size": self.MAX_RESULTS,
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        payload, _content_type = self.fetcher.fetch(
+            MEDIATHEKVIEW_QUERY_URL,
+            max_bytes=self.MAX_RESPONSE_BYTES,
+            accepted_types=("application/json",),
+            timeout=10,
+            method="POST",
+            body=body,
+            headers={"Content-Type": "application/json"},
+        )
+        return self.parse(provider_key, payload)
 
 
 class AmbientAudioCache:

@@ -403,6 +403,15 @@ the previous audio owner, while browsing subscriptions does not. Persistent
 feed URLs with query strings are rejected to prevent signed/private tokens from
 entering SQLite and portable backups.
 
+`MediathekCatalog` performs credential-free ARD/ZDF search through one bounded
+MediathekViewWeb JSON request: POST only, HTTPS only, ten-second timeout,
+2 MiB response ceiling and 30 results. Private-address, local and credentialed
+sources are rejected. The private result cache retains the broadcaster stream
+and website URLs; public snapshots expose only an opaque item id, provider,
+channel, topic, title, description, duration and timestamp. Explicit Play
+resolves that opaque id and loads the source into the central `MpvEngine`.
+Search, provider switching and selection do not change audio ownership.
+
 AmbientR4D10 stores its ordered scene library in the existing generic
 `channels` table under the `ambient` service ID. Built-in definitions in
 `ambient.py` bind each public audio URL to a review page, credit and license;

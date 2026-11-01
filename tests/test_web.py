@@ -117,7 +117,7 @@ class WebTests(unittest.TestCase):
         self.assertNotIn("display-screen-border", html)
         self.assertNotIn("screen_border_enabled", script)
         self.assertIn("border-radius: 43px", stylesheet)
-        for tab in ("radio", "podcasts", "weather", "media", "device", "system", "services"):
+        for tab in ("radio", "podcasts", "mediathek", "weather", "media", "device", "system", "services"):
             self.assertIn(f'data-tab="{tab}"', html)
             self.assertIn(f'data-tab-panel="{tab}"', html)
         self.assertIn('id="device-screen-preview"', html)
@@ -164,6 +164,10 @@ class WebTests(unittest.TestCase):
         self.assertIn('id="podcast-episode-list"', html)
         self.assertIn('"podcast_subscribe"', script)
         self.assertIn('"podcast_play"', script)
+        self.assertIn('id="mediathek-search-form"', html)
+        self.assertIn('id="mediathek-result-list"', html)
+        self.assertIn('"mediathek_search"', script)
+        self.assertIn('"mediathek_play"', script)
         self.assertIn('id="service-search" type="search"', html)
         self.assertIn('id="service-list"', html)
         self.assertIn("serviceMatchesSearch", script)

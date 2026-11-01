@@ -575,6 +575,90 @@ class ServiceCatalogTests(unittest.TestCase):
         self.assertNotIn("feed_url", public_snapshot["subscriptions"][0])
         self.assertEqual(persisted[0]["name"], "Science Weekly")
 
+    def test_mediathek_search_and_play_use_central_player_without_exposing_source(self) -> None:
+        class State:
+            state = "stopped"
+            volume = 30
+            paused = False
+
+            def as_dict(self):
+                return {"state": self.state, "volume": self.volume, "paused": self.paused}
+
+        class Player:
+            def __init__(self):
+                self.state = State()
+                self.loaded = None
+
+            def load(self, source):
+                self.loaded = source
+                self.state.state = "playing"
+
+            def stop(self):
+                self.state.state = "stopped"
+
+            def close(self):
+                pass
+
+        class Recorder:
+            state = State()
+
+            def close(self):
+                pass
+
+        class Mediathek:
+            def search(self, provider, query):
+                from openr4d10.content import MediathekEntry
+
+                self.request = (provider, query)
+                return [MediathekEntry(
+                    item_id="item-1",
+                    provider="ARD",
+                    service_id="ard_mediathek",
+                    channel="ARD",
+                    topic="Wissen",
+                    title="Der Test",
+                    description="Öffentlicher Beitrag",
+                    duration_seconds=600,
+                    timestamp=1793520000,
+                    source_url="https://media.example.test/video.mp4",
+                    website_url="https://www.ardmediathek.de/video/test",
+                )]
+
+        with tempfile.TemporaryDirectory() as raw:
+            player = Player()
+            catalog = ServiceCatalog(
+                Path(raw).resolve(),
+                executable_lookup=lambda _name: "/usr/bin/mpv",
+                player=player,
+                recorder=Recorder(),
+                mediathek_catalog=Mediathek(),
+            )
+            try:
+                result = catalog.control({
+                    "action": "mediathek_search",
+                    "provider": "ard",
+                    "query": "Wissen",
+                })
+                snapshot = catalog.snapshot()
+                item = snapshot["mediathek"]["providers"]["ard"]["results"][0]
+                self.assertEqual(result["result_count"], 1)
+                self.assertNotIn("source_url", item)
+                self.assertNotIn("website_url", item)
+                catalog.control({
+                    "action": "mediathek_play",
+                    "provider": "ard",
+                    "item_id": item["item_id"],
+                })
+                playing = catalog.snapshot()
+                self.assertEqual(player.loaded, "https://media.example.test/video.mp4")
+                self.assertEqual(playing["active_service"], "ard_mediathek")
+                self.assertEqual(playing["mediathek"]["active_item"]["title"], "Der Test")
+                service_states = {entry["service_id"]: entry for entry in playing["items"]}
+                self.assertEqual(service_states["ard_mediathek"]["readiness"], "ready")
+                self.assertEqual(service_states["zdf_mediathek"]["readiness"], "ready")
+            finally:
+                catalog.close()
+
     def test_catalog_covers_documented_services_without_claiming_credentials(self) -> None:
         available = {
             "mpv": "/usr/bin/mpv",

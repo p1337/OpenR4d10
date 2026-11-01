@@ -17,6 +17,7 @@ let stationLanguageFilter = "";
 let stationCategoryFilter = "";
 let stationLibraryView = "active";
 let podcastSearchQuery = "";
+let mediathekProvider = "ard";
 let brandmeisterTalkgroups = [];
 let brandmeisterCatalog = [];
 let brandmeisterCatalogQuery = "";
@@ -307,13 +308,14 @@ function renderServices(catalog) {
   renderWebcams(catalog);
   renderBrandmeisterTalkgroups(catalog.brandmeister || {});
   renderPodcasts(catalog);
+  renderMediathek(catalog);
   renderWeather(catalog);
   renderPlaybackActions(catalog.playback || {});
 }
 
 function renderPlaybackActions(playback) {
   const running = playback.state === "playing" && playback.paused !== true;
-  for (const button of document.querySelectorAll('[data-action="pause"], [data-music-action="pause"]')) {
+  for (const button of document.querySelectorAll('[data-action="pause"], [data-music-action="pause"], [data-mediathek-action="pause"]')) {
     button.textContent = t(running ? "Pause" : "Play");
     button.classList.toggle("play-action", !running);
     button.classList.toggle("accent-action", running);
@@ -800,6 +802,98 @@ function renderPodcasts(catalog) {
       ? "Select Update on a subscription to load its episodes."
       : "Subscribe to a public podcast feed first.");
     episodeList.append(row);
+  }
+}
+
+function mediathekDuration(seconds) {
+  const value = Number(seconds);
+  if (!Number.isFinite(value) || value <= 0) return "";
+  const hours = Math.floor(value / 3600);
+  const minutes = Math.floor((value % 3600) / 60);
+  const rest = Math.floor(value % 60);
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`
+    : `${minutes}:${String(rest).padStart(2, "0")}`;
+}
+
+function selectMediathekProvider(provider) {
+  mediathekProvider = provider === "zdf" ? "zdf" : "ard";
+  for (const button of document.querySelectorAll("[data-mediathek-provider]")) {
+    button.setAttribute("aria-selected", button.dataset.mediathekProvider === mediathekProvider ? "true" : "false");
+  }
+  const state = latestStatus?.services?.mediathek?.providers?.[mediathekProvider];
+  byId("mediathek-search").value = state?.query || "";
+  if (latestStatus?.services) renderMediathek(latestStatus.services);
+}
+
+function renderMediathek(catalog) {
+  const mediathek = catalog?.mediathek || {};
+  const providers = mediathek.providers || {};
+  const ardResults = Array.isArray(providers.ard?.results) ? providers.ard.results : [];
+  const zdfResults = Array.isArray(providers.zdf?.results) ? providers.zdf.results : [];
+  setText("mediathek-ard-count", ardResults.length);
+  setText("mediathek-zdf-count", zdfResults.length);
+  const providerState = providers[mediathekProvider] || {};
+  const results = Array.isArray(providerState.results) ? providerState.results : [];
+  const list = byId("mediathek-result-list");
+  list.replaceChildren();
+  for (const item of results) {
+    const row = document.createElement("li");
+    if (item.item_id === providerState.selected_item_id) row.dataset.active = "true";
+    const copy = document.createElement("span");
+    copy.className = "station-row-copy";
+    const title = document.createElement("strong");
+    title.textContent = item.title;
+    const detail = document.createElement("small");
+    detail.textContent = [item.channel, item.topic, mediathekDuration(item.duration_seconds)].filter(Boolean).join(" · ");
+    const description = document.createElement("p");
+    description.textContent = item.description;
+    copy.append(title, detail, description);
+    const actions = document.createElement("span");
+    actions.className = "library-actions";
+    const play = document.createElement("button");
+    play.type = "button";
+    play.className = "library-play play-action";
+    play.textContent = t("Play");
+    play.addEventListener("click", () => mediathekCommand("mediathek_play", {
+      provider: mediathekProvider,
+      item_id: item.item_id,
+    }));
+    actions.append(play);
+    row.addEventListener("click", (event) => {
+      if (event.target.closest("button")) return;
+      mediathekCommand("mediathek_select", { provider: mediathekProvider, item_id: item.item_id });
+    });
+    row.append(copy, actions);
+    list.append(row);
+  }
+  setText("mediathek-result-count", results.length);
+  if (!results.length) {
+    const row = document.createElement("li");
+    row.textContent = t("No Mediathek results loaded yet.");
+    list.append(row);
+  }
+}
+
+async function mediathekCommand(action, extra = {}) {
+  const output = byId("mediathek-status");
+  output.textContent = t("Working …");
+  try {
+    const response = await fetch("/api/control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...extra }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    output.textContent = Number.isInteger(payload.result_count)
+      ? t("{{count}} Mediathek results loaded.", { count: payload.result_count })
+      : action === "mediathek_play"
+        ? t("Mediathek item is playing.")
+        : t("Mediathek selection saved.");
+    await refresh();
+  } catch (error) {
+    output.textContent = t("Error: {{message}}", { message: error.message });
   }
 }
 
@@ -1483,6 +1577,22 @@ byId("podcast-subscribe-form").addEventListener("submit", async (event) => {
   await podcastCommand("podcast_subscribe", { url: byId("podcast-feed-url").value });
   event.currentTarget.reset();
 });
+
+for (const button of document.querySelectorAll("[data-mediathek-provider]")) {
+  button.addEventListener("click", () => selectMediathekProvider(button.dataset.mediathekProvider));
+}
+
+byId("mediathek-search-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await mediathekCommand("mediathek_search", {
+    provider: mediathekProvider,
+    query: byId("mediathek-search").value,
+  });
+});
+
+for (const button of document.querySelectorAll("[data-mediathek-action]")) {
+  button.addEventListener("click", () => sendControl(button.dataset.mediathekAction));
+}
 
 byId("ambient-scene-form").addEventListener("submit", async (event) => {
   event.preventDefault();

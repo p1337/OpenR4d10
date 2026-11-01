@@ -39,6 +39,8 @@ from .content import (
     DWD_RADAR_GIF_URL,
     DwdSatelliteFrames,
     FeedReader,
+    MediathekCatalog,
+    MediathekEntry,
     PodcastReader,
     PresetArtwork,
     TrackArtwork,
@@ -57,6 +59,7 @@ MEDIA_EXTENSIONS = {
 }
 DEFAULT_ENABLED_SERVICES = {
     "system", "webradio", "weather", "ambient", "local_media", "recorder", "rss", "podcasts", "webcam", "brandmeister",
+    "ard_mediathek", "zdf_mediathek",
 }
 DISPLAY_BRIGHTNESS_KEY = "display.brightness_percent"
 DEFAULT_DISPLAY_BRIGHTNESS = 100
@@ -138,8 +141,8 @@ BUILTIN_SERVICES = (
     ServiceManifest("webcam", "Webcams", "video", "Persistent snapshot, MJPEG and RTSP camera library", ("images", "video", "channels"), "process", ("ffmpeg",)),
     ServiceManifest("youtube_audio", "YouTube Audio", "media", "Audio access only where technically and legally permitted", ("playback", "library"), "external"),
     ServiceManifest("spotify", "Spotify", "media", "Spotify Connect through a user-configured compatible client", ("playback",), "external", requires_credentials=True, credential_hint="Use the user's own eligible Spotify account locally."),
-    ServiceManifest("ard_mediathek", "ARD Mediathek", "media", "Officially accessible ARD audio and media", ("catalog", "playback"), "external"),
-    ServiceManifest("zdf_mediathek", "ZDF Mediathek", "media", "Officially accessible ZDF audio and media", ("catalog", "playback"), "external"),
+    ServiceManifest("ard_mediathek", "ARD Mediathek", "media", "Officially accessible ARD audio and media", ("catalog", "playback"), "process", ("mpv",)),
+    ServiceManifest("zdf_mediathek", "ZDF Mediathek", "media", "Officially accessible ZDF audio and media", ("catalog", "playback"), "process", ("mpv",)),
     ServiceManifest("international_media", "International Media", "media", "Configured public broadcasters and news sources", ("catalog", "playback"), "external"),
     ServiceManifest("speech", "Speech", "accessibility", "Offline German dictation, commands and read-aloud", ("stt", "tts"), "external"),
     ServiceManifest("bluetooth_audio", "Bluetooth Audio", "audio", "Bluetooth audio and HID routing", ("playback", "hid"), "external"),
@@ -158,6 +161,7 @@ class ServiceCatalog:
         recorder: StreamRecorder | None = None,
         feed_reader: FeedReader | None = None,
         podcast_reader: PodcastReader | None = None,
+        mediathek_catalog: MediathekCatalog | None = None,
         camera: CameraSnapshot | None = None,
         artwork: PresetArtwork | None = None,
         track_artwork: TrackArtwork | None = None,
@@ -184,6 +188,7 @@ class ServiceCatalog:
         )
         self.feed_reader = feed_reader or FeedReader()
         self.podcast_reader = podcast_reader or PodcastReader()
+        self.mediathek_catalog = mediathek_catalog or MediathekCatalog()
         self.camera = camera or CameraSnapshot(state_directory / "cache")
         self.artwork = artwork or PresetArtwork(state_directory / "cache")
         self.track_artwork = track_artwork or TrackArtwork(self.cover_root)
@@ -215,6 +220,13 @@ class ServiceCatalog:
         self._podcast_cache: dict[int, dict[str, object]] = {}
         self._active_podcast_subscription_id: int | None = None
         self._active_podcast_episode: dict[str, object] | None = None
+        self._mediathek_results: dict[str, list[MediathekEntry]] = {
+            "ard": [],
+            "zdf": [],
+        }
+        self._mediathek_queries = {"ard": "", "zdf": ""}
+        self._mediathek_selected: dict[str, str | None] = {"ard": None, "zdf": None}
+        self._active_mediathek_item: dict[str, object] | None = None
         external_ids = {
             item.service_id
             for item in BUILTIN_SERVICES
@@ -1651,6 +1663,14 @@ class ServiceCatalog:
                     ),
                 }
             )
+        mediathek_providers = {}
+        for provider in ("ard", "zdf"):
+            results = self._mediathek_results[provider]
+            mediathek_providers[provider] = {
+                "query": self._mediathek_queries[provider],
+                "selected_item_id": self._mediathek_selected[provider],
+                "results": [item.public() for item in results],
+            }
         return {
             "schema_version": SCHEMA_VERSION,
             "settings": {
@@ -1689,6 +1709,18 @@ class ServiceCatalog:
                 "episodes": podcast_episodes,
                 "active_episode": self._active_podcast_episode,
                 "limits": {"subscriptions": 100, "episodes_per_feed": 50},
+            },
+            "mediathek": {
+                "providers": mediathek_providers,
+                "active_item": (
+                    self._active_mediathek_item
+                    if self.active_service in {"ard_mediathek", "zdf_mediathek"}
+                    else None
+                ),
+                "limits": {
+                    "results_per_provider": MediathekCatalog.MAX_RESULTS,
+                    "response_bytes": MediathekCatalog.MAX_RESPONSE_BYTES,
+                },
             },
             "weather": {
                 "active_channel_id": self.active_weather_channel_id,
@@ -2717,6 +2749,76 @@ class ServiceCatalog:
             if isinstance(direction, bool) or not isinstance(direction, int):
                 raise ValueError("podcast_move requires an integer direction")
             return {"moved": self.store.move_channel(int(subscription_id), direction)}
+        elif action == "mediathek_search":
+            provider = request.get("provider")
+            query = request.get("query", "")
+            if not isinstance(provider, str) or provider not in {"ard", "zdf"}:
+                raise ValueError("mediathek_search requires provider ard or zdf")
+            if not isinstance(query, str):
+                raise ValueError("mediathek_search requires a text query")
+            service_id = f"{provider}_mediathek"
+            self._require_enabled(service_id)
+            results = self.mediathek_catalog.search(provider, query)
+            self._mediathek_results[provider] = results
+            self._mediathek_queries[provider] = query.strip()[:120]
+            self._mediathek_selected[provider] = (
+                results[0].item_id if results else None
+            )
+            return {
+                "provider": provider,
+                "result_count": len(results),
+                "selected_item_id": self._mediathek_selected[provider],
+            }
+        elif action == "mediathek_select":
+            provider = request.get("provider")
+            item_id = request.get("item_id")
+            if not isinstance(provider, str) or provider not in {"ard", "zdf"}:
+                raise ValueError("mediathek_select requires provider ard or zdf")
+            if not isinstance(item_id, str):
+                raise ValueError("mediathek_select requires an item id")
+            if not any(
+                item.item_id == item_id for item in self._mediathek_results[provider]
+            ):
+                raise ValueError("Mediathek item was not found")
+            self._mediathek_selected[provider] = item_id
+            return {"provider": provider, "selected_item_id": item_id}
+        elif action == "mediathek_play":
+            provider = request.get("provider")
+            item_id = request.get("item_id")
+            if not isinstance(provider, str) or provider not in {"ard", "zdf"}:
+                raise ValueError("mediathek_play requires provider ard or zdf")
+            if not isinstance(item_id, str):
+                raise ValueError("mediathek_play requires an item id")
+            service_id = f"{provider}_mediathek"
+            self._require_enabled(service_id)
+            item = next(
+                (
+                    candidate
+                    for candidate in self._mediathek_results[provider]
+                    if candidate.item_id == item_id
+                ),
+                None,
+            )
+            if item is None:
+                raise ValueError("Mediathek item was not found; search again")
+            source = validate_media_source(item.source_url, (self.media_root,))
+            if self.radio_buffer is not None:
+                self.radio_buffer.stop(flush=True)
+            self._stop_brandmeister_for_audio_owner()
+            self._stop_ambient_layers()
+            self.player.load(source)
+            self.active_service = service_id
+            self.active_preset_id = None
+            self.active_station_id = None
+            self.active_ambient_scene_id = None
+            self._active_podcast_episode = None
+            self._mediathek_selected[provider] = item_id
+            self._active_mediathek_item = item.public()
+            return {
+                "provider": provider,
+                "item_id": item_id,
+                "playback": self.player.state.as_dict(),
+            }
         elif action == "adapter_call":
             service_id = request.get("service_id")
             operation = request.get("operation")
@@ -3726,6 +3828,9 @@ class ServiceCatalog:
             if active_ambient_scene is not None
             else str(self._active_podcast_episode["podcast"])
             if self.active_service == "podcasts" and self._active_podcast_episode is not None
+            else str(self._active_mediathek_item["channel"])
+            if self.active_service in {"ard_mediathek", "zdf_mediathek"}
+            and self._active_mediathek_item is not None
             else playback.source or self.active_service
         )
         track_line = "No title information"
@@ -3741,6 +3846,11 @@ class ServiceCatalog:
             track_line = self._radio_track_line(buffered) or track_line
         elif self.active_service == "podcasts" and self._active_podcast_episode is not None:
             track_line = str(self._active_podcast_episode["title"])
+        elif (
+            self.active_service in {"ard_mediathek", "zdf_mediathek"}
+            and self._active_mediathek_item is not None
+        ):
+            track_line = str(self._active_mediathek_item["title"])
         elif self.active_service == "ambient" and self.active_ambient_scene_id is not None:
             if active_ambient_scene is not None:
                 track_line = self._ambient_display_text(active_ambient_scene)[1]
