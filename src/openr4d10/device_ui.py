@@ -7,6 +7,7 @@ from datetime import datetime
 from functools import lru_cache
 import math
 from pathlib import Path
+import time
 from typing import Mapping
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont, ImageOps
@@ -1714,6 +1715,12 @@ def render_device_ui(
 
     if state.service == "DMR":
         list_top = content_top + 2
+        pulse_wave = 0.5 + 0.5 * math.sin(time.monotonic() * 4.0 * math.pi)
+        pulse_low = (20, 112, 68)
+        activity_green = tuple(
+            round(low + (high - low) * pulse_wave)
+            for low, high in zip(pulse_low, PLAY_GREEN)
+        )
         if not state.dmr_catalog_rows:
             empty_font = _font(12, bold=True)
             empty = _localized_device_text("Select talkgroups and press play", text)
@@ -1750,7 +1757,7 @@ def render_device_ui(
                 width=3 if active else 2 if selected else 1,
             )
             if enabled:
-                draw.ellipse((15, top + 9, 26, top + 20), fill=PLAY_GREEN if active else accent)
+                draw.ellipse((15, top + 9, 26, top + 20), fill=activity_green if active else accent)
             else:
                 draw.ellipse((15, top + 9, 26, top + 20), outline=(91, 108, 112), width=2)
             code = str(item.get("country_code") or "TG")[:2]
@@ -1770,8 +1777,37 @@ def render_device_ui(
                 if isinstance(row_position, int) and state.dmr_catalog_count
                 else ""
             )
-            secondary = " · ".join(value for value in (position, identity) if value)
-            draw.text((49, top + 16), _fit_text(draw, secondary, secondary_font, 134), font=secondary_font, fill=PLAY_GREEN if active else (171, 184, 187))
+            secondary_x = 49
+            if position:
+                draw.text(
+                    (secondary_x, top + 16),
+                    position,
+                    font=secondary_font,
+                    fill=(171, 184, 187),
+                )
+                secondary_x += draw.textbbox(
+                    (49, top + 16), position, font=secondary_font
+                )[2] - 49
+            if identity:
+                separator = " · " if position else ""
+                if separator:
+                    draw.text(
+                        (secondary_x, top + 16),
+                        separator,
+                        font=secondary_font,
+                        fill=(171, 184, 187),
+                    )
+                    secondary_x += draw.textbbox(
+                        (secondary_x, top + 16), separator, font=secondary_font
+                    )[2] - secondary_x
+                available = max(0, 183 - secondary_x)
+                if available:
+                    draw.text(
+                        (secondary_x, top + 16),
+                        _fit_text(draw, identity, secondary_font, available),
+                        font=secondary_font,
+                        fill=accent,
+                    )
             state_label = str(text["dmr_on"] if enabled else text["dmr_off"])
             state_font = _font(8, bold=True)
             state_width = draw.textbbox((0, 0), state_label, font=state_font)[2]

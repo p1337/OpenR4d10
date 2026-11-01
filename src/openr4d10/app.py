@@ -29,6 +29,7 @@ LOG = logging.getLogger(__name__)
 VOICE_DOUBLE_CLICK_SECONDS = 0.45
 VOICE_TAP_MAX_SECONDS = 0.35
 RECORDER_FRAME_INTERVAL_SECONDS = 0.1
+DMR_FRAME_INTERVAL_SECONDS = 0.1
 RECORDER_INTERACTION_QUIET_SECONDS = 0.2
 DMR_PTT_HOLD_SECONDS = 2.0
 
@@ -941,17 +942,25 @@ class OpenR4d10App:
                 try:
                     input_context = getattr(self.display, "input_context", None)
                     context = input_context() if callable(input_context) else {}
+                    interactive_service = (
+                        str(context.get("service") or "").upper()
+                        if isinstance(context, dict)
+                        else ""
+                    )
                     if (
-                        isinstance(context, dict)
-                        and context.get("service") == "REC"
+                        interactive_service in {"REC", "DMR"}
                         and self._last_receiver_telemetry
                     ):
-                        if not self._recorder_interaction_active():
-                            self.render_recorder_once()
+                        if interactive_service == "DMR":
+                            self.render_interaction_once("DMR")
+                            frame_interval = DMR_FRAME_INTERVAL_SECONDS
+                        else:
+                            if not self._recorder_interaction_active():
+                                self.render_recorder_once()
+                            frame_interval = RECORDER_FRAME_INTERVAL_SECONDS
                         delay = max(
                             0.0,
-                            RECORDER_FRAME_INTERVAL_SECONDS
-                            - (time.monotonic() - cycle_started),
+                            frame_interval - (time.monotonic() - cycle_started),
                         )
                     else:
                         self.render_once()

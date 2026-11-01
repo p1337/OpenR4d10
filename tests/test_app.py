@@ -1542,6 +1542,83 @@ class AppTests(unittest.TestCase):
             [("control", "voice_recorder_open")],
         )
 
+    def test_visible_dmr_view_uses_capped_ten_fps_interaction_refresh(self) -> None:
+        class TwoCycleEvent:
+            def __init__(self) -> None:
+                self.waits = []
+                self.stopped = False
+
+            def is_set(self) -> bool:
+                return self.stopped
+
+            def set(self) -> None:
+                self.stopped = True
+
+            def wait(self, delay: float) -> bool:
+                self.waits.append(delay)
+                if len(self.waits) >= 2:
+                    self.stopped = True
+                return self.stopped
+
+        class DmrDisplay:
+            def __init__(self) -> None:
+                self.frames = 0
+
+            def input_context(self):
+                return {"service": "DMR", "menu_open": False}
+
+            def snapshot(self):
+                return {"service": "DMR", "menu_open": False}
+
+            def render(self, _frame) -> None:
+                self.frames += 1
+
+            def close(self) -> None:
+                pass
+
+        class Services:
+            def receiver_overlay(self, _view_service=None):
+                return {
+                    "service": "DMR",
+                    "station": "BrandMeister",
+                    "title": "TG 91",
+                    "subtitle": "Ready",
+                    "playing": True,
+                    "activity_rows": [],
+                }
+
+            def close(self) -> None:
+                pass
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            display = DmrDisplay()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                    web=WebConfig(enabled=False),
+                ),
+                display=display,
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=Services(),  # type: ignore[arg-type]
+            )
+            stop_event = TwoCycleEvent()
+            app.stop_event = stop_event  # type: ignore[assignment]
+            app.install_signal_handlers = lambda: None  # type: ignore[method-assign]
+            app.run()
+
+        self.assertGreaterEqual(display.frames, 2)
+        self.assertEqual(stop_event.waits[0], 1.0)
+        self.assertGreater(stop_event.waits[1], 0.0)
+        self.assertLessEqual(stop_event.waits[1], 0.1)
+
     def test_render_once_surfaces_unconfigured_power(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)

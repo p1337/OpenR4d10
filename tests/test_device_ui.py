@@ -327,19 +327,37 @@ class DeviceUiTests(unittest.TestCase):
                 {"talkgroup": 505, "name": "Australia", "enabled": False, "selected": False, "position": 6},
             ],
         )
-        drawn = self._drawn_text(state)
+        rendered_text = []
+        original_text = ImageDraw.ImageDraw.text
+
+        def capture_text(draw, xy, text, *args, **kwargs):
+            rendered_text.append((str(text), kwargs.get("fill")))
+            return original_text(draw, xy, text, *args, **kwargs)
+
+        with (
+            patch.object(ImageDraw.ImageDraw, "text", new=capture_text),
+            patch("openr4d10.device_ui.time.monotonic", return_value=0.0),
+        ):
+            medium_pulse = render_device_ui(state)
+        drawn = [value for value, _fill in rendered_text]
         self.assertTrue(any(value.startswith("TG 262  Germany") for value in drawn))
         self.assertTrue(any("DL1TEST" in value for value in drawn))
+        self.assertIn(("#1/1700", (171, 184, 187)), rendered_text)
+        self.assertIn(("DL1TEST", state.accent), rendered_text)
         self.assertIn("TG 91  Worldwide", drawn)
         self.assertTrue(any(value.startswith("TG 3100  Inactive exa") for value in drawn))
         self.assertTrue(any("3/1700" in value for value in drawn))
         self.assertIn("ON", drawn)
         self.assertIn("OFF", drawn)
         self.assertIn("PAUSE", drawn)
+        with patch("openr4d10.device_ui.time.monotonic", return_value=0.125):
+            bright_pulse = render_device_ui(state)
+        self.assertNotEqual(medium_pulse.getpixel((20, 79)), bright_pulse.getpixel((20, 79)))
+        self.assertEqual(bright_pulse.getpixel((20, 79)), PLAY_GREEN)
         self.assertGreater(
             sum(
                 pixel == PLAY_GREEN
-                for pixel in render_device_ui(state).get_flattened_data()
+                for pixel in bright_pulse.get_flattened_data()
             ),
             20,
         )

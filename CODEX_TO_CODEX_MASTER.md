@@ -3457,3 +3457,19 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   `whisplaysound`, setzt ausschließlich `speaker=100` und läuft vor dem
   unprivilegierten OpenR4d10-Dienst. Fehlt die Karte, darf die Hauptanwendung
   weiterhin starten und ihre vorhandene Diagnose melden.
+
+### 2026-11-01 – DMR-Sprecheralias bleibt hinter der technischen Position
+
+- Die technische Katalogposition einer DMR-Zeile bleibt während eines Rufs
+  sichtbar und wird niemals durch Rufzeichen, Sprechername oder Talker-Alias
+  ersetzt. Der tatsächlich aus HoseLine empfangene Alias steht unmittelbar
+  dahinter in der konfigurierten Akzentfarbe; unbekannte Namen werden nicht
+  erfunden.
+- Der Statuspunkt vor einer momentan sprechenden Talkgroup pulsiert mit zwei
+  vollständigen Helligkeitszyklen pro Sekunde zwischen dunklerem und hellerem
+  Grün. Die aktive Zeile behält zusätzlich ihren grünen Glow.
+- Damit diese Rückmeldung nicht am zweisekündigen Telemetrietakt hängt, läuft
+  die sichtbare DMR-Ansicht bei vorhandener gecachter Telemetrie über denselben
+  auf 100 Millisekunden begrenzten Interaktions-Zeichenpfad wie der Recorder.
+  Das Display bleibt damit bei höchstens 10 FPS; eine zweite GPIO-, Eingabe-
+  oder Netzwerkabfrageschleife ist verboten.

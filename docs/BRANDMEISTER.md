@@ -81,6 +81,13 @@ list does not claim to enumerate silent members of a talkgroup. Geographic or
 callsign enrichment through third-party subscriber databases is deliberately
 not performed without a separately reviewed data-use contract.
 
+During a call the normal catalog row glows green. Its technical catalog
+position remains visible; a real HoseLine talker alias is appended directly
+behind that position in the configured accent colour rather than replacing
+it. The row's leading activity dot pulses between two green intensities at
+2 Hz. The visible DMR view uses the shared display interaction refresh capped
+at 10 FPS, without adding another network or GPIO polling loop.
+
 The selected row exposes `ON`/localized `AN` or `OFF`/localized `AUS`; PTT
 changes that state. The right-button edge label remains `PLAY` (or the localized
 equivalent) because that button starts reception. Browser rows combine the

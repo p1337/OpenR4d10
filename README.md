@@ -344,10 +344,11 @@ service explicitly owns PTT. The default interface accent is `#FDB813`.
 BrandMeister replaces the otherwise meaningless Squelch assignment in its
 device view. The right outer axis browses the complete official talkgroup
 catalog one entry at a time, while the left inner axis jumps 25 entries per
-detent. The device renders a bounded window over the entire catalog with
-enabled entries first and all inactive entries below them. A speaking TG is
-pinned above that list and shows the DMR source ID plus the HoseLine talker
-alias when the network supplied one. The short right press starts BrandMeister
+detent. The device renders six bounded catalog rows with enabled entries first
+and all inactive entries below them. A speaking TG keeps its normal row and
+glows green; its technical position remains visible and the real HoseLine
+talker alias is appended behind it in the accent colour when supplied. The
+leading green point pulses at 2 Hz. The short right press starts BrandMeister
 reception for the enabled TGs and therefore explicitly takes over audio from
 radio or another audio service. A short PTT press toggles the selected TG when
 the button is released. Holding PTT for at least two seconds instead opens the
