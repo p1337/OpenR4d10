@@ -2887,3 +2887,8 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   reales Ziel und `pwm_gpio@22` als Kompatibilitätsschreibweise. Overlay und
   physischer BCM bleiben unverändert `gpio=22`; es wird kein anderer Pin
   freigegeben.
+- Die native Bootanimation läuft mit `ProtectSystem=strict`, veröffentlicht
+  aber nach dem ersten vollständigen Frame atomar einen Helligkeitsauftrag.
+  Ihre Unit benötigt deshalb genau `ReadWritePaths=/run/openr4d10-backlight`;
+  ohne diesen Pfad scheitert sie real mit `open backlight request: Read-only
+  file system`. Weitere schreibbare Systempfade sind nicht zulässig.

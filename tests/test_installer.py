@@ -92,6 +92,10 @@ class InstallerContractTests(unittest.TestCase):
         self.assertIn("openr4d10-backlight-init.service", boot_installer)
         self.assertIn('"$node" == pwm_gpio@16', helper)
         self.assertIn("pwm_gpio@22", helper)
+        self.assertIn(
+            "ReadWritePaths=/run/openr4d10-backlight",
+            (repository / "boot" / "openr4d10-boot.service").read_text(encoding="utf-8"),
+        )
         self.assertIn("PERIOD_NS=1000000", helper)
         self.assertIn("PathExists=/run/openr4d10-backlight/brightness.request", path_unit)
         self.assertIn("User=root", service)

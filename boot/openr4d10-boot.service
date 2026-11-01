@@ -25,6 +25,7 @@ NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
+ReadWritePaths=/run/openr4d10-backlight
 DevicePolicy=closed
 DeviceAllow=/dev/spidev0.0 rw
 DeviceAllow=/dev/gpiochip0 rw

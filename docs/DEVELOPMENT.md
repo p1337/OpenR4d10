@@ -157,6 +157,9 @@ first full frame. The normal display later restores the persisted value through
 the same request. Tests must reject a GPIO22 request in the native player. Keep
 the application's `ProtectSystem=strict`; its only added writable path is the
 dedicated `/run/openr4d10-backlight` request directory.
+The separately sandboxed early-boot unit also needs that exact runtime path in
+`ReadWritePaths`, because its native player atomically publishes the first
+brightness request there; it receives no other writable system path.
 
 `display_appearance` accepts and persists only one `#RRGGBB` accent string.
 The Whisplay renderer used for the physical panel and PNG preview always draws
