@@ -62,10 +62,10 @@
               <label for="media-source" data-i18n="Direct audio source">Direct audio source</label>
               <div class="media-source-row">
                 <input id="media-source" name="source" type="url" inputmode="url" placeholder="https://…" autocomplete="off" required>
-                <button type="submit" data-i18n="Play">Play</button>
+                <button type="submit" class="play-action" data-i18n="Play">Play</button>
               </div>
               <div class="media-actions" aria-label="Playback controls" data-i18n-aria-label="Playback controls">
-                <button type="button" data-action="pause" data-i18n="Play / Pause">Play / Pause</button><button type="button" data-action="stop" data-i18n="Stop">Stop</button>
+                <button type="button" data-action="pause" data-i18n="Play / Pause">Play / Pause</button><button type="button" class="accent-action" data-action="stop" data-i18n="Stop">Stop</button>
                 <button type="button" data-action="radio_keep_current" data-i18n="Keep this song">Keep this song</button>
                 <label class="capture-switch"><input id="radio-continuous" type="checkbox"><span data-i18n="Record and split continuously">Record and split continuously</span></label>
               </div>
@@ -102,8 +102,8 @@
               <label for="brandmeister-search" data-i18n="All official talkgroups">All official talkgroups</label>
               <input id="brandmeister-search" type="search" placeholder="Search number, name or country …" data-i18n-placeholder="Search number, name or country …" autocomplete="off">
               <ul id="brandmeister-catalog-list" class="library-list station-catalog-list"></ul>
-              <div class="media-source-row"><button type="submit" data-i18n="Listen on device">Listen on device</button><button id="brandmeister-device-stop" type="button" data-i18n="Stop device reception">Stop device reception</button></div>
-              <div class="media-source-row"><button id="brandmeister-browser-listen" type="button" data-i18n="Also listen in browser">Also listen in browser</button><button id="brandmeister-disconnect" type="button" data-i18n="Stop browser reception" disabled>Stop browser reception</button></div>
+              <div class="media-source-row"><button type="submit" class="play-action" data-i18n="Listen on device">Listen on device</button><button id="brandmeister-device-stop" class="accent-action" type="button" data-i18n="Stop device reception">Stop device reception</button></div>
+              <div class="media-source-row"><button id="brandmeister-browser-listen" class="play-action" type="button" data-i18n="Also listen in browser">Also listen in browser</button><button id="brandmeister-disconnect" class="accent-action" type="button" data-i18n="Stop browser reception" disabled>Stop browser reception</button></div>
               <output id="brandmeister-hoseline-status" aria-live="polite" data-i18n="Enter a talkgroup above 90.">Enter a talkgroup above 90.</output>
               <p id="brandmeister-call" class="services-note" hidden></p>
             </form>
@@ -197,8 +197,8 @@
                 <button type="button" data-music-action="media_previous" aria-label="Previous" data-i18n-aria-label="Previous">◀</button>
                 <button type="button" data-music-action="pause" data-i18n="Play / Pause">Play / Pause</button>
                 <button type="button" data-music-action="media_next" aria-label="Next" data-i18n-aria-label="Next">▶</button>
-                <button type="button" data-music-action="media_shuffle" data-i18n="Shuffle all recordings">Shuffle all recordings</button>
-                <button type="button" class="library-play" data-music-action="media_soundmix" data-i18n="My Soundmix">My Soundmix</button>
+                <button type="button" class="play-action" data-music-action="media_shuffle" data-i18n="Shuffle all recordings">Shuffle all recordings</button>
+                <button type="button" class="library-play play-action" data-music-action="media_soundmix" data-i18n="My Soundmix">My Soundmix</button>
               </div>
               <p class="services-note" data-i18n="Recorded songs are stored under Music by artist; voice recordings stay under VoiceRecorder.">Recorded songs are stored under Music by artist; voice recordings stay under VoiceRecorder.</p><ul id="media-list" class="library-list media-library-list"></ul>
             </section>

@@ -228,11 +228,14 @@ the backlight dark until its first complete frame and then uses the same
 bounded handoff. This transition needs the installer's automatic reboot.
 The same settings area stores the selected accent color. Every normal service
 view receives one centrally composited, clearly visible strong, soft edge glow
-in that color along the physical rounded contour, including a straight upper
+along the physical rounded contour, including a straight upper
 glow immediately below the status row. Recorder, system and future plugin
 views inherit it without service-specific drawing code. Menus and the WLAN
 setup screen deliberately retain their separate navigation treatment. The glow
-has no crisp border line and no disable switch. Media, weather and camera
+uses the accent color while idle, green during actual audio playback and red
+during radio or microphone recording; continuous recording pulses red. Real
+Play actions are green, while Pause and Stop remain in the accent color. It has
+no crisp border line and no disable switch. Media, weather and camera
 images use the same 43-pixel corner radius as the panel. Device text is never
 introduced below the SSID text size; battery percentage is at least that size
 and bold. Menu selection and PTT indicators remain independent functional cues.

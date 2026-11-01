@@ -3283,6 +3283,14 @@ class ServiceCatalog:
     def receiver_overlay(self, view_service: str | None = None) -> dict[str, object]:
         """Return metadata for the selected view without changing audio ownership."""
         requested = str(view_service or "").upper()
+        playback = self.player.state
+        brandmeister_state = self.brandmeister.snapshot()
+        audio_active = (
+            getattr(playback, "state", "stopped") == "playing"
+            and not bool(getattr(playback, "paused", False))
+        ) or str(brandmeister_state.get("status") or "stopped") in {
+            "connecting", "listening", "call", "reconnecting",
+        }
         valid_views = {"SYSTEM", "RADIO", "WEATHER", "AMBIENT", "DMR", "PLAYER", "REC"}
         if not self._initial_view_resolved:
             if requested not in valid_views:
@@ -3318,10 +3326,10 @@ class ServiceCatalog:
                         str(frame["timestamp"]) if frame is not None else loading
                     ),
                     "playing": bool(frames),
+                    "audio_active": audio_active,
                     "channel": ids.index(self.active_weather_channel_id) + 1 if self.active_weather_channel_id in ids else 1,
                     "image_file": str(frame["file"]) if frame is not None else None,
                 }
-        playback = self.player.state
         if requested == "AMBIENT":
             scenes = self.store.channels("ambient")
             scene = (
@@ -3356,6 +3364,7 @@ class ServiceCatalog:
                 "title": "AmbientR4D10",
                 "subtitle": description,
                 "playing": selected_is_playing,
+                "audio_active": audio_active,
                 "volume": playback.volume,
                 "preset_id": artwork_preset_id if artwork_preset_id in AMBIENT_BY_ID else None,
                 "layer_rows": self._ambient_layer_rows(),
@@ -3383,7 +3392,7 @@ class ServiceCatalog:
                 isinstance(saved_metadata, dict) and saved_metadata.get("enabled") is True
             )
             selected_name = str(selected.get("name") or "BrandMeister") if selected else "BrandMeister"
-            state = self.brandmeister.snapshot()
+            state = brandmeister_state
             destination = state.get("destination")
             active_talkgroup = (
                 destination
@@ -3424,6 +3433,7 @@ class ServiceCatalog:
                     else "Select talkgroups and press play"
                 ),
                 "playing": listening,
+                "audio_active": audio_active,
                 "volume": playback.volume,
                 "channel": (
                     catalog_talkgroups.index(selected_talkgroup) + 1
@@ -3481,6 +3491,7 @@ class ServiceCatalog:
                     "title": str(station["name"]) if station is not None else "Radio",
                     "subtitle": track_line,
                     "playing": False,
+                    "audio_active": audio_active,
                     "volume": playback.volume,
                     "preset_id": preset.preset_id if preset is not None else None,
                     "channel": 1 if station is not None else None,
@@ -3501,6 +3512,7 @@ class ServiceCatalog:
                 "title": title,
                 "subtitle": subtitle,
                 "playing": False,
+                "audio_active": audio_active,
                 "volume": playback.volume,
             }
         if requested == "REC" or self.active_service == "recorder":
@@ -3527,6 +3539,7 @@ class ServiceCatalog:
                 "title": title,
                 "subtitle": "Right microphone above · left microphone below",
                 "playing": False,
+                "audio_active": False,
                 "recording": state == "recording",
                 "continuous": continuous,
                 "timeline": voice.get("timeline") or [],
@@ -3534,7 +3547,12 @@ class ServiceCatalog:
                 "volume": playback.volume,
             }
         if playback.state not in {"playing", "paused"}:
-            return {"service": requested or "SYSTEM", "playing": False, "volume": playback.volume}
+            return {
+                "service": requested or "SYSTEM",
+                "playing": False,
+                "audio_active": audio_active,
+                "volume": playback.volume,
+            }
         selected = self._selected_preset() if self.active_service == "webradio" else None
         active_ambient_scene = (
             self.store.channel(self.active_ambient_scene_id)
@@ -3588,6 +3606,7 @@ class ServiceCatalog:
             "title": track_line,
             "subtitle": track_line,
             "playing": not playback.paused,
+            "audio_active": audio_active,
             "recording": (
                 self.recorder.state.state == "recording" or buffered_recording
             ),

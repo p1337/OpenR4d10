@@ -299,6 +299,16 @@ function renderServices(catalog) {
   renderBrandmeisterTalkgroups(catalog.brandmeister || {});
   renderPodcasts(catalog);
   renderWeather(catalog);
+  renderPlaybackActions(catalog.playback || {});
+}
+
+function renderPlaybackActions(playback) {
+  const running = playback.state === "playing" && playback.paused !== true;
+  for (const button of document.querySelectorAll('[data-action="pause"], [data-music-action="pause"]')) {
+    button.textContent = t(running ? "Pause" : "Play");
+    button.classList.toggle("play-action", !running);
+    button.classList.toggle("accent-action", running);
+  }
 }
 
 byId("service-search").addEventListener("input", (event) => {
@@ -571,6 +581,7 @@ function renderLibrary(catalog) {
     const down = libraryButton("↓", "station_move", { station_id: station.id, direction: 1 });
     const play = libraryButton(t("Play"), "station_play", { station_id: station.id });
     play.classList.add("library-play");
+    play.classList.add("play-action");
     up.disabled = index === 0;
     down.disabled = index === stations.length - 1;
     actions.append(
@@ -659,6 +670,7 @@ function renderLibrary(catalog) {
     favorite.setAttribute("aria-label", item.favorite ? t("Remove favorite") : t("Add favorite"));
     const play = libraryButton(t("Play"), "media_play", { media_id: item.id });
     play.classList.add("library-play");
+    play.classList.add("play-action");
     const remove = document.createElement("button");
     remove.type = "button";
     remove.textContent = t("Delete");
@@ -683,6 +695,7 @@ function podcastButton(label, action, extra, primary = false) {
   button.type = "button";
   button.textContent = label;
   if (primary) button.classList.add("library-play");
+  if (action === "podcast_play") button.classList.add("play-action");
   button.addEventListener("click", () => podcastCommand(action, extra));
   return button;
 }
@@ -793,6 +806,7 @@ function ambientButton(label, action, extra, primary = false) {
   button.type = "button";
   button.textContent = label;
   if (primary) button.classList.add("library-play");
+  if (action === "ambient_play") button.classList.add("play-action");
   button.addEventListener("click", () => ambientCommand(action, extra));
   return button;
 }

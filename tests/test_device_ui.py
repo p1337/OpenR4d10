@@ -17,6 +17,7 @@ from openr4d10.device_ui import (
     DeviceUiState,
     HEIGHT,
     MAIN_MENU_ITEMS,
+    PLAY_GREEN,
     SERVICES,
     WIDTH,
     _display_text,
@@ -548,6 +549,40 @@ class DeviceUiTests(unittest.TestCase):
         self.assertEqual(image.getpixel((234, 85)), state.accent)
         self.assertNotEqual(image.getpixel((235, 85)), state.accent)
         self.assertNotEqual(image.getpixel((220, 270)), state.accent)
+
+    def test_idle_play_action_is_green_and_active_pause_uses_accent(self) -> None:
+        idle = render_device_ui(DeviceUiState(service_index=SERVICES.index("RADIO")))
+        active = render_device_ui(
+            DeviceUiState(service_index=SERVICES.index("RADIO"), playing=True)
+        )
+        self.assertEqual(idle.getpixel((215, 90)), PLAY_GREEN)
+        self.assertEqual(active.getpixel((220, 92)), DeviceUiState().accent)
+
+    def test_polish_voice_recorder_uses_common_dyktafon_name(self) -> None:
+        captured: list[str] = []
+        original_text = ImageDraw.ImageDraw.text
+
+        def capture_text(draw, xy, text, *args, **kwargs):
+            captured.append(str(text))
+            return original_text(draw, xy, text, *args, **kwargs)
+
+        state = DeviceUiState(
+            service_index=SERVICES.index("REC"), language="pl"
+        )
+        with patch.object(ImageDraw.ImageDraw, "text", capture_text):
+            render_device_ui(state)
+        self.assertIn("Dyktafon", captured)
+        self.assertNotIn("Rejestrator głosu", captured)
+
+    def test_global_audio_playback_turns_shared_glow_green(self) -> None:
+        state = DeviceUiState(
+            service_index=SERVICES.index("WEATHER"),
+            audio_active=True,
+        )
+        image = render_device_ui(state)
+        glow = image.getpixel((7, 80))
+        self.assertGreater(glow[1], glow[0])
+        self.assertGreater(glow[1], glow[2])
 
     def test_clock_is_centered_on_the_full_display_width(self) -> None:
         positions: dict[str, tuple[float, float]] = {}

@@ -2990,3 +2990,23 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Talkgroups beziehungsweise bedient Filter und Navigation wie dokumentiert;
   weder kurzer noch doppelter oder langer PTT-Druck startet eine Aufnahme,
   markiert Audio oder aktiviert einen roten Aufnahme-Glow.
+
+### 2026-11-01 – Wiedergabefarbe und polnischer Recordername
+
+- Der polnische Gerätename des Sprachrecorders lautet im üblichen
+  Endnutzer-Sprachgebrauch **`Dyktafon`**, nicht das technische
+  `Rejestrator głosu`. Laufende Aufnahme bleibt `Nagrywanie`, Daueraufnahme
+  `Nagrywanie ciągłe`.
+- Der zentrale Dienst-Glow zeigt einen global tatsächlich laufenden
+  Audioplayer grün, auch wenn gerade eine andere visuelle Dienstansicht
+  geöffnet ist. Aufnahme hat Vorrang: markierte beziehungsweise laufende
+  Aufnahmen bleiben rot; ohne Wiedergabe und Aufnahme bleibt der Glow in der
+  gewählten Akzentfarbe.
+- Jede echte Play-Aktion wird grün dargestellt. Zeigt dieselbe Stelle dagegen
+  Pause oder Stop, verwendet sie die gewählte Akzentfarbe. Das gilt für den
+  physischen Play-Kreis und die tatsächlichen Play-Aktionen im Browser, nicht
+  pauschal für Aktivieren-, Aktualisieren- oder Anzeigen-Schaltflächen.
+- Beim Öffnen von `Dyktafon`/`Sprachaufzeichnung` endet weiterhin jede
+  Audioausgabe sofort: mpv-basierte Streams, Radio-Ringspeicher,
+  Ambient-Zusatzlagen und BrandMeister. Erst danach darf Mikrofonaufnahme
+  beginnen.

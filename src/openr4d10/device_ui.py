@@ -21,6 +21,7 @@ MEDIA_TOP_RADIUS = 12
 MEDIA_MARGIN = 7
 PLAYER_GLOW_STRENGTH = 1.3
 DEFAULT_ACCENT = (253, 184, 19)
+PLAY_GREEN = (54, 209, 126)
 SERVICES = ("SYSTEM", "RADIO", "WEATHER", "AMBIENT", "DMR", "PLAYER", "REC")
 MAIN_MENU_ITEMS = (
     "display",
@@ -188,7 +189,7 @@ DISPLAY_TEXT = {
         "select_channel_play": "Wybierz kanał i naciśnij GRAJ",
         "select_talkgroups_play": "Wybierz grupy i naciśnij GRAJ",
         "recording_controls": "Sterowanie nagrywaniem",
-        "voice_recorder": "Rejestrator głosu",
+        "voice_recorder": "Dyktafon",
         "voice_hold": "Przytrzymaj PTT, aby nagrywać",
         "voice_recording": "Nagrywanie",
         "voice_continuous": "Nagrywanie ciągłe",
@@ -382,6 +383,7 @@ class DeviceUiState:
     title: str = "System online"
     subtitle: str = "Receiver ready"
     playing: bool = False
+    audio_active: bool = False
     recording: bool = False
     menu_open: bool = False
     menu_kind: str | None = None
@@ -443,6 +445,7 @@ class DeviceUiState:
             "recorder_timeline": [list(item) for item in self.recorder_timeline],
             "recorder_continuous": self.recorder_continuous,
             "recorder_output": self.recorder_output,
+            "audio_active": self.audio_active,
             "accent_color": "#{:02X}{:02X}{:02X}".format(*self.accent),
         }
 
@@ -748,6 +751,7 @@ class DeviceUiState:
         self.wifi_label = str(receiver.get("wifi") or "OFFLINE")[:32]
         self.ip_address = str(receiver.get("ip_address") or "--")[:15]
         self.playing = bool(receiver.get("playing", self.playing))
+        self.audio_active = bool(receiver.get("audio_active", self.playing))
         self.right_action = "PAUSE" if self.playing else "PLAY"
         self.recording = bool(receiver.get("recording", False))
         self.recorder_continuous = receiver.get("continuous") is True
@@ -840,11 +844,12 @@ def _vertical_label(
     *,
     clockwise: bool,
     header_height: int,
+    color: tuple[int, int, int] = (135, 143, 148),
 ) -> None:
     font = _font(9, bold=True)
     bbox = font.getbbox(text)
     label = Image.new("RGBA", (bbox[2] + 6, bbox[3] - bbox[1] + 6), (0, 0, 0, 0))
-    ImageDraw.Draw(label).text((3, 2 - bbox[1]), text, font=font, fill=(135, 143, 148, 255))
+    ImageDraw.Draw(label).text((3, 2 - bbox[1]), text, font=font, fill=(*color, 255))
     rotated = label.rotate(-90 if clockwise else 90, expand=True)
     image.alpha_composite(
         rotated,
@@ -1462,7 +1467,19 @@ def render_device_ui(
     draw.line((17, 19, 222, 19), fill=(25, 35, 39), width=1)
     draw.line((119, 2, 119, 37), fill=(25, 35, 39), width=1)
     _vertical_label(image, left_action, 8, clockwise=False, header_height=header_height)
-    _vertical_label(image, right_action, 221, clockwise=False, header_height=header_height)
+    right_action_color = (
+        accent if state.playing else PLAY_GREEN
+        if state.service in {"RADIO", "AMBIENT", "DMR", "PLAYER"}
+        else (135, 143, 148)
+    )
+    _vertical_label(
+        image,
+        right_action,
+        221,
+        clockwise=False,
+        header_height=header_height,
+        color=right_action_color,
+    )
     _control_value(
         draw,
         19,
@@ -1550,7 +1567,13 @@ def render_device_ui(
     # decoration. Keep it ahead of every service-specific early return so the
     # recorder and newly registered plugin views inherit it automatically.
     recording_glow = state.service in {"RADIO", "REC"} and state.recording
-    glow_accent = (207, 38, 49) if recording_glow else accent
+    glow_accent = (
+        (207, 38, 49)
+        if recording_glow
+        else PLAY_GREEN
+        if state.audio_active
+        else accent
+    )
     glow_strength = 1.0
     if recording_glow and state.recorder_continuous:
         phase = datetime.now().timestamp() * (2.0 * math.pi / 2.4)
@@ -1799,12 +1822,13 @@ def render_device_ui(
         _draw_back_or_ptt(draw, accent, True, content_top)
     else:
         # Exactly one compact metadata block high (station + track), never taller.
-        draw.ellipse((200, content_top + 5, 234, content_top + 39), fill=(12, 23, 27), outline=accent, width=2)
+        action_color = accent if state.playing else PLAY_GREEN
+        draw.ellipse((200, content_top + 5, 234, content_top + 39), fill=(12, 23, 27), outline=action_color, width=2)
         if state.playing:
             draw.rectangle((211, content_top + 15, 214, content_top + 29), fill=accent)
             draw.rectangle((220, content_top + 15, 223, content_top + 29), fill=accent)
         else:
-            draw.polygon(((211, content_top + 13), (211, content_top + 31), (225, content_top + 22)), fill=accent)
+            draw.polygon(((211, content_top + 13), (211, content_top + 31), (225, content_top + 22)), fill=PLAY_GREEN)
     if state.recording:
         draw.ellipse((190, content_top + 4, 198, content_top + 12), fill=(255, 78, 78))
     return image.convert("RGB")

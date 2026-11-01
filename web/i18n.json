@@ -269,7 +269,7 @@
     "Web Radio": ["Web Radio", "Webradio", "Radio internetowe", "Radio Web", "Radio web"],
     "Local Media": ["Local Media", "Lokale Medien", "Media lokalne", "Médias locaux", "Medios locales"],
     "Recorder": ["Recorder", "Recorder", "Rejestrator", "Enregistreur", "Grabadora"],
-    "Voice Recorder": ["Voice Recorder", "Sprachaufzeichnung", "Rejestrator głosu", "Enregistreur vocal", "Grabadora de voz"],
+    "Voice Recorder": ["Voice Recorder", "Sprachaufzeichnung", "Dyktafon", "Enregistreur vocal", "Grabadora de voz"],
     "Remote SDR": ["Remote SDR", "Remote-SDR", "Zdalne SDR", "SDR distant", "SDR remoto"],
     "Private PTT": ["Private PTT", "Privates PTT", "Prywatne PTT", "PTT privé", "PTT privado"],
     "Feeds": ["Feeds", "Feeds", "Kanały", "Flux", "Fuentes"],

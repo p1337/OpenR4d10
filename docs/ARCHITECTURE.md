@@ -28,6 +28,10 @@ and before any service-specific content branch, so recorder, system and future
 registered plugin views cannot accidentally omit it. Individual services must
 not draw a parallel frame. Only device menus and the WLAN setup screen bypass
 that layer because they use their own navigation treatment.
+The same compositor owns its state colors: idle uses the saved accent, any
+globally active audio owner uses green, and radio/voice recording overrides
+both with red. Continuous recording modulates only red glow strength. Play
+actions use the same green cue, while Pause and Stop use the saved accent.
 
 Encoder hardware is isolated behind logical `InputEvent` values. Four rotary
 controls (`left_outer`, `left_inner`, `right_outer`, `right_inner`) and two
