@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from openr4d10.adapters import FileDisplay, SystemTelemetry, UnconfiguredTelemetry
 from openr4d10.app import OpenR4d10App
-from openr4d10.config import AppConfig
+from openr4d10.config import AppConfig, WebConfig
 from openr4d10.input_events import Control, InputEvent
 
 
@@ -1223,6 +1223,86 @@ class AppTests(unittest.TestCase):
         )
         self.assertIn("RuntimeDirectoryMode=0770", unit)
         self.assertIn("RuntimeDirectoryPreserve=yes", unit)
+
+    def test_restored_voice_recorder_runs_exclusive_entry_before_first_frame(self) -> None:
+        events = []
+
+        class InputDisplay:
+            def __init__(self) -> None:
+                self.service = "SYSTEM"
+                self.app = None
+
+            def render(self, frame) -> None:
+                receiver = frame.fields.get("receiver", {})
+                self.service = str(receiver.get("service") or self.service)
+                events.append(("render", self.service, receiver.get("audio_active")))
+                self.app.stop_event.set()
+
+            def snapshot(self):
+                return {"service": self.service, "menu_open": False}
+
+            def close(self) -> None:
+                events.append(("display_close",))
+
+        class Services:
+            active_service = "brandmeister"
+
+            def receiver_overlay(self, view_service=None):
+                events.append(("overlay", view_service))
+                return {
+                    "service": "REC",
+                    "station": "Voice Recorder",
+                    "title": "Voice Recorder",
+                    "subtitle": "Hold PTT to record",
+                    "playing": False,
+                    "audio_active": self.active_service == "brandmeister",
+                }
+
+            def control(self, request):
+                events.append(("control", request["action"]))
+                self.active_service = "recorder"
+                return {"recording": {"state": "stopped"}}
+
+            def close(self) -> None:
+                events.append(("services_close",))
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            display = InputDisplay()
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                    web=WebConfig(enabled=False),
+                ),
+                display=display,
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,  # type: ignore[arg-type]
+            )
+            display.app = app
+            app.install_signal_handlers = lambda: None  # type: ignore[method-assign]
+            app.run()
+
+        self.assertEqual(
+            events[:4],
+            [
+                ("overlay", None),
+                ("control", "voice_recorder_open"),
+                ("overlay", "REC"),
+                ("render", "REC", False),
+            ],
+        )
+        self.assertEqual(
+            [event for event in events if event == ("control", "voice_recorder_open")],
+            [("control", "voice_recorder_open")],
+        )
 
     def test_render_once_surfaces_unconfigured_power(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

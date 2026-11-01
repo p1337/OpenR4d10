@@ -3082,3 +3082,21 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Statusinformationen in einem eigenen Bereich oberhalb der Timeline. Er darf
   weder als winzige Schrift noch ein zweites Mal mitten in der Audiospur
   erscheinen. Cursor, Gesamtdauer und Wiedergabestatus bleiben lesbar.
+
+### 2026-11-01 – Recorder-App-Start ist ein exklusiver Audio-Lebenszyklus
+
+- Roberts Formulierung „wenn die App startet“ ist wörtlich und nicht nur als
+  späterer Dienstwechsel zu verstehen: Wird `Dyktafon` beziehungsweise
+  `Sprachaufzeichnung` beim Prozessstart als zuletzt verwendete Geräteansicht
+  wiederhergestellt, muss derselbe exklusive Entry-Lebenszyklus laufen wie bei
+  einer manuellen Navigation in den Recorder.
+- Der Start-Lebenszyklus wird synchron ausgeführt, bevor Webserver,
+  Boot-Wartephase oder das erste Recorder-Bild fortfahren. BrandMeister,
+  Ambient-Grundton und -Zusatzlagen, gemeinsamer mpv-Player und
+  Radio-Ringspeicher müssen zu diesem Zeitpunkt bereits gestoppt sein.
+- Eine bloße Wiederherstellung der sichtbaren `REC`-Ansicht ohne
+  `voice_recorder_open` ist unzulässig. Sie führte real zu `service=REC` bei
+  gleichzeitigem `active_service=brandmeister` und hörbarem DMR nach einem
+  Neustart. Der einmalige Startpfad und der spätere Navigationspfad verwenden
+  deshalb dieselbe vorhandene Recorder-Entry-Aktion; der Start darf sie nicht
+  bei jedem Render-Refresh erneut auslösen.

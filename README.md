@@ -76,6 +76,9 @@ the installer report exactly which adapters still need configuration.
   press plays or pauses from the cursor; recording from an earlier cursor
   replaces only the covered interval and preserves the untouched tail;
   recorder playback is fixed at 100% and restores the prior service volume on exit
+- restored VoiceRecorder startup uses that same exclusive entry lifecycle
+  before the web server, boot wait or first recorder frame; rebooting into the
+  last `REC` view can therefore never leave BrandMeister or another stream audible
 - silent ICY title lookup in the radio view before audible Play, with localized
   non-technical fallback text when a station supplies no title
 - simple recorded-music player with favorites, `My Soundmix`, shuffle,

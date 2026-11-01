@@ -53,6 +53,7 @@ class OpenR4d10App:
         self._device_input_lock = threading.Lock()
         self._status_lock = threading.Lock()
         self._view_initialized = False
+        self._pending_initial_view_overlay: dict[str, object] | None = None
         self._ptt_pressed_at: float | None = None
         self._voice_last_release_at: float | None = None
         self._voice_ignore_release = False
@@ -660,20 +661,36 @@ class OpenR4d10App:
             LOG.error("%s adapter failed: %s", name, exc)
             return {"state": "error", "component": name}, f"{name}: {exc}"
 
+    def _initialize_restored_view(self) -> None:
+        """Run the entry lifecycle for the restored view exactly once."""
+
+        if self.services is None or self._view_initialized:
+            return
+        overlay = dict(self.services.receiver_overlay(None))
+        restored_service = str(overlay.get("service") or "").upper()
+        if restored_service == "REC":
+            self.services.control({"action": "voice_recorder_open"})
+            overlay = dict(self.services.receiver_overlay("REC"))
+        self._pending_initial_view_overlay = overlay
+        self._view_initialized = True
+
     def render_once(self) -> None:
         receiver, receiver_error = self._safe_read(self.receiver, "receiver")
         if self.services is not None:
-            snapshot = getattr(self.display, "snapshot", None)
-            current_ui = snapshot() if callable(snapshot) else {}
-            view_service = (
-                str(current_ui.get("service"))
-                if self._view_initialized
-                and isinstance(current_ui, dict)
-                and current_ui.get("service")
-                else None
-            )
-            receiver.update(self.services.receiver_overlay(view_service))
-            self._view_initialized = True
+            self._initialize_restored_view()
+            if self._pending_initial_view_overlay is not None:
+                overlay = self._pending_initial_view_overlay
+                self._pending_initial_view_overlay = None
+            else:
+                snapshot = getattr(self.display, "snapshot", None)
+                current_ui = snapshot() if callable(snapshot) else {}
+                view_service = (
+                    str(current_ui.get("service"))
+                    if isinstance(current_ui, dict) and current_ui.get("service")
+                    else None
+                )
+                overlay = self.services.receiver_overlay(view_service)
+            receiver.update(overlay)
         power, power_error = self._safe_read(self.power, "power")
         errors = [error for error in (receiver_error, power_error) if error]
         self._publish(dashboard_frame(self.config.title, receiver, power, errors))
@@ -690,6 +707,10 @@ class OpenR4d10App:
         self.install_signal_handlers()
         LOG.info("OpenR4d10 service starting")
         try:
+            # Restoring REC is an application-entry event, not a presentation
+            # detail. Silence every other audio owner before the web server,
+            # boot wait or first recorder frame can proceed.
+            self._initialize_restored_view()
             if self.config.web.enabled:
                 self._web_server = WebServer(
                     self.config.web.host,

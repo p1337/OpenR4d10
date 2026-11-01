@@ -277,6 +277,16 @@ Leaving the service finalizes that working file in the fixed
 100-percent player level; its entry remembers and its exit restores the prior
 global service volume.
 
+The entry lifecycle is required for both navigation and process startup. On
+startup the application resolves the persisted view before starting the web
+server or waiting through the semantic boot sequence. If that restored view is
+`REC`, it synchronously invokes the existing `voice_recorder_open` action and
+then rebuilds the first overlay from the silenced state. The resolved overlay
+is cached only until the first frame, so normal refreshes do not repeatedly
+reset recorder playback or volume. Treating restored view state as a
+presentation-only value previously allowed `service=REC` and
+`active_service=brandmeister` to coexist after reboot.
+
 Physical media surfaces use one shared asymmetric mask: 12-pixel upper corners,
 43-pixel lower corners matching the panel, and equal minimal side/bottom
 margins. This applies to station artwork and visual service media rather than
@@ -497,15 +507,18 @@ not substituted for the SSID.
 5. Adapters are created from explicit backend names.
 6. The service catalog migrates the non-secret state database and evaluates
    local dependencies.
-7. The persisted display brightness and device language are loaded into the
+7. The application resolves the persisted device view. A restored `REC` view
+   runs the exclusive VoiceRecorder entry action synchronously and silences
+   every other audio owner before startup continues.
+8. The persisted display brightness and device language are loaded into the
    display adapter without opening a second hardware path.
-8. The local web dashboard binds to the configured local address and port.
-9. The semantic text boot manifest is rendered when enabled.
-10. The semantic dashboard state is refreshed at the configured interval and
+9. The local web dashboard binds to the configured local address and port.
+10. The semantic text boot manifest is rendered when enabled.
+11. The semantic dashboard state is refreshed at the configured interval and
    exposed through `/api/status`.
-11. The Whisplay UI calls `claim_display()`, waits for the boot player to close
+12. The Whisplay UI calls `claim_display()`, waits for the boot player to close
    SPI/GPIO and keeps the ownership lock for its entire lifetime.
-12. `SIGTERM` or `SIGINT` stops the loop, database and HTTP server cleanly.
+13. `SIGTERM` or `SIGINT` stops the loop, database and HTTP server cleanly.
 
 Both display services declare the shared `/run/openr4d10-boot` runtime. This is
 also required when the installer starts the application in an already running
