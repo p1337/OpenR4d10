@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title description">
+  <title id="title">OpenR4d10 Hardware-Bedienübersicht</title>
+  <desc id="description">Schematische Frontansicht mit zwei Doppelencodern, Whisplay-PTT und PiSugar-Powertaste.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#071314"/><stop offset="1" stop-color="#0d2324"/></linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#18292a"/><stop offset="1" stop-color="#091314"/></linearGradient>
+    <radialGradient id="knob"><stop stop-color="#526061"/><stop offset="0.55" stop-color="#283536"/><stop offset="1" stop-color="#0b1112"/></radialGradient>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <style>
+      text{font-family:Inter,"DejaVu Sans",Arial,sans-serif;fill:#edf7f4} .accent{fill:#fdb813}.muted{fill:#91aaa6}.line{stroke:#fdb813;stroke-width:3;fill:none}.hair{stroke:#456260;stroke-width:2;fill:none}.card{fill:#0a1718;stroke:#294142;stroke-width:2}.h1{font-size:54px;font-weight:800;letter-spacing:1px}.h2{font-size:29px;font-weight:800}.body{font-size:22px}.small{font-size:18px}.tag{font-size:17px;font-weight:800;letter-spacing:2px}
+    </style>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#bg)"/>
+  <text x="72" y="86" class="h1">OPENR4D10 · BEDIENUNG</text>
+  <text x="74" y="124" class="body muted">Ein Griffmuster für jeden Dienst · schematische, nicht maßhaltige Darstellung</text>
+
+  <rect x="520" y="205" width="560" height="680" rx="105" fill="url(#body)" stroke="#395253" stroke-width="4"/>
+  <rect x="562" y="315" width="476" height="500" rx="68" fill="#020909" stroke="#fdb813" stroke-width="4" filter="url(#glow)"/>
+  <rect x="585" y="342" width="430" height="72" rx="16" fill="#0b191a" stroke="#274041" stroke-width="2"/>
+  <text x="608" y="374" class="tag accent">VOL 30%</text><text x="825" y="374" class="tag accent">CH 001</text>
+  <text x="608" y="400" class="tag muted">SQL 5</text><text x="825" y="400" class="tag muted">SRV RADIO</text>
+  <rect x="585" y="435" width="430" height="335" rx="45" fill="#102223"/>
+  <text x="800" y="590" text-anchor="middle" class="h2">240 × 280</text>
+  <text x="800" y="630" text-anchor="middle" class="body muted">Dienstinhalt</text>
+
+  <circle cx="640" cy="210" r="82" fill="url(#knob)" stroke="#fdb813" stroke-width="4"/>
+  <circle cx="640" cy="210" r="47" fill="#172425" stroke="#81908f" stroke-width="4"/>
+  <circle cx="960" cy="210" r="82" fill="url(#knob)" stroke="#fdb813" stroke-width="4"/>
+  <circle cx="960" cy="210" r="47" fill="#172425" stroke="#81908f" stroke-width="4"/>
+  <path d="M640 131v20M960 131v20" class="line"/>
+  <text x="640" y="215" text-anchor="middle" class="tag">L</text><text x="960" y="215" text-anchor="middle" class="tag">R</text>
+
+  <rect x="499" y="350" width="28" height="92" rx="14" fill="#fdb813"/>
+  <rect x="1073" y="535" width="28" height="110" rx="14" fill="#e94d63"/>
+
+  <rect x="65" y="175" width="370" height="232" rx="28" class="card"/>
+  <text x="92" y="220" class="h2">LINKER DOPPELENCODER</text>
+  <text x="92" y="263" class="body"><tspan class="accent">Außen</tspan><tspan> · Lautstärke ±10 %</tspan></text>
+  <text x="92" y="302" class="body"><tspan class="accent">Innen</tspan><tspan> · Sekundärfunktion / SQL</tspan></text>
+  <text x="92" y="341" class="body"><tspan class="accent">Klick</tspan><tspan> · bewusst frei</tspan></text>
+  <text x="92" y="377" class="small muted">Im Recorder: 0,1 s / Anfang–Ende</text>
+  <path d="M435 292H505L565 240" class="line"/>
+
+  <rect x="1165" y="175" width="370" height="250" rx="28" class="card"/>
+  <text x="1192" y="220" class="h2">RECHTER ENCODER</text>
+  <text x="1192" y="263" class="body"><tspan class="accent">Außen</tspan><tspan> · Kanal / Eintrag</tspan></text>
+  <text x="1192" y="302" class="body"><tspan class="accent">Innen</tspan><tspan> · Dienst wechseln</tspan></text>
+  <text x="1192" y="341" class="body"><tspan class="accent">Klick</tspan><tspan> · Auswahl / Play / Pause</tspan></text>
+  <text x="1192" y="380" class="body"><tspan class="accent">2 s</tspan><tspan> · Quick-Menü</tspan></text>
+  <path d="M1165 300H1095L1035 240" class="line"/>
+
+  <rect x="65" y="470" width="370" height="190" rx="28" class="card"/>
+  <text x="92" y="515" class="h2">PISUGAR POWER</text>
+  <text x="92" y="560" class="body"><tspan class="accent">Kurz</tspan><tspan> · Hauptmenü</tspan></text>
+  <text x="92" y="599" class="body"><tspan class="accent">Lang</tspan><tspan> · Gerät ausschalten</tspan></text>
+  <text x="92" y="633" class="small muted">Langer Druck gehört nur PiSugar.</text>
+  <path d="M435 555H470V396H499" class="line"/>
+
+  <rect x="1165" y="495" width="370" height="200" rx="28" class="card"/>
+  <text x="1192" y="540" class="h2">WHISPLAY PTT</text>
+  <text x="1192" y="584" class="body"><tspan class="accent">Menü</tspan><tspan> · eine Ebene zurück</tspan></text>
+  <text x="1192" y="623" class="body"><tspan class="accent">Dienst</tspan><tspan> · Kontextaktion</tspan></text>
+  <text x="1192" y="657" class="small muted">Radio behalten · REC aufnehmen · DMR wählen</text>
+  <path d="M1165 590H1102" class="line"/>
+
+  <rect x="65" y="748" width="370" height="137" rx="28" class="card"/>
+  <text x="92" y="790" class="h2">BROWSER</text>
+  <text x="92" y="830" class="body">W/S · A/D · Pfeile · Enter</text>
+  <text x="92" y="861" class="small muted">Leertaste = Menü · Backspace = PTT</text>
+
+  <rect x="1165" y="748" width="370" height="137" rx="28" class="card"/>
+  <text x="1192" y="790" class="h2">MERKSATZ</text>
+  <text x="1192" y="830" class="body">Rechts wählen. Rechts klicken.</text>
+  <text x="1192" y="861" class="body accent">PTT zurück oder Dienstaktion.</text>
+
+  <path d="M520 915H1080" class="hair"/>
+  <text x="800" y="955" text-anchor="middle" class="small muted">OpenR4d10 · Quick-Start-Grafik · Encoder-GPIOs und Gehäusepositionen noch nicht final vermessen</text>
+</svg>
+

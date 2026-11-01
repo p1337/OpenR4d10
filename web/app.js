@@ -1648,7 +1648,7 @@ const keyboardDeviceInputs = {
   ArrowDown: { control: "right_outer", steps: 1 },
   ArrowLeft: { control: "right_inner", steps: -1 },
   ArrowRight: { control: "right_inner", steps: 1 },
-  Space: { control: "left_press" },
+  Space: { control: "home" },
   Enter: { control: "right_press" },
 };
 

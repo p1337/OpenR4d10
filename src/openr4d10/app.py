@@ -109,6 +109,14 @@ class OpenR4d10App:
         input_setter = getattr(self.display, "set_input_handler", None)
         if callable(input_setter):
             input_setter(self._apply_hardware_input)
+        power_button_setter = getattr(self.power, "set_power_button_callback", None)
+        if callable(power_button_setter):
+            power_button_setter(self._apply_power_button_short)
+
+    def _apply_power_button_short(self) -> dict[str, object]:
+        """Route one released PiSugar short press to the global main menu."""
+
+        return self._apply_hardware_input(InputEvent(Control.HOME))
 
     def _apply_hardware_input(self, event: InputEvent) -> dict[str, object]:
         """Route physical controls through the same serialized application path."""
@@ -1290,6 +1298,12 @@ class OpenR4d10App:
         close_display = getattr(self.display, "close", None)
         if callable(close_display):
             close_display()
+        power_button_setter = getattr(self.power, "set_power_button_callback", None)
+        if callable(power_button_setter):
+            power_button_setter(None)
+        close_power = getattr(self.power, "close", None)
+        if callable(close_power):
+            close_power()
         if self.services is not None:
             self.services.close()
             self.services = None

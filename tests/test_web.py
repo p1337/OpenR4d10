@@ -63,7 +63,7 @@ class WebTests(unittest.TestCase):
         self.assertIn("keyboardDeviceRequest", script)
         self.assertNotIn("steps: -request.steps", script)
         self.assertIn('ArrowLeft: { control: "right_inner", steps: -1 }', script)
-        self.assertIn('Space: { control: "left_press" }', script)
+        self.assertIn('Space: { control: "home" }', script)
         self.assertIn('Enter: { control: "right_press" }', script)
         self.assertIn('image.src = scene.artwork;\n      image.alt = "";\n      image.loading = "eager"', script)
         self.assertIn('id="ambient-layer-list"', html)
@@ -204,6 +204,9 @@ class WebTests(unittest.TestCase):
         self.assertNotIn("Geräteansicht", html)
         self.assertNotIn("device-screen-title", html)
         self.assertIn('data-i18n="LIVE DISPLAY"', html)
+        self.assertIn('href="/controls-overview.svg"', html)
+        self.assertIn('data-i18n="CONTROL GUIDE"', html)
+        self.assertTrue(web_root.joinpath("controls-overview.svg").is_file())
         self.assertEqual(translations["locales"], ["en", "de", "pl", "fr", "es"])
         messages = translations["messages"]
         html_keys = {
@@ -240,6 +243,9 @@ class WebTests(unittest.TestCase):
             static.joinpath("app.js").write_text("", encoding="utf-8")
             static.joinpath("i18n.json").write_text(
                 '{"locales":["en"],"messages":{}}', encoding="utf-8"
+            )
+            static.joinpath("controls-overview.svg").write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg"/>', encoding="utf-8"
             )
             server = WebServer(
                 "127.0.0.1",
@@ -278,6 +284,9 @@ class WebTests(unittest.TestCase):
                         "application/json; charset=utf-8",
                     )
                     self.assertEqual(json.loads(response.read())["locales"], ["en"])
+                with urlopen(f"http://{host}:{port}/controls-overview.svg", timeout=2) as response:
+                    self.assertEqual(response.headers["Content-Type"], "image/svg+xml")
+                    self.assertIn(b"<svg", response.read())
                 request = Request(
                     f"http://{host}:{port}/api/control",
                     data=b'{"action":"pause"}',

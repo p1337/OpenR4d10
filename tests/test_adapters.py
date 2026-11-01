@@ -125,6 +125,16 @@ class AdapterTests(unittest.TestCase):
         ):
             PiSugar3Telemetry().read()
 
+    def test_pisugar3_power_button_emits_short_release_but_never_long_press(self) -> None:
+        telemetry = PiSugar3Telemetry()
+        self.assertFalse(telemetry._observe_power_button(False, 1.0))
+        self.assertFalse(telemetry._observe_power_button(True, 2.0))
+        self.assertTrue(telemetry._observe_power_button(False, 2.4))
+
+        self.assertFalse(telemetry._observe_power_button(True, 3.0))
+        self.assertFalse(telemetry._observe_power_button(True, 3.7))
+        self.assertFalse(telemetry._observe_power_button(False, 4.0))
+
 
 if __name__ == "__main__":
     unittest.main()

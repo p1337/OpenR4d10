@@ -36,6 +36,9 @@ the installer report exactly which adapters still need configuration.
 - read-only PiSugar 3 battery percentage over the manufacturer-documented I2C
   identity and capacity registers; no separate PiSugar web service or default
   account is installed
+- read-only PiSugar 3 power-button input: one complete short press opens the
+  main menu, while a press held beyond 0.6 seconds is discarded by OpenR4d10
+  and remains exclusively under the PiSugar power controller
 - native 240 x 280 physical UI with the agreed four-axis encoder layout
 - real Whisplay button on physical pin 11 / BCM17 routed to the logical PTT and
   menu-back path with active-high debouncing
@@ -283,10 +286,16 @@ NetworkManager startup delay or a failed AP activation.
 The dashboard shows live service, system and adapter status. The real Whisplay
 display and sound card are verified. The PiSugar 3 adapter uses the same SMBus
 byte-data transaction as the manufacturer driver, checks the official device
-identity and application mode at I2C address `0x57`, then reads only the
+identity and application mode at I2C address `0x57`, and reads the
 calculated 0–100% capacity register. The percentage appears immediately left
 of the physical battery icon and in the web energy card. It never changes
 charging, RTC, shutdown or controller configuration.
+
+A separate read-only 20-ms monitor reads only the documented power-button bit
+in status register `0x02`. It emits Home after a released press of at most
+0.6 seconds; longer holds produce no application event and therefore retain
+the PiSugar's normal power-off behavior. It never changes watchdog or
+controller configuration.
 
 The **Einstellungen → Display** panel changes the physical Whisplay backlight
 immediately from 0 through 100 percent. The value is stored in the existing
@@ -357,7 +366,16 @@ bottom `READY`/`OpenR4d10` strip are not rendered. Opening the main menu hides
 the complete player and shows the localized heading plus the ten documented
 settings areas as a scrollable list. Up/down on the right outer control moves
 the selection, Enter opens it and PTT returns one menu level unless a ready
-service explicitly owns PTT. The default interface accent is `#FDB813`.
+service explicitly owns PTT. A short PiSugar power-button press opens this
+menu globally; the left encoder push is deliberately unassigned for future
+service use. Browser Space simulates the PiSugar short press. The default
+interface accent is `#FDB813`.
+
+The complete user-facing control contract, hardware legend and honest mapping
+of every currently implemented service are maintained in
+[`docs/USER_GUIDE_CONTROLS.md`](docs/USER_GUIDE_CONTROLS.md). Its two scalable
+SVG quick-reference sheets are suitable for the browser, repository and print;
+they are deliberately schematic rather than unverified enclosure drawings.
 
 BrandMeister replaces the otherwise meaningless Squelch assignment in its
 device view. The right outer axis browses the complete official talkgroup

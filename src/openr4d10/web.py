@@ -28,6 +28,7 @@ STATIC_FILES = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/hoseline.js": ("hoseline.js", "text/javascript; charset=utf-8"),
     "/i18n.json": ("i18n.json", "application/json; charset=utf-8"),
+    "/controls-overview.svg": ("controls-overview.svg", "image/svg+xml"),
 }
 
 

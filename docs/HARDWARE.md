@@ -341,7 +341,7 @@ stereo capture and encoding path; a supervised left/right capsule tap test is
 still required before treating the physical capsule-to-channel order as an
 independent hardware measurement.
 
-## PiSugar 3 percentage telemetry
+## PiSugar 3 percentage telemetry and power button
 
 The physically reported pack is the 1200-mAh PiSugar 3 for the Pi Zero family.
 The official
@@ -368,6 +368,24 @@ returns the version byte `0x03` for every requested register. A target probe on
 2026-10-31 confirmed the required SMBus byte-data path as `0x03` for register
 `0x00`, `0x0F` for `0x01`, and `0x5A` (90%) for `0x2A`. Do not replace the
 combined SMBus transaction with split raw I2C calls.
+
+The same adapter reads one additional manufacturer-documented input without
+writing any controller state: bit 0 of status register `0x02` reports the
+PiSugar 3 power-button level. A dedicated input-core thread polls it every
+20 ms, initializes from the first observed level without synthesizing an edge,
+and emits logical `HOME` only after a complete press/release cycle lasting at
+most 0.6 seconds. A longer hold is latched as non-application input and its
+release is ignored, leaving the PiSugar power-off behavior untouched. The
+watchdog, soft-shutdown and all other controller functions remain disabled and
+unmodified.
+
+The resulting default input contract is:
+
+- PiSugar power button, short press: open the global main menu;
+- PiSugar power button, long hold: no OpenR4d10 action; PiSugar retains power control;
+- Whisplay BCM17 button: physical PTT;
+- left encoder press: deliberately unassigned for later service use;
+- right encoder press: select/play, with its existing long-press quick menu.
 
 ## Still deliberately unknown
 

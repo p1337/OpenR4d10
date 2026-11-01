@@ -24,7 +24,7 @@ Normalansicht
 ├─ REC
 └─ SYSTEM (reine Statusansicht; keine Mediengrafik, kein Play)
 
-Hauptmenü (linker Klick / Leertaste)
+Hauptmenü (PiSugar-Powertaste kurz / Browser: Leertaste)
 ├─ Anzeige
 ├─ Akzentfarbe
 ├─ WLAN
@@ -40,6 +40,7 @@ Navigation
 ├─ rechter äußerer Encoder / Pfeil hoch-runter: Eintrag oder Kanal
 ├─ rechter Klick / Enter: auswählen
 ├─ PTT / Backspace: eine Ebene zurück
+├─ linker Klick: unbelegt und für spätere Dienstfunktionen frei
 ├─ linker äußerer Encoder / W-S: Lautstärke in 10-%-Schritten
 ├─ linker innerer Encoder / A-D: Squelch
 └─ rechter innerer Encoder / Pfeil links-rechts: Dienst wechseln

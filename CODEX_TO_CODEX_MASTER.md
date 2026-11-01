@@ -235,8 +235,13 @@ Die zwei Encoder-Drucktaster sind verbindlich so belegt:
 
 | Drucktaster | kurz drücken | 2 Sekunden halten |
 |---|---|---|
-| links | Hauptmenü | Einstellungen des aktiven Dienstes |
+| links | unbelegt; für spätere Dienstfunktion frei | unbelegt; für spätere Dienstfunktion frei |
 | rechts | Play/Pause; bei BrandMeister Kanal/Talkgroup aktivieren oder deaktivieren | Quick-Menü inklusive Aufnahme |
+
+Der globale Hauptmenüzugang liegt auf einem kurzen Druck der separaten
+PiSugar-3-Powertaste. Ein langer Druck wird von OpenR4d10 vollständig ignoriert
+und bleibt der PiSugar-Ein-/Ausschaltlogik vorbehalten. Die physische
+Whisplay-Taste bleibt ausschließlich die kontextabhängige Hardware-PTT-Taste.
 
 Die ausgewählte Geräteansicht und der tatsächlich laufende Audioplayer sind
 zwei getrennte Zustände. Das Drehen des Dienstreglers navigiert ausschließlich
@@ -264,7 +269,7 @@ Eingaben zusätzlich auf eine PC-Tastatur ab:
 - `A`/`D`: linker innerer Encoder (Squelch niedriger/höher),
 - Pfeil hoch/runter: rechter äußerer Encoder (vorheriger/nächster Kanal),
 - Pfeil links/rechts: rechter innerer Encoder (Dienst zurück/vor),
-- Leertaste: linker Drucktaster,
+- Leertaste: kurzer PiSugar-Powertastendruck beziehungsweise Hauptmenü,
 - Enter: rechter Drucktaster,
 - Backspace halten: PTT aktiv; Loslassen beendet PTT. In Text-, Auswahl- und
   anderen bearbeitbaren Feldern bleibt Backspace ausschließlich die normale
@@ -3768,3 +3773,45 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   outside the input/SPI thread, use a cancellable generation token, and start
   random video playback when ready. Further channel steps choose another random
   result. Expiring stream URLs remain forbidden in persistent state.
+
+### 2026-11-01 – PiSugar-Powertaste öffnet das Hauptmenü
+
+- Der reale PiSugar 3 stellt den aktuellen Pegel seiner Powertaste in Bit 0
+  des dokumentierten Statusregisters `0x02` bereit. OpenR4d10 liest
+  ausschließlich dieses Bit über den bereits erlaubten SMBus-Pfad; der
+  optionale PiSugar-Webserver wird dafür nicht installiert.
+- Ein vollständiger kurzer Druck mit Loslassen innerhalb von höchstens 0,6
+  Sekunden erzeugt genau ein logisches `HOME` und öffnet aus jeder Dienstansicht
+  das lokalisierte Hauptmenü. Browser-Leertaste bildet dieselbe logische Aktion
+  ab.
+- Jeder längere Druck sowie seine spätere Loslassflanke werden von OpenR4d10
+  vollständig verworfen. Die vorhandene PiSugar-Abschaltfunktion bleibt damit
+  unverändert; Watchdog, Soft-Shutdown und Controllerkonfiguration werden weder
+  aktiviert noch beschrieben.
+- Der linke Encoder-Druck verliert seine bisherige globale Menü- und
+  Einstellungsbelegung und bleibt bewusst frei. Rechter Druck bleibt
+  Auswahl/Play beziehungsweise langes Quick-Menü; die Whisplay-Hardwaretaste
+  bleibt PTT.
+
+### 2026-11-01 – Einheitliches Bedienhandbuch und Produktionsgrafiken
+
+- Jeder bereits tatsächlich implementierte Dienst erhält eine verständliche
+  Nutzerbeschreibung mit Zweck, Gerätebedienung und Browserbedienung. Ein im
+  Katalog sichtbarer, aber nicht verbundener Adaptervertrag darf darin niemals
+  als fertiger Dienst erscheinen.
+- Alle Dienste folgen demselben Grundmuster: links Lautstärke beziehungsweise
+  die sichtbar beschriftete Sekundärfunktion, rechts Dienst/Kanal/Auswahl,
+  rechter Druck Auswahl oder Play/Pause, PTT Kontextaktion oder in Menüs
+  zurück, kurzer PiSugar-Druck Hauptmenü. Abweichungen sind nur erlaubt, wenn
+  die Standardfunktion fachlich nicht existiert, und müssen im Funktionskopf
+  sofort sichtbar sein.
+- `docs/USER_GUIDE_CONTROLS.md` ist die nutzerbezogene Bedienwahrheit. Die
+  skalierbaren SVGs `web/controls-overview.svg` und
+  `docs/assets/openr4d10-service-controls.svg` bilden die kompakte
+  Quick-Start- und Dienstmatrix für Browser, README und Druck. Sie sind
+  Produktionsgrafiken, aber ausdrücklich keine maßhaltigen Gehäuse- oder
+  Bohrschablonen vor der realen Encodervermessung.
+- RSS und Webcams werden bis zur Implementierung eigener nativer Ansichten
+  ehrlich als browserverwaltet dokumentiert. Podcasts und lokale Medien teilen
+  die vorhandene PLAYER-Ausgabe, während Abos beziehungsweise Bibliothek im
+  Browser verwaltet werden.

@@ -22,7 +22,7 @@ from PIL import Image, ImageOps
 
 from .ambient import AMBIENT_ARTWORK_ROOT, AMBIENT_BY_ID
 from .config import AdapterConfig, HardwareConfig
-from .cpu_affinity import pin_current_thread_to_ui_core
+from .cpu_affinity import pin_current_thread_to_input_core, pin_current_thread_to_ui_core
 from .device_ui import (
     DISPLAY_TEXT,
     DeviceUiState,
@@ -617,12 +617,23 @@ class PiSugar3Telemetry:
     VERSION_REGISTER = 0x00
     MODE_REGISTER = 0x01
     CAPACITY_REGISTER = 0x2A
+    STATUS_REGISTER = 0x02
+    POWER_BUTTON_MASK = 0x01
     VERSION_PISUGAR3 = 0x03
     MODE_APPLICATION = 0x0F
+    POWER_BUTTON_POLL_SECONDS = 0.02
+    POWER_BUTTON_RETRY_SECONDS = 0.5
+    POWER_BUTTON_MAX_SHORT_SECONDS = 0.6
 
     def __init__(self, device: Path = Path("/dev/i2c-1")) -> None:
         self.device = device
         self._lock = threading.Lock()
+        self._power_button_callback: Callable[[], object] | None = None
+        self._power_button_stop = threading.Event()
+        self._power_button_thread: threading.Thread | None = None
+        self._power_button_available = False
+        self._power_button_last_state = False
+        self._power_button_pressed_at: float | None = None
 
     @classmethod
     def _register(cls, fd: int, register: int) -> int:
@@ -676,6 +687,128 @@ class PiSugar3Telemetry:
             "model": "PiSugar 3",
             "battery_percent": capacity,
         }
+
+    def set_power_button_callback(
+        self, callback: Callable[[], object] | None
+    ) -> None:
+        """Emit only a released short press; PiSugar retains every long press."""
+
+        self._power_button_callback = callback
+        if callback is None:
+            self._stop_power_button_monitor()
+            return
+        thread = self._power_button_thread
+        if thread is not None and thread.is_alive():
+            return
+        self._power_button_stop.clear()
+        self._power_button_thread = threading.Thread(
+            target=self._monitor_power_button,
+            name="openr4d10-pisugar-power-button",
+            daemon=True,
+        )
+        self._power_button_thread.start()
+
+    def _observe_power_button(self, pressed: bool, now: float) -> bool:
+        """Return true exactly once for a complete short press/release cycle."""
+
+        if not self._power_button_available:
+            self._power_button_last_state = pressed
+            self._power_button_pressed_at = now if pressed else None
+            self._power_button_available = True
+            return False
+
+        was_pressed = self._power_button_last_state
+        self._power_button_last_state = pressed
+        if pressed and not was_pressed:
+            self._power_button_pressed_at = now
+            return False
+        if not pressed and was_pressed:
+            pressed_at = self._power_button_pressed_at
+            self._power_button_pressed_at = None
+            return (
+                pressed_at is not None
+                and now - pressed_at <= self.POWER_BUTTON_MAX_SHORT_SECONDS
+            )
+        if (
+            pressed
+            and self._power_button_pressed_at is not None
+            and now - self._power_button_pressed_at
+            > self.POWER_BUTTON_MAX_SHORT_SECONDS
+        ):
+            # A long press belongs exclusively to PiSugar's power controller.
+            self._power_button_pressed_at = None
+        elif not pressed:
+            self._power_button_pressed_at = None
+        return False
+
+    def _reset_power_button_state(self) -> None:
+        self._power_button_available = False
+        self._power_button_last_state = False
+        self._power_button_pressed_at = None
+
+    def _monitor_power_button(self) -> None:
+        """Read the documented PiSugar 3 power-button bit without any writes."""
+
+        pin_current_thread_to_input_core()
+        try:
+            import fcntl
+        except ImportError:  # pragma: no cover - Linux target boundary
+            return
+
+        flags = os.O_RDWR | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+        while not self._power_button_stop.is_set():
+            fd: int | None = None
+            try:
+                fd = os.open(self.device, flags)
+                fcntl.ioctl(fd, self.I2C_SLAVE, self.ADDRESS)
+                with self._lock:
+                    version = self._register(fd, self.VERSION_REGISTER)
+                    mode = self._register(fd, self.MODE_REGISTER)
+                    if version != self.VERSION_PISUGAR3 or mode != self.MODE_APPLICATION:
+                        raise AdapterError(
+                            "I2C address 0x57 did not identify a PiSugar 3 in application mode"
+                        )
+                    pressed = bool(
+                        self._register(fd, self.STATUS_REGISTER)
+                        & self.POWER_BUTTON_MASK
+                    )
+                self._reset_power_button_state()
+                self._observe_power_button(pressed, time.monotonic())
+
+                while not self._power_button_stop.wait(
+                    self.POWER_BUTTON_POLL_SECONDS
+                ):
+                    with self._lock:
+                        pressed = bool(
+                            self._register(fd, self.STATUS_REGISTER)
+                            & self.POWER_BUTTON_MASK
+                        )
+                    if not self._observe_power_button(pressed, time.monotonic()):
+                        continue
+                    callback = self._power_button_callback
+                    if callback is not None:
+                        try:
+                            callback()
+                        except Exception:
+                            LOG.exception("PiSugar power-button input failed")
+            except (AdapterError, OSError):
+                self._reset_power_button_state()
+                self._power_button_stop.wait(self.POWER_BUTTON_RETRY_SECONDS)
+            finally:
+                if fd is not None:
+                    os.close(fd)
+
+    def _stop_power_button_monitor(self) -> None:
+        self._power_button_stop.set()
+        thread = self._power_button_thread
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(timeout=0.5)
+        self._power_button_thread = None
+        self._reset_power_button_state()
+
+    def close(self) -> None:
+        self._power_button_callback = None
+        self._stop_power_button_monitor()
 
 
 class SystemTelemetry:

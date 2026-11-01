@@ -584,7 +584,7 @@ class DeviceUiTests(unittest.TestCase):
 
     def test_main_menu_scroll_select_and_ptt_back_navigation(self) -> None:
         state = DeviceUiState(channel=3, language="de")
-        state.apply(InputEvent(Control.LEFT_PRESS))
+        state.apply(InputEvent(Control.HOME))
         state.apply(InputEvent(Control.RIGHT_OUTER, steps=4))
         self.assertEqual(state.channel, 3)
         self.assertEqual(state.selected_menu_item, "service_store")
@@ -602,6 +602,14 @@ class DeviceUiTests(unittest.TestCase):
         self.assertTrue(state.menu_open)
         state.apply(InputEvent(Control.PTT, active=True))
         self.assertFalse(state.menu_open)
+
+    def test_left_press_is_free_and_home_opens_main_menu(self) -> None:
+        state = DeviceUiState(language="de")
+        state.apply(InputEvent(Control.LEFT_PRESS))
+        self.assertFalse(state.menu_open)
+        state.apply(InputEvent(Control.HOME))
+        self.assertTrue(state.menu_open)
+        self.assertEqual(state.menu_kind, "main_menu")
 
     def test_explicit_ptt_context_owns_button_and_uses_edge_badge(self) -> None:
         state = DeviceUiState(

@@ -13,6 +13,7 @@ class Control(str, Enum):
     RIGHT_INNER = "right_inner"
     LEFT_PRESS = "left_press"
     RIGHT_PRESS = "right_press"
+    HOME = "home"
     PTT = "ptt"
 
 

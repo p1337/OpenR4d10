@@ -260,6 +260,9 @@ h2 { margin-bottom: 0; font-size: 1.15rem; letter-spacing: -0.02em; }
 .services-panel { margin-top: 14px; }
 .settings-panel { margin-top: 14px; }
 .device-control-panel { margin-top: 14px; }
+.control-guide-panel { margin-top: 14px; }
+.control-guide-image { display: block; margin-top: 16px; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: #071314; }
+.control-guide-image img { display: block; width: 100%; height: auto; }
 .display-brightness-setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 20px; align-items: center; margin-top: 22px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(5, 12, 14, .58); }
 .display-appearance-setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 20px; align-items: center; margin-top: 12px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(5, 12, 14, .58); }
 .display-brightness-setting label strong, .display-brightness-setting label span { display: block; }

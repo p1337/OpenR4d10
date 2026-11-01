@@ -556,15 +556,10 @@ class DeviceUiState:
                 self.channel = max(1, min(999, self.channel + event.steps))
         elif event.control == Control.RIGHT_INNER:
             self.service_index = (self.service_index + event.steps) % len(SERVICES)
-        elif event.control == Control.LEFT_PRESS:
-            if event.held_seconds >= 2.0:
-                self._open_menu("service_settings")
-                self.title = "Service settings"
-                self.subtitle = "Settings for the active service"
-            else:
-                self._open_menu("main_menu")
-                self.title = "Main menu"
-                self.subtitle = "Rotate SERVICE to select"
+        elif event.control == Control.HOME:
+            self._open_menu("main_menu")
+            self.title = "Main menu"
+            self.subtitle = "Rotate SERVICE to select"
         elif event.control == Control.RIGHT_PRESS:
             if event.held_seconds >= 2.0:
                 if self.service == "AMBIENT":

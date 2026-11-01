@@ -11,6 +11,62 @@ from openr4d10.input_events import Control, InputEvent
 
 
 class AppTests(unittest.TestCase):
+    def test_pisugar_short_power_button_opens_main_menu(self) -> None:
+        class InputDisplay:
+            def __init__(self):
+                from openr4d10.device_ui import DeviceUiState
+
+                self.state = DeviceUiState()
+
+            def snapshot(self):
+                return self.state.public_state()
+
+            def apply_input(self, event):
+                self.state.apply(event)
+                return self.snapshot()
+
+            def render(self, _frame):
+                pass
+
+        class Power:
+            def __init__(self):
+                self.callback = None
+                self.closed = False
+
+            def set_power_button_callback(self, callback):
+                self.callback = callback
+
+            def read(self):
+                return {"state": "ready", "battery_percent": 80}
+
+            def close(self):
+                self.closed = True
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            display = InputDisplay()
+            power = Power()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=display,  # type: ignore[arg-type]
+                power=power,  # type: ignore[arg-type]
+                receiver=UnconfiguredTelemetry("receiver"),
+            )
+            self.assertIsNotNone(power.callback)
+            power.callback()
+            self.assertTrue(display.state.menu_open)
+            self.assertEqual(display.state.menu_kind, "main_menu")
+            app.close()
+            self.assertIsNone(power.callback)
+            self.assertTrue(power.closed)
     def test_mediathek_uses_only_lower_left_encoder_for_seek(self) -> None:
         class InputDisplay:
             def snapshot(self):

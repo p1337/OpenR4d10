@@ -144,7 +144,10 @@ When `DeviceUiState.menu_open` identifies the main menu, the renderer exits the
 player branch entirely and paints the localized heading plus the documented
 ten-item settings list. The right outer encoder moves only the bounded menu
 selection, and a short right press opens the selected page instead of reaching
-media controls. Menu history stays inside `DeviceUiState`; an active PTT press
+media controls. Logical `HOME`, produced by a released short PiSugar power-
+button press or Browser Space, opens the main menu from every service. The left
+encoder press has no global action and remains available for later service use.
+Menu history stays inside `DeviceUiState`; an active PTT press
 returns one level unless the current semantic frame explicitly declares a
 ready PTT-owning context. The back/PTT affordance is one edge-aligned silhouette
 with a left-rounded, right-open frame and a filled mini arrow. The normal player

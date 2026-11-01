@@ -478,6 +478,12 @@ Keep configuration ownership, adapter contracts, storage paths, service
 permissions and recurring diagnostic traps documented in `docs/`. Update tests
 with every contract change. Never add a second installation path or direct GPIO
 implementation until the existing adapter boundary has been evaluated first.
+
+PiSugar 3 power-button tests must preserve the read-only status-register
+contract: an initial level creates no event, a released press up to 0.6 seconds
+creates exactly one logical `HOME`, and every longer hold plus its release
+creates none. No test or implementation may enable watchdog, soft shutdown or
+write a PiSugar register as a side effect of menu input.
 # DMR boot and Mediathek device regression rules
 
 Tests must fail if the real `run` path calls
