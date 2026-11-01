@@ -269,6 +269,15 @@ note "Installing the official unified Whisplay sound-card driver"
 # ALSA configuration. The service is started again below even though the new
 # kernel module and overlay deliberately wait for a controlled reboot.
 systemctl stop openr4d10.service >/dev/null 2>&1 || true
+# A root-owned backup or interrupted previous start may leave SQLite's fixed
+# files unreadable to the application user. Repair only this known database
+# boundary; never recurse into user media or follow a symlink.
+for sqlite_file in "$state_database" "$state_database-wal" "$state_database-shm"; do
+    if [[ -f "$sqlite_file" && ! -L "$sqlite_file" ]]; then
+        chown openr4d10:openr4d10 "$sqlite_file"
+        chmod 0640 "$sqlite_file"
+    fi
+done
 driver_build_root="$(mktemp -d)"
 trap 'rm -rf -- "$driver_build_root"' EXIT
 cp -a -- "$SOURCE_ROOT/vendor/pisugar-whisplay/audio/." "$driver_build_root/"
@@ -287,7 +296,7 @@ systemctl restart openr4d10.service
 
 note "Checking local web dashboard"
 web_ready=false
-for _attempt in {1..10}; do
+for _attempt in {1..60}; do
     if python3 -c 'from urllib.request import urlopen; response = urlopen("http://127.0.0.1/healthz", timeout=1); raise SystemExit(0 if response.read() == b"ok\n" else 1)' >/dev/null 2>&1; then
         web_ready=true
         break

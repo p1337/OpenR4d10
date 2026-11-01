@@ -253,6 +253,10 @@ current-boot `queued`, `running` or `rebooting` state.
 `install.sh` must create a portable state backup before `apt-get update` whenever
 the live SQLite database exists. A failed backup is a hard stop; do not move this
 protection behind package installation or release-symlink replacement.
+Before restarting the service, the installer repairs only the fixed SQLite DB,
+WAL and SHM ownership without following symlinks or recursing into media. The
+bounded health loop allows 60 attempts so one automatic systemd retry can still
+become ready without producing a false failed update.
 
 Compatibility controls `preset_play` and `preset_save` and the feed control
 `feed_fetch_preset` accept only a checked-in preset ID and never a client-supplied

@@ -30,6 +30,9 @@ class InstallerContractTests(unittest.TestCase):
         for relative in ("media", "media/ambient", "recordings", "cache"):
             self.assertIn(f'"$STATE_ROOT/{relative}"', installer)
         self.assertNotIn('chown -R openr4d10', installer)
+        self.assertIn('"$state_database-wal" "$state_database-shm"', installer)
+        self.assertIn('! -L "$sqlite_file"', installer)
+        self.assertIn('for _attempt in {1..60}', installer)
         self.assertIn("python3-websockets", installer)
         self.assertIn("python3-msgpack", installer)
 

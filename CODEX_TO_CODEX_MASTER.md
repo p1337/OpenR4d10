@@ -3144,3 +3144,20 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   geerbte Affinität belasten.
   Auf nicht verifizierten Plattformen oder mit weniger als vier CPUs wird
   keine Affinität erzwungen.
+
+### 2026-11-01 – Webupdate wartet auf den realen langsamen Erststart
+
+- Beim realen Update auf 0.10.69 wurde der Release korrekt installiert. Der
+  erste Dienststart traf jedoch einmalig auf eine nicht schreibbare SQLite-
+  WAL-/Sidecar-Grenze und der automatische systemd-Neustart stellte den Dienst
+  erst nach Ablauf des zu kurzen Installer-Healthchecks bereit. Dadurch blieb
+  das Update fälschlich auf `failed`, obwohl anschließend 0.10.69 aktiv war.
+- Der einzige Installer repariert vor dem Dienststart ausschließlich Besitzer
+  und Modus der festen SQLite-Datei sowie ihrer beiden festen WAL-/SHM-
+  Sidecars; Medien- und Benutzerverzeichnisse werden weiterhin nicht rekursiv
+  verändert. Symlinks und andere Dateitypen werden nicht angefasst.
+- Der lokale `/healthz`-Check erhält ein ausreichendes begrenztes
+  Bereitschaftsfenster für einen einmaligen systemd-Fehlstart plus Neustart.
+  Erst ein danach weiterhin nicht erreichbarer Webdienst lässt das Update
+  fehlschlagen; ein erfolgreicher später Start darf nicht mehr um wenige
+  Sekunden verpasst werden.
