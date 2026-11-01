@@ -21,6 +21,7 @@ from PIL import Image
 
 from .ambient import AMBIENT_ARTWORK_ROOT, AMBIENT_BY_ID
 from .config import AdapterConfig, HardwareConfig
+from .cpu_affinity import pin_current_thread_to_ui_core
 from .device_ui import DISPLAY_TEXT, DeviceUiState, image_to_rgb565, render_device_ui
 from .input_events import Control, InputEvent
 from .models import Frame
@@ -121,6 +122,13 @@ class CommandDisplay:
 class WhisplayDisplay:
     """Render semantic frames as the agreed native 240 x 280 device UI."""
 
+    _PRIORITY_GLOW_REGIONS = (
+        (0, 64, 240, 18),
+        (0, 82, 20, 171),
+        (220, 82, 20, 171),
+        (0, 253, 240, 27),
+    )
+
     def __init__(
         self,
         panel: WhisplayPanel | None = None,
@@ -145,6 +153,11 @@ class WhisplayDisplay:
         self.brightness_percent = 100
         self._input_handler: Callable[[InputEvent], object] | None = None
         self._lock = threading.Lock()
+        self._priority_event = threading.Event()
+        self._priority_stop = threading.Event()
+        self._priority_thread: threading.Thread | None = None
+        self._priority_recording = False
+        self._priority_continuous = False
 
     def set_input_handler(
         self, handler: Callable[[InputEvent], object] | None
@@ -164,6 +177,81 @@ class WhisplayDisplay:
             handler(InputEvent(Control.PTT, active=active))
         except Exception:
             LOG.exception("Whisplay button input failed")
+
+    def input_context(self) -> dict[str, object]:
+        """Return the tiny routing context without waiting for an SPI transfer."""
+
+        return {
+            "service": self.state.service,
+            "menu_open": self.state.menu_open,
+            "menu_kind": self.state.menu_kind,
+        }
+
+    @staticmethod
+    def _rgb565_region(
+        frame: bytes,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+    ) -> bytes:
+        row_bytes = width * 2
+        source_stride = 240 * 2
+        output = bytearray(row_bytes * height)
+        target = 0
+        for row in range(y, y + height):
+            start = row * source_stride + x * 2
+            output[target : target + row_bytes] = frame[start : start + row_bytes]
+            target += row_bytes
+        return bytes(output)
+
+    def request_recorder_glow(self, *, recording: bool, continuous: bool) -> None:
+        """Queue a non-blocking, partial glow update for a PTT edge."""
+
+        self._priority_recording = recording
+        self._priority_continuous = continuous
+        thread = self._priority_thread
+        if thread is None or not thread.is_alive():
+            self._priority_stop.clear()
+            self._priority_thread = threading.Thread(
+                target=self._priority_display_loop,
+                name="openr4d10-priority-glow",
+                daemon=True,
+            )
+            self._priority_thread.start()
+        self._priority_event.set()
+
+    def _priority_display_loop(self) -> None:
+        pin_current_thread_to_ui_core()
+        while not self._priority_stop.is_set():
+            self._priority_event.wait()
+            self._priority_event.clear()
+            if self._priority_stop.is_set():
+                return
+            recording = self._priority_recording
+            continuous = self._priority_continuous
+            try:
+                with self._lock:
+                    if self.state.service != "REC":
+                        continue
+                    self.state.recording = recording
+                    self.state.recorder_continuous = continuous
+                    image = self._render_image()
+                    frame = image_to_rgb565(image)
+                    show_region = getattr(self.panel, "show_region", None)
+                    if not callable(show_region):
+                        self.panel.show(frame)
+                        continue
+                    for x, y, width, height in self._PRIORITY_GLOW_REGIONS:
+                        show_region(
+                            self._rgb565_region(frame, x, y, width, height),
+                            x,
+                            y,
+                            width,
+                            height,
+                        )
+            except (OSError, RuntimeError, ValueError, WhisplayError):
+                LOG.exception("Whisplay priority glow update failed")
 
     def _show_state(self) -> None:
         self._refresh_hotspot_setup()
@@ -334,6 +422,12 @@ class WhisplayDisplay:
             return output.getvalue()
 
     def close(self) -> None:
+        self._priority_stop.set()
+        self._priority_event.set()
+        priority_thread = self._priority_thread
+        if priority_thread is not None and priority_thread is not threading.current_thread():
+            priority_thread.join(timeout=0.5)
+        self._priority_thread = None
         with self._lock:
             self._input_handler = None
             setter = getattr(self.panel, "set_button_callback", None)

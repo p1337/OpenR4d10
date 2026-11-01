@@ -15,6 +15,7 @@ import time
 from typing import Any, Callable
 
 from .boot_display import claim_display
+from .cpu_affinity import pin_current_thread_to_input_core
 
 
 WIDTH = 240
@@ -199,6 +200,7 @@ class WhisplayPanel:
         self._button_thread.start()
 
     def _button_monitor(self) -> None:
+        pin_current_thread_to_input_core()
         try:
             stable = self._button_pressed()
         except Exception:
@@ -306,6 +308,41 @@ class WhisplayPanel:
         self._set(self._dc, self.DC_BCM, True)
         self._write(rgb565)
         self._apply_brightness()
+
+    def show_region(
+        self,
+        rgb565: bytes,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+    ) -> None:
+        """Update one bounded logical display rectangle without a full frame."""
+
+        values = (x, y, width, height)
+        if any(isinstance(value, bool) or not isinstance(value, int) for value in values):
+            raise ValueError("Whisplay region coordinates must be integers")
+        if width <= 0 or height <= 0:
+            raise ValueError("Whisplay region dimensions must be positive")
+        if x < 0 or y < 0 or x + width > WIDTH or y + height > HEIGHT:
+            raise ValueError("Whisplay region must stay inside the logical frame")
+        if len(rgb565) != width * height * 2:
+            raise ValueError("Whisplay region byte count does not match its dimensions")
+        self.open()
+        x_end = x + width - 1
+        y_start = y + 20
+        y_end = y_start + height - 1
+        self._command(
+            0x2A,
+            bytes((x >> 8, x & 0xFF, x_end >> 8, x_end & 0xFF)),
+        )
+        self._command(
+            0x2B,
+            bytes((y_start >> 8, y_start & 0xFF, y_end >> 8, y_end & 0xFF)),
+        )
+        self._command(0x2C)
+        self._set(self._dc, self.DC_BCM, True)
+        self._write(rgb565)
 
     def close(self) -> None:
         self._button_stop.set()

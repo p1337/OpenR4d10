@@ -3100,3 +3100,43 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Neustart. Der einmalige Startpfad und der spätere Navigationspfad verwenden
   deshalb dieselbe vorhandene Recorder-Entry-Aktion; der Start darf sie nicht
   bei jedem Render-Refresh erneut auslösen.
+
+### 2026-11-01 – PTT-Aufnahmeflanken sind der zeitkritische Recorderpfad
+
+- Der reale Whisplay-Test zeigt ungefähr zwei Sekunden Verzögerung zwischen
+  gedrücktem Hardware-PTT und beginnender Mikrofonaufnahme. Das ist für den
+  Sprachrecorder unzulässig. Die physische BCM17-Druckflanke muss den bereits
+  vorhandenen Aufnahmeprozess unmittelbar starten; Dateizusammenbau,
+  Transkodierung, Indexierung und Displayarbeit dürfen diesen kritischen Pfad
+  nicht verzögern.
+- Die BCM17-Loslassflanke beendet beziehungsweise pausiert die laufende
+  Mikrofonaufnahme ebenso unmittelbar. Erst nachdem der Capture-Prozess sicher
+  kein weiteres Sample schreibt, dürfen Segmentzusammenbau und sonstige
+  Nacharbeiten erfolgen. Diese Nacharbeiten dürfen weder die nächste
+  Eingabeflanke noch das sichtbare Ende der Aufnahme blockieren.
+- Die Doppelklick-Erkennung darf eine normale gehaltene Aufnahme nicht
+  verzögern und insbesondere keine Loslassflanke unterdrücken. Ein erster
+  normaler Druck startet sofort und sein Loslassen stoppt sofort; ein möglicher
+  zweiter Druck kann danach den Dauerbetrieb auslösen.
+- Die Recorder-Timeline besitzt immer einen sichtbaren Playhead. Er wird als
+  weißer vertikaler Strich mit mindestens zwei Pixeln Breite nach allen
+  Wellenformelementen gezeichnet und liegt dadurch sichtbar über der Spur.
+  Nach dem Pausieren steht er an der tatsächlichen Aufnahme-/Cursorposition;
+  der rechte Druck kann die Wiedergabe genau dort starten.
+- Während der Recorder sichtbar ist, wird die Timeline flüssig in einem
+  eigenen begrenzten Takt aktualisiert. Audioaufnahme und beide PTT-Flanken
+  haben dennoch absolute Priorität vor Vollbild-SPI, Telemetrie, Netz- und
+  Bildarbeit. Ein PTT-Ereignis stößt deshalb keinen synchronen vollständigen
+  Displaytransfer an. Sein roter beziehungsweise wieder normaler Glow wird
+  sofort über eine priorisierte kleine ST7789-Teilflächenaktualisierung
+  sichtbar; die reguläre Timeline darf danach nachziehen.
+- Auf dem verifizierten vierkernigen Pi Zero 2 W wird ein CPU-Kern für den
+  Hardware-Eingabeworker und ein weiterer Kern für UI-Renderer, SPI und die
+  Live-Wellenform reserviert. BCM17 und die später vermessenen Encoder
+  verwenden den Eingabepfad; Web, Telemetrie, Audio- und Dateiarbeit verwenden
+  die beiden übrigen Hintergrundkerne. Ein vom Eingabethread gestarteter
+  ffmpeg-/mpv-Prozess und dessen Pegelauswertung werden ausdrücklich wieder
+  auf die Hintergrundkerne gesetzt, damit sie weder Eingabe noch UI durch
+  geerbte Affinität belasten.
+  Auf nicht verifizierten Plattformen oder mit weniger als vier CPUs wird
+  keine Affinität erzwungen.

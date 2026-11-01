@@ -12,6 +12,10 @@ from . import __version__
 from .adapters import AdapterError, Display, Telemetry
 from .boot import load_boot_sequence
 from .config import AppConfig, ConfigError, HardwareConfig
+from .cpu_affinity import (
+    pin_current_thread_to_background_cores,
+    pin_current_thread_to_ui_core,
+)
 from .input_events import Control, InputEvent
 from .models import Frame
 from .services import ServiceCatalog
@@ -21,6 +25,10 @@ from .ui import dashboard_frame
 from .web import WebServer
 
 LOG = logging.getLogger(__name__)
+
+VOICE_DOUBLE_CLICK_SECONDS = 0.45
+VOICE_TAP_MAX_SECONDS = 0.35
+RECORDER_FRAME_INTERVAL_SECONDS = 0.2
 
 
 class OpenR4d10App:
@@ -56,6 +64,7 @@ class OpenR4d10App:
         self._pending_initial_view_overlay: dict[str, object] | None = None
         self._ptt_pressed_at: float | None = None
         self._voice_last_release_at: float | None = None
+        self._voice_pressed_at: float | None = None
         self._voice_ignore_release = False
         self._voice_ignore_until = 0.0
         self._radio_last_release_at: float | None = None
@@ -65,6 +74,8 @@ class OpenR4d10App:
             screen="startup", title=config.title, body="Dienst wird gestartet"
         ).as_dict()
         self._web_server: WebServer | None = None
+        self._last_receiver_telemetry: dict[str, object] = {}
+        self._last_power_telemetry: dict[str, object] = {}
         brightness_reader = getattr(self.services, "display_brightness", None)
         brightness_setter = getattr(self.display, "set_brightness", None)
         if callable(brightness_reader) and callable(brightness_setter):
@@ -281,7 +292,11 @@ class OpenR4d10App:
         """Resolve one logical input and repaint it as one serialized action."""
         media_result: dict[str, object] | None = None
         display_snapshot = getattr(self.display, "snapshot", None)
-        current_ui = display_snapshot() if callable(display_snapshot) else {}
+        fast_context = getattr(self.display, "input_context", None)
+        if event.control == Control.PTT and callable(fast_context):
+            current_ui = fast_context()
+        else:
+            current_ui = display_snapshot() if callable(display_snapshot) else {}
         menu_open = isinstance(current_ui, dict) and current_ui.get("menu_open") is True
         menu_kind = (
             str(current_ui.get("menu_kind"))
@@ -547,6 +562,7 @@ class OpenR4d10App:
             snapshot = getattr(recorder, "voice_snapshot", None)
             voice = snapshot() if callable(snapshot) else {}
             if event.active is True:
+                self._voice_pressed_at = now
                 if now < self._voice_ignore_until:
                     self._voice_ignore_release = True
                 elif voice.get("continuous") is True:
@@ -558,7 +574,7 @@ class OpenR4d10App:
                     self._voice_last_release_at = None
                 elif (
                     self._voice_last_release_at is not None
-                    and now - self._voice_last_release_at <= 0.45
+                    and now - self._voice_last_release_at <= VOICE_DOUBLE_CLICK_SECONDS
                 ):
                     media_result = self.services.control(
                         {"action": "voice_recorder_continuous"}
@@ -571,13 +587,42 @@ class OpenR4d10App:
                     )
                     self._voice_ignore_release = False
             elif self._voice_ignore_release or now < self._voice_ignore_until:
+                self._voice_pressed_at = None
                 self._voice_ignore_release = False
             else:
+                pressed_at = self._voice_pressed_at
+                self._voice_pressed_at = None
                 media_result = self.services.control(
                     {"action": "voice_recorder_pause"}
                 )
-                self._voice_last_release_at = now
-        device_state = handler(event)
+                held_seconds = (
+                    max(0.0, now - pressed_at) if pressed_at is not None else 0.0
+                )
+                self._voice_last_release_at = (
+                    now if held_seconds <= VOICE_TAP_MAX_SECONDS else None
+                )
+        recorder_ptt_event = (
+            event.control == Control.PTT
+            and not menu_open
+            and selected_service == "REC"
+        )
+        if recorder_ptt_event:
+            # Audio edges must never wait for the physical full-frame SPI path.
+            # The priority renderer below paints only the glow asynchronously.
+            device_state = current_ui if isinstance(current_ui, dict) else {}
+            priority_glow = getattr(self.display, "request_recorder_glow", None)
+            recording_state = (
+                media_result.get("recording")
+                if isinstance(media_result, dict)
+                else None
+            )
+            if callable(priority_glow) and isinstance(recording_state, dict):
+                priority_glow(
+                    recording=recording_state.get("state") == "recording",
+                    continuous=recording_state.get("continuous") is True,
+                )
+        else:
+            device_state = handler(event)
         new_service = (
             str(device_state.get("service"))
             if isinstance(device_state, dict) and device_state.get("service")
@@ -593,6 +638,7 @@ class OpenR4d10App:
                     {"action": "voice_recorder_close"}
                 )
                 self._voice_last_release_at = None
+                self._voice_pressed_at = None
                 self._voice_ignore_release = False
                 self._voice_ignore_until = 0.0
             if new_service == "REC":
@@ -600,7 +646,7 @@ class OpenR4d10App:
                     {"action": "voice_recorder_open"}
                 )
         self._view_initialized = True
-        if media_result is not None:
+        if media_result is not None and not recorder_ptt_event:
             self.render_once()
             snapshot = getattr(self.display, "snapshot", None)
             if callable(snapshot):
@@ -676,6 +722,7 @@ class OpenR4d10App:
 
     def render_once(self) -> None:
         receiver, receiver_error = self._safe_read(self.receiver, "receiver")
+        self._last_receiver_telemetry = dict(receiver)
         if self.services is not None:
             self._initialize_restored_view()
             if self._pending_initial_view_overlay is not None:
@@ -692,8 +739,26 @@ class OpenR4d10App:
                 overlay = self.services.receiver_overlay(view_service)
             receiver.update(overlay)
         power, power_error = self._safe_read(self.power, "power")
+        self._last_power_telemetry = dict(power)
         errors = [error for error in (receiver_error, power_error) if error]
         self._publish(dashboard_frame(self.config.title, receiver, power, errors))
+
+    def render_recorder_once(self) -> None:
+        """Refresh the recorder without putting telemetry/network work in its path."""
+
+        if self.services is None or not self._last_receiver_telemetry:
+            self.render_once()
+            return
+        receiver = dict(self._last_receiver_telemetry)
+        receiver.update(self.services.receiver_overlay("REC"))
+        self._publish(
+            dashboard_frame(
+                self.config.title,
+                receiver,
+                dict(self._last_power_telemetry),
+                [],
+            )
+        )
 
     def close(self) -> None:
         close_display = getattr(self.display, "close", None)
@@ -707,6 +772,9 @@ class OpenR4d10App:
         self.install_signal_handlers()
         LOG.info("OpenR4d10 service starting")
         try:
+            # Web and other threads created during startup inherit the two
+            # background cores on the verified Pi Zero 2 W.
+            pin_current_thread_to_background_cores()
             # Restoring REC is an application-entry event, not a presentation
             # detail. Silence every other audio owner before the web server,
             # boot wait or first recorder frame can proceed.
@@ -727,13 +795,29 @@ class OpenR4d10App:
                     self.config.web.host,
                     self.config.web.port,
                 )
+            # The application loop owns native rendering and SPI.  Keep it on
+            # its dedicated core; the Whisplay button monitor pins itself to
+            # the separate input core when the panel opens.
+            pin_current_thread_to_ui_core()
             self.show_boot()
             while not self.stop_event.is_set():
                 try:
-                    self.render_once()
+                    input_context = getattr(self.display, "input_context", None)
+                    context = input_context() if callable(input_context) else {}
+                    if (
+                        isinstance(context, dict)
+                        and context.get("service") == "REC"
+                        and self._last_receiver_telemetry
+                    ):
+                        self.render_recorder_once()
+                        delay = RECORDER_FRAME_INTERVAL_SECONDS
+                    else:
+                        self.render_once()
+                        delay = self.config.refresh_interval_seconds
                 except (AdapterError, OSError, ValueError) as exc:
                     LOG.error("Display adapter failed: %s", exc)
-                self.stop_event.wait(self.config.refresh_interval_seconds)
+                    delay = self.config.refresh_interval_seconds
+                self.stop_event.wait(delay)
         finally:
             if self._web_server is not None:
                 self._web_server.stop()

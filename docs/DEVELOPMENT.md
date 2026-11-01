@@ -55,6 +55,15 @@ localized control label with its associated value; a fixed origin offset is
 insufficient because the two font sizes have different metrics. They also
 require the mirrored right-side order and one common right label edge.
 
+Recorder performance regressions must prove that a PTT press/release does not
+call the normal display snapshot, `apply_input()` redraw or `render_once()`
+path. The edge may queue only the priority glow update. Tests also require the
+ST7789 region coordinates and y-offset, a white two-pixel playhead rendered
+after dense waveform bars, live elapsed position, file-probed segment duration
+and the verified four-core split: background `{0,1}`, UI `{2}`, input `{3}`.
+Do not move telemetry or remote artwork lookup back into the 5 Hz recorder
+frame path.
+
 The normal `run` command also creates a migrated non-secret state database in
 the configured state directory. Tests must always point this at a temporary
 absolute directory. Never add tokens, passwords or keys to this database; its

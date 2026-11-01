@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import Mock, patch
 
 from openr4d10.media import (
     MPV_IPC_TIMEOUT_SECONDS,
@@ -225,6 +226,35 @@ class ProcessBoundaryTests(unittest.TestCase):
             timeline = recorder.voice_snapshot()["timeline"]
             self.assertEqual(len(timeline), 1)
             self.assertLess(timeline[0][0], timeline[0][1])
+
+    def test_live_voice_snapshot_advances_playhead_before_pause(self) -> None:
+        def fake_popen(command, **_kwargs):
+            Path(command[-1]).write_bytes(b"live-audio")
+            return FakeProcess()
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            recorder = StreamRecorder(root / "recordings", popen=fake_popen)
+            with patch("openr4d10.media.time.monotonic", side_effect=[10.0, 12.0]):
+                recorder.voice_start()
+                snapshot = recorder.voice_snapshot()
+            self.assertEqual(snapshot["position_ms"], 2000)
+            self.assertEqual(snapshot["duration_ms"], 2000)
+            recorder.voice_pause()
+
+    def test_voice_pause_uses_closed_file_duration_not_blocked_wall_time(self) -> None:
+        def fake_popen(command, **_kwargs):
+            Path(command[-1]).write_bytes(b"closed-audio")
+            return FakeProcess()
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            recorder = StreamRecorder(root / "recordings", popen=fake_popen)
+            recorder._probe_audio_duration_ms = Mock(return_value=1234)  # type: ignore[method-assign]
+            recorder.voice_start()
+            snapshot = recorder.voice_pause()
+            self.assertEqual(snapshot["position_ms"], 1234)
+            self.assertEqual(snapshot["duration_ms"], 1234)
 
     def test_voice_cursor_boundaries_and_overwrite_preserve_the_unreached_tail(self) -> None:
         commands = []

@@ -79,6 +79,14 @@ the installer report exactly which adapters still need configuration.
 - restored VoiceRecorder startup uses that same exclusive entry lifecycle
   before the web server, boot wait or first recorder frame; rebooting into the
   last `REC` view can therefore never leave BrandMeister or another stream audible
+- latency-prioritized VoiceRecorder input: physical PTT starts capture on its
+  press edge and stops it on release without waiting for telemetry or a full
+  display transfer; the white two-pixel playhead is drawn above the waveform
+  and the red/idle glow changes through a small ST7789 region update
+- verified Pi Zero 2 W CPU placement uses all four cores by role: two for
+  background/audio/web work, one for the fluid native UI and waveform, and one
+  for BCM17 plus future measured encoder input; other platforms keep their
+  normal operating-system scheduling
 - silent ICY title lookup in the radio view before audible Play, with localized
   non-technical fallback text when a station supplies no title
 - simple recorded-music player with favorites, `My Soundmix`, shuffle,

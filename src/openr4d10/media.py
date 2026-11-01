@@ -17,6 +17,11 @@ import time
 from typing import Any, Callable
 from urllib.parse import SplitResult, urlsplit, urlunsplit
 
+from .cpu_affinity import (
+    pin_current_thread_to_background_cores,
+    pin_process_to_background_cores,
+)
+
 
 class MediaError(RuntimeError):
     pass
@@ -130,6 +135,7 @@ class MpvEngine:
                 pass_fds=(child.fileno(),),
                 start_new_session=True,
             )
+            pin_process_to_background_cores(self._process.pid)
         except Exception:
             parent.close()
             child.close()
@@ -704,6 +710,7 @@ class StreamRecorder:
                 self.state.timeline = list(self._voice_timeline)
 
     def _read_voice_levels(self, process: subprocess.Popen[bytes]) -> None:
+        pin_current_thread_to_background_cores()
         stderr = getattr(process, "stderr", None)
         if stderr is None:
             return
@@ -742,6 +749,9 @@ class StreamRecorder:
                     close_fds=True,
                     start_new_session=True,
                 )
+                process_id = getattr(self.process, "pid", None)
+                if isinstance(process_id, int):
+                    pin_process_to_background_cores(process_id)
             except OSError as exc:
                 self._voice_active_segment = None
                 self._voice_recording_started = None
@@ -775,10 +785,16 @@ class StreamRecorder:
         if process is not None and process.poll() is None:
             process.send_signal(signal.SIGINT)
             try:
-                process.wait(timeout=5)
+                process.wait(timeout=0.35)
             except subprocess.TimeoutExpired:
                 process.terminate()
-                process.wait(timeout=2)
+                try:
+                    process.wait(timeout=0.35)
+                except subprocess.TimeoutExpired:
+                    killer = getattr(process, "kill", None)
+                    if callable(killer):
+                        killer()
+                    process.wait(timeout=0.25)
         self.process = None
         thread = self._voice_stats_thread
         if thread is not None and thread is not threading.current_thread():
@@ -788,14 +804,20 @@ class StreamRecorder:
     def voice_pause(self) -> dict[str, Any]:
         with self._voice_lock:
             started = self._voice_recording_started
-            elapsed_ms = (
+            estimated_ms = (
                 max(1, round((time.monotonic() - started) * 1000))
                 if started is not None
                 else 1
             )
             self._stop_active_process()
             if self._voice_active_segment is not None:
-                self._commit_voice_segment(elapsed_ms)
+                segment = self._voice_active_segment
+                segment_ms = (
+                    self._probe_audio_duration_ms(segment)
+                    if segment.is_file() and segment.stat().st_size > 0
+                    else estimated_ms
+                )
+                self._commit_voice_segment(segment_ms)
             self.state.state = "paused" if self._voice_session_dir is not None else "stopped"
             self.state.continuous = False
             self.state.session_active = self._voice_session_dir is not None
@@ -905,8 +927,26 @@ class StreamRecorder:
     def voice_snapshot(self) -> dict[str, Any]:
         with self._voice_lock:
             self.state.timeline = list(self._voice_timeline)
-            self.state.position_ms = self._voice_cursor_ms
-            self.state.duration_ms = self._voice_duration_ms
+            process_running = self.process is not None and self.process.poll() is None
+            if (
+                process_running
+                and self.state.state == "recording"
+                and self._voice_recording_started is not None
+            ):
+                elapsed_ms = max(
+                    1,
+                    round((time.monotonic() - self._voice_recording_started) * 1000),
+                )
+                live_position = self._voice_recording_start_ms + elapsed_ms
+                self.state.position_ms = live_position
+                self.state.duration_ms = max(self._voice_duration_ms, live_position)
+            else:
+                self.state.position_ms = self._voice_cursor_ms
+                self.state.duration_ms = self._voice_duration_ms
+                if self.state.state == "recording" and self.process is not None:
+                    self.state.state = "error"
+                    self.state.error = "microphone capture stopped unexpectedly"
+                    self.state.continuous = False
             return self.state.as_dict()
 
     def stop(self) -> dict[str, Any]:

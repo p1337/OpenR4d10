@@ -277,6 +277,23 @@ Leaving the service finalizes that working file in the fixed
 100-percent player level; its entry remembers and its exit restores the prior
 global service volume.
 
+VoiceRecorder PTT edges are a separate latency-critical path inside that same
+recorder. The physical input callback reads only the display's lock-free routing
+context, starts or stops capture before any renderer call and never performs a
+synchronous full-frame transfer. The display queues a four-region ST7789 glow
+update, while the normal recorder frame loop renders the waveform at 5 Hz from
+cached telemetry. Network, SSID and power reads are excluded from those fast
+frames. The playhead is a white two-pixel overlay drawn after every stereo bar,
+so it remains visible at the live end and at a paused seek position. Segment
+duration is probed from the closed audio file instead of trusting wall time.
+
+On the verified four-core Pi Zero 2 W, CPU affinity gives background work
+(including ffmpeg/mpv and the level parser) cores 0–1, native UI/SPI core 2 and
+the physical input poller core 3. Processes spawned from the input callback are
+immediately moved back to cores 0–1 so inherited affinity cannot starve input.
+The mapping is best-effort and disabled unless `/proc/device-tree/model`
+identifies a Pi Zero 2 with at least four CPUs.
+
 The entry lifecycle is required for both navigation and process startup. On
 startup the application resolves the persisted view before starting the web
 server or waiting through the semantic boot sequence. If that restored view is

@@ -7,7 +7,7 @@ import tempfile
 import threading
 import time
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 from PIL import Image, ImageDraw
 
@@ -512,14 +512,15 @@ class DeviceUiTests(unittest.TestCase):
             language="de",
             recording=True,
             recorder_continuous=True,
-            recorder_timeline=[[80, 20]],
+            recorder_timeline=[[80, 20], [80, 20]],
             recorder_output="261101_082159_VoiceRecorder.mp3",
         )
         image = render_device_ui(state)
         glow = image.getpixel((7, 180))
         self.assertGreater(glow[0], glow[1] * 2)
-        self.assertEqual(image.getpixel((17, 185)), (255, 92, 92))
-        self.assertEqual(image.getpixel((17, 240)), state.accent)
+        self.assertEqual(image.getpixel((17, 185)), (255, 255, 255))
+        self.assertEqual(image.getpixel((222, 185)), (255, 92, 92))
+        self.assertEqual(image.getpixel((222, 240)), state.accent)
 
     def test_radio_recording_uses_red_glow_but_dmr_never_does(self) -> None:
         radio = render_device_ui(
@@ -613,6 +614,7 @@ class DeviceUiTests(unittest.TestCase):
             language="pl",
             recorder_position_ms=1200,
             recorder_duration_ms=3000,
+            recorder_timeline=[[100, 100] for _ in range(96)],
         )
         with patch.object(ImageDraw.ImageDraw, "text", capture_text):
             image = render_device_ui(state)
@@ -622,7 +624,8 @@ class DeviceUiTests(unittest.TestCase):
         self.assertLess(hints[0][1][1], 130)
         self.assertIn("GRAJ", [item[0] for item in captured])
         self.assertNotIn("PTT", [item[0] for item in captured])
-        self.assertNotEqual(image.getpixel((99, 190)), (7, 17, 20))
+        self.assertEqual(image.getpixel((99, 190)), (255, 255, 255))
+        self.assertEqual(image.getpixel((100, 190)), (255, 255, 255))
 
     def test_global_audio_playback_turns_shared_glow_green(self) -> None:
         state = DeviceUiState(
@@ -781,12 +784,19 @@ class FakePanel:
         self.brightness: list[int] = []
         self.button_callback = None
         self.closed = False
+        self.regions: list[tuple[bytes, int, int, int, int]] = []
+        self.region_event = threading.Event()
 
     def show(self, frame: bytes) -> None:
         self.frames.append(frame)
 
     def set_brightness(self, brightness_percent: int) -> None:
         self.brightness.append(brightness_percent)
+
+    def show_region(self, frame, x, y, width, height) -> None:
+        self.regions.append((frame, x, y, width, height))
+        if len(self.regions) >= 4:
+            self.region_event.set()
 
     def set_button_callback(self, callback) -> None:
         self.button_callback = callback
@@ -800,6 +810,44 @@ class FakePanel:
 
 
 class WhisplayDisplayTests(unittest.TestCase):
+    def test_priority_recorder_glow_uses_small_partial_updates(self) -> None:
+        panel = FakePanel()
+        display = WhisplayDisplay(panel=panel)  # type: ignore[arg-type]
+        display.state.service_index = SERVICES.index("REC")
+
+        display.request_recorder_glow(recording=True, continuous=False)
+        self.assertTrue(panel.region_event.wait(1.0))
+
+        self.assertTrue(display.state.recording)
+        self.assertEqual(len(panel.regions), 4)
+        self.assertLess(
+            sum(width * height for _frame, _x, _y, width, height in panel.regions),
+            WIDTH * HEIGHT,
+        )
+        for frame, _x, _y, width, height in panel.regions:
+            self.assertEqual(len(frame), width * height * 2)
+        display.close()
+
+    def test_panel_region_uses_logical_coordinates_and_y_offset(self) -> None:
+        panel = WhisplayPanel()
+        panel._spi = Mock()
+        panel._dc = Mock()
+        panel._command = Mock()  # type: ignore[method-assign]
+        panel._set = Mock()  # type: ignore[method-assign]
+        panel._write = Mock()  # type: ignore[method-assign]
+
+        panel.show_region(bytes(4 * 3 * 2), 5, 7, 4, 3)
+
+        self.assertEqual(
+            panel._command.call_args_list,
+            [
+                call(0x2A, b"\x00\x05\x00\x08"),
+                call(0x2B, b"\x00\x1b\x00\x1d"),
+                call(0x2C),
+            ],
+        )
+        panel._write.assert_called_once_with(bytes(24))
+
     def test_physical_button_monitor_debounces_active_high_edges(self) -> None:
         class FakeButton:
             def __init__(self) -> None:

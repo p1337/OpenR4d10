@@ -1020,6 +1020,92 @@ class AppTests(unittest.TestCase):
             ],
         )
 
+    def test_voice_ptt_edges_skip_full_display_and_queue_priority_glow(self) -> None:
+        class Recorder:
+            def __init__(self) -> None:
+                self.state = "paused"
+
+            def voice_snapshot(self):
+                return {"state": self.state, "continuous": False}
+
+        class InputDisplay:
+            def __init__(self) -> None:
+                self.render_count = 0
+                self.apply_count = 0
+                self.glows = []
+
+            def render(self, _frame) -> None:
+                self.render_count += 1
+
+            def input_context(self):
+                return {"service": "REC", "menu_open": False, "menu_kind": None}
+
+            def snapshot(self):
+                raise AssertionError("PTT fast path must not wait for display snapshot")
+
+            def apply_input(self, _event):
+                self.apply_count += 1
+                return self.input_context()
+
+            def request_recorder_glow(self, *, recording, continuous):
+                self.glows.append((recording, continuous))
+
+        class Services:
+            active_service = "recorder"
+
+            def __init__(self) -> None:
+                self.recorder = Recorder()
+                self.requests = []
+
+            def control(self, request):
+                self.requests.append(request)
+                if request["action"] == "voice_recorder_hold":
+                    self.recorder.state = "recording"
+                elif request["action"] == "voice_recorder_pause":
+                    self.recorder.state = "paused"
+                return {"recording": self.recorder.voice_snapshot()}
+
+            def receiver_overlay(self, _view_service=None):
+                return {"service": "REC", "recording": self.recorder.state == "recording"}
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            display = InputDisplay()
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=display,
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,
+            )
+            with patch("openr4d10.app.time.monotonic", side_effect=[10.0, 11.0]):
+                app.control(
+                    {"action": "device_input", "control": "ptt", "active": True}
+                )
+                app.control(
+                    {"action": "device_input", "control": "ptt", "active": False}
+                )
+
+        self.assertEqual(
+            services.requests,
+            [
+                {"action": "voice_recorder_hold"},
+                {"action": "voice_recorder_pause"},
+            ],
+        )
+        self.assertEqual(display.apply_count, 0)
+        self.assertEqual(display.render_count, 0)
+        self.assertEqual(display.glows, [(True, False), (False, False)])
+
     def test_radio_ptt_double_click_starts_and_next_click_stops_keep_all(self) -> None:
         class Buffer:
             def __init__(self) -> None:

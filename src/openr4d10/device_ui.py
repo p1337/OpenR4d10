@@ -1448,24 +1448,33 @@ def _draw_voice_recorder(
     )
     draw.line((left + 6, middle, right - 6, middle), fill=(70, 86, 90), width=1)
     samples = state.recorder_timeline[-96:]
-    if state.recorder_duration_ms > 0:
-        cursor_fraction = min(
-            1.0, state.recorder_position_ms / state.recorder_duration_ms
+    if samples:
+        usable_width = right - left - 14
+        step = usable_width / max(1, len(samples) - 1)
+        amplitude = max(8, (bottom - top) // 2 - 8)
+        for index, sample in enumerate(samples):
+            sample_left, sample_right = sample
+            x = round(left + 7 + index * step)
+            upper = round(amplitude * sample_right / 100)
+            lower = round(amplitude * sample_left / 100)
+            draw.line((x, middle - upper, x, middle), fill=(255, 92, 92), width=1)
+            draw.line((x, middle, x, middle + lower), fill=state.accent, width=1)
+
+    # Draw the playhead last so dense stereo bars can never cover it.  A new
+    # or still-live session keeps a visible cursor even before its first
+    # finalized duration is available.
+    if state.recorder_duration_ms > 0 or state.recorder_output or samples:
+        cursor_fraction = (
+            min(1.0, state.recorder_position_ms / state.recorder_duration_ms)
+            if state.recorder_duration_ms > 0
+            else 0.0
         )
         cursor_x = round(left + 6 + (right - left - 12) * cursor_fraction)
-        draw.line((cursor_x, top + 4, cursor_x, bottom - 4), fill=state.accent, width=2)
-    if not samples:
-        return
-    usable_width = right - left - 14
-    step = usable_width / max(1, len(samples) - 1)
-    amplitude = max(8, (bottom - top) // 2 - 8)
-    for index, sample in enumerate(samples):
-        sample_left, sample_right = sample
-        x = round(left + 7 + index * step)
-        upper = round(amplitude * sample_right / 100)
-        lower = round(amplitude * sample_left / 100)
-        draw.line((x, middle - upper, x, middle), fill=(255, 92, 92), width=1)
-        draw.line((x, middle, x, middle + lower), fill=state.accent, width=1)
+        draw.line(
+            (cursor_x, top + 4, cursor_x, bottom - 4),
+            fill=(255, 255, 255),
+            width=2,
+        )
 
 
 def render_device_ui(
