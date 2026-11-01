@@ -7,6 +7,8 @@ After=network-online.target
 After=openr4d10-boot.service
 Wants=openr4d10-update-recover.service
 After=openr4d10-update-recover.service
+Wants=openr4d10-audio-max.service
+After=openr4d10-audio-max.service
 
 [Service]
 Type=simple

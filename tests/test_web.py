@@ -82,7 +82,7 @@ class WebTests(unittest.TestCase):
         self.assertIn("talkgroup <= 90", script)
         self.assertIn("chooseBrandmeisterReplacement", script)
         self.assertIn("replace_talkgroup: replacement", script)
-        self.assertIn("Five talkgroups are active. Which one should be replaced?", translations["messages"])
+        self.assertIn("Six talkgroups are active. Which one should be replaced?", translations["messages"])
         self.assertIn('"station_move"', script)
         self.assertIn('"station_delete"', script)
         self.assertIn("Playback volume {{volume}}%", script)

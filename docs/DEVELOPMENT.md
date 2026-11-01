@@ -288,8 +288,8 @@ cancellable timer opens the country filter at the two-second threshold while
 PTT remains held. Releasing after that threshold is consumed and must neither
 toggle a TG nor close the country menu. Tests must drive the timer without a
 wall-clock sleep and prove both the pre-threshold cancellation and post-threshold
-release behavior. A sixth activation must be
-tested as an explicit five-row replacement transaction, including cancellation;
+release behavior. A seventh activation must be
+tested as an explicit six-choice replacement transaction, including cancellation;
 it must never evict a TG implicitly.
 Device-catalog tests must also disable a selected enabled TG and prove that the
 cursor returns to catalog position one on the first remaining enabled row,

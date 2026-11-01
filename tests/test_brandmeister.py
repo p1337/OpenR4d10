@@ -8,6 +8,7 @@ from unittest.mock import patch
 from openr4d10.brandmeister import (
     BrandmeisterReceiver,
     BrandmeisterTalkgroupCatalog,
+    MAX_TALKGROUPS,
     country_code,
     group_message,
 )
@@ -35,6 +36,10 @@ class _Process:
 class BrandmeisterReceiverTests(unittest.TestCase):
     def test_subscription_message_and_country_mapping_match_hoseline(self) -> None:
         self.assertEqual(group_message(1, (91,)), bytes((0x92, 1, 0x91, 91)))
+        six = (91, 92, 260, 262, 3100, 505)
+        self.assertEqual(group_message(1, six)[2], 0x90 + MAX_TALKGROUPS)
+        with self.assertRaisesRegex(ValueError, "one to six"):
+            group_message(1, six + (234,))
         self.assertEqual(country_code(262), "DE")
         self.assertEqual(country_code(260), "PL")
         self.assertIsNone(country_code(91))

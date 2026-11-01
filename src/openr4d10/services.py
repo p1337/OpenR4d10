@@ -29,6 +29,7 @@ from .ambient import (
 from .brandmeister import (
     BrandmeisterReceiver,
     BrandmeisterTalkgroupCatalog,
+    MAX_TALKGROUPS,
     country_code,
 )
 from .content import (
@@ -575,10 +576,10 @@ class ServiceCatalog:
         if rows and not any(item["selected"] is True for item in rows):
             rows[0]["selected"] = True
             self._selected_brandmeister_replacement = int(rows[0]["talkgroup"])
-        return rows[:5]
+        return rows[:MAX_TALKGROUPS]
 
     def _brandmeister_device_window(
-        self, entries: list[dict[str, object]], *, size: int = 5
+        self, entries: list[dict[str, object]], *, size: int = MAX_TALKGROUPS
     ) -> tuple[list[dict[str, object]], int, int]:
         """Return a bounded, scrollable catalog window for the 240x280 UI."""
 
@@ -641,7 +642,7 @@ class ServiceCatalog:
                 and metadata.get("enabled") is True
             ):
                 enabled.append(talkgroup)
-            if len(enabled) == 5:
+            if len(enabled) == MAX_TALKGROUPS:
                 break
         return enabled
 
@@ -733,7 +734,7 @@ class ServiceCatalog:
                     "updated_at": str(heard.get("updated_at") or ""),
                 }
             )
-            if len(rows) == 5:
+            if len(rows) == MAX_TALKGROUPS:
                 break
         rows.sort(key=lambda item: not bool(item["active"]))
         return rows
@@ -1720,7 +1721,7 @@ class ServiceCatalog:
                 "replacement_rows": self._brandmeister_replacement_rows()
                 if self._pending_brandmeister_talkgroup is not None
                 else [],
-                "limits": {"saved": 30, "enabled": 5},
+                "limits": {"saved": 30, "enabled": MAX_TALKGROUPS},
             },
             "media": media,
             "items": services,
@@ -2359,7 +2360,7 @@ class ServiceCatalog:
                 channels = self.store.channels("brandmeister")
                 if len(channels) >= 30:
                     raise ValueError("at most 30 BrandMeister talkgroups can be saved")
-                if len(self._enabled_brandmeister_talkgroups()) >= 5:
+                if len(self._enabled_brandmeister_talkgroups()) >= MAX_TALKGROUPS:
                     self._pending_brandmeister_talkgroup = talkgroup
                     self._selected_brandmeister_replacement = self._enabled_brandmeister_talkgroups()[0]
                     return {
@@ -2384,7 +2385,7 @@ class ServiceCatalog:
             metadata = channel.get("metadata")
             metadata = dict(metadata) if isinstance(metadata, dict) else {}
             enabled = metadata.get("enabled") is not True
-            if enabled and len(self._enabled_brandmeister_talkgroups()) >= 5:
+            if enabled and len(self._enabled_brandmeister_talkgroups()) >= MAX_TALKGROUPS:
                 self._pending_brandmeister_talkgroup = talkgroup
                 self._selected_brandmeister_replacement = self._enabled_brandmeister_talkgroups()[0]
                 return {
@@ -2440,7 +2441,7 @@ class ServiceCatalog:
             channels = self.store.channels("brandmeister")
             if len(channels) >= 30 and not any(str(item["external_id"]) == str(talkgroup) for item in channels):
                 raise ValueError("at most 30 BrandMeister talkgroups can be saved")
-            if enabled and len(self._enabled_brandmeister_talkgroups()) >= 5:
+            if enabled and len(self._enabled_brandmeister_talkgroups()) >= MAX_TALKGROUPS:
                 if isinstance(replace_talkgroup, int):
                     return self._replace_brandmeister_talkgroup(
                         replace_talkgroup,
@@ -2485,7 +2486,11 @@ class ServiceCatalog:
                 raise ValueError("BrandMeister talkgroup was not found")
             metadata = channel.get("metadata")
             metadata = dict(metadata) if isinstance(metadata, dict) else {}
-            if enabled and metadata.get("enabled") is not True and len(self._enabled_brandmeister_talkgroups()) >= 5:
+            if (
+                enabled
+                and metadata.get("enabled") is not True
+                and len(self._enabled_brandmeister_talkgroups()) >= MAX_TALKGROUPS
+            ):
                 talkgroup = metadata.get("talkgroup")
                 if isinstance(replace_talkgroup, int) and isinstance(talkgroup, int):
                     return self._replace_brandmeister_talkgroup(
@@ -3534,23 +3539,40 @@ class ServiceCatalog:
             alias = state.get("alias")
             status = str(state.get("status") or "stopped")
             catalog_entries = self._brandmeister_device_entries(allow_network=False)
+            activity_rows = self._brandmeister_activity_rows(state)
+            activity_by_talkgroup = {
+                int(item["talkgroup"]): item for item in activity_rows
+            }
+            for item in catalog_entries:
+                talkgroup = item.get("talkgroup")
+                heard = (
+                    activity_by_talkgroup.get(talkgroup, {})
+                    if isinstance(talkgroup, int) and not isinstance(talkgroup, bool)
+                    else {}
+                )
+                source = heard.get("source")
+                item.update(
+                    {
+                        "active": heard.get("active") is True,
+                        "source": (
+                            source
+                            if isinstance(source, int) and not isinstance(source, bool)
+                            else None
+                        ),
+                        "alias": str(heard.get("alias") or "")[:80],
+                    }
+                )
             catalog_talkgroups = [int(item["talkgroup"]) for item in catalog_entries]
             listening = status in {"connecting", "listening", "call", "reconnecting"}
-            activity_rows = self._brandmeister_activity_rows(state)
             catalog_rows, catalog_position, catalog_count = self._brandmeister_device_window(
                 catalog_entries
             )
             country_rows, country_position, country_count = self._bounded_selection_window(
                 self._brandmeister_country_entries(allow_network=False)
             )
-            replacement_rows = self._brandmeister_replacement_rows()
-            replacement_position = next(
-                (
-                    index
-                    for index, item in enumerate(replacement_rows, start=1)
-                    if item.get("selected") is True
-                ),
-                0,
+            replacement_entries = self._brandmeister_replacement_rows()
+            replacement_rows, replacement_position, replacement_count = (
+                self._bounded_selection_window(replacement_entries)
             )
             return {
                 "service": "DMR",
@@ -3586,7 +3608,7 @@ class ServiceCatalog:
                 "pending_talkgroup": self._pending_brandmeister_talkgroup,
                 "replacement_rows": replacement_rows,
                 "replacement_position": replacement_position,
-                "replacement_count": len(replacement_rows),
+                "replacement_count": replacement_count,
             }
         service_label = {
             "webradio": "RADIO",

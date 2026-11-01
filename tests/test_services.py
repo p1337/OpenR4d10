@@ -794,7 +794,7 @@ class ServiceCatalogTests(unittest.TestCase):
             finally:
                 catalog.close()
 
-    def test_brandmeister_country_filter_and_sixth_talkgroup_replacement(self) -> None:
+    def test_brandmeister_country_filter_and_seventh_talkgroup_replacement(self) -> None:
         class Receiver:
             def __init__(self):
                 self.state = {
@@ -831,6 +831,7 @@ class ServiceCatalogTests(unittest.TestCase):
                     {"talkgroup": 3100, "name": "USA", "country_code": "US"},
                     {"talkgroup": 234, "name": "United Kingdom", "country_code": "GB"},
                     {"talkgroup": 204, "name": "Netherlands", "country_code": "NL"},
+                    {"talkgroup": 260, "name": "Poland", "country_code": "PL"},
                     {"talkgroup": 505, "name": "Australia", "country_code": "AU"},
                 ]
 
@@ -873,6 +874,7 @@ class ServiceCatalogTests(unittest.TestCase):
                     (3100, "USA"),
                     (234, "United Kingdom"),
                     (204, "Netherlands"),
+                    (260, "Poland"),
                 ):
                     catalog.control(
                         {
@@ -888,11 +890,12 @@ class ServiceCatalogTests(unittest.TestCase):
                 replacement_frame = catalog.receiver_overlay("DMR")
                 self.assertTrue(replacement_frame["replacement_required"])
                 self.assertEqual(len(replacement_frame["replacement_rows"]), 5)
+                self.assertEqual(replacement_frame["replacement_count"], 6)
 
                 catalog.control({"action": "brandmeister_replacement_step", "steps": 1})
                 replaced = catalog.control({"action": "brandmeister_replacement_confirm"})
                 enabled = catalog._enabled_brandmeister_talkgroups()
-                self.assertEqual(len(enabled), 5)
+                self.assertEqual(len(enabled), 6)
                 self.assertIn(505, enabled)
                 self.assertNotIn(replaced["replaced_talkgroup"], enabled)
             finally:

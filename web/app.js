@@ -22,6 +22,7 @@ let brandmeisterCatalog = [];
 let brandmeisterCatalogQuery = "";
 let brandmeisterCatalogSignature = "";
 let brandmeisterReceiver = null;
+let brandmeisterEnabledLimit = 6;
 
 const BRANDMEISTER_FLAGS = new Map([
   ["204", "🇳🇱"], ["208", "🇫🇷"], ["214", "🇪🇸"], ["222", "🇮🇹"],
@@ -1510,12 +1511,12 @@ function selectedBrandmeisterTalkgroups() {
 
 function chooseBrandmeisterReplacement() {
   const active = brandmeisterTalkgroups.filter((item) => item.enabled);
-  if (active.length < 5) return undefined;
+  if (active.length < brandmeisterEnabledLimit) return undefined;
   const choices = active
     .map((item, index) => `${index + 1}: TG ${item.talkgroup} · ${item.name}`)
     .join("\n");
   const answer = window.prompt(
-    `${t("Five talkgroups are active. Which one should be replaced?")}\n\n${choices}\n\n${t("Enter a number from 1 to 5, or cancel.")}`,
+    `${t("Six talkgroups are active. Which one should be replaced?")}\n\n${choices}\n\n${t("Enter a number from 1 to 6, or cancel.")}`,
     "1",
   );
   if (answer === null) return null;
@@ -1601,6 +1602,10 @@ function renderBrandmeisterCatalog() {
 }
 
 function renderBrandmeisterTalkgroups(state = {}) {
+  const configuredLimit = state.limits?.enabled;
+  brandmeisterEnabledLimit = Number.isInteger(configuredLimit) && configuredLimit > 0
+    ? configuredLimit
+    : 6;
   brandmeisterTalkgroups = Array.isArray(state.channels) ? state.channels : [];
   const list = byId("brandmeister-talkgroup-list");
   list.replaceChildren();
@@ -1656,7 +1661,7 @@ function renderBrandmeisterTalkgroups(state = {}) {
     row.append(activityIcon, label, actions);
     list.append(row);
   }
-  byId("brandmeister-talkgroup-count").textContent = `${selectedBrandmeisterTalkgroups().length} / 5`;
+  byId("brandmeister-talkgroup-count").textContent = `${selectedBrandmeisterTalkgroups().length} / ${brandmeisterEnabledLimit}`;
   renderBrandmeisterCatalog();
   updateBrandmeisterState(state);
 }
@@ -1670,7 +1675,7 @@ async function addBrandmeisterTalkgroup() {
   }
   await brandmeisterCommand("brandmeister_talkgroup_add", {
     talkgroup,
-    enabled: selectedBrandmeisterTalkgroups().length < 5,
+    enabled: selectedBrandmeisterTalkgroups().length < brandmeisterEnabledLimit,
   });
   input.value = "";
   return true;

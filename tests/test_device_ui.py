@@ -276,7 +276,7 @@ class DeviceUiTests(unittest.TestCase):
             label_right = measure.textbbox(label_xy, label, font=label_font)[2]
             self.assertLessEqual(label_right + 6, value_xy[0])
 
-    def test_dmr_view_pins_active_call_above_scrollable_catalog_rows(self) -> None:
+    def test_dmr_view_glows_active_call_inside_six_row_catalog(self) -> None:
         state = DeviceUiState(
             service_index=SERVICES.index("DMR"),
             source="TG 262",
@@ -296,12 +296,23 @@ class DeviceUiTests(unittest.TestCase):
             ],
             dmr_catalog_rows=[
                 {
+                    "talkgroup": 262,
+                    "name": "Germany",
+                    "country_code": "DE",
+                    "enabled": True,
+                    "active": True,
+                    "source": 2621234,
+                    "alias": "DL1TEST",
+                    "selected": False,
+                    "position": 1,
+                },
+                {
                     "talkgroup": 91,
                     "name": "Worldwide",
                     "country_code": "",
                     "enabled": True,
                     "selected": False,
-                    "position": 1,
+                    "position": 2,
                 },
                 {
                     "talkgroup": 3100,
@@ -309,19 +320,29 @@ class DeviceUiTests(unittest.TestCase):
                     "country_code": "US",
                     "enabled": False,
                     "selected": True,
-                    "position": 2,
+                    "position": 3,
                 },
+                {"talkgroup": 92, "name": "Europe", "enabled": False, "selected": False, "position": 4},
+                {"talkgroup": 260, "name": "Poland", "enabled": False, "selected": False, "position": 5},
+                {"talkgroup": 505, "name": "Australia", "enabled": False, "selected": False, "position": 6},
             ],
         )
         drawn = self._drawn_text(state)
-        self.assertIn("TG 262", drawn)
+        self.assertTrue(any(value.startswith("TG 262  Germany") for value in drawn))
         self.assertTrue(any("DL1TEST" in value for value in drawn))
         self.assertIn("TG 91  Worldwide", drawn)
         self.assertTrue(any(value.startswith("TG 3100  Inactive exa") for value in drawn))
-        self.assertIn("2/1700", drawn)
+        self.assertTrue(any("3/1700" in value for value in drawn))
         self.assertIn("ON", drawn)
         self.assertIn("OFF", drawn)
         self.assertIn("PAUSE", drawn)
+        self.assertGreater(
+            sum(
+                pixel == PLAY_GREEN
+                for pixel in render_device_ui(state).get_flattened_data()
+            ),
+            20,
+        )
 
     def test_dmr_country_and_replacement_menus_use_device_lists(self) -> None:
         state = DeviceUiState(service_index=SERVICES.index("DMR"), language="de")

@@ -11,7 +11,7 @@ application at `https://hose.brandmeister.network/`:
 - 8 kHz G.711 µ-law call audio decoded through the browser Web Audio API
 
 The quick list stores up to 30 numeric talkgroup choices in the device SQLite
-state and subscribes to at most five checked entries at once. A country flag
+state and subscribes to at most six checked entries at once. A country flag
 is derived only for known DMR country prefixes; unknown and worldwide groups
 use the globe symbol. When a subscribed group becomes active, its destination,
 source and available talker alias take visual priority while the other checked
@@ -36,10 +36,11 @@ official catalog one entry at a time. Because Squelch has no meaning for this
 IP-based DMR receiver, the left inner axis jumps 25 catalog entries per detent.
 The device renders a bounded scrolling window over that complete catalog, with
 enabled entries first and inactive entries below them. The selected row, its
-on/off state and its position in the full catalog stay visible. A currently
-speaking subscribed talkgroup is pinned above the scrolling rows and shows its
-destination, source ID and available alias. The device no longer renders a
-single decorative TG or country tile.
+   on/off state and its position in the full catalog stay visible. The normal row
+   of a currently speaking subscribed talkgroup receives a green glow and its
+   observed source ID or alias; it is not duplicated in a pinned heading. The
+   freed height provides a sixth catalog row. The device no longer renders a
+   single decorative TG or country tile.
 
 The short right press while the BrandMeister view is open starts reception of
 the already enabled talkgroups. This is an explicit Play action and takes audio
@@ -58,20 +59,20 @@ The right outer axis selects a country and the right press applies that browse
 filter. The filter applies only to the inactive add-catalog below the
 enabled-first block: all currently enabled talkgroups remain visible and
 controllable regardless of country. `All countries` restores the complete
-inactive official catalog below them. The filter never changes the five current
+inactive official catalog below them. The filter never changes the six current
 subscriptions. Inside a menu PTT keeps its normal back/cancel role. A long
 right press remains the service quick menu. The header changes with the service and shows the real DMR
-assignments instead of `SQL` and a generic channel label. Up to five checked
+assignments instead of `SQL` and a generic channel label. Up to six checked
 talkgroups are subscribed at once. None of these controls transmits audio or a
 BrandMeister PTT message.
 
-When five talkgroups are active and a sixth is selected, OpenR4d10 does not
+When six talkgroups are active and a seventh is selected, OpenR4d10 does not
 silently remove one and does not merely reject the action. The device opens a
-five-row replacement list: right outer selects the old TG, right press confirms
+scrollable replacement list containing all six active TGs: right outer selects the old TG, right press confirms
 the swap and PTT cancels it. The browser presents the same explicit choice.
 
 The native receiver keeps one bounded current/last-heard row for each of the
-up to five subscribed talkgroups. A row contains only data actually observed
+up to six subscribed talkgroups. A row contains only data actually observed
 in HoseLine packets: destination talkgroup, source DMR ID, optional talker
 alias, active state and update time. Active rows sort first. The browser and
 physical display render these rows as a compact icon list; the device no longer

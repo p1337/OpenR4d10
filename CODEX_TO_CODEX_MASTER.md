@@ -1141,7 +1141,7 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 - Die aktuelle offizielle HoseLine-Webanwendung verwendet öffentlich
   `wss://hose.brandmeister.network/spotter/`, MessagePack-Steuernachrichten und
   8-kHz-G.711-µ-law-Audiopakete. OpenR4d10 implementiert diesen belegten Pfad
-  deshalb direkt im Webbrowser: bis zu fünf numerische Talkgroups gleichzeitig
+  deshalb direkt im Webbrowser: bis zu sechs numerische Talkgroups gleichzeitig
   über eine kompakte Quickliste mit Checkboxen und Länderflaggen abonnieren,
   µ-law-Dekodierung über Web Audio und Anzeige von Quelle, Ziel und Talker Alias.
   Sobald eine der abonnierten Gruppen spricht, erhält dieser aktive Ruf die
@@ -1186,11 +1186,13 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   sichtbar.
 - Die BrandMeister-Geräteansicht ist keine einzelne TG-Karte und verwendet kein
   dekoratives TG- oder Länderbild. Eine gerade sprechende abonnierte Talkgroup
-  steht mit tatsächlich empfangener Quell-ID beziehungsweise Alias immer in
-  einer eigenen kompakten Zeile oben. Darunter liegt ein virtuell scrollbares
-  Fenster des vollständigen offiziellen Talkgroup-Katalogs: aktivierte
-  Einträge zuerst, danach alle inaktiven Einträge. Markierung, An/Aus-Zustand
-  und Position im Gesamtkatalog müssen ohne Browser erkennbar bleiben.
+  darf nicht noch einmal in einer eigenen Kopfzeile dupliziert werden. Stattdessen
+  erhält genau ihr normaler Katalogeintrag einen deutlich sichtbaren grünen
+  Zeilen-Glow. Der dadurch freigegebene Platz gehört einem sechsten sichtbaren
+  Eintrag. Das virtuell scrollbare Fenster des vollständigen offiziellen
+  Talkgroup-Katalogs zeigt aktivierte Einträge zuerst, danach alle inaktiven
+  Einträge. Markierung, An/Aus-Zustand und Position im Gesamtkatalog müssen ohne
+  Browser erkennbar bleiben.
 - Am 2026-10-31 bestätigt Robert während eines realen abonnierten HoseLine-Rufs
   hörbaren Ton aus dem montierten Whisplay-Lautsprecher. Damit ist der native
   WebSocket-/MessagePack-/G.711-µ-law-/PCM-/ALSA-Pfad bis zur realen Hardware
@@ -2778,12 +2780,13 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 ### 2026-10-31 – BrandMeister-Aktivitäts- und Teilnehmerliste
 
 - Die BrandMeister-Geräteansicht verwendet die bisherige große Bildfläche nicht
-  mehr für eine dekorative Länderflagge. Stattdessen zeigt sie bis zu fünf
+  mehr für eine dekorative Länderflagge. Stattdessen zeigt sie bis zu sechs
   kompakte Talkgroup-Zeilen mit Statussymbol, Nummer, Name und – ausschließlich
   soweit im empfangenen HoseLine-Paket vorhanden – DMR-Quell-ID und Talker
   Alias. Der Browser verwendet dieselbe Information in seiner Quickliste.
-- Aktuell sprechende Talkgroups stehen oben und erhalten eine klare aktive
-  Markierung. Nach Rufende bleibt der letzte beobachtete Teilnehmer als
+- Aktuell sprechende Talkgroups erhalten in ihrem normalen Listeneintrag einen
+  klaren grünen Glow, werden aber nicht in einer eigenen Kopfzeile dupliziert.
+  Nach Rufende bleibt der letzte beobachtete Teilnehmer als
   „zuletzt gehört“ sichtbar, bis eine neue Empfangssitzung beginnt. Die Liste
   behauptet ausdrücklich nicht, alle stillen Mitglieder einer Talkgroup oder
   deren Anwesenheit zu kennen.
@@ -2801,11 +2804,11 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 ### 2026-10-31 – Vollständige TG-Liste am Gerät und PTT-Umschaltung
 
 - Robert stellt klar, dass die DMR-Geräteansicht nicht nur eine einzelne
-  TG-Karte und auch nicht nur die bis zu fünf aktivierten Gruppen zeigen darf.
-  Eine aktuell sprechende abonnierte TG steht oben; darunter ist der gesamte
-  offizielle Katalog als begrenztes sichtbares Scrollfenster bedienbar.
+  TG-Karte und auch nicht nur die bis zu sechs aktivierten Gruppen zeigen darf.
+  Der gesamte offizielle Katalog ist als begrenztes sichtbares Scrollfenster
+  bedienbar; die aktive abonnierte TG glüht direkt in ihrem normalen Eintrag.
 - Aktivierte TGs stehen im Geräte-Browsepfad zuerst, alle inaktiven folgen
-  darunter. Es werden trotzdem nur fünf Zeilen je Frame veröffentlicht und
+  darunter. Es werden sechs Zeilen je Frame veröffentlicht und
   gezeichnet; Drehen verschiebt dieses Fenster über den vollständigen lokalen
   Katalog, damit Status und 240-x-280-Renderer begrenzt bleiben.
 - In der DMR-Ansicht schaltet die PTT-Druckflanke die markierte TG an oder aus.
@@ -2851,8 +2854,8 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Talkgroup in der persistenten Quickliste. Die Loslassflanke bleibt inert und
   es wird weiterhin keinerlei Sprache oder DMR-PTT gesendet. In geöffneten
   Menüs bleibt PTT Zurück/Abbrechen; langer rechter Druck bleibt Schnellmenü.
-- Fünf bereits aktivierte Gruppen verhindern Play nicht. Das Fünferlimit gilt
-  ausschließlich für den Versuch, eine sechste Gruppe zu aktivieren.
+- Sechs bereits aktivierte Gruppen verhindern Play nicht. Das Sechserlimit gilt
+  ausschließlich für den Versuch, eine siebte Gruppe zu aktivieren.
 - Die Displaylautstärke stammt dienstübergreifend aus dem zentralen tatsächlichen
   Audiopegel. Eine inaktive BrandMeister-Instanz darf während sichtbarer
   DMR-Ansicht nicht ihren alten Wert – typischerweise 30 Prozent – über die
@@ -2888,7 +2891,7 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   dritter Aktivierungsversuch wird verständlich abgewiesen; diese feste Grenze
   schützt CPU, Akku und die bereits beobachtete Display-PWM-Stabilität.
 
-### 2026-11-01 – DMR-Länderfilter und geführtes Ersetzen der sechsten TG
+### 2026-11-01 – DMR-Länderfilter und geführtes Ersetzen oberhalb der TG-Grenze
 
 - Die normale DMR-Belegung bleibt: kurzer rechter Druck/Enter startet oder
   stoppt den Empfang, kurzer PTT-/Backspace-Druck schaltet die markierte TG.
@@ -2900,7 +2903,7 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   gebildet und enthält `Alle`, alle sicher aus DMR-MCC ableitbaren Länder sowie
   `Andere` für nicht konservativ zuordenbare Gruppen. Rechts außen scrollt,
   rechter Druck übernimmt den Filter, PTT geht zurück. Ein Länderfilter ändert
-  nur die Browse-Liste, niemals die fünf laufenden HoseLine-Abonnements.
+  nur die Browse-Liste, niemals die sechs laufenden HoseLine-Abonnements.
 - Der Länderfilter gilt ausschließlich für den inaktiven Katalog, aus dem neue
   Talkgroups hinzugefügt werden. Die bereits aktivierten Talkgroups bilden
   weiterhin den festen enabled-first-Block am Anfang der normalen DMR-Liste
@@ -2909,11 +2912,11 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Standardkatalog; ein Land zeigt darunter nur die passenden noch inaktiven
   Kandidaten. Aktive TGs dürfen durch einen Hinzufügen-Filter niemals
   ausgeblendet werden.
-- Beim Aktivieren einer sechsten TG wird nicht mehr nur das Fünferlimit
+- Beim Aktivieren einer siebten TG wird nicht mehr nur das Sechserlimit
   gemeldet. Stattdessen merkt der Dienst die gewünschte neue TG und öffnet
-  `Welche ersetzen?` mit den fünf aktiven Gruppen. Rechts außen wählt die zu
+  `Welche ersetzen?` mit den sechs aktiven Gruppen. Rechts außen wählt die zu
   ersetzende TG, rechter Druck führt den Tausch aus, PTT bricht ohne Änderung
-  ab. Der Browser bietet dieselbe Auswahl vor dem Aktivieren einer sechsten TG.
+  ab. Der Browser bietet dieselbe Auswahl vor dem Aktivieren einer siebten TG.
 
 ### 2026-11-01 – Reale BCM22-PWM-Knotenbezeichnung
 
@@ -3422,3 +3425,35 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   der ausdrücklich ausgeschalteten TG kein Abonnement. Bleibt keine aktive TG
   übrig, bleibt die gerade deaktivierte Zeile als deterministischer Fallback
   markiert.
+
+### 2026-11-01 – DMR-Aktivität direkt in sechs Talkgroup-Zeilen
+
+- Robert entfernt die redundante separate Zeile für die momentan sprechende
+  Talkgroup aus der normalen BrandMeister-Geräteansicht. Die zugehörige normale
+  Talkgroup-Zeile leuchtet während des real empfangenen Rufs stattdessen grün;
+  Auswahlrahmen und An/Aus-Zustand bleiben davon unabhängig erkennbar.
+- Der gewonnene Platz wird nicht leer gelassen: Das 240-x-280-Display zeigt in
+  der normalen DMR-Ansicht sechs kompakte Katalogzeilen. Die Position im
+  Gesamtkatalog steht in der markierten Zeile und benötigt keine neue Kopfzeile.
+- Der native HoseLine-Empfänger, die persistente Aktivierungsgrenze, Browser-
+  Anzeige und Status-API erlauben nun sechs gleichzeitig abonnierte Talkgroups.
+  Erst die Aktivierung einer siebten TG öffnet die ausdrückliche Ersetzung; sie
+  darf keine der sechs aktiven Gruppen stillschweigend entfernen.
+
+### 2026-11-01 – Whisplay-Ausgang nutzt die kalibrierte Maximalverstärkung
+
+- Die sichtbaren 0–100 Prozent waren bisher der digitale Quellpegel von mpv
+  beziehungsweise dem µ-law-Decoder, während der unabhängige Whisplay-Mixer
+  nach jedem Hersteller-Warmup fest auf 80 stand. `100 %` im Display war damit
+  nicht die maximale physische Ausgangsverstärkung.
+- Robert verlangt ausdrücklich die maximal verfügbare Lautstärke. OpenR4d10
+  setzt den stabilen ALSA-Regler `speaker` deshalb nach dem Hersteller-Warmup
+  auf 100. Laut der eingebundenen, messkalibrierten Herstellerkennlinie ist
+  Index 100 die maximale saubere Ausgabe vor Clipping; die Anwendung erhöht
+  mpv nicht über 100 Prozent und erzeugt keine zusätzliche digitale
+  Übersteuerung.
+- Diese Einstellung ist eine feste, versionierte Bootgrenze und kein manueller
+  Einmalbefehl auf dem Pi. Ein eigener root-eigener One-Shot wartet begrenzt auf
+  `whisplaysound`, setzt ausschließlich `speaker=100` und läuft vor dem
+  unprivilegierten OpenR4d10-Dienst. Fehlt die Karte, darf die Hauptanwendung
+  weiterhin starten und ihre vorhandene Diagnose melden.

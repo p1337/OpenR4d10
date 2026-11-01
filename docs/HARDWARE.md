@@ -316,6 +316,16 @@ exists with range 0 through 100 and was initialized to 80. These checks confirm
 driver, overlay and mixer activation. A received BrandMeister HoseLine call was
 subsequently heard through the fitted speaker on 2026-10-31.
 
+The application percentage and the codec mixer are distinct gain stages.
+OpenR4d10 keeps source gain bounded to 0 through 100 and, from 0.10.88 onward,
+sets the stable ALSA `speaker` control to 100 after the manufacturer warm-up.
+The vendored driver defines that index as the observer-calibrated maximum clean
+output before speaker clipping. A fixed root-owned one-shot performs only this
+bounded mixer change before the unprivileged application starts; it does not
+patch the vendored driver or apply digital gain above unity. On the confirmed
+WM8960 lookup table this moves the output control from raw 118 (about -3 dB) to
+raw 126 (about +5 dB), using the previously unused 8 dB codec-output range.
+
 On 2026-11-01 a one-second target probe captured `whisplaysound` through
 `ffmpeg` at 48 kHz with two channels and encoded a valid MP3 through the
 installed `libmp3lame`. Both ALSA channels produced independent `astats` level

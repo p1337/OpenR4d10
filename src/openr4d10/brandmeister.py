@@ -19,7 +19,7 @@ LOG = logging.getLogger(__name__)
 
 HOSELINE_ENDPOINT = "wss://hose.brandmeister.network/spotter/?token=test%3Atest"
 HOSELINE_PROTOCOL = "spotter"
-MAX_TALKGROUPS = 5
+MAX_TALKGROUPS = 6
 TALKGROUP_CATALOG_URL = "https://api.brandmeister.network/v2/talkgroup"
 
 
@@ -35,7 +35,7 @@ def _encode_unsigned(value: int) -> bytes:
 
 def group_message(message_type: int, talkgroups: tuple[int, ...]) -> bytes:
     if not 0 <= len(talkgroups) <= MAX_TALKGROUPS:
-        raise ValueError("one to five talkgroups are supported")
+        raise ValueError("one to six talkgroups are supported")
     return bytes((0x92, message_type, 0x90 + len(talkgroups))) + b"".join(
         _encode_unsigned(talkgroup) for talkgroup in talkgroups
     )
@@ -151,7 +151,7 @@ class BrandmeisterReceiver:
     def listen(self, talkgroups: list[int] | tuple[int, ...]) -> dict[str, object]:
         normalized = tuple(dict.fromkeys(talkgroups))
         if not normalized or len(normalized) > MAX_TALKGROUPS:
-            raise ValueError("one to five talkgroups are required")
+            raise ValueError("one to six talkgroups are required")
         if any(
             isinstance(item, bool)
             or not isinstance(item, int)

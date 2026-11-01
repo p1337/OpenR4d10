@@ -618,7 +618,7 @@ class DeviceUiState:
         self.dmr_selected_enabled = receiver.get("selected_enabled") is True
         self.activity_rows = []
         if isinstance(activity_rows, list):
-            for item in activity_rows[:5]:
+            for item in activity_rows[:6]:
                 if not isinstance(item, Mapping):
                     continue
                 talkgroup = item.get("talkgroup")
@@ -637,7 +637,7 @@ class DeviceUiState:
                 )
         self.dmr_catalog_rows = []
         if isinstance(catalog_rows, list):
-            for item in catalog_rows[:5]:
+            for item in catalog_rows[:6]:
                 if not isinstance(item, Mapping):
                     continue
                 talkgroup = item.get("talkgroup")
@@ -649,6 +649,14 @@ class DeviceUiState:
                         "name": str(item.get("name") or "")[:40],
                         "country_code": str(item.get("country_code") or "")[:2].upper(),
                         "enabled": item.get("enabled") is True,
+                        "active": item.get("active") is True,
+                        "source": (
+                            item.get("source")
+                            if isinstance(item.get("source"), int)
+                            and not isinstance(item.get("source"), bool)
+                            else None
+                        ),
+                        "alias": str(item.get("alias") or "")[:40],
                         "selected": item.get("selected") is True,
                         "position": item.get("position")
                         if isinstance(item.get("position"), int)
@@ -727,7 +735,7 @@ class DeviceUiState:
         if receiver.get("replacement_required") is True and self.menu_kind != "dmr_replace":
             self._open_menu("dmr_replace")
             self.title = "Replace talkgroup"
-            self.subtitle = "Choose one of the five active talkgroups"
+            self.subtitle = "Choose one of the six active talkgroups"
         layer_rows = receiver.get("layer_rows")
         self.ambient_layer_rows = []
         if isinstance(layer_rows, list):
@@ -1705,73 +1713,46 @@ def render_device_ui(
         return image.convert("RGB")
 
     if state.service == "DMR":
-        active_row = next(
-            (item for item in state.activity_rows if item.get("active") is True),
-            None,
-        )
-        if active_row is not None:
-            draw.rounded_rectangle(
-                (9, content_top + 2, 230, content_top + 40),
-                radius=8,
-                fill=(28, 38, 34),
-                outline=accent,
-                width=2,
-            )
-        station_font = _font(16, bold=True)
-        station = _fit_text(draw, state.source, station_font, 153)
-        draw.text((14, content_top + 4), station, font=station_font, fill=(245, 248, 249))
-        detail_font = _font(9, bold=True)
-        if active_row is not None:
-            active_name = str(active_row.get("name") or "")
-            active_alias = str(active_row.get("alias") or "")
-            active_source = active_row.get("source")
-            active_identity = active_alias or (
-                f"DMR {active_source}" if isinstance(active_source, int) else ""
-            )
-            detail = " · ".join(
-                value for value in (active_name, active_identity) if value
-            )
-        else:
-            detail = state.title if state.title.casefold() != state.source.casefold() else state.subtitle
-        draw.text(
-            (14, content_top + 27),
-            _fit_text(draw, _localized_device_text(detail, text), detail_font, 153),
-            font=detail_font,
-            fill=(196, 207, 209),
-        )
-        position = (
-            f"{state.dmr_catalog_position}/{state.dmr_catalog_count}"
-            if state.dmr_catalog_count
-            else "--"
-        )
-        position_font = _font(9, bold=True)
-        position_width = draw.textbbox((0, 0), position, font=position_font)[2]
-        draw.text(
-            (226 - position_width, content_top + 15),
-            position,
-            font=position_font,
-            fill=accent,
-        )
-        list_top = content_top + 45
+        list_top = content_top + 2
         if not state.dmr_catalog_rows:
             empty_font = _font(12, bold=True)
             empty = _localized_device_text("Select talkgroups and press play", text)
             draw.text((14, list_top + 22), _fit_text(draw, empty, empty_font, 208), font=empty_font, fill=(178, 187, 189))
-        for index, item in enumerate(state.dmr_catalog_rows[:5]):
-            top = list_top + index * 31
+        active_tops = [
+            list_top + index * 34
+            for index, item in enumerate(state.dmr_catalog_rows[:6])
+            if item.get("active") is True
+        ]
+        if active_tops:
+            glow = Image.new("RGBA", image.size, (0, 0, 0, 0))
+            glow_draw = ImageDraw.Draw(glow)
+            for top in active_tops:
+                glow_draw.rounded_rectangle(
+                    (7, top - 2, 232, top + 30),
+                    radius=9,
+                    outline=(*PLAY_GREEN, 220),
+                    width=4,
+                )
+            image = Image.alpha_composite(
+                image.convert("RGBA"), glow.filter(ImageFilter.GaussianBlur(radius=4))
+            ).convert("RGB")
+            draw = ImageDraw.Draw(image)
+        for index, item in enumerate(state.dmr_catalog_rows[:6]):
+            top = list_top + index * 34
             selected = item.get("selected") is True
             enabled = item.get("enabled") is True
+            active = item.get("active") is True
             draw.rounded_rectangle(
-                (9, top, 230, top + 27),
+                (9, top, 230, top + 30),
                 radius=7,
-                fill=(23, 33, 30) if enabled else (11, 22, 25),
-                outline=accent if selected else (45, 61, 65),
-                width=2 if selected else 1,
+                fill=(15, 48, 34) if active else (23, 33, 30) if enabled else (11, 22, 25),
+                outline=PLAY_GREEN if active else accent if selected else (45, 61, 65),
+                width=3 if active else 2 if selected else 1,
             )
             if enabled:
-                draw.ellipse((15, top + 8, 26, top + 19), fill=accent)
+                draw.ellipse((15, top + 9, 26, top + 20), fill=PLAY_GREEN if active else accent)
             else:
-                draw.ellipse((15, top + 8, 26, top + 19), outline=(91, 108, 112), width=2)
+                draw.ellipse((15, top + 9, 26, top + 20), outline=(91, 108, 112), width=2)
             code = str(item.get("country_code") or "TG")[:2]
             code_font = _font(7, bold=True)
             draw.text((31, top + 2), code, font=code_font, fill=accent if enabled else (151, 164, 167))
@@ -1780,16 +1761,25 @@ def render_device_ui(
             draw.text((49, top + 1), _fit_text(draw, primary, primary_font, 140), font=primary_font, fill=(240, 245, 246))
             secondary_font = _font(8)
             row_position = item.get("position")
-            secondary = f"#{row_position}" if isinstance(row_position, int) else ""
-            draw.text((49, top + 15), secondary, font=secondary_font, fill=(171, 184, 187))
+            identity = str(item.get("alias") or "")
+            source = item.get("source")
+            if not identity and isinstance(source, int):
+                identity = f"DMR {source}"
+            position = (
+                f"#{row_position}/{state.dmr_catalog_count}"
+                if isinstance(row_position, int) and state.dmr_catalog_count
+                else ""
+            )
+            secondary = " · ".join(value for value in (position, identity) if value)
+            draw.text((49, top + 16), _fit_text(draw, secondary, secondary_font, 134), font=secondary_font, fill=PLAY_GREEN if active else (171, 184, 187))
             state_label = str(text["dmr_on"] if enabled else text["dmr_off"])
             state_font = _font(8, bold=True)
             state_width = draw.textbbox((0, 0), state_label, font=state_font)[2]
             draw.text(
-                (222 - state_width, top + 9),
+                (222 - state_width, top + 10),
                 state_label,
                 font=state_font,
-                fill=accent if selected else (151, 164, 167),
+                fill=PLAY_GREEN if active else accent if selected else (151, 164, 167),
             )
         return image.convert("RGB")
 

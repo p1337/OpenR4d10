@@ -7,6 +7,8 @@ import importlib.util
 import os
 from pathlib import Path
 import platform
+import re
+import subprocess
 
 from .boot import load_boot_sequence
 from .config import AppConfig, HardwareConfig
@@ -86,7 +88,40 @@ def _whisplay_audio_checks(
         cards = ""
 
     if "whisplaysound" in cards.lower():
-        return [Check("OK", "Whisplay ALSA card is available: whisplaysound")]
+        checks = [Check("OK", "Whisplay ALSA card is available: whisplaysound")]
+        try:
+            result = subprocess.run(
+                [
+                    "/usr/bin/amixer",
+                    "-c",
+                    "whisplaysound",
+                    "cget",
+                    "name=speaker",
+                ],
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=2,
+            )
+        except (OSError, subprocess.SubprocessError):
+            result = None
+        match = (
+            re.search(r"^\s*:\s*values=(\d+)\s*$", result.stdout, re.MULTILINE)
+            if result is not None and result.returncode == 0
+            else None
+        )
+        if match and int(match.group(1)) == 100:
+            checks.append(Check("OK", "Whisplay speaker gain is at calibrated maximum: 100"))
+        elif match:
+            checks.append(
+                Check(
+                    "WARN",
+                    f"Whisplay speaker gain is {match.group(1)}; expected calibrated maximum 100",
+                )
+            )
+        else:
+            checks.append(Check("WARN", "Whisplay speaker gain could not be read"))
+        return checks
     if any(path.is_file() for path in overlay_paths):
         return [
             Check(

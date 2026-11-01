@@ -61,6 +61,9 @@ the installer report exactly which adapters still need configuration.
 - checksummed, secret-free SQLite backup and guarded offline restore
 - direct web-radio/local-media playback through private mpv JSON IPC and
   stream recording through shell-free ffmpeg/Opus
+- boot-persistent maximum clean Whisplay speaker gain: the bounded ALSA
+  `speaker` control is set to 100 after codec warm-up while digital source gain
+  remains capped at 100 to avoid fabricated overdrive
 - bounded RSS/Atom reader and a persistent sortable camera library for
   credential-free Snapshot, MJPEG and RTSP sources with frame limits, image
   validation and safe local JPEG re-encoding
@@ -124,12 +127,13 @@ the installer report exactly which adapters still need configuration.
   speaker plus optional browser audio, with a persistent multi-talkgroup
   checkbox quick list, complete searchable official catalog, country flags and
   compact per-talkgroup current/last-heard participant rows on web and device;
-  the physical view pins the speaking TG above a scrollable enabled-first
-  catalog window; a short right click starts reception of the enabled TGs,
+  the physical view highlights the speaking TG with a green glow directly in
+  its six-row scrollable enabled-first catalog window; a short right click
+  starts reception of the enabled TGs,
   short PTT toggles the marked TG and a two-second PTT hold opens the country
   filter immediately at the threshold while the button is still held, without
-  transmitting; the following release is consumed, and activating a sixth TG
-  explicitly asks which of the five active TGs to replace; disabling a marked
+  transmitting; the following release is consumed, and activating a seventh TG
+  explicitly asks which of the six active TGs to replace; disabling a marked
   TG returns the device cursor to the first remaining active TG instead of
   following the disabled row into the inactive catalog;
   no account password or user token
@@ -360,9 +364,9 @@ because the right press owns reception start. The selected catalog row still
 shows its translated On/Off state, and PTT changes that state. In the browser
 every saved row has a normal checkbox plus a written On/Off state. A change
 reconfigures an already running receiver immediately, but never steals audio
-from radio while BrandMeister is stopped. If five TGs are already active, the
-sixth opens an explicit replacement choice on both device and browser; cancel
-leaves all five unchanged.
+  from radio while BrandMeister is stopped. If six TGs are already active, the
+  seventh opens an explicit replacement choice on both device and browser;
+  cancel leaves all six unchanged.
 
 The service section accepts an explicit `http` or `https` audio URL for local
 playback and recording. It rejects credentials embedded in URLs and does not

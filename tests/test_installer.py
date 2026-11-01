@@ -65,6 +65,21 @@ class InstallerContractTests(unittest.TestCase):
         self.assertIn("bin/openr4d10-hotspot", installer)
         self.assertIn("systemd/openr4d10-hotspot.timer", installer)
         self.assertIn("systemctl enable --now openr4d10-hotspot.timer", installer)
+        self.assertIn("bin/openr4d10-audio-max", installer)
+        self.assertIn("systemd/openr4d10-audio-max.service", installer)
+        audio_helper = (repository / "bin" / "openr4d10-audio-max").read_text(
+            encoding="utf-8"
+        )
+        audio_service = (
+            repository / "systemd" / "openr4d10-audio-max.service"
+        ).read_text(encoding="utf-8")
+        self.assertIn("cset name=speaker 100", audio_helper)
+        self.assertNotIn("cset name=speaker 101", audio_helper)
+        self.assertIn("After=sound.target whisplay-soundcard-warmup.service", audio_service)
+        self.assertIn("Before=openr4d10.service", audio_service)
+        self.assertIn("ExecStart=/usr/local/sbin/openr4d10-audio-max", audio_service)
+        self.assertIn("User=root", audio_service)
+        self.assertIn("After=openr4d10-audio-max.service", application_service)
         self.assertIn("boot/openr4d10-backlight", installer)
         self.assertIn("Backing up persistent OpenR4d10 state before the update", installer)
         self.assertIn("from openr4d10.backup import create_backup", installer)

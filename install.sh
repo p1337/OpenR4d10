@@ -17,6 +17,8 @@ readonly WIFI_REPAIR_HELPER_FILE=/usr/local/sbin/openr4d10-wifi-repair
 readonly HOTSPOT_SERVICE_FILE=/etc/systemd/system/openr4d10-hotspot.service
 readonly HOTSPOT_TIMER_FILE=/etc/systemd/system/openr4d10-hotspot.timer
 readonly HOTSPOT_HELPER_FILE=/usr/local/sbin/openr4d10-hotspot
+readonly AUDIO_MAX_SERVICE_FILE=/etc/systemd/system/openr4d10-audio-max.service
+readonly AUDIO_MAX_HELPER_FILE=/usr/local/sbin/openr4d10-audio-max
 
 CHECK_ONLY=false
 ALLOW_UNSUPPORTED=false
@@ -58,9 +60,11 @@ required=(
     systemd/openr4d10-update.path systemd/openr4d10-update-recover.service
     systemd/openr4d10-wifi-repair.service systemd/openr4d10-wifi-repair.path
     systemd/openr4d10-hotspot.service systemd/openr4d10-hotspot.timer
+    systemd/openr4d10-audio-max.service
     bin/openr4d10 bin/openr4d10-update bin/openr4d10-update-recover
     bin/openr4d10-wifi-repair
     bin/openr4d10-hotspot
+    bin/openr4d10-audio-max
     boot/install.sh boot/openr4d10-boot.service
     boot/openr4d10-backlight boot/openr4d10-backlight-init.service
     boot/openr4d10-backlight.path boot/openr4d10-backlight.service
@@ -260,6 +264,8 @@ install -m 0644 -o root -g root "$SOURCE_ROOT/systemd/openr4d10-wifi-repair.path
 install -m 0755 -o root -g root "$SOURCE_ROOT/bin/openr4d10-hotspot" "$HOTSPOT_HELPER_FILE"
 install -m 0644 -o root -g root "$SOURCE_ROOT/systemd/openr4d10-hotspot.service" "$HOTSPOT_SERVICE_FILE"
 install -m 0644 -o root -g root "$SOURCE_ROOT/systemd/openr4d10-hotspot.timer" "$HOTSPOT_TIMER_FILE"
+install -m 0755 -o root -g root "$SOURCE_ROOT/bin/openr4d10-audio-max" "$AUDIO_MAX_HELPER_FILE"
+install -m 0644 -o root -g root "$SOURCE_ROOT/systemd/openr4d10-audio-max.service" "$AUDIO_MAX_SERVICE_FILE"
 
 note "Installing the verified Whisplay ST7789 boot display"
 OPENR4D10_SKIP_APT=1 bash "$SOURCE_ROOT/boot/install.sh"
@@ -289,6 +295,7 @@ trap - EXIT
 note "Enabling systemd autostart"
 systemctl daemon-reload
 systemctl enable openr4d10.service
+systemctl enable openr4d10-audio-max.service
 systemctl enable --now openr4d10-update-recover.service
 systemctl enable --now openr4d10-update.path openr4d10-wifi-repair.path
 systemctl enable --now openr4d10-hotspot.timer
