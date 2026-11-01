@@ -1,8 +1,20 @@
 from pathlib import Path
+import re
+import tomllib
 import unittest
 
 
 class InstallerContractTests(unittest.TestCase):
+    def test_release_version_is_consistent_across_installer_and_python_metadata(self) -> None:
+        repository = Path(__file__).resolve().parents[1]
+        release = repository.joinpath("VERSION").read_text(encoding="ascii").strip()
+        project = tomllib.loads(repository.joinpath("pyproject.toml").read_text(encoding="utf-8"))
+        package = repository.joinpath("src", "openr4d10", "__init__.py").read_text(encoding="utf-8")
+        match = re.search(r'^__version__ = "([^"]+)"$', package, re.MULTILINE)
+        self.assertIsNotNone(match)
+        self.assertEqual(release, project["project"]["version"])
+        self.assertEqual(release, match.group(1))
+
     def test_radio_capture_fingerprint_tool_is_installed(self) -> None:
         repository = Path(__file__).resolve().parents[1]
         installer = (repository / "install.sh").read_text(encoding="utf-8")
