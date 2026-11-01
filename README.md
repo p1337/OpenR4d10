@@ -86,6 +86,10 @@ the installer report exactly which adapters still need configuration.
   press edge and stops it on release without waiting for telemetry or a full
   display transfer; the white two-pixel playhead is drawn above the waveform
   and the red/idle glow changes through a small ST7789 region update
+- near-live VoiceRecorder cursor and playback display: encoder/browser seek
+  performs one cached-telemetry repaint, RGB565 conversion is vectorized, the
+  native timeline keeps a deadline-based 5 Hz cadence and the browser preview
+  reads the last drawn native frame without blocking SPI with a rerender
 - verified Pi Zero 2 W CPU placement uses all four cores by role: two for
   background/audio/web work, one for the fluid native UI and waveform, and one
   for BCM17 plus future measured encoder input; other platforms keep their

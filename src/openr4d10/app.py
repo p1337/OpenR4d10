@@ -606,6 +606,18 @@ class OpenR4d10App:
             and not menu_open
             and selected_service == "REC"
         )
+        recorder_semantic_event = (
+            selected_service == "REC"
+            and not menu_open
+            and media_result is not None
+            and event.control
+            in {
+                Control.LEFT_OUTER,
+                Control.LEFT_INNER,
+                Control.RIGHT_OUTER,
+                Control.RIGHT_PRESS,
+            }
+        )
         if recorder_ptt_event:
             # Audio edges must never wait for the physical full-frame SPI path.
             # The priority renderer below paints only the glow asynchronously.
@@ -621,6 +633,11 @@ class OpenR4d10App:
                     recording=recording_state.get("state") == "recording",
                     continuous=recording_state.get("continuous") is True,
                 )
+        elif recorder_semantic_event:
+            # The service result is authoritative.  A presentation-only
+            # apply_input() here would transfer one stale full frame before the
+            # resolved recorder frame and doubles cursor latency.
+            device_state = current_ui if isinstance(current_ui, dict) else {}
         else:
             device_state = handler(event)
         new_service = (
@@ -647,7 +664,10 @@ class OpenR4d10App:
                 )
         self._view_initialized = True
         if media_result is not None and not recorder_ptt_event:
-            self.render_once()
+            if recorder_semantic_event:
+                self.render_recorder_once()
+            else:
+                self.render_once()
             snapshot = getattr(self.display, "snapshot", None)
             if callable(snapshot):
                 device_state = snapshot()
@@ -801,6 +821,7 @@ class OpenR4d10App:
             pin_current_thread_to_ui_core()
             self.show_boot()
             while not self.stop_event.is_set():
+                cycle_started = time.monotonic()
                 try:
                     input_context = getattr(self.display, "input_context", None)
                     context = input_context() if callable(input_context) else {}
@@ -810,7 +831,11 @@ class OpenR4d10App:
                         and self._last_receiver_telemetry
                     ):
                         self.render_recorder_once()
-                        delay = RECORDER_FRAME_INTERVAL_SECONDS
+                        delay = max(
+                            0.0,
+                            RECORDER_FRAME_INTERVAL_SECONDS
+                            - (time.monotonic() - cycle_started),
+                        )
                     else:
                         self.render_once()
                         delay = self.config.refresh_interval_seconds

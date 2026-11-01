@@ -30,6 +30,9 @@ class WebTests(unittest.TestCase):
         ):
             self.assertIn(f'data-device-control="{control}"', html)
         self.assertIn('action: "device_input"', script)
+        self.assertIn("const RECORDER_SCREEN_REFRESH_MS = 200", script)
+        self.assertIn('latestDeviceState?.service === "REC"', script)
+        self.assertIn("if (deviceScreenPending) return", script)
         for key_code in (
             "KeyW",
             "KeyS",

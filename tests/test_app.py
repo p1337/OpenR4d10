@@ -1240,13 +1240,18 @@ class AppTests(unittest.TestCase):
 
     def test_voice_recorder_encoders_seek_boundaries_and_play_from_cursor(self) -> None:
         class InputDisplay:
+            def __init__(self) -> None:
+                self.apply_calls = 0
+                self.render_calls = 0
+
             def render(self, _frame) -> None:
-                pass
+                self.render_calls += 1
 
             def snapshot(self):
                 return {"service": "REC", "menu_open": False}
 
             def apply_input(self, _event):
+                self.apply_calls += 1
                 return self.snapshot()
 
         class Services:
@@ -1265,6 +1270,7 @@ class AppTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             services = Services()
+            display = InputDisplay()
             app = OpenR4d10App(
                 AppConfig(
                     log_level="INFO",
@@ -1275,7 +1281,7 @@ class AppTests(unittest.TestCase):
                     runtime_directory=root,
                     state_directory=root,
                 ),
-                display=InputDisplay(),
+                display=display,
                 power=UnconfiguredTelemetry("power"),
                 receiver=SystemTelemetry(),
                 services=services,
@@ -1296,6 +1302,8 @@ class AppTests(unittest.TestCase):
                 {"action": "voice_recorder_play_toggle"},
             ],
         )
+        self.assertEqual(display.apply_calls, 0)
+        self.assertEqual(display.render_calls, 5)
 
     def test_application_unit_provides_display_handoff_runtime(self) -> None:
         unit = (

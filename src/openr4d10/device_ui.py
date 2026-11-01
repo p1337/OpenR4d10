@@ -22,6 +22,10 @@ MEDIA_MARGIN = 7
 PLAYER_GLOW_STRENGTH = 1.3
 DEFAULT_ACCENT = (253, 184, 19)
 PLAY_GREEN = (54, 209, 126)
+_RGB565_RED_HIGH = [value & 0xF8 for value in range(256)]
+_RGB565_GREEN_HIGH = [value >> 5 for value in range(256)]
+_RGB565_GREEN_LOW = [(value & 0x1C) << 3 for value in range(256)]
+_RGB565_BLUE_LOW = [value >> 3 for value in range(256)]
 SERVICES = ("SYSTEM", "RADIO", "WEATHER", "AMBIENT", "DMR", "PLAYER", "REC")
 MAIN_MENU_ITEMS = (
     "display",
@@ -1886,16 +1890,15 @@ def image_to_rgb565(image: Image.Image) -> bytes:
     rgb = image.convert("RGB")
     if rgb.size != (WIDTH, HEIGHT):
         raise ValueError(f"device image must be {WIDTH}x{HEIGHT}")
-    source = memoryview(rgb.tobytes())
-    output = bytearray(WIDTH * HEIGHT * 2)
-    target = 0
-    for offset in range(0, len(source), 3):
-        value = (
-            ((source[offset] & 0xF8) << 8)
-            | ((source[offset + 1] & 0xFC) << 3)
-            | (source[offset + 2] >> 3)
-        )
-        output[target] = value >> 8
-        output[target + 1] = value & 0xFF
-        target += 2
-    return bytes(output)
+    red, green, blue = rgb.split()
+    high = ImageChops.add(
+        red.point(_RGB565_RED_HIGH),
+        green.point(_RGB565_GREEN_HIGH),
+    )
+    low = ImageChops.add(
+        green.point(_RGB565_GREEN_LOW),
+        blue.point(_RGB565_BLUE_LOW),
+    )
+    # Pillow's two-channel LA storage interleaves the two byte planes.  Here
+    # they are RGB565 high and low bytes, not luminance and alpha semantics.
+    return Image.merge("LA", (high, low)).tobytes()

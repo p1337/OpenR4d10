@@ -67,6 +67,15 @@ and the verified four-core split: background `{0,1}`, UI `{2}`, input `{3}`.
 Do not move telemetry or remote artwork lookup back into the 5 Hz recorder
 frame path.
 
+Recorder seek, boundary and play/pause controls have a separate latency
+regression: one resolved input may cause exactly one recorder repaint and must
+not call the display adapter's presentation-only `apply_input()` first. The
+5 Hz loop is deadline-based, not `render time + 200 ms`. RGB565 tests must keep
+the exact big-endian wire bytes while the implementation stays free of a
+Python per-pixel loop. `/api/device-screen.png` reads the adapter's last drawn
+image; a recorder browser preview may poll that bounded endpoint at 5 Hz but
+must never overlap its own image requests or raise the full `/api/status` rate.
+
 ## Release gate and device provenance
 
 Local tests are necessary but never sufficient for a Pi release. After every

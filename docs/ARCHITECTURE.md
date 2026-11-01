@@ -293,6 +293,16 @@ During recorder playback the 5 Hz overlay reads mpv's actual absolute position,
 moves that same playhead and uses the central green audio-active glow; pausing
 leaves the cursor at the last reported position.
 
+Recorder seek, boundary and play/pause inputs use one semantic update and one
+native repaint. They do not first repaint the presentation-only encoder state
+and then repaint the resolved recorder state, and they reuse cached receiver
+and power telemetry. RGB565 conversion is performed by Pillow channel
+operations rather than a Python per-pixel loop. The recorder loop schedules a
+fixed 5 Hz target by subtracting render time from the next wait. The display
+adapter also caches the last image it actually presented; the browser preview
+encodes that cached frame without rerendering or holding the SPI lock through a
+second complete composition.
+
 On the verified four-core Pi Zero 2 W, CPU affinity gives background work
 (including ffmpeg/mpv and the level parser) cores 0–1, native UI/SPI core 2 and
 the physical input poller core 3. Processes spawned from the input callback are

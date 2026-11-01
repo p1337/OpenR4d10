@@ -692,6 +692,22 @@ class DeviceUiTests(unittest.TestCase):
                 self.assertEqual(len(encoded), WIDTH * HEIGHT * 2)
                 self.assertEqual(encoded[:2], expected)
 
+    def test_rgb565_vectorized_channels_match_reference_formula(self) -> None:
+        pixels = [
+            (red, green, blue)
+            for red in (0, 1, 31, 127, 254, 255)
+            for green in (0, 1, 63, 128, 254, 255)
+            for blue in (0, 1, 31, 127, 254, 255)
+        ]
+        frame = Image.new("RGB", (WIDTH, HEIGHT))
+        frame.putdata((pixels * ((WIDTH * HEIGHT // len(pixels)) + 1))[: WIDTH * HEIGHT])
+        encoded = image_to_rgb565(frame)
+        source = frame.tobytes()
+        for index in range(WIDTH * HEIGHT):
+            red, green, blue = source[index * 3 : index * 3 + 3]
+            value = ((red & 0xF8) << 8) | ((green & 0xFC) << 3) | (blue >> 3)
+            self.assertEqual(encoded[index * 2 : index * 2 + 2], value.to_bytes(2, "big"))
+
     def test_encoder_events_are_hardware_independent(self) -> None:
         state = DeviceUiState(volume=50, squelch=4, channel=10)
         state.apply(InputEvent(Control.LEFT_OUTER, steps=3))
@@ -836,6 +852,19 @@ class FakePanel:
 
 
 class WhisplayDisplayTests(unittest.TestCase):
+    def test_screen_png_encodes_the_last_drawn_frame_without_rerendering(self) -> None:
+        panel = FakePanel()
+        display = WhisplayDisplay(panel=panel)  # type: ignore[arg-type]
+        display.render(Frame(screen="main", title="OpenR4d10", body="Ready"))
+
+        with patch.object(display, "_render_image", side_effect=AssertionError("rerendered")):
+            first = display.screen_png()
+            second = display.screen_png()
+
+        self.assertTrue(first.startswith(b"\x89PNG\r\n\x1a\n"))
+        self.assertEqual(first, second)
+        display.close()
+
     def test_priority_recorder_glow_uses_small_partial_updates(self) -> None:
         panel = FakePanel()
         display = WhisplayDisplay(panel=panel)  # type: ignore[arg-type]

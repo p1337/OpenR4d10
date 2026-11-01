@@ -158,6 +158,7 @@ class WhisplayDisplay:
         self._priority_thread: threading.Thread | None = None
         self._priority_recording = False
         self._priority_continuous = False
+        self._last_image: Image.Image | None = None
 
     def set_input_handler(
         self, handler: Callable[[InputEvent], object] | None
@@ -241,6 +242,7 @@ class WhisplayDisplay:
                     show_region = getattr(self.panel, "show_region", None)
                     if not callable(show_region):
                         self.panel.show(frame)
+                        self._last_image = image
                         continue
                     for x, y, width, height in self._PRIORITY_GLOW_REGIONS:
                         show_region(
@@ -250,13 +252,16 @@ class WhisplayDisplay:
                             width,
                             height,
                         )
+                    self._last_image = image
             except (OSError, RuntimeError, ValueError, WhisplayError):
                 LOG.exception("Whisplay priority glow update failed")
 
     def _show_state(self) -> None:
         self._refresh_hotspot_setup()
         try:
-            self.panel.show(image_to_rgb565(self._render_image()))
+            image = self._render_image()
+            self.panel.show(image_to_rgb565(image))
+            self._last_image = image
         except (OSError, RuntimeError, WhisplayError) as exc:
             raise AdapterError(f"Whisplay display failed: {exc}") from exc
 
@@ -416,10 +421,13 @@ class WhisplayDisplay:
     def screen_png(self) -> bytes:
         """Return the exact native renderer output used for the physical panel."""
         with self._lock:
-            self._refresh_hotspot_setup()
-            output = BytesIO()
-            self._render_image().save(output, format="PNG", optimize=False)
-            return output.getvalue()
+            if self._last_image is None:
+                self._refresh_hotspot_setup()
+                self._last_image = self._render_image()
+            image = self._last_image.copy()
+        output = BytesIO()
+        image.save(output, format="PNG", optimize=False)
+        return output.getvalue()
 
     def close(self) -> None:
         self._priority_stop.set()

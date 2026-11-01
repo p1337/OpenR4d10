@@ -3210,3 +3210,33 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   ausschließlich das feste GitHub-Archiv über `bootstrap.sh`; direkte
   Quellcodeänderungen unter `/opt/openr4d10` oder an installierten Helfern sind
   verboten.
+
+### 2026-11-01 – Recorder-Cursor und Livebild ohne Eingabestau
+
+- Eine Messung am realen Pi hat den Fehler eindeutig getrennt: Die eigentliche
+  `voice_recorder_seek`-Operation benötigt nur etwa 65–115 ms, derselbe Schritt
+  über den gemeinsamen Browser-/Encoderpfad benötigte dagegen 1,86–2,55 s pro
+  Rastung. Mehrere Browserereignisse stauten sich dadurch auf ungefähr fünf
+  Sekunden. Ursache war nicht die Vierkern-Affinität, sondern zwei synchrone
+  Vollbildtransfers einschließlich normaler Telemetrie pro semantischem
+  Recorderereignis sowie die bisherige Python-Pixel-Schleife für RGB565.
+- Recorder-Positions-, Grenz- und Play/Pause-Ereignisse dürfen die bereits vom
+  Dienst aufgelöste Aktion nur einmal in den nativen Zustand übernehmen und
+  einmal zeichnen. Der Recorder-Schnellpfad verwendet die bereits vorhandenen
+  Telemetrie-Caches; WLAN-, Batterie- und Systemabfragen gehören nicht in eine
+  Cursorflanke. Ein vorläufiges `DeviceUiState.apply()` mit anschließendem
+  zweiten Vollbild ist in diesem Pfad verboten.
+- Die RGB565-Wandlung bleibt exakt big-endian, verwendet aber ausschließlich
+  vektorisierte Pillow-Kanaloperationen statt einer Python-Schleife über 67.200
+  Pixel. Auf dem realen Zero 2 W sank die isoliert gemessene Wandlung damit von
+  ungefähr 299 ms auf ungefähr 11 ms pro Vollbild.
+- Der 5-Hz-Recorder-Takt ist ein fester Zielzeitpunkt und keine zusätzliche
+  Pause von 200 ms nach dem Zeichnen. Renderzeit wird vom nächsten Intervall
+  abgezogen. Die physische Ansicht bleibt auf UI-Kern 2; die Kernzuordnung wird
+  nicht aufgehoben, weil sie den gemessenen Stau nicht verursacht hat.
+- Die Browser-Liveansicht darf den schweren Gesamtstatus weiterhin nur im
+  normalen Takt laden, fragt im sichtbaren Recorder aber das gecachte native
+  Bild begrenzt mit 5 Hz ab. Der Displayadapter hält das zuletzt tatsächlich
+  gezeichnete Bild vor; `/api/device-screen.png` darf deshalb nicht für jede
+  Browserabfrage nochmals die komplette Oberfläche rendern oder den SPI-Pfad
+  blockieren. Gleichzeitige Bildanfragen werden im Browser nicht gestapelt.

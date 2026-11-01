@@ -125,15 +125,22 @@ if ([...document.querySelectorAll("[data-tab]")].some((item) => item.dataset.tab
   activateTab(requestedTab);
 }
 
+const RECORDER_SCREEN_REFRESH_MS = 200;
+let deviceScreenPending = false;
+
 function refreshDeviceScreen() {
+  if (deviceScreenPending) return;
   const image = byId("device-screen-preview");
+  deviceScreenPending = true;
   image.src = `/api/device-screen.png?t=${Date.now()}`;
 }
 
 byId("device-screen-preview").addEventListener("load", () => {
+  deviceScreenPending = false;
   setText("device-screen-status", t("240 × 280 · live"));
 });
 byId("device-screen-preview").addEventListener("error", () => {
+  deviceScreenPending = false;
   setText("device-screen-status", t("Native view unavailable"));
 });
 
@@ -1927,6 +1934,11 @@ byId("language-select").addEventListener("change", async (event) => {
 initializeI18n().finally(() => {
   refresh();
   window.setInterval(refresh, 2000);
+  window.setInterval(() => {
+    if (!document.hidden && latestDeviceState?.service === "REC") {
+      refreshDeviceScreen();
+    }
+  }, RECORDER_SCREEN_REFRESH_MS);
   window.setInterval(() => {
     if (!weatherAnimationFrames.length) return;
     weatherAnimationIndex = (weatherAnimationIndex + 1) % weatherAnimationFrames.length;
