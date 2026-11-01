@@ -366,6 +366,11 @@ kbd { display: inline-block; min-width: 24px; padding: 3px 6px; border: 1px soli
 .station-row-copy small { margin-top: 4px; color: var(--muted); font-size: .64rem; }
 .ambient-scene-list li[data-active="true"] { box-shadow: inset 3px 0 0 var(--accent); }
 .ambient-attribution a { color: var(--accent); }
+.ambient-layer-control { margin-top: 18px; }
+.ambient-layer-list li[data-active="true"] { box-shadow: inset 3px 0 0 var(--accent); }
+.ambient-layer-actions { align-items: center; }
+.ambient-layer-level { min-width: 42px; text-align: center; color: var(--accent); }
+.ambient-layer-control .media-source-row { margin-top: 12px; }
 .station-control { margin-top: 16px; }
 .library-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .brandmeister-activity-list li { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; }

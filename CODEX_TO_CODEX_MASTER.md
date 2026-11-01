@@ -2828,3 +2828,51 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   DMR-Ansicht nicht ihren alten Wert – typischerweise 30 Prozent – über die
   hörbar geänderte Radio-/Playerlautstärke schreiben. Beim Start des nativen
   DMR-Empfängers wird genau dieser zentrale Pegel übernommen.
+
+### 2026-11-01 – Ambient-Klanglagen und persistente Lieblingsmischungen
+
+- AmbientR4D10 erhält vier weitere eigenständige, offline gecachte Grundszenen:
+  dezente Vögel auf einer Streuobstwiese, entferntes Autobahnrauschen mit
+  vereinzelten Vögeln, Meer von einer Klippe mit hörbar entferntem Wasser und
+  entfernten Donner. Jede Szene verwendet eine vorab geprüfte, queryfreie
+  Freesound-Ogg-Vorschau mit dokumentierter CC0-Quelle, festem SHA-256 und eine
+  gebündelte textfreie Grafik im vorhandenen dunklen Diorama-Stil.
+- Dieselben vier Aufnahmen sind zusätzlich als dezente Klanglagen verfügbar.
+  Sie laufen ausschließlich zusammen mit einer aktiven Ambient-Grundszene und
+  werden über getrennte lokale `mpv`-Instanzen auf dem bereits real bestätigten
+  ALSA-Mischpfad ausgegeben. Ein echter Laufzeittest am Whisplay bestätigte,
+  dass der ALSA-Ausgang neben dem bestehenden Hauptplayer eine zweite leise
+  Instanz gleichzeitig öffnet; es wird daher kein speicherintensiver
+  `aloop`-Filter und kein paralleler neuer Audio-Stack eingeführt.
+- Im Ambient-Schnellmenü blättert rechts außen durch die Klanglagen. Ein kurzer
+  rechter Druck schaltet die markierte Lage ein oder aus, links innen verändert
+  ausschließlich deren relativen Pegel in Zehn-Prozent-Schritten und PTT geht
+  zurück. Die normale linke Außenachse bleibt der Gesamtlautstärke vorbehalten.
+- Aktivierung und Pegel werden in der bestehenden SQLite-Einstellungsablage
+  gespeichert. Ein Lieblingsmix speichert Grundszene plus alle Klanglagen als
+  neuen normalen Ambient-Kanal; er ist dadurch sortierbar, löschbar,
+  updatefest und direkt über Browser oder Gerät erneut abspielbar. Das
+  Schnellmenü enthält dafür einen eigenen `Mix speichern`-Eintrag; der Browser
+  erlaubt zusätzlich einen frei gewählten Namen.
+- Der Zero 2 W darf höchstens zwei Zusatzlagen gleichzeitig dekodieren. Ein
+  dritter Aktivierungsversuch wird verständlich abgewiesen; diese feste Grenze
+  schützt CPU, Akku und die bereits beobachtete Display-PWM-Stabilität.
+
+### 2026-11-01 – DMR-Länderfilter und geführtes Ersetzen der sechsten TG
+
+- Die normale DMR-Belegung bleibt: kurzer rechter Druck/Enter startet oder
+  stoppt den Empfang, kurzer PTT-/Backspace-Druck schaltet die markierte TG.
+  Ein mindestens zwei Sekunden gehaltener PTT-/Backspace-Druck öffnet dagegen
+  eine geräteinterne Länderliste. Der zentrale Eingabepfad misst dafür die
+  bereits vorhandenen aktiven HIGH/LOW-Flanken; es entsteht weder eine zweite
+  GPIO-Auswertung noch eine Sendefunktion.
+- Die Länderliste wird aus dem lokal gecachten offiziellen Talkgroup-Katalog
+  gebildet und enthält `Alle`, alle sicher aus DMR-MCC ableitbaren Länder sowie
+  `Andere` für nicht konservativ zuordenbare Gruppen. Rechts außen scrollt,
+  rechter Druck übernimmt den Filter, PTT geht zurück. Ein Länderfilter ändert
+  nur die Browse-Liste, niemals die fünf laufenden HoseLine-Abonnements.
+- Beim Aktivieren einer sechsten TG wird nicht mehr nur das Fünferlimit
+  gemeldet. Stattdessen merkt der Dienst die gewünschte neue TG und öffnet
+  `Welche ersetzen?` mit den fünf aktiven Gruppen. Rechts außen wählt die zu
+  ersetzende TG, rechter Druck führt den Tausch aus, PTT bricht ohne Änderung
+  ab. Der Browser bietet dieselbe Auswahl vor dem Aktivieren einer sechsten TG.

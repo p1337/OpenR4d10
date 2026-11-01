@@ -12,6 +12,7 @@ from PIL import Image
 from openr4d10.ambient import (
     AMBIENT_ARTWORK_ROOT,
     AMBIENT_BY_ID,
+    AMBIENT_LAYER_IDS,
     AMBIENT_PRESETS,
     ambient_text,
 )
@@ -36,6 +37,9 @@ class Player:
     def stop(self) -> None:
         self.state = PlaybackState(volume=self.state.volume)
 
+    def set_volume(self, volume) -> None:
+        self.state.volume = volume
+
     def close(self) -> None:
         pass
 
@@ -55,7 +59,10 @@ class AmbientPresetTests(unittest.TestCase):
     def test_presets_have_public_https_sources_and_documented_licenses(self) -> None:
         self.assertEqual(
             {item.preset_id for item in AMBIENT_PRESETS},
-            {"cafe", "forest", "beach", "brook", "rain", "night_crickets"},
+            {
+                "cafe", "forest", "beach", "brook", "rain", "night_crickets",
+                "orchard_birds", "distant_highway", "cliff_sea", "distant_thunder",
+            },
         )
         for item in AMBIENT_PRESETS:
             with self.subTest(item.preset_id):
@@ -200,7 +207,7 @@ class AmbientServiceTests(unittest.TestCase):
             catalog = ServiceCatalog(root, player=player, recorder=Recorder())
             try:
                 snapshot = catalog.snapshot()["ambient"]
-                self.assertEqual(len(snapshot["scenes"]), 6)
+                self.assertEqual(len(snapshot["scenes"]), 10)
                 self.assertNotIn("source_url", snapshot["scenes"][0])
                 self.assertEqual(
                     snapshot["scenes"][0]["artwork"], "/api/ambient-art/cafe"
@@ -362,6 +369,98 @@ class AmbientServiceTests(unittest.TestCase):
                     )
             finally:
                 catalog.close()
+
+    def test_layers_are_relative_persistent_bounded_and_stop_with_audio_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            base = Player()
+            layer_players: list[Player] = []
+
+            def layer_factory():
+                player = Player()
+                layer_players.append(player)
+                return player
+
+            catalog = ServiceCatalog(
+                root,
+                player=base,
+                recorder=Recorder(),
+                ambient_layer_player_factory=layer_factory,
+            )
+            try:
+                first = catalog.snapshot()["ambient"]["scenes"][0]
+                catalog.control({"action": "ambient_play", "scene_id": first["id"]})
+                catalog.control(
+                    {
+                        "action": "ambient_layer_set",
+                        "layer_id": "orchard_birds",
+                        "enabled": True,
+                        "volume": 40,
+                    }
+                )
+                self.assertEqual(len(layer_players), 1)
+                self.assertEqual(layer_players[0].state.volume, 12)
+                catalog.control(
+                    {"action": "ambient_layer_set", "layer_id": "cliff_sea", "enabled": True}
+                )
+                with self.assertRaisesRegex(ValueError, "at most two"):
+                    catalog.control(
+                        {
+                            "action": "ambient_layer_set",
+                            "layer_id": "distant_thunder",
+                            "enabled": True,
+                        }
+                    )
+                catalog.control({"action": "stop"})
+                self.assertEqual(catalog._ambient_layer_players, {})
+            finally:
+                catalog.close()
+
+            reopened = ServiceCatalog(root, player=Player(), recorder=Recorder())
+            try:
+                layers = {
+                    item["id"]: item for item in reopened.snapshot()["ambient"]["layers"]
+                }
+                self.assertTrue(layers["orchard_birds"]["enabled"])
+                self.assertEqual(layers["orchard_birds"]["volume"], 40)
+                self.assertEqual(tuple(layer_id for layer_id in AMBIENT_LAYER_IDS), AMBIENT_LAYER_IDS)
+            finally:
+                reopened.close()
+
+    def test_favorite_mix_saves_base_and_layer_levels_as_ambient_channel(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            catalog = ServiceCatalog(root, player=Player(), recorder=Recorder())
+            try:
+                catalog.control(
+                    {
+                        "action": "ambient_layer_set",
+                        "layer_id": "distant_thunder",
+                        "enabled": True,
+                        "volume": 20,
+                    }
+                )
+                result = catalog.control(
+                    {"action": "ambient_favorite_save", "name": "Leiser Abend"}
+                )
+                favorite = catalog.store.channel(result["favorite_scene_id"])
+                self.assertEqual(favorite["name"], "Leiser Abend")
+                self.assertTrue(favorite["metadata"]["mix_layers"]["distant_thunder"]["enabled"])
+                self.assertNotIn("source_url", catalog.snapshot()["ambient"]["scenes"][-1])
+            finally:
+                catalog.close()
+
+            reopened = ServiceCatalog(root, player=Player(), recorder=Recorder())
+            try:
+                favorite = next(
+                    item
+                    for item in reopened.snapshot()["ambient"]["scenes"]
+                    if item["favorite_mix"]
+                )
+                self.assertEqual(favorite["name"], "Leiser Abend")
+                self.assertEqual(favorite["artwork"], "/api/ambient-art/cafe")
+            finally:
+                reopened.close()
 
 
 if __name__ == "__main__":

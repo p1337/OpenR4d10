@@ -49,6 +49,11 @@ DISPLAY_TEXT = {
         "main_menu": "MAIN MENU",
         "service_settings": "SERVICE SETTINGS",
         "quick_menu": "QUICK MENU",
+        "ambient_layers": "SOUND LAYERS",
+        "dmr_countries": "COUNTRIES",
+        "dmr_replace": "REPLACE TG?",
+        "layer_on": "ON",
+        "layer_off": "OFF",
         "display": "DISPLAY",
         "accent_color": "ACCENT COLOR",
         "wlan": "WI-FI",
@@ -94,6 +99,11 @@ DISPLAY_TEXT = {
         "main_menu": "HAUPTMENÜ",
         "service_settings": "DIENST-EINSTELLUNGEN",
         "quick_menu": "SCHNELLMENÜ",
+        "ambient_layers": "KLANGLAGEN",
+        "dmr_countries": "LÄNDER",
+        "dmr_replace": "TG ERSETZEN?",
+        "layer_on": "AN",
+        "layer_off": "AUS",
         "display": "ANZEIGE",
         "accent_color": "AKZENTFARBE",
         "wlan": "WLAN",
@@ -139,6 +149,11 @@ DISPLAY_TEXT = {
         "main_menu": "MENU GŁÓWNE",
         "service_settings": "USTAWIENIA USŁUGI",
         "quick_menu": "SZYBKIE MENU",
+        "ambient_layers": "WARSTWY DŹWIĘKU",
+        "dmr_countries": "KRAJE",
+        "dmr_replace": "ZASTĄPIĆ TG?",
+        "layer_on": "WŁ",
+        "layer_off": "WYŁ",
         "display": "EKRAN",
         "accent_color": "KOLOR AKCENTU",
         "wlan": "WI-FI",
@@ -184,6 +199,11 @@ DISPLAY_TEXT = {
         "main_menu": "MENU PRINCIPAL",
         "service_settings": "RÉGLAGES SERVICE",
         "quick_menu": "MENU RAPIDE",
+        "ambient_layers": "COUCHES SONORES",
+        "dmr_countries": "PAYS",
+        "dmr_replace": "REMPLACER TG ?",
+        "layer_on": "ON",
+        "layer_off": "OFF",
         "display": "ÉCRAN",
         "accent_color": "COULEUR D’ACCENT",
         "wlan": "WI-FI",
@@ -229,6 +249,11 @@ DISPLAY_TEXT = {
         "main_menu": "MENÚ PRINCIPAL",
         "service_settings": "AJUSTES SERVICIO",
         "quick_menu": "MENÚ RÁPIDO",
+        "ambient_layers": "CAPAS DE SONIDO",
+        "dmr_countries": "PAÍSES",
+        "dmr_replace": "¿SUSTITUIR TG?",
+        "layer_on": "ON",
+        "layer_off": "OFF",
         "display": "PANTALLA",
         "accent_color": "COLOR DE ACENTO",
         "wlan": "WI-FI",
@@ -305,6 +330,15 @@ class DeviceUiState:
     dmr_catalog_position: int = 0
     dmr_catalog_count: int = 0
     dmr_selected_enabled: bool = False
+    dmr_country_rows: list[dict[str, object]] = field(default_factory=list)
+    dmr_country_position: int = 0
+    dmr_country_count: int = 0
+    dmr_replacement_rows: list[dict[str, object]] = field(default_factory=list)
+    dmr_replacement_position: int = 0
+    dmr_replacement_count: int = 0
+    ambient_layer_rows: list[dict[str, object]] = field(default_factory=list)
+    ambient_layer_position: int = 0
+    ambient_layer_count: int = 0
     title: str = "System online"
     subtitle: str = "Receiver ready"
     playing: bool = False
@@ -357,6 +391,15 @@ class DeviceUiState:
             "dmr_catalog_position": self.dmr_catalog_position,
             "dmr_catalog_count": self.dmr_catalog_count,
             "dmr_selected_enabled": self.dmr_selected_enabled,
+            "dmr_country_rows": [dict(item) for item in self.dmr_country_rows],
+            "dmr_country_position": self.dmr_country_position,
+            "dmr_country_count": self.dmr_country_count,
+            "dmr_replacement_rows": [dict(item) for item in self.dmr_replacement_rows],
+            "dmr_replacement_position": self.dmr_replacement_position,
+            "dmr_replacement_count": self.dmr_replacement_count,
+            "ambient_layer_rows": [dict(item) for item in self.ambient_layer_rows],
+            "ambient_layer_position": self.ambient_layer_position,
+            "ambient_layer_count": self.ambient_layer_count,
             "accent_color": "#{:02X}{:02X}{:02X}".format(*self.accent),
         }
 
@@ -404,7 +447,9 @@ class DeviceUiState:
     def apply(self, event: InputEvent) -> None:
         if event.control == Control.LEFT_OUTER:
             self.volume = max(0, min(100, self.volume + event.steps * 10))
-        elif event.control == Control.LEFT_INNER:
+        elif event.control == Control.LEFT_INNER and not (
+            self.menu_open and self.menu_kind == "ambient_layers"
+        ):
             self.squelch = max(0, min(9, self.squelch + event.steps))
         elif event.control == Control.RIGHT_OUTER:
             if self.menu_open and self.menu_kind == "main_menu":
@@ -427,9 +472,16 @@ class DeviceUiState:
                 self.subtitle = "Rotate SERVICE to select"
         elif event.control == Control.RIGHT_PRESS:
             if event.held_seconds >= 2.0:
-                self._open_menu("quick_menu")
-                self.title = "Quick menu"
-                self.subtitle = "Recording and playback actions"
+                if self.service == "AMBIENT":
+                    self._open_menu("ambient_layers")
+                    self.title = "Sound layers"
+                    self.subtitle = "Toggle and adjust subtle background sounds"
+                else:
+                    self._open_menu("quick_menu")
+                    self.title = "Quick menu"
+                    self.subtitle = "Recording and playback actions"
+            elif self.menu_open and self.menu_kind in {"dmr_countries", "dmr_replace"}:
+                self._menu_back()
             elif self.menu_open:
                 self._select_menu_item()
             elif self.service in {"RADIO", "AMBIENT", "DMR", "PLAYER"}:
@@ -442,6 +494,15 @@ class DeviceUiState:
                 self.ptt_active = False
                 if event.active and self.menu_open:
                     self._menu_back()
+                elif (
+                    event.active is False
+                    and event.held_seconds >= 2.0
+                    and not self.menu_open
+                    and self.service == "DMR"
+                ):
+                    self._open_menu("dmr_countries")
+                    self.title = "Countries"
+                    self.subtitle = "Filter talkgroups by country"
 
     def update_from_frame(self, frame: Frame) -> None:
         fields = frame.fields
@@ -489,6 +550,8 @@ class DeviceUiState:
         )
         activity_rows = receiver.get("activity_rows")
         catalog_rows = receiver.get("catalog_rows")
+        country_rows = receiver.get("country_rows")
+        replacement_rows = receiver.get("replacement_rows")
         self.dmr_selected_enabled = receiver.get("selected_enabled") is True
         self.activity_rows = []
         if isinstance(activity_rows, list):
@@ -540,6 +603,100 @@ class DeviceUiState:
         self.dmr_catalog_count = (
             catalog_count
             if isinstance(catalog_count, int) and not isinstance(catalog_count, bool)
+            else 0
+        )
+        self.dmr_country_rows = []
+        if isinstance(country_rows, list):
+            for item in country_rows[:5]:
+                if not isinstance(item, Mapping):
+                    continue
+                self.dmr_country_rows.append(
+                    {
+                        "code": str(item.get("code") or "")[:2].upper(),
+                        "name": str(item.get("name") or "")[:40],
+                        "selected": item.get("selected") is True,
+                        "position": item.get("position")
+                        if isinstance(item.get("position"), int)
+                        and not isinstance(item.get("position"), bool)
+                        else None,
+                    }
+                )
+        country_position = receiver.get("country_position")
+        country_count = receiver.get("country_count")
+        self.dmr_country_position = (
+            country_position
+            if isinstance(country_position, int) and not isinstance(country_position, bool)
+            else 0
+        )
+        self.dmr_country_count = (
+            country_count
+            if isinstance(country_count, int) and not isinstance(country_count, bool)
+            else 0
+        )
+        self.dmr_replacement_rows = []
+        if isinstance(replacement_rows, list):
+            for item in replacement_rows[:5]:
+                if not isinstance(item, Mapping):
+                    continue
+                talkgroup = item.get("talkgroup")
+                if not isinstance(talkgroup, int) or isinstance(talkgroup, bool):
+                    continue
+                self.dmr_replacement_rows.append(
+                    {
+                        "talkgroup": talkgroup,
+                        "name": str(item.get("name") or "")[:40],
+                        "country_code": str(item.get("country_code") or "")[:2].upper(),
+                        "selected": item.get("selected") is True,
+                    }
+                )
+        replacement_position = receiver.get("replacement_position")
+        replacement_count = receiver.get("replacement_count")
+        self.dmr_replacement_position = (
+            replacement_position
+            if isinstance(replacement_position, int) and not isinstance(replacement_position, bool)
+            else 0
+        )
+        self.dmr_replacement_count = (
+            replacement_count
+            if isinstance(replacement_count, int) and not isinstance(replacement_count, bool)
+            else 0
+        )
+        if receiver.get("replacement_required") is True and self.menu_kind != "dmr_replace":
+            self._open_menu("dmr_replace")
+            self.title = "Replace talkgroup"
+            self.subtitle = "Choose one of the five active talkgroups"
+        layer_rows = receiver.get("layer_rows")
+        self.ambient_layer_rows = []
+        if isinstance(layer_rows, list):
+            for item in layer_rows[:5]:
+                if not isinstance(item, Mapping):
+                    continue
+                layer_id = item.get("id")
+                if not isinstance(layer_id, str):
+                    continue
+                volume = item.get("volume")
+                self.ambient_layer_rows.append(
+                    {
+                        "id": layer_id,
+                        "name": str(item.get("name") or "")[:40],
+                        "enabled": item.get("enabled") is True,
+                        "active": item.get("active") is True,
+                        "selected": item.get("selected") is True,
+                        "volume": volume
+                        if isinstance(volume, int) and not isinstance(volume, bool)
+                        else None,
+                    }
+                )
+        layer_position = receiver.get("layer_position")
+        layer_count = receiver.get("layer_count")
+        self.ambient_layer_position = (
+            layer_position
+            if isinstance(layer_position, int) and not isinstance(layer_position, bool)
+            else 0
+        )
+        self.ambient_layer_count = (
+            layer_count
+            if isinstance(layer_count, int) and not isinstance(layer_count, bool)
             else 0
         )
         if not self.menu_open:
@@ -939,6 +1096,126 @@ def _draw_main_menu_items(
         draw.polygon(((231, 264), (239, 264), (235, 270)), fill=state.accent)
 
 
+def _draw_ambient_layers(
+    draw: ImageDraw.ImageDraw,
+    state: DeviceUiState,
+    text: Mapping[str, object],
+    content_top: int,
+) -> None:
+    count_font = _font(9, bold=True)
+    count = (
+        f"{state.ambient_layer_position}/{state.ambient_layer_count}"
+        if state.ambient_layer_count
+        else "--"
+    )
+    count_width = draw.textbbox((0, 0), count, font=count_font)[2]
+    draw.text((224 - count_width, content_top + 14), count, font=count_font, fill=state.accent)
+    row_top = content_top + 35
+    name_font = _font(11, bold=True)
+    state_font = _font(8, bold=True)
+    volume_font = _font(9, bold=True)
+    for index, item in enumerate(state.ambient_layer_rows[:5]):
+        top = row_top + index * 31
+        selected = item.get("selected") is True
+        enabled = item.get("enabled") is True
+        draw.rounded_rectangle(
+            (9, top, 230, top + 27),
+            radius=7,
+            fill=(35, 30, 14) if selected else (11, 22, 25),
+            outline=state.accent if selected else (45, 61, 65),
+            width=2 if selected else 1,
+        )
+        if item.get("id") == "__save_favorite__":
+            draw.polygon(
+                ((17, top + 13), (21, top + 9), (25, top + 13), (21, top + 18)),
+                fill=state.accent,
+            )
+            label = _fit_text(draw, str(item.get("name") or ""), name_font, 173)
+            draw.text((33, top + 7), label, font=name_font, fill=(245, 248, 249))
+            continue
+        if enabled:
+            draw.ellipse((15, top + 8, 26, top + 19), fill=state.accent)
+        else:
+            draw.ellipse((15, top + 8, 26, top + 19), outline=(91, 108, 112), width=2)
+        label = _fit_text(draw, str(item.get("name") or ""), name_font, 132)
+        draw.text((33, top + 2), label, font=name_font, fill=(245, 248, 249))
+        status = str(text["layer_on"] if enabled else text["layer_off"])
+        draw.text((33, top + 15), status, font=state_font, fill=state.accent if enabled else (151, 164, 167))
+        volume = item.get("volume")
+        volume_text = f"{volume}%" if isinstance(volume, int) else "--"
+        width = draw.textbbox((0, 0), volume_text, font=volume_font)[2]
+        draw.text((219 - width, top + 8), volume_text, font=volume_font, fill=(230, 235, 236))
+
+
+def _draw_dmr_countries(
+    draw: ImageDraw.ImageDraw,
+    state: DeviceUiState,
+    content_top: int,
+) -> None:
+    count_font = _font(9, bold=True)
+    count = (
+        f"{state.dmr_country_position}/{state.dmr_country_count}"
+        if state.dmr_country_count
+        else "--"
+    )
+    count_width = draw.textbbox((0, 0), count, font=count_font)[2]
+    draw.text((224 - count_width, content_top + 14), count, font=count_font, fill=state.accent)
+    name_font = _font(12, bold=True)
+    code_font = _font(9, bold=True)
+    for index, item in enumerate(state.dmr_country_rows[:5]):
+        top = content_top + 35 + index * 31
+        selected = item.get("selected") is True
+        draw.rounded_rectangle(
+            (9, top, 230, top + 27),
+            radius=7,
+            fill=(35, 30, 14) if selected else (11, 22, 25),
+            outline=state.accent if selected else (45, 61, 65),
+            width=2 if selected else 1,
+        )
+        if selected:
+            draw.polygon(((17, top + 8), (25, top + 13), (17, top + 19)), fill=state.accent)
+        code = str(item.get("code") or "*")
+        draw.text((32, top + 8), code, font=code_font, fill=state.accent)
+        name = _fit_text(draw, str(item.get("name") or code), name_font, 156)
+        draw.text((59, top + 5), name, font=name_font, fill=(245, 248, 249))
+
+
+def _draw_dmr_replacements(
+    draw: ImageDraw.ImageDraw,
+    state: DeviceUiState,
+    content_top: int,
+) -> None:
+    count_font = _font(9, bold=True)
+    count = (
+        f"{state.dmr_replacement_position}/{state.dmr_replacement_count}"
+        if state.dmr_replacement_count
+        else "--"
+    )
+    count_width = draw.textbbox((0, 0), count, font=count_font)[2]
+    draw.text((224 - count_width, content_top + 14), count, font=count_font, fill=state.accent)
+    name_font = _font(10, bold=True)
+    detail_font = _font(8, bold=True)
+    for index, item in enumerate(state.dmr_replacement_rows[:5]):
+        top = content_top + 35 + index * 31
+        selected = item.get("selected") is True
+        draw.rounded_rectangle(
+            (9, top, 230, top + 27),
+            radius=7,
+            fill=(35, 30, 14) if selected else (11, 22, 25),
+            outline=state.accent if selected else (45, 61, 65),
+            width=2 if selected else 1,
+        )
+        code = str(item.get("country_code") or "TG")
+        draw.text((17, top + 9), code, font=detail_font, fill=state.accent)
+        primary = f"TG {item['talkgroup']}  {item.get('name') or ''}".strip()
+        draw.text(
+            (42, top + 6),
+            _fit_text(draw, primary, name_font, 178),
+            font=name_font,
+            fill=(245, 248, 249),
+        )
+
+
 def _draw_hotspot_setup(
     draw: ImageDraw.ImageDraw,
     state: DeviceUiState,
@@ -1125,6 +1402,12 @@ def render_device_ui(
         _draw_back_or_ptt(draw, accent, state.ptt_active, content_top)
         if menu_key == "main_menu":
             _draw_main_menu_items(draw, state, text, content_top)
+        elif menu_key == "ambient_layers":
+            _draw_ambient_layers(draw, state, text, content_top)
+        elif menu_key == "dmr_countries":
+            _draw_dmr_countries(draw, state, content_top)
+        elif menu_key == "dmr_replace":
+            _draw_dmr_replacements(draw, state, content_top)
         return image.convert("RGB")
 
     if state.service in {"SYSTEM", "REC"}:

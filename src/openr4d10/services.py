@@ -21,6 +21,8 @@ from urllib.parse import urlsplit
 from .ambient import (
     AMBIENT_ARTWORK_ROOT,
     AMBIENT_BY_ID,
+    AMBIENT_LAYER_DEFAULTS,
+    AMBIENT_LAYER_IDS,
     AMBIENT_PRESETS,
     ambient_text,
 )
@@ -59,6 +61,9 @@ DISPLAY_BRIGHTNESS_KEY = "display.brightness_percent"
 DEFAULT_DISPLAY_BRIGHTNESS = 100
 AMBIENT_SOURCE_MIGRATION_KEY = "ambient.direct_sources_v1"
 QUIET_CAFE_MIGRATION_KEY = "ambient.quiet_cafe_v1"
+AMBIENT_SCENE_UPGRADE_KEY = "ambient.layer_scenes_v1"
+AMBIENT_LAYER_STATE_KEY = "ambient.layer_state_v1"
+AMBIENT_SAVE_ACTION = "__save_favorite__"
 OLD_CAFE_AUDIO_URL = (
     "https://upload.wikimedia.org/wikipedia/commons/5/54/Cafe_ambiance.ogg"
 )
@@ -82,6 +87,20 @@ SOLIX_METRIC_RANGES = {
     "battery_percent": (0.0, 100.0),
     "energy_today_kwh": (0.0, 10_000.0),
 }
+BRANDMEISTER_COUNTRY_NAMES = {
+    "AU": "Australia", "AT": "Austria", "CA": "Canada", "CH": "Switzerland",
+    "DE": "Germany", "ES": "Spain", "FR": "France", "GB": "United Kingdom",
+    "IT": "Italy", "NL": "Netherlands", "PL": "Poland", "PT": "Portugal",
+    "US": "United States",
+}
+BRANDMEISTER_COUNTRY_NAMES_DE = {
+    "AU": "Australien", "AT": "Österreich", "CA": "Kanada", "CH": "Schweiz",
+    "DE": "Deutschland", "ES": "Spanien", "FR": "Frankreich", "GB": "Großbritannien",
+    "IT": "Italien", "NL": "Niederlande", "PL": "Polen", "PT": "Portugal",
+    "US": "Vereinigte Staaten",
+}
+BRANDMEISTER_ALL_COUNTRIES = "*"
+BRANDMEISTER_OTHER_COUNTRIES = "--"
 
 LOG = logging.getLogger(__name__)
 
@@ -147,6 +166,7 @@ class ServiceCatalog:
         adapter_registry: ServiceAdapterRegistry | None = None,
         ambient_artwork_root: Path | None = None,
         ambient_audio_cache: AmbientAudioCache | None = None,
+        ambient_layer_player_factory: Callable[[], MpvEngine] | None = None,
         brandmeister: BrandmeisterReceiver | None = None,
         brandmeister_catalog: BrandmeisterTalkgroupCatalog | None = None,
     ) -> None:
@@ -169,6 +189,13 @@ class ServiceCatalog:
         self.ambient_audio = ambient_audio_cache or AmbientAudioCache(
             self.media_root / "ambient"
         )
+        self._ambient_layer_player_factory = ambient_layer_player_factory or (
+            lambda: MpvEngine(
+                executable=getattr(self.player, "executable", Path("/usr/bin/mpv")),
+                media_roots=getattr(self.player, "media_roots", (self.media_root,)),
+            )
+        )
+        self._ambient_layer_players: dict[str, MpvEngine] = {}
         self.brandmeister = brandmeister or BrandmeisterReceiver()
         self.brandmeister_catalog = brandmeister_catalog or BrandmeisterTalkgroupCatalog(
             state_directory / "cache" / "brandmeister-talkgroups.json"
@@ -205,8 +232,14 @@ class ServiceCatalog:
         self.active_weather_channel_id: int | None = None
         self.selected_ambient_scene_id: int | None = None
         self.active_ambient_scene_id: int | None = None
+        self.selected_ambient_layer_id = AMBIENT_LAYER_IDS[0]
+        self._ambient_layer_state: dict[str, dict[str, object]] = {}
         self.selected_brandmeister_channel_id: int | None = None
         self.selected_brandmeister_talkgroup: int | None = None
+        self.brandmeister_country_filter: str | None = None
+        self.selected_brandmeister_country = BRANDMEISTER_ALL_COUNTRIES
+        self._pending_brandmeister_talkgroup: int | None = None
+        self._selected_brandmeister_replacement: int | None = None
         self.selected_camera_id: int | None = None
         self._brandmeister_catalog_entries_cache: list[dict[str, object]] = []
         self._brandmeister_catalog_guard = threading.Lock()
@@ -299,6 +332,8 @@ class ServiceCatalog:
         self._seed_germany_satellite_upgrade()
         self._upgrade_ambient_source_urls()
         self._upgrade_quiet_cafe_source()
+        self._seed_ambient_layer_scenes()
+        self._ambient_layer_state = self._load_ambient_layer_state()
         weather_channels = self.store.channels("weather")
         if weather_channels:
             self.active_weather_channel_id = int(weather_channels[0]["id"])
@@ -436,7 +471,96 @@ class ServiceCatalog:
                 }
             )
             seen.add(talkgroup)
-        return ordered
+        if self.brandmeister_country_filter is None:
+            return ordered
+        country_filter = self.brandmeister_country_filter
+        return [
+            item
+            for item in ordered
+            if (
+                str(item.get("country_code") or "") == country_filter
+                if country_filter != BRANDMEISTER_OTHER_COUNTRIES
+                else not str(item.get("country_code") or "")
+            )
+        ]
+
+    def _brandmeister_country_entries(
+        self, *, allow_network: bool
+    ) -> list[dict[str, object]]:
+        entries = self._brandmeister_catalog_entries(allow_network=allow_network)
+        codes = sorted(
+            {
+                str(item.get("country_code") or BRANDMEISTER_OTHER_COUNTRIES)
+                for item in entries
+            }
+        )
+        names = (
+            BRANDMEISTER_COUNTRY_NAMES_DE
+            if self.display_language() == "de"
+            else BRANDMEISTER_COUNTRY_NAMES
+        )
+        all_name = "Alle Länder" if self.display_language() == "de" else "All countries"
+        other_name = "Andere" if self.display_language() == "de" else "Other"
+        rows = [
+            {
+                "code": BRANDMEISTER_ALL_COUNTRIES,
+                "name": all_name,
+                "selected": self.selected_brandmeister_country == BRANDMEISTER_ALL_COUNTRIES,
+            }
+        ]
+        for code in codes:
+            rows.append(
+                {
+                    "code": code,
+                    "name": other_name if code == BRANDMEISTER_OTHER_COUNTRIES else names.get(code, code),
+                    "selected": self.selected_brandmeister_country == code,
+                }
+            )
+        return rows
+
+    @staticmethod
+    def _bounded_selection_window(
+        rows: list[dict[str, object]], *, size: int = 5
+    ) -> tuple[list[dict[str, object]], int, int]:
+        if not rows:
+            return [], 0, 0
+        selected = next(
+            (index for index, item in enumerate(rows) if item.get("selected") is True),
+            0,
+        )
+        window_size = max(1, min(size, len(rows)))
+        start = max(0, min(selected - window_size // 2, len(rows) - window_size))
+        visible = []
+        for index, item in enumerate(rows[start : start + window_size], start=start):
+            row = dict(item)
+            row["position"] = index + 1
+            visible.append(row)
+        return visible, selected + 1, len(rows)
+
+    def _brandmeister_replacement_rows(self) -> list[dict[str, object]]:
+        rows: list[dict[str, object]] = []
+        for channel in self.store.channels("brandmeister"):
+            metadata = channel.get("metadata")
+            metadata = metadata if isinstance(metadata, dict) else {}
+            talkgroup = metadata.get("talkgroup")
+            if (
+                metadata.get("enabled") is not True
+                or not isinstance(talkgroup, int)
+                or isinstance(talkgroup, bool)
+            ):
+                continue
+            rows.append(
+                {
+                    "talkgroup": talkgroup,
+                    "name": str(channel["name"]),
+                    "country_code": country_code(talkgroup) or "",
+                    "selected": talkgroup == self._selected_brandmeister_replacement,
+                }
+            )
+        if rows and not any(item["selected"] is True for item in rows):
+            rows[0]["selected"] = True
+            self._selected_brandmeister_replacement = int(rows[0]["talkgroup"])
+        return rows[:5]
 
     def _brandmeister_device_window(
         self, entries: list[dict[str, object]], *, size: int = 5
@@ -506,6 +630,57 @@ class ServiceCatalog:
                 break
         return enabled
 
+    def _replace_brandmeister_talkgroup(
+        self,
+        old_talkgroup: int,
+        new_talkgroup: int,
+        new_name: str,
+    ) -> dict[str, object]:
+        old_channel = self._saved_brandmeister_channel_for_talkgroup(old_talkgroup)
+        if old_channel is None:
+            raise ValueError("the talkgroup selected for replacement is not saved")
+        old_metadata = old_channel.get("metadata")
+        old_metadata = dict(old_metadata) if isinstance(old_metadata, dict) else {}
+        if old_metadata.get("enabled") is not True:
+            raise ValueError("the talkgroup selected for replacement is not active")
+
+        new_channel = self._saved_brandmeister_channel_for_talkgroup(new_talkgroup)
+        if new_channel is None:
+            if len(self.store.channels("brandmeister")) >= 30:
+                raise ValueError("at most 30 BrandMeister talkgroups can be saved")
+            new_channel_id = self.store.add_channel(
+                "brandmeister",
+                str(new_talkgroup),
+                new_name,
+                {"talkgroup": new_talkgroup, "enabled": False},
+            )
+            new_channel = self.store.channel(new_channel_id)
+        if new_channel is None:
+            raise RuntimeError("replacement talkgroup could not be saved")
+
+        old_metadata["enabled"] = False
+        self.store.update_channel(
+            int(old_channel["id"]), str(old_channel["name"]), old_metadata
+        )
+        new_metadata = new_channel.get("metadata")
+        new_metadata = dict(new_metadata) if isinstance(new_metadata, dict) else {}
+        new_metadata.update({"talkgroup": new_talkgroup, "enabled": True})
+        self.store.update_channel(
+            int(new_channel["id"]), str(new_channel["name"]), new_metadata
+        )
+        self.selected_brandmeister_talkgroup = new_talkgroup
+        self.selected_brandmeister_channel_id = int(new_channel["id"])
+        self._pending_brandmeister_talkgroup = None
+        self._selected_brandmeister_replacement = None
+        state = self._reconfigure_brandmeister_receiver()
+        return {
+            "channel_id": int(new_channel["id"]),
+            "talkgroup": new_talkgroup,
+            "enabled": True,
+            "replaced_talkgroup": old_talkgroup,
+            "brandmeister": state,
+        }
+
     def _brandmeister_activity_rows(
         self, state: dict[str, object] | None = None
     ) -> list[dict[str, object]]:
@@ -569,6 +744,7 @@ class ServiceCatalog:
             if self.active_service == "brandmeister":
                 self.active_service = "system"
             return self.brandmeister.snapshot()
+        self._stop_ambient_layers()
         self.player.stop()
         if self.radio_buffer is not None:
             self.radio_buffer.stop(flush=True)
@@ -596,6 +772,8 @@ class ServiceCatalog:
         return state
 
     def _stop_brandmeister_for_audio_owner(self) -> None:
+        if self.active_service == "ambient":
+            self._stop_ambient_layers()
         if self.active_service == "brandmeister":
             self.brandmeister.stop()
 
@@ -718,6 +896,211 @@ class ServiceCatalog:
                     updated,
                 )
         self.store.set_setting(QUIET_CAFE_MIGRATION_KEY, True)
+
+    def _seed_ambient_layer_scenes(self) -> None:
+        """Append the four new reviewed scenes once without resetting user order."""
+
+        if self.store.get_setting(AMBIENT_SCENE_UPGRADE_KEY, False) is True:
+            return
+        existing = {
+            str(item["external_id"]) for item in self.store.channels("ambient")
+        }
+        for preset_id in AMBIENT_LAYER_IDS:
+            if preset_id in existing:
+                continue
+            item = AMBIENT_BY_ID[preset_id]
+            self.store.add_channel(
+                "ambient",
+                item.preset_id,
+                item.name,
+                {
+                    "source_url": item.audio_url,
+                    "description": item.description,
+                    "source_page": item.source_page,
+                    "credit": item.credit,
+                    "license_name": item.license_name,
+                    "license_url": item.license_url,
+                    "sha256": item.sha256,
+                },
+            )
+        self.store.set_setting(AMBIENT_SCENE_UPGRADE_KEY, True)
+
+    def _load_ambient_layer_state(self) -> dict[str, dict[str, object]]:
+        raw = self.store.get_setting(AMBIENT_LAYER_STATE_KEY, {})
+        raw = raw if isinstance(raw, dict) else {}
+        state: dict[str, dict[str, object]] = {}
+        for layer_id in AMBIENT_LAYER_IDS:
+            item = raw.get(layer_id)
+            item = item if isinstance(item, dict) else {}
+            enabled = item.get("enabled") is True
+            volume = item.get("volume", AMBIENT_LAYER_DEFAULTS[layer_id])
+            if isinstance(volume, bool) or not isinstance(volume, int):
+                volume = AMBIENT_LAYER_DEFAULTS[layer_id]
+            state[layer_id] = {
+                "enabled": enabled,
+                "volume": max(0, min(100, volume)),
+            }
+        return state
+
+    def _persist_ambient_layer_state(self) -> None:
+        self.store.set_setting(AMBIENT_LAYER_STATE_KEY, self._ambient_layer_state)
+
+    def _ambient_layer_source(self, layer_id: str) -> str:
+        preset = AMBIENT_BY_ID[layer_id]
+        if preset.sha256 is not None:
+            cached = self.ambient_audio.cached(preset.preset_id, preset.sha256)
+            if cached is not None:
+                return validate_media_source(str(cached), (self.media_root,))
+        return validate_media_source(preset.audio_url, (self.media_root,))
+
+    def _ambient_layer_output_volume(self, layer_id: str) -> int:
+        relative = int(self._ambient_layer_state[layer_id]["volume"])
+        return round(self.player.state.volume * relative / 100)
+
+    def _stop_ambient_layers(self) -> None:
+        players = tuple(self._ambient_layer_players.values())
+        self._ambient_layer_players.clear()
+        for player in players:
+            player.close()
+
+    def _sync_ambient_layers(self, *, restart: bool = False) -> None:
+        if self.active_service != "ambient" or self.active_ambient_scene_id is None:
+            self._stop_ambient_layers()
+            return
+        if restart:
+            self._stop_ambient_layers()
+        for layer_id in AMBIENT_LAYER_IDS:
+            enabled = self._ambient_layer_state[layer_id]["enabled"] is True
+            player = self._ambient_layer_players.get(layer_id)
+            if not enabled:
+                if player is not None:
+                    player.close()
+                    del self._ambient_layer_players[layer_id]
+                continue
+            volume = self._ambient_layer_output_volume(layer_id)
+            if player is None:
+                player = self._ambient_layer_player_factory()
+                player.state.volume = volume
+                try:
+                    player.load_playlist(
+                        [self._ambient_layer_source(layer_id)],
+                        loop=True,
+                    )
+                    if self.player.state.paused:
+                        player.toggle_pause()
+                except Exception:
+                    player.close()
+                    raise
+                self._ambient_layer_players[layer_id] = player
+            elif player.state.volume != volume:
+                player.set_volume(volume)
+
+    def _set_ambient_layer_state(
+        self,
+        layer_id: str,
+        *,
+        enabled: bool | None = None,
+        volume: int | None = None,
+    ) -> dict[str, object]:
+        if layer_id not in AMBIENT_LAYER_IDS:
+            raise ValueError("unknown ambient sound layer")
+        state = self._ambient_layer_state[layer_id]
+        if (
+            enabled is True
+            and state["enabled"] is not True
+            and sum(
+                item["enabled"] is True
+                for item in self._ambient_layer_state.values()
+            ) >= 2
+        ):
+            raise ValueError("at most two ambient sound layers can be active")
+        if enabled is not None:
+            state["enabled"] = enabled
+        if volume is not None:
+            state["volume"] = max(0, min(100, volume))
+        self._persist_ambient_layer_state()
+        self._sync_ambient_layers()
+        return dict(state)
+
+    def _ambient_layer_rows(self) -> list[dict[str, object]]:
+        rows: list[dict[str, object]] = []
+        language = self.display_language()
+        for position, layer_id in enumerate(AMBIENT_LAYER_IDS, start=1):
+            preset = AMBIENT_BY_ID[layer_id]
+            translated = ambient_text(layer_id, language)
+            name, description = translated or (preset.name, preset.description)
+            state = self._ambient_layer_state[layer_id]
+            rows.append(
+                {
+                    "id": layer_id,
+                    "name": name,
+                    "description": description,
+                    "enabled": state["enabled"] is True,
+                    "volume": int(state["volume"]),
+                    "active": layer_id in self._ambient_layer_players,
+                    "selected": layer_id == self.selected_ambient_layer_id,
+                    "position": position,
+                    "source_page": preset.source_page,
+                    "credit": preset.credit,
+                    "license_name": preset.license_name,
+                    "license_url": preset.license_url,
+                }
+            )
+        rows.append(
+            {
+                "id": AMBIENT_SAVE_ACTION,
+                "name": {
+                    "de": "Mix speichern",
+                    "pl": "Zapisz miks",
+                    "fr": "Enregistrer le mix",
+                    "es": "Guardar mezcla",
+                }.get(language, "Save favorite mix"),
+                "description": "",
+                "enabled": False,
+                "volume": None,
+                "active": False,
+                "selected": self.selected_ambient_layer_id == AMBIENT_SAVE_ACTION,
+                "position": len(AMBIENT_LAYER_IDS) + 1,
+            }
+        )
+        return rows
+
+    def _save_ambient_favorite(self, requested_name: object = None) -> int:
+        if self.selected_ambient_scene_id is None:
+            raise ValueError("select an ambient base scene first")
+        base = self._ambient_scene(self.selected_ambient_scene_id)
+        metadata = base.get("metadata")
+        if not isinstance(metadata, dict) or not isinstance(metadata.get("source_url"), str):
+            raise ValueError("ambient base scene has no media source")
+        name = requested_name.strip() if isinstance(requested_name, str) else ""
+        if not name:
+            number = 1 + sum(
+                str(item["external_id"]).startswith("mix-")
+                for item in self.store.channels("ambient")
+            )
+            name = f"Favorite mix {number}"
+        if len(name) > 160:
+            raise ValueError("favorite mix name is too long")
+        source_preset_id = str(
+            metadata.get("source_preset_id") or base.get("external_id") or ""
+        )
+        favorite_metadata = {
+            "source_url": str(metadata["source_url"]),
+            "source_preset_id": source_preset_id,
+            "description": "Favorite AmbientR4D10 sound mix",
+            "mix_layers": {
+                layer_id: dict(self._ambient_layer_state[layer_id])
+                for layer_id in AMBIENT_LAYER_IDS
+            },
+        }
+        scene_id = self.store.add_channel(
+            "ambient",
+            f"mix-{uuid.uuid4().hex[:16]}",
+            name,
+            favorite_metadata,
+        )
+        self.selected_ambient_scene_id = scene_id
+        return scene_id
 
     def display_brightness(self) -> int:
         value = self.store.get_setting(
@@ -1051,16 +1434,20 @@ class ServiceCatalog:
                 if isinstance(source_url, str)
                 else ""
             )
+            artwork_preset_id = str(
+                metadata.get("source_preset_id") or preset_id
+            )
             ambient_scenes.append(
                 {
                     "id": int(item["id"]),
                     "preset_id": preset_id,
                     "name": str(item["name"]),
                     "artwork": (
-                        f"/api/ambient-art/{preset_id}"
-                        if preset_id in AMBIENT_BY_ID
+                        f"/api/ambient-art/{artwork_preset_id}"
+                        if artwork_preset_id in AMBIENT_BY_ID
                         else None
                     ),
+                    "favorite_mix": preset_id.startswith("mix-"),
                     "description": str(metadata.get("description") or ""),
                     "credit": str(metadata.get("credit") or ""),
                     "license_name": str(metadata.get("license_name") or ""),
@@ -1173,6 +1560,9 @@ class ServiceCatalog:
                 "selected_scene_id": self.selected_ambient_scene_id,
                 "active_scene_id": self.active_ambient_scene_id,
                 "scenes": ambient_scenes,
+                "selected_layer_id": self.selected_ambient_layer_id,
+                "layers": self._ambient_layer_rows(),
+                "max_active_layers": 2,
             },
             "webcams": {
                 "selected_camera_id": self.selected_camera_id,
@@ -1185,6 +1575,12 @@ class ServiceCatalog:
                 "selected_talkgroup": self.selected_brandmeister_talkgroup,
                 "channels": brandmeister_channels,
                 "activity_rows": brandmeister_activity,
+                "country_filter": self.brandmeister_country_filter,
+                "replacement_required": self._pending_brandmeister_talkgroup is not None,
+                "pending_talkgroup": self._pending_brandmeister_talkgroup,
+                "replacement_rows": self._brandmeister_replacement_rows()
+                if self._pending_brandmeister_talkgroup is not None
+                else [],
                 "limits": {"saved": 30, "enabled": 5},
             },
             "media": media,
@@ -1209,6 +1605,8 @@ class ServiceCatalog:
                 if service_id == "brandmeister":
                     self.brandmeister.stop()
                 if self.active_service == service_id:
+                    if service_id == "ambient":
+                        self._stop_ambient_layers()
                     self.player.stop()
                     if service_id == "webradio" and self.radio_buffer is not None:
                         self.radio_buffer.stop(flush=True)
@@ -1256,8 +1654,12 @@ class ServiceCatalog:
             if self.player.state.state not in {"playing", "paused"}:
                 raise ValueError("no active media to pause or resume")
             self.player.toggle_pause()
+            if self.active_service == "ambient":
+                for layer_player in self._ambient_layer_players.values():
+                    layer_player.toggle_pause()
         elif action == "stop":
             self.brandmeister.stop()
+            self._stop_ambient_layers()
             self.player.stop()
             if self.radio_buffer is not None:
                 self.radio_buffer.stop(flush=True)
@@ -1273,6 +1675,8 @@ class ServiceCatalog:
                 self.player.state.volume = value  # type: ignore[assignment]
             else:
                 self.player.set_volume(value)  # type: ignore[arg-type]
+                if self.active_service == "ambient":
+                    self._sync_ambient_layers()
         elif action == "volume_step":
             steps = request.get("steps")
             if (
@@ -1288,6 +1692,8 @@ class ServiceCatalog:
                 self.player.state.volume = volume
             else:
                 self.player.set_volume(volume)
+                if self.active_service == "ambient":
+                    self._sync_ambient_layers()
         elif action == "record_start":
             self._require_enabled("recorder")
             source = request.get("source")
@@ -1441,9 +1847,83 @@ class ServiceCatalog:
                 and self.player.state.state in {"playing", "paused"}
             ):
                 self.player.toggle_pause()
+                for layer_player in self._ambient_layer_players.values():
+                    layer_player.toggle_pause()
             else:
                 scene = self._ambient_scene(self.selected_ambient_scene_id)
                 self._play_ambient_scene(scene)
+        elif action == "ambient_layer_step":
+            self._require_enabled("ambient")
+            steps = request.get("steps")
+            if (
+                isinstance(steps, bool)
+                or not isinstance(steps, int)
+                or steps == 0
+                or abs(steps) > 10
+            ):
+                raise ValueError("ambient layer steps must be between -10 and 10")
+            entries = [*AMBIENT_LAYER_IDS, AMBIENT_SAVE_ACTION]
+            current = (
+                entries.index(self.selected_ambient_layer_id)
+                if self.selected_ambient_layer_id in entries
+                else 0
+            )
+            self.selected_ambient_layer_id = entries[(current + steps) % len(entries)]
+            return {"layer_id": self.selected_ambient_layer_id}
+        elif action == "ambient_layer_toggle":
+            self._require_enabled("ambient")
+            layer_id = request.get("layer_id", self.selected_ambient_layer_id)
+            if layer_id == AMBIENT_SAVE_ACTION:
+                scene_id = self._save_ambient_favorite(request.get("name"))
+                return {"favorite_scene_id": scene_id}
+            if not isinstance(layer_id, str) or layer_id not in AMBIENT_LAYER_IDS:
+                raise ValueError("unknown ambient sound layer")
+            self.selected_ambient_layer_id = layer_id
+            enabled = self._ambient_layer_state[layer_id]["enabled"] is not True
+            state = self._set_ambient_layer_state(layer_id, enabled=enabled)
+            return {"layer_id": layer_id, "layer": state}
+        elif action == "ambient_layer_volume_step":
+            self._require_enabled("ambient")
+            steps = request.get("steps")
+            if (
+                isinstance(steps, bool)
+                or not isinstance(steps, int)
+                or steps == 0
+                or abs(steps) > 10
+            ):
+                raise ValueError("ambient layer volume steps must be between -10 and 10")
+            layer_id = self.selected_ambient_layer_id
+            if layer_id == AMBIENT_SAVE_ACTION:
+                return {"layer_id": layer_id}
+            volume = int(self._ambient_layer_state[layer_id]["volume"]) + steps * 10
+            state = self._set_ambient_layer_state(layer_id, volume=volume)
+            return {"layer_id": layer_id, "layer": state}
+        elif action == "ambient_layer_set":
+            self._require_enabled("ambient")
+            layer_id = request.get("layer_id")
+            enabled = request.get("enabled")
+            volume = request.get("volume")
+            if not isinstance(layer_id, str) or layer_id not in AMBIENT_LAYER_IDS:
+                raise ValueError("unknown ambient sound layer")
+            if enabled is not None and not isinstance(enabled, bool):
+                raise ValueError("ambient layer enabled must be boolean")
+            if volume is not None and (
+                isinstance(volume, bool)
+                or not isinstance(volume, int)
+                or not 0 <= volume <= 100
+            ):
+                raise ValueError("ambient layer volume must be from 0 to 100")
+            self.selected_ambient_layer_id = layer_id
+            state = self._set_ambient_layer_state(
+                layer_id,
+                enabled=enabled,
+                volume=volume,
+            )
+            return {"layer_id": layer_id, "layer": state}
+        elif action == "ambient_favorite_save":
+            self._require_enabled("ambient")
+            scene_id = self._save_ambient_favorite(request.get("name"))
+            return {"favorite_scene_id": scene_id}
         elif action == "ambient_scene_save":
             self._require_enabled("ambient")
             name = request.get("name")
@@ -1529,6 +2009,90 @@ class ServiceCatalog:
                 "talkgroup": talkgroup,
                 "name": str(selected["name"]),
             }
+        elif action == "brandmeister_country_menu_open":
+            self._require_enabled("brandmeister")
+            self._brandmeister_catalog_entries(allow_network=True)
+            self.selected_brandmeister_country = (
+                self.brandmeister_country_filter or BRANDMEISTER_ALL_COUNTRIES
+            )
+            return {"country_menu": True}
+        elif action == "brandmeister_country_step":
+            self._require_enabled("brandmeister")
+            steps = request.get("steps")
+            if (
+                isinstance(steps, bool)
+                or not isinstance(steps, int)
+                or steps == 0
+                or abs(steps) > 10
+            ):
+                raise ValueError("BrandMeister country steps must be between -10 and 10")
+            rows = self._brandmeister_country_entries(allow_network=True)
+            codes = [str(item["code"]) for item in rows]
+            current = (
+                codes.index(self.selected_brandmeister_country)
+                if self.selected_brandmeister_country in codes
+                else 0
+            )
+            self.selected_brandmeister_country = codes[(current + steps) % len(codes)]
+            return {"country_code": self.selected_brandmeister_country}
+        elif action == "brandmeister_country_select":
+            self._require_enabled("brandmeister")
+            code = self.selected_brandmeister_country
+            self.brandmeister_country_filter = (
+                None if code == BRANDMEISTER_ALL_COUNTRIES else code
+            )
+            entries = self._brandmeister_device_entries(allow_network=True)
+            if entries:
+                talkgroup = int(entries[0]["talkgroup"])
+                self.selected_brandmeister_talkgroup = talkgroup
+                saved = self._saved_brandmeister_channel_for_talkgroup(talkgroup)
+                self.selected_brandmeister_channel_id = (
+                    int(saved["id"]) if saved is not None else None
+                )
+            return {"country_code": code, "country_filter_applied": True}
+        elif action == "brandmeister_replacement_step":
+            self._require_enabled("brandmeister")
+            steps = request.get("steps")
+            if (
+                isinstance(steps, bool)
+                or not isinstance(steps, int)
+                or steps == 0
+                or abs(steps) > 10
+            ):
+                raise ValueError("BrandMeister replacement steps must be between -10 and 10")
+            rows = self._brandmeister_replacement_rows()
+            talkgroups = [int(item["talkgroup"]) for item in rows]
+            if not talkgroups:
+                raise ValueError("no active BrandMeister talkgroup can be replaced")
+            current = (
+                talkgroups.index(self._selected_brandmeister_replacement)
+                if self._selected_brandmeister_replacement in talkgroups
+                else 0
+            )
+            self._selected_brandmeister_replacement = talkgroups[(current + steps) % len(talkgroups)]
+            return {"replace_talkgroup": self._selected_brandmeister_replacement}
+        elif action == "brandmeister_replacement_confirm":
+            self._require_enabled("brandmeister")
+            new_talkgroup = self._pending_brandmeister_talkgroup
+            old_talkgroup = self._selected_brandmeister_replacement
+            if new_talkgroup is None or old_talkgroup is None:
+                raise ValueError("no BrandMeister replacement is pending")
+            entry = next(
+                (
+                    item
+                    for item in self._brandmeister_catalog_entries(allow_network=True)
+                    if item.get("talkgroup") == new_talkgroup
+                ),
+                None,
+            )
+            name = str(entry.get("name") or f"TG {new_talkgroup}") if entry else f"TG {new_talkgroup}"
+            return self._replace_brandmeister_talkgroup(
+                old_talkgroup, new_talkgroup, name
+            )
+        elif action == "brandmeister_replacement_cancel":
+            self._pending_brandmeister_talkgroup = None
+            self._selected_brandmeister_replacement = None
+            return {"replacement_cancelled": True}
         elif action == "brandmeister_toggle":
             self._require_enabled("brandmeister")
             state = self.brandmeister.snapshot()
@@ -1557,7 +2121,13 @@ class ServiceCatalog:
                 if len(channels) >= 30:
                     raise ValueError("at most 30 BrandMeister talkgroups can be saved")
                 if len(self._enabled_brandmeister_talkgroups()) >= 5:
-                    raise ValueError("at most five BrandMeister talkgroups can be active")
+                    self._pending_brandmeister_talkgroup = talkgroup
+                    self._selected_brandmeister_replacement = self._enabled_brandmeister_talkgroups()[0]
+                    return {
+                        "talkgroup": talkgroup,
+                        "enabled": False,
+                        "replacement_required": True,
+                    }
                 channel_id = self.store.add_channel(
                     "brandmeister",
                     str(talkgroup),
@@ -1576,7 +2146,14 @@ class ServiceCatalog:
             metadata = dict(metadata) if isinstance(metadata, dict) else {}
             enabled = metadata.get("enabled") is not True
             if enabled and len(self._enabled_brandmeister_talkgroups()) >= 5:
-                raise ValueError("at most five BrandMeister talkgroups can be active")
+                self._pending_brandmeister_talkgroup = talkgroup
+                self._selected_brandmeister_replacement = self._enabled_brandmeister_talkgroups()[0]
+                return {
+                    "channel_id": int(channel["id"]),
+                    "talkgroup": talkgroup,
+                    "enabled": False,
+                    "replacement_required": True,
+                }
             metadata["enabled"] = enabled
             self.store.update_channel(int(channel["id"]), str(channel["name"]), metadata)
             self.selected_brandmeister_talkgroup = talkgroup
@@ -1593,6 +2170,7 @@ class ServiceCatalog:
             talkgroup = request.get("talkgroup")
             name = request.get("name")
             enabled = request.get("enabled", False)
+            replace_talkgroup = request.get("replace_talkgroup")
             if (
                 isinstance(talkgroup, bool)
                 or not isinstance(talkgroup, int)
@@ -1604,11 +2182,22 @@ class ServiceCatalog:
                 raise ValueError("talkgroup name must be text")
             if not isinstance(enabled, bool):
                 raise ValueError("talkgroup enabled state must be boolean")
+            if replace_talkgroup is not None and (
+                isinstance(replace_talkgroup, bool)
+                or not isinstance(replace_talkgroup, int)
+            ):
+                raise ValueError("replacement talkgroup must be an integer")
             channels = self.store.channels("brandmeister")
             if len(channels) >= 30 and not any(str(item["external_id"]) == str(talkgroup) for item in channels):
                 raise ValueError("at most 30 BrandMeister talkgroups can be saved")
             if enabled and len(self._enabled_brandmeister_talkgroups()) >= 5:
-                raise ValueError("at most five BrandMeister talkgroups can be active")
+                if isinstance(replace_talkgroup, int):
+                    return self._replace_brandmeister_talkgroup(
+                        replace_talkgroup,
+                        talkgroup,
+                        name.strip()[:160] if isinstance(name, str) else f"TG {talkgroup}",
+                    )
+                raise ValueError("select an active BrandMeister talkgroup to replace")
             channel_id = self.store.add_channel(
                 "brandmeister",
                 str(talkgroup),
@@ -1631,17 +2220,28 @@ class ServiceCatalog:
             self._require_enabled("brandmeister")
             channel_id = request.get("channel_id")
             enabled = request.get("enabled")
+            replace_talkgroup = request.get("replace_talkgroup")
             if isinstance(channel_id, bool) or not isinstance(channel_id, int):
                 raise ValueError("BrandMeister channel id must be an integer")
             if not isinstance(enabled, bool):
                 raise ValueError("talkgroup enabled state must be boolean")
+            if replace_talkgroup is not None and (
+                isinstance(replace_talkgroup, bool)
+                or not isinstance(replace_talkgroup, int)
+            ):
+                raise ValueError("replacement talkgroup must be an integer")
             channel = self.store.channel(channel_id)
             if channel is None or channel.get("service_id") != "brandmeister":
                 raise ValueError("BrandMeister talkgroup was not found")
             metadata = channel.get("metadata")
             metadata = dict(metadata) if isinstance(metadata, dict) else {}
             if enabled and metadata.get("enabled") is not True and len(self._enabled_brandmeister_talkgroups()) >= 5:
-                raise ValueError("at most five BrandMeister talkgroups can be active")
+                talkgroup = metadata.get("talkgroup")
+                if isinstance(replace_talkgroup, int) and isinstance(talkgroup, int):
+                    return self._replace_brandmeister_talkgroup(
+                        replace_talkgroup, talkgroup, str(channel["name"])
+                    )
+                raise ValueError("select an active BrandMeister talkgroup to replace")
             metadata["enabled"] = enabled
             self.store.update_channel(channel_id, str(channel["name"]), metadata)
             state = self._reconfigure_brandmeister_receiver()
@@ -2109,7 +2709,10 @@ class ServiceCatalog:
         if not isinstance(metadata, dict) or not isinstance(metadata.get("source_url"), str):
             raise ValueError("ambient scene has no media source")
         source = validate_media_source(str(metadata["source_url"]), (self.media_root,))
-        preset = AMBIENT_BY_ID.get(str(scene.get("external_id") or ""))
+        source_preset_id = str(
+            metadata.get("source_preset_id") or scene.get("external_id") or ""
+        )
+        preset = AMBIENT_BY_ID.get(source_preset_id)
         if (
             preset is not None
             and preset.sha256 is not None
@@ -2118,6 +2721,25 @@ class ServiceCatalog:
             cached = self.ambient_audio.cached(preset.preset_id, preset.sha256)
             if cached is not None:
                 source = validate_media_source(str(cached), (self.media_root,))
+        mix_layers = metadata.get("mix_layers")
+        if isinstance(mix_layers, dict):
+            enabled_count = 0
+            restored: dict[str, dict[str, object]] = {}
+            for layer_id in AMBIENT_LAYER_IDS:
+                item = mix_layers.get(layer_id)
+                item = item if isinstance(item, dict) else {}
+                enabled = item.get("enabled") is True and enabled_count < 2
+                if enabled:
+                    enabled_count += 1
+                volume = item.get("volume", AMBIENT_LAYER_DEFAULTS[layer_id])
+                if isinstance(volume, bool) or not isinstance(volume, int):
+                    volume = AMBIENT_LAYER_DEFAULTS[layer_id]
+                restored[layer_id] = {
+                    "enabled": enabled,
+                    "volume": max(0, min(100, volume)),
+                }
+            self._ambient_layer_state = restored
+            self._persist_ambient_layer_state()
         if self.radio_buffer is not None:
             self.radio_buffer.stop(flush=True)
         self._stop_brandmeister_for_audio_owner()
@@ -2129,6 +2751,7 @@ class ServiceCatalog:
         self.active_preset_id = None
         self.active_station_id = None
         self._active_podcast_episode = None
+        self._sync_ambient_layers(restart=True)
 
     def _cache_builtin_ambient_audio(self) -> None:
         for preset in AMBIENT_PRESETS:
@@ -2544,6 +3167,12 @@ class ServiceCatalog:
             ids = [int(item["id"]) for item in scenes]
             scene_id = int(scene["id"]) if scene is not None else None
             preset_id = str(scene["external_id"]) if scene is not None else ""
+            scene_metadata = scene.get("metadata") if scene is not None else None
+            artwork_preset_id = (
+                str(scene_metadata.get("source_preset_id") or preset_id)
+                if isinstance(scene_metadata, dict)
+                else preset_id
+            )
             selected_is_playing = (
                 scene_id is not None
                 and self.active_service == "ambient"
@@ -2558,7 +3187,17 @@ class ServiceCatalog:
                 "subtitle": description,
                 "playing": selected_is_playing,
                 "volume": playback.volume,
-                "preset_id": preset_id if preset_id in AMBIENT_BY_ID else None,
+                "preset_id": artwork_preset_id if artwork_preset_id in AMBIENT_BY_ID else None,
+                "layer_rows": self._ambient_layer_rows(),
+                "layer_position": next(
+                    (
+                        index
+                        for index, item in enumerate(self._ambient_layer_rows(), start=1)
+                        if item["selected"] is True
+                    ),
+                    1,
+                ),
+                "layer_count": len(AMBIENT_LAYER_IDS) + 1,
                 "channel": (
                     ids.index(scene_id) + 1
                     if scene_id is not None and scene_id in ids
@@ -2591,6 +3230,18 @@ class ServiceCatalog:
             catalog_rows, catalog_position, catalog_count = self._brandmeister_device_window(
                 catalog_entries
             )
+            country_rows, country_position, country_count = self._bounded_selection_window(
+                self._brandmeister_country_entries(allow_network=False)
+            )
+            replacement_rows = self._brandmeister_replacement_rows()
+            replacement_position = next(
+                (
+                    index
+                    for index, item in enumerate(replacement_rows, start=1)
+                    if item.get("selected") is True
+                ),
+                0,
+            )
             return {
                 "service": "DMR",
                 "station": f"TG {active_talkgroup}" if isinstance(active_talkgroup, int) else "BrandMeister",
@@ -2616,6 +3267,15 @@ class ServiceCatalog:
                 "catalog_position": catalog_position,
                 "catalog_count": catalog_count,
                 "selected_enabled": selected_enabled,
+                "country_rows": country_rows,
+                "country_position": country_position,
+                "country_count": country_count,
+                "country_filter": self.brandmeister_country_filter,
+                "replacement_required": self._pending_brandmeister_talkgroup is not None,
+                "pending_talkgroup": self._pending_brandmeister_talkgroup,
+                "replacement_rows": replacement_rows,
+                "replacement_position": replacement_position,
+                "replacement_count": len(replacement_rows),
             }
         service_label = {
             "webradio": "RADIO",
@@ -2705,9 +3365,19 @@ class ServiceCatalog:
             if active_ambient_scene is not None:
                 track_line = self._ambient_display_text(active_ambient_scene)[1]
         ambient_preset_id = (
-            str(active_ambient_scene["external_id"])
+            str(
+                (
+                    active_ambient_scene.get("metadata") or {}
+                ).get("source_preset_id")
+                or active_ambient_scene["external_id"]
+            )
             if active_ambient_scene is not None
-            and str(active_ambient_scene["external_id"]) in AMBIENT_BY_ID
+            and str(
+                (
+                    active_ambient_scene.get("metadata") or {}
+                ).get("source_preset_id")
+                or active_ambient_scene["external_id"]
+            ) in AMBIENT_BY_ID
             else None
         )
         return {
@@ -2739,6 +3409,16 @@ class ServiceCatalog:
                 if self.active_service == "ambient"
                 else None
             ),
+            "layer_rows": self._ambient_layer_rows() if service_label == "AMBIENT" else [],
+            "layer_position": next(
+                (
+                    index
+                    for index, item in enumerate(self._ambient_layer_rows(), start=1)
+                    if item["selected"] is True
+                ),
+                1,
+            ) if service_label == "AMBIENT" else 0,
+            "layer_count": len(AMBIENT_LAYER_IDS) + 1 if service_label == "AMBIENT" else 0,
         }
 
     def close(self) -> None:
@@ -2755,6 +3435,7 @@ class ServiceCatalog:
                 worker.join(timeout=max(0.0, remaining / len(workers)))
         self.recorder.close()
         self.brandmeister.close()
+        self._stop_ambient_layers()
         if self.radio_buffer is not None:
             self.radio_buffer.close()
         self.player.close()

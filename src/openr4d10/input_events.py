@@ -43,7 +43,7 @@ class InputEvent:
         if self.control == Control.PTT:
             if not isinstance(self.active, bool):
                 raise ValueError("PTT input requires an active state")
-            if self.held_seconds != 0:
-                raise ValueError("PTT input cannot contain a hold duration")
+            if self.active and self.held_seconds != 0:
+                raise ValueError("an active PTT edge cannot contain a hold duration")
         elif self.active is not None:
             raise ValueError("only PTT input accepts an active state")

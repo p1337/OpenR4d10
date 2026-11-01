@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from openr4d10.adapters import FileDisplay, SystemTelemetry, UnconfiguredTelemetry
 from openr4d10.app import OpenR4d10App
@@ -639,6 +640,122 @@ class AppTests(unittest.TestCase):
                 {"action": "brandmeister_step", "steps": -25},
                 {"action": "brandmeister_toggle_selected"},
                 {"action": "brandmeister_toggle"},
+            ],
+        )
+
+    def test_long_dmr_ptt_opens_country_list_instead_of_toggling_talkgroup(self) -> None:
+        class InputDisplay:
+            def render(self, _frame) -> None:
+                pass
+
+            def snapshot(self):
+                return {"service": "DMR", "menu_open": False}
+
+            def apply_input(self, _event):
+                return self.snapshot()
+
+            def set_input_handler(self, _handler):
+                pass
+
+        class Services:
+            active_service = "brandmeister"
+
+            def __init__(self):
+                self.requests = []
+
+            def control(self, request):
+                self.requests.append(request)
+                return {"country_menu": True}
+
+            def receiver_overlay(self, _view_service=None):
+                return {"service": "DMR", "station": "TG 91"}
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=InputDisplay(),
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,
+            )
+            with patch("openr4d10.app.time.monotonic", side_effect=[100.0, 102.1]):
+                app.control({"action": "device_input", "control": "ptt", "active": True})
+                app.control({"action": "device_input", "control": "ptt", "active": False})
+
+        self.assertEqual(
+            services.requests,
+            [{"action": "brandmeister_country_menu_open"}],
+        )
+
+    def test_ambient_quick_menu_routes_selection_toggle_and_layer_volume(self) -> None:
+        class InputDisplay:
+            def render(self, _frame) -> None:
+                pass
+
+            def snapshot(self):
+                return {
+                    "service": "AMBIENT",
+                    "menu_open": True,
+                    "menu_kind": "ambient_layers",
+                }
+
+            def apply_input(self, _event):
+                return self.snapshot()
+
+            def set_input_handler(self, _handler):
+                pass
+
+        class Services:
+            active_service = "ambient"
+
+            def __init__(self):
+                self.requests = []
+
+            def control(self, request):
+                self.requests.append(request)
+                return {"layer_id": "orchard_birds"}
+
+            def receiver_overlay(self, _view_service=None):
+                return {"service": "AMBIENT", "station": "Forest"}
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=InputDisplay(),
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,
+            )
+            app.control({"action": "device_input", "control": "right_outer", "steps": 1})
+            app.control({"action": "device_input", "control": "left_inner", "steps": -1})
+            app.control({"action": "device_input", "control": "right_press"})
+
+        self.assertEqual(
+            services.requests,
+            [
+                {"action": "ambient_layer_step", "steps": 1},
+                {"action": "ambient_layer_volume_step", "steps": -1},
+                {"action": "ambient_layer_toggle"},
             ],
         )
 

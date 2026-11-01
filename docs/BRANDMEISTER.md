@@ -43,14 +43,22 @@ single decorative TG or country tile.
 
 The short right press while the BrandMeister view is open starts reception of
 the already enabled talkgroups. This is an explicit Play action and takes audio
-ownership from a running radio or another audio service. PTT instead adds and
-enables the selected talkgroup in the persistent quick list or disables an
-already saved entry; only its press edge toggles and release is inert. Inside a
-menu PTT keeps its normal back/cancel role. A long right press remains the
-service quick menu. The header changes with the service and shows the real DMR
+ownership from a running radio or another audio service. A short PTT press adds
+and enables the selected talkgroup in the persistent quick list or disables an
+already saved entry when the button is released. Holding PTT for at least two
+seconds opens a country list derived from the bounded cached official catalog.
+The right outer axis selects a country and the right press applies that browse
+filter. The filter never changes the five current subscriptions. Inside a menu
+PTT keeps its normal back/cancel role. A long right press remains the service
+quick menu. The header changes with the service and shows the real DMR
 assignments instead of `SQL` and a generic channel label. Up to five checked
 talkgroups are subscribed at once. None of these controls transmits audio or a
 BrandMeister PTT message.
+
+When five talkgroups are active and a sixth is selected, OpenR4d10 does not
+silently remove one and does not merely reject the action. The device opens a
+five-row replacement list: right outer selects the old TG, right press confirms
+the swap and PTT cancels it. The browser presents the same explicit choice.
 
 The native receiver keeps one bounded current/last-heard row for each of the
 up to five subscribed talkgroups. A row contains only data actually observed

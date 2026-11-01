@@ -313,6 +313,11 @@ alias and G.711 µ-law packet shapes. Browser controls and physical encoder
 events mutate the same SQLite rows. A separate bounded daily cache of the
 official public talkgroup-name endpoint supplies search metadata without
 placing thousands of catalog rows into every status snapshot.
+The application measures the DMR PTT press centrally: release before two
+seconds toggles the selected TG, while a two-second hold opens a country filter
+over the cached catalog. A pending sixth activation is an explicit state with a
+bounded five-row replacement list; only confirmation performs the atomic
+disable/enable swap, and cancel preserves the prior subscriptions.
 
 Curated radio and news source definitions remain reviewable data in `presets.py`,
 separate from playback and parser logic. Radio definitions are seeded exactly

@@ -75,17 +75,20 @@ the installer report exactly which adapters still need configuration.
   persistent active/disabled selection, search and language/category filters
 - persistent podcast subscriptions with bounded RSS/Atom episode loading,
   search and playback through the existing audio owner
-- separate AmbientR4D10 audio service with six license-documented café,
-  forest, beach, brook, rain and night soundscapes, endless looping and a
-  persistent sortable scene library with one consistent bundled artwork per
-  built-in scene in both the browser and physical display
+- separate AmbientR4D10 audio service with ten license-documented café,
+  nature, water, traffic, rain and night soundscapes, endless looping, up to
+  two subtle additive sound layers, persistent favorite mixes and a sortable
+  scene library with one consistent bundled artwork per built-in scene in both
+  the browser and physical display
 - native receive-only BrandMeister HoseLine audio through the Whisplay ALSA
   speaker plus optional browser audio, with a persistent multi-talkgroup
   checkbox quick list, complete searchable official catalog, country flags and
   compact per-talkgroup current/last-heard participant rows on web and device;
   the physical view pins the speaking TG above a scrollable enabled-first
-  catalog window; a short right click starts reception of the enabled TGs while
-  PTT toggles the marked TG without transmitting;
+  catalog window; a short right click starts reception of the enabled TGs,
+  short PTT toggles the marked TG and a two-second PTT hold opens the country
+  filter without transmitting; activating a sixth TG explicitly asks which of
+  the five active TGs to replace;
   no account password or user token
 - standard-library-only test suite and GitHub Actions CI
 
@@ -278,9 +281,11 @@ enabled entries first and all inactive entries below them. A speaking TG is
 pinned above that list and shows the DMR source ID plus the HoseLine talker
 alias when the network supplied one. The short right press starts BrandMeister
 reception for the enabled TGs and therefore explicitly takes over audio from
-radio or another audio service. PTT toggles the selected TG on its press edge;
-its release edge is inert. Neither action transmits audio. A long right press
-remains the service quick menu. The localized header shows these real assignments
+radio or another audio service. A short PTT press toggles the selected TG when
+the button is released. Holding PTT for at least two seconds instead opens the
+country filter; the right outer axis chooses a country and the right press
+applies it. Neither action transmits audio. A long right press remains the
+service quick menu. The localized header shows these real assignments
 (`JMP`/`TG` in English) instead of the normal `SQL`/`CH` labels. On 2026-10-31
 a real subscribed HoseLine call was heard through the fitted Whisplay speaker,
 confirming the native ALSA path. Ended calls remain visibly marked as last
@@ -291,7 +296,9 @@ because the right press owns reception start. The selected catalog row still
 shows its translated On/Off state, and PTT changes that state. In the browser
 every saved row has a normal checkbox plus a written On/Off state. A change
 reconfigures an already running receiver immediately, but never steals audio
-from radio while BrandMeister is stopped.
+from radio while BrandMeister is stopped. If five TGs are already active, the
+sixth opens an explicit replacement choice on both device and browser; cancel
+leaves all five unchanged.
 
 The service section accepts an explicit `http` or `https` audio URL for local
 playback and recording. It rejects credentials embedded in URLs and does not
@@ -358,7 +365,7 @@ credentials or persistent query strings are refused so signed/private feed
 tokens cannot accidentally enter backups or public state.
 
 The **AmbientR4D10** tab is an independent audio service, not a radio-station
-group or a third-party branded clone. Its six initial soundscapes are fetched
+group or a third-party branded clone. Its ten built-in soundscapes are fetched
 once from reviewed public CC sources, checksum-verified into the protected
 local media cache and looped offline by the existing private mpv owner;
 the café uses a quieter CC0 coffeehouse recording with a small group instead
@@ -366,11 +373,18 @@ of dense crowd noise. Opening the service does not disturb other audio. Once
 its channel control is turned, the newly selected scene starts immediately and
 replaces the previous audio source. Scene order, deletion and custom
 credential-free HTTP(S) additions persist across updates. Sources, attribution
-and licenses are recorded in [`docs/AMBIENT.md`](docs/AMBIENT.md). The six
+and licenses are recorded in [`docs/AMBIENT.md`](docs/AMBIENT.md). The ten
 matching scene artworks are bundled locally, so no external image service is
 needed at runtime. The Ambient tab loads those local thumbnails immediately
 through the bounded OpenR4d10 content endpoint rather than deferring them as
 off-screen browser images.
+
+Hold the right control for two seconds in the Ambient view to open the sound
+layer list. The outer right control selects, a short right press toggles, the
+inner left control changes the selected relative level in ten-percent steps,
+and PTT returns. At most two layers run together. The last list row and the
+browser can save the current base scene plus layer levels as an update-safe
+favorite mix.
 
 If the repository files are already present, the local command remains:
 

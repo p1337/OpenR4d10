@@ -854,6 +854,49 @@ function renderAmbient(catalog) {
     row.textContent = t("No soundscapes configured.");
     list.append(row);
   }
+
+  const layers = Array.isArray(catalog?.ambient?.layers)
+    ? catalog.ambient.layers.filter((item) => item.id !== "__save_favorite__")
+    : [];
+  const layerList = byId("ambient-layer-list");
+  layerList.replaceChildren();
+  const activeLayers = layers.filter((item) => item.enabled).length;
+  setText("ambient-layer-count", `${activeLayers} / ${catalog?.ambient?.max_active_layers || 2}`);
+  layers.forEach((layer) => {
+    const row = document.createElement("li");
+    if (layer.enabled) row.dataset.active = "true";
+    const copy = document.createElement("span");
+    copy.className = "station-row-copy";
+    const name = document.createElement("strong");
+    name.textContent = t(layer.name);
+    const description = document.createElement("small");
+    description.textContent = t(layer.description);
+    copy.append(name, description);
+    const actions = document.createElement("span");
+    actions.className = "library-actions ambient-layer-actions";
+    const toggle = ambientButton(
+      layer.enabled ? t("On") : t("Off"),
+      "ambient_layer_set",
+      { layer_id: layer.id, enabled: !layer.enabled },
+      layer.enabled,
+    );
+    const minus = ambientButton("−10", "ambient_layer_set", {
+      layer_id: layer.id,
+      volume: Math.max(0, layer.volume - 10),
+    });
+    const level = document.createElement("strong");
+    level.className = "ambient-layer-level";
+    level.textContent = `${layer.volume}%`;
+    const plus = ambientButton("+10", "ambient_layer_set", {
+      layer_id: layer.id,
+      volume: Math.min(100, layer.volume + 10),
+    });
+    minus.disabled = layer.volume <= 0;
+    plus.disabled = layer.volume >= 100;
+    actions.append(toggle, minus, level, plus);
+    row.append(copy, actions);
+    layerList.append(row);
+  });
 }
 
 async function ambientCommand(action, extra = {}) {
@@ -1349,6 +1392,13 @@ byId("ambient-scene-form").addEventListener("submit", async (event) => {
   event.currentTarget.reset();
 });
 
+byId("ambient-favorite-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const name = byId("ambient-favorite-name").value.trim();
+  await ambientCommand("ambient_favorite_save", name ? { name } : {});
+  byId("ambient-favorite-name").value = "";
+});
+
 function brandmeisterFlag(talkgroup) {
   const text = String(talkgroup);
   return BRANDMEISTER_FLAGS.get(text.slice(0, 3)) || "🌐";
@@ -1356,6 +1406,25 @@ function brandmeisterFlag(talkgroup) {
 
 function selectedBrandmeisterTalkgroups() {
   return brandmeisterTalkgroups.filter((item) => item.enabled).map((item) => item.talkgroup);
+}
+
+function chooseBrandmeisterReplacement() {
+  const active = brandmeisterTalkgroups.filter((item) => item.enabled);
+  if (active.length < 5) return undefined;
+  const choices = active
+    .map((item, index) => `${index + 1}: TG ${item.talkgroup} · ${item.name}`)
+    .join("\n");
+  const answer = window.prompt(
+    `${t("Five talkgroups are active. Which one should be replaced?")}\n\n${choices}\n\n${t("Enter a number from 1 to 5, or cancel.")}`,
+    "1",
+  );
+  if (answer === null) return null;
+  const index = Number(answer) - 1;
+  if (!Number.isInteger(index) || !active[index]) {
+    byId("brandmeister-hoseline-status").textContent = t("No talkgroup was replaced.");
+    return null;
+  }
+  return active[index].talkgroup;
 }
 
 async function brandmeisterCommand(action, extra = {}) {
@@ -1397,16 +1466,25 @@ function renderBrandmeisterCatalog() {
     checkbox.checked = selected.get(item.talkgroup)?.enabled === true;
     checkbox.addEventListener("change", async () => {
       const saved = selected.get(item.talkgroup);
+      const replacement = checkbox.checked && saved?.enabled !== true
+        ? chooseBrandmeisterReplacement()
+        : undefined;
+      if (replacement === null) {
+        checkbox.checked = false;
+        return;
+      }
       if (saved) {
         await brandmeisterCommand("brandmeister_talkgroup_set", {
           channel_id: saved.id,
           enabled: checkbox.checked,
+          ...(replacement === undefined ? {} : { replace_talkgroup: replacement }),
         });
       } else {
         await brandmeisterCommand("brandmeister_talkgroup_add", {
           talkgroup: item.talkgroup,
           name: item.name,
           enabled: checkbox.checked,
+          ...(replacement === undefined ? {} : { replace_talkgroup: replacement }),
         });
       }
     });
@@ -1438,10 +1516,20 @@ function renderBrandmeisterTalkgroups(state = {}) {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = item.enabled;
-    checkbox.addEventListener("change", () => brandmeisterCommand(
-      "brandmeister_talkgroup_set",
-      { channel_id: item.id, enabled: checkbox.checked },
-    ));
+    checkbox.addEventListener("change", async () => {
+      const replacement = checkbox.checked && item.enabled !== true
+        ? chooseBrandmeisterReplacement()
+        : undefined;
+      if (replacement === null) {
+        checkbox.checked = false;
+        return;
+      }
+      await brandmeisterCommand("brandmeister_talkgroup_set", {
+        channel_id: item.id,
+        enabled: checkbox.checked,
+        ...(replacement === undefined ? {} : { replace_talkgroup: replacement }),
+      });
+    });
     const copy = document.createElement("span");
     const title = document.createElement("strong");
     title.textContent = `${brandmeisterFlag(item.talkgroup)} TG ${item.talkgroup} · ${item.name}`;

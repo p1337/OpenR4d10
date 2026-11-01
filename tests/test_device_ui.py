@@ -255,6 +255,63 @@ class DeviceUiTests(unittest.TestCase):
         self.assertIn("OFF", drawn)
         self.assertIn("PAUSE", drawn)
 
+    def test_dmr_country_and_replacement_menus_use_device_lists(self) -> None:
+        state = DeviceUiState(service_index=SERVICES.index("DMR"), language="de")
+        state.apply(InputEvent(Control.PTT, active=False, held_seconds=2.1))
+        self.assertTrue(state.menu_open)
+        self.assertEqual(state.menu_kind, "dmr_countries")
+        state.update_from_frame(
+            Frame(
+                screen="receiver",
+                title="BrandMeister",
+                body="Ready",
+                fields={
+                    "receiver": {
+                        "service": "DMR",
+                        "country_rows": [
+                            {"code": "*", "name": "Alle Länder", "selected": False, "position": 1},
+                            {"code": "DE", "name": "Deutschland", "selected": True, "position": 2},
+                        ],
+                        "country_position": 2,
+                        "country_count": 8,
+                    }
+                },
+            )
+        )
+        drawn = self._drawn_text(state)
+        self.assertIn("LÄNDER", drawn)
+        self.assertIn("Deutschland", drawn)
+        self.assertIn("2/8", drawn)
+
+        state.update_from_frame(
+            Frame(
+                screen="receiver",
+                title="BrandMeister",
+                body="Ready",
+                fields={
+                    "receiver": {
+                        "service": "DMR",
+                        "replacement_required": True,
+                        "replacement_rows": [
+                            {
+                                "talkgroup": 91,
+                                "name": "Worldwide",
+                                "country_code": "",
+                                "selected": True,
+                            }
+                        ],
+                        "replacement_position": 1,
+                        "replacement_count": 5,
+                    }
+                },
+            )
+        )
+        self.assertEqual(state.menu_kind, "dmr_replace")
+        drawn = self._drawn_text(state)
+        self.assertIn("TG ERSETZEN?", drawn)
+        self.assertIn("TG 91  Worldwide", drawn)
+        self.assertIn("1/5", drawn)
+
     def test_date_and_redundant_player_text_are_not_rendered(self) -> None:
         first = DeviceUiState(
             service_index=1,
@@ -455,6 +512,46 @@ class DeviceUiTests(unittest.TestCase):
         self.assertTrue(state.ptt_active)
         state.apply(InputEvent(Control.PTT, active=False))
         self.assertFalse(state.ptt_active)
+
+    def test_ambient_quick_menu_lists_layers_and_reserves_inner_left_for_level(self) -> None:
+        state = DeviceUiState(service_index=3, squelch=5, language="de")
+        state.ambient_layer_position = 1
+        state.ambient_layer_count = 5
+        state.ambient_layer_rows = [
+            {
+                "id": "orchard_birds",
+                "name": "Streuobstwiese & Vögel",
+                "enabled": True,
+                "active": True,
+                "selected": True,
+                "volume": 30,
+            },
+            {
+                "id": "distant_highway",
+                "name": "Ferne Autobahn & Vögel",
+                "enabled": False,
+                "active": False,
+                "selected": False,
+                "volume": 20,
+            },
+            {
+                "id": "__save_favorite__",
+                "name": "Mix speichern",
+                "enabled": False,
+                "active": False,
+                "selected": False,
+                "volume": None,
+            },
+        ]
+        state.apply(InputEvent(Control.RIGHT_PRESS, held_seconds=2.0))
+        state.apply(InputEvent(Control.LEFT_INNER, steps=1))
+        self.assertEqual(state.menu_kind, "ambient_layers")
+        self.assertEqual(state.squelch, 5)
+        drawn = self._drawn_text(state)
+        self.assertIn("KLANGLAGEN", drawn)
+        self.assertIn("Streuobstwiese & Vögel", drawn)
+        self.assertIn("30%", drawn)
+        self.assertIn("Mix speichern", drawn)
 
     def test_receiver_service_selects_matching_header_mode(self) -> None:
         state = DeviceUiState()

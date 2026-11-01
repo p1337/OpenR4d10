@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import signal
 import threading
+import time
 from typing import Any
 
 from . import __version__
@@ -52,6 +53,7 @@ class OpenR4d10App:
         self._device_input_lock = threading.Lock()
         self._status_lock = threading.Lock()
         self._view_initialized = False
+        self._ptt_pressed_at: float | None = None
         self._latest_frame = Frame(
             screen="startup", title=config.title, body="Dienst wird gestartet"
         ).as_dict()
@@ -274,6 +276,11 @@ class OpenR4d10App:
         display_snapshot = getattr(self.display, "snapshot", None)
         current_ui = display_snapshot() if callable(display_snapshot) else {}
         menu_open = isinstance(current_ui, dict) and current_ui.get("menu_open") is True
+        menu_kind = (
+            str(current_ui.get("menu_kind"))
+            if isinstance(current_ui, dict) and current_ui.get("menu_kind")
+            else None
+        )
         selected_service = (
             str(current_ui.get("service"))
             if isinstance(current_ui, dict) and current_ui.get("service")
@@ -287,10 +294,94 @@ class OpenR4d10App:
                 "recorder": "REC",
             }.get(getattr(self.services, "active_service", "system"), "SYSTEM")
         )
+        if (
+            event.control == Control.PTT
+            and selected_service == "DMR"
+            and not menu_open
+        ):
+            if event.active is True:
+                self._ptt_pressed_at = time.monotonic()
+            else:
+                started = self._ptt_pressed_at
+                self._ptt_pressed_at = None
+                held_seconds = max(0.0, time.monotonic() - started) if started is not None else 0.0
+                event = InputEvent(
+                    Control.PTT,
+                    held_seconds=held_seconds,
+                    active=False,
+                )
         if self.services is not None and event.control == Control.LEFT_OUTER:
             media_result = self.services.control(
                 {"action": "volume_step", "steps": event.steps}
             )
+        elif (
+            self.services is not None
+            and event.control == Control.LEFT_INNER
+            and menu_open
+            and menu_kind == "ambient_layers"
+        ):
+            media_result = self.services.control(
+                {"action": "ambient_layer_volume_step", "steps": event.steps}
+            )
+        elif (
+            self.services is not None
+            and event.control == Control.RIGHT_OUTER
+            and menu_open
+            and menu_kind == "ambient_layers"
+        ):
+            media_result = self.services.control(
+                {"action": "ambient_layer_step", "steps": event.steps}
+            )
+        elif (
+            self.services is not None
+            and event.control == Control.RIGHT_PRESS
+            and event.held_seconds < 2.0
+            and menu_open
+            and menu_kind == "ambient_layers"
+        ):
+            media_result = self.services.control({"action": "ambient_layer_toggle"})
+        elif (
+            self.services is not None
+            and event.control == Control.RIGHT_OUTER
+            and menu_open
+            and menu_kind == "dmr_countries"
+        ):
+            media_result = self.services.control(
+                {"action": "brandmeister_country_step", "steps": event.steps}
+            )
+        elif (
+            self.services is not None
+            and event.control == Control.RIGHT_PRESS
+            and event.held_seconds < 2.0
+            and menu_open
+            and menu_kind == "dmr_countries"
+        ):
+            media_result = self.services.control({"action": "brandmeister_country_select"})
+        elif (
+            self.services is not None
+            and event.control == Control.RIGHT_OUTER
+            and menu_open
+            and menu_kind == "dmr_replace"
+        ):
+            media_result = self.services.control(
+                {"action": "brandmeister_replacement_step", "steps": event.steps}
+            )
+        elif (
+            self.services is not None
+            and event.control == Control.RIGHT_PRESS
+            and event.held_seconds < 2.0
+            and menu_open
+            and menu_kind == "dmr_replace"
+        ):
+            media_result = self.services.control({"action": "brandmeister_replacement_confirm"})
+        elif (
+            self.services is not None
+            and event.control == Control.PTT
+            and event.active is True
+            and menu_open
+            and menu_kind == "dmr_replace"
+        ):
+            media_result = self.services.control({"action": "brandmeister_replacement_cancel"})
         elif (
             self.services is not None
             and event.control == Control.LEFT_INNER
@@ -358,12 +449,18 @@ class OpenR4d10App:
         elif (
             self.services is not None
             and event.control == Control.PTT
-            and event.active is True
+            and event.active is False
             and not menu_open
             and selected_service == "DMR"
         ):
             media_result = self.services.control(
-                {"action": "brandmeister_toggle_selected"}
+                {
+                    "action": (
+                        "brandmeister_country_menu_open"
+                        if event.held_seconds >= 2.0
+                        else "brandmeister_toggle_selected"
+                    )
+                }
             )
         elif (
             self.services is not None

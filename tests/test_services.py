@@ -684,6 +684,96 @@ class ServiceCatalogTests(unittest.TestCase):
             finally:
                 catalog.close()
 
+    def test_brandmeister_country_filter_and_sixth_talkgroup_replacement(self) -> None:
+        class Receiver:
+            def __init__(self):
+                self.state = {
+                    "status": "stopped", "talkgroups": [], "destination": None,
+                    "source": None, "alias": "", "volume": 30, "error": None,
+                    "country_code": None,
+                }
+
+            def snapshot(self):
+                return dict(self.state)
+
+            def set_volume(self, volume):
+                self.state["volume"] = volume
+                return self.snapshot()
+
+            def listen(self, talkgroups):
+                self.state["status"] = "listening"
+                self.state["talkgroups"] = list(talkgroups)
+                return self.snapshot()
+
+            def stop(self):
+                self.state["status"] = "stopped"
+                self.state["talkgroups"] = []
+                return self.snapshot()
+
+            def close(self):
+                self.stop()
+
+        class Talkgroups:
+            def entries(self):
+                return [
+                    {"talkgroup": 91, "name": "Worldwide", "country_code": None},
+                    {"talkgroup": 262, "name": "Germany", "country_code": "DE"},
+                    {"talkgroup": 3100, "name": "USA", "country_code": "US"},
+                    {"talkgroup": 234, "name": "United Kingdom", "country_code": "GB"},
+                    {"talkgroup": 204, "name": "Netherlands", "country_code": "NL"},
+                    {"talkgroup": 505, "name": "Australia", "country_code": "AU"},
+                ]
+
+        with tempfile.TemporaryDirectory() as raw:
+            catalog = ServiceCatalog(
+                Path(raw).resolve(),
+                brandmeister=Receiver(),  # type: ignore[arg-type]
+                brandmeister_catalog=Talkgroups(),  # type: ignore[arg-type]
+                executable_lookup=lambda _name: "/bin/true",
+            )
+            try:
+                catalog._load_brandmeister_catalog()
+                catalog.control({"action": "brandmeister_country_menu_open"})
+                catalog.selected_brandmeister_country = "DE"
+                selected = catalog.control({"action": "brandmeister_country_select"})
+                self.assertEqual(selected["country_code"], "DE")
+                country_frame = catalog.receiver_overlay("DMR")
+                self.assertEqual(country_frame["country_filter"], "DE")
+                self.assertTrue(
+                    all(row["country_code"] == "DE" for row in country_frame["catalog_rows"])
+                )
+
+                catalog.brandmeister_country_filter = None
+                for talkgroup, name in (
+                    (262, "Germany"),
+                    (3100, "USA"),
+                    (234, "United Kingdom"),
+                    (204, "Netherlands"),
+                ):
+                    catalog.control(
+                        {
+                            "action": "brandmeister_talkgroup_add",
+                            "talkgroup": talkgroup,
+                            "name": name,
+                            "enabled": True,
+                        }
+                    )
+                catalog.selected_brandmeister_talkgroup = 505
+                pending = catalog.control({"action": "brandmeister_toggle_selected"})
+                self.assertTrue(pending["replacement_required"])
+                replacement_frame = catalog.receiver_overlay("DMR")
+                self.assertTrue(replacement_frame["replacement_required"])
+                self.assertEqual(len(replacement_frame["replacement_rows"]), 5)
+
+                catalog.control({"action": "brandmeister_replacement_step", "steps": 1})
+                replaced = catalog.control({"action": "brandmeister_replacement_confirm"})
+                enabled = catalog._enabled_brandmeister_talkgroups()
+                self.assertEqual(len(enabled), 5)
+                self.assertIn(505, enabled)
+                self.assertNotIn(replaced["replaced_talkgroup"], enabled)
+            finally:
+                catalog.close()
+
     def test_solix_adapter_exposes_only_bounded_public_energy_metrics(self) -> None:
         class Registry:
             def configured(self, service_id):

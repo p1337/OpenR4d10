@@ -190,6 +190,11 @@ the first persistent station. A held right press opens the quick menu without
 touching playback. No
 GPIO number is accepted by this endpoint. Browser PTT uses held Backspace only
 outside editable fields and must release on key-up, focus loss and tab hiding.
+In the normal BrandMeister view the application measures those same physical
+or browser edges: a release before two seconds toggles the marked TG and a
+release after two seconds opens the country filter. A sixth activation must be
+tested as an explicit five-row replacement transaction, including cancellation;
+it must never evict a TG implicitly.
 While the device menu is open, browser Up/Down must follow the visible list
 direction without changing the physical `right_outer` semantics. It remains an input indication, not an audio claim,
 until a real authorized service adapter consumes it.
@@ -250,7 +255,7 @@ stable public episode IDs, playback through the existing `MpvEngine`, and the
 absence of raw feed/enclosure URLs in snapshots. Network tests are diagnostic
 only. Never check in a private podcast URL, a feed query token or a signed
 enclosure URL.
-AmbientR4D10 regressions must verify the six reviewed built-ins, HTTPS source
+AmbientR4D10 regressions must verify the ten reviewed built-ins, HTTPS source
 and license metadata, absence of playable URLs from public snapshots, and real
 `loop=True` playback only after an explicit play action. They must also prove
 that selection alone leaves the audio owner untouched and that custom scenes,

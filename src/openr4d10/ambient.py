@@ -108,9 +108,60 @@ AMBIENT_PRESETS = (
         CC_BY_SA_4_URL,
         "f0d82e6b96d110d09615ccca2b2f0b8945f06b0be50c09864c66b9e440b1a7b3",
     ),
+    AmbientPreset(
+        "orchard_birds",
+        "Orchard meadow & birds",
+        "Light birdsong across a quiet orchard meadow",
+        "https://cdn.freesound.org/previews/440/440807_8523759-lq.ogg",
+        "https://freesound.org/people/PuzzleAudio/sounds/440807/",
+        "PuzzleAudio",
+        "CC0 1.0",
+        CC0_URL,
+        "64efe6c695a26333528592674fd23652cb712ebd359bb159e253f882099dca2f",
+    ),
+    AmbientPreset(
+        "distant_highway",
+        "Distant road & birds",
+        "Distant traffic with occasional birds",
+        "https://cdn.freesound.org/previews/188/188402_1451873-lq.ogg",
+        "https://freesound.org/people/myrinvp/sounds/188402/",
+        "myrinvp",
+        "CC0 1.0",
+        CC0_URL,
+        "caa3be417ae45f0298c2dba9fe6eca2ec852180e3ceb5980c6bec15894030ef4",
+    ),
+    AmbientPreset(
+        "cliff_sea",
+        "Sea from a cliff",
+        "Sea heard from a high cliff with the water farther away",
+        "https://cdn.freesound.org/previews/525/525029_11519060-lq.ogg",
+        "https://freesound.org/people/bruno.auzet/sounds/525029/",
+        "bruno.auzet",
+        "CC0 1.0",
+        CC0_URL,
+        "6f5e589d412feeee5d8c01defff9092bf169c8f9b64a01451e8d9d8636e64a58",
+    ),
+    AmbientPreset(
+        "distant_thunder",
+        "Distant thunder",
+        "Low thunder rolling far beyond the listener",
+        "https://cdn.freesound.org/previews/530/530133_10334845-lq.ogg",
+        "https://freesound.org/people/Beetlemuse/sounds/530133/",
+        "Beetlemuse",
+        "CC0 1.0",
+        CC0_URL,
+        "97b3411cd2b2ba2036b4cb8e45ef245a7350a39cbcb47bc7463900fa1edadb6d",
+    ),
 )
 
 AMBIENT_BY_ID = {item.preset_id: item for item in AMBIENT_PRESETS}
+AMBIENT_LAYER_DEFAULTS = {
+    "orchard_birds": 30,
+    "distant_highway": 20,
+    "cliff_sea": 25,
+    "distant_thunder": 20,
+}
+AMBIENT_LAYER_IDS = tuple(AMBIENT_LAYER_DEFAULTS)
 AMBIENT_ARTWORK_ROOT = Path(__file__).resolve().parents[2] / "assets" / "ambient"
 
 AMBIENT_TRANSLATIONS = {
@@ -121,6 +172,10 @@ AMBIENT_TRANSLATIONS = {
         "brook": ("Waldbach", "Ein kleiner Bach fließt durch den Wald"),
         "rain": ("Sanfter Regen", "Leichter Regen ohne künstliche Musik"),
         "night_crickets": ("Nachtfeld & Grillen", "Langes Grillenkonzert auf einem nächtlichen Feld"),
+        "orchard_birds": ("Streuobstwiese & Vögel", "Leichtes Vogelgezwitscher auf einer ruhigen Streuobstwiese"),
+        "distant_highway": ("Ferne Autobahn & Vögel", "Entferntes Straßenrauschen mit vereinzelten Vögeln"),
+        "cliff_sea": ("Meer von der Klippe", "Meeresrauschen von einer hohen Klippe, das Wasser weiter entfernt"),
+        "distant_thunder": ("Entfernter Donner", "Leiser Donner rollt weit in der Ferne"),
     },
     "pl": {
         "cafe": ("Kawiarnia", "Mała spokojna kawiarnia z cichymi rozmowami"),
@@ -129,6 +184,10 @@ AMBIENT_TRANSLATIONS = {
         "brook": ("Leśny strumień", "Mały strumień płynący przez las"),
         "rain": ("Delikatny deszcz", "Lekki deszcz bez syntetycznej muzyki"),
         "night_crickets": ("Nocne pole i świerszcze", "Długi nocny chór świerszczy polnych"),
+        "orchard_birds": ("Sad i ptaki", "Delikatny śpiew ptaków w spokojnym sadzie"),
+        "distant_highway": ("Odległa droga i ptaki", "Odległy szum drogi i sporadyczne ptaki"),
+        "cliff_sea": ("Morze z klifu", "Morze słyszane z wysokiego klifu"),
+        "distant_thunder": ("Odległy grzmot", "Cichy grzmot daleko na horyzoncie"),
     },
     "fr": {
         "cafe": ("Café", "Petit café calme aux conversations feutrées"),
@@ -137,6 +196,10 @@ AMBIENT_TRANSLATIONS = {
         "brook": ("Ruisseau forestier", "Petit ruisseau traversant une forêt"),
         "rain": ("Pluie douce", "Pluie légère sans musique synthétique"),
         "night_crickets": ("Champ nocturne et grillons", "Long chœur nocturne de grillons des champs"),
+        "orchard_birds": ("Verger et oiseaux", "Chant léger d’oiseaux dans un verger calme"),
+        "distant_highway": ("Route lointaine et oiseaux", "Circulation lointaine et quelques oiseaux"),
+        "cliff_sea": ("Mer depuis la falaise", "Mer entendue depuis une haute falaise"),
+        "distant_thunder": ("Tonnerre lointain", "Grondement discret très loin"),
     },
     "es": {
         "cafe": ("Cafetería", "Cafetería pequeña y tranquila con conversaciones suaves"),
@@ -145,6 +208,10 @@ AMBIENT_TRANSLATIONS = {
         "brook": ("Arroyo del bosque", "Un pequeño arroyo que atraviesa el bosque"),
         "rain": ("Lluvia suave", "Lluvia ligera sin música sintética"),
         "night_crickets": ("Campo nocturno y grillos", "Largo coro nocturno de grillos de campo"),
+        "orchard_birds": ("Huerto y pájaros", "Canto ligero de pájaros en un huerto tranquilo"),
+        "distant_highway": ("Carretera lejana y pájaros", "Tráfico lejano con pájaros ocasionales"),
+        "cliff_sea": ("Mar desde el acantilado", "Mar oído desde un acantilado alto"),
+        "distant_thunder": ("Trueno lejano", "Trueno suave muy distante"),
     },
 }
 
