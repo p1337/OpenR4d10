@@ -467,6 +467,13 @@ gcc -O2 -std=c11 -Wall -Wextra -Werror \
 
 ## Making lasting architecture changes
 
+Bei Mediathek-Änderungen muss zusätzlich nachgewiesen werden, dass
+`LEFT_OUTER` nur die Lautstärke ändert, `LEFT_INNER` schnelle Suchrastungen
+zusammenfasst und nur einen mpv-Sprung auslöst. Fortschritt und Puffer dürfen
+nur aus der zentralen mpv-Zeitquelle stammen. Neue Browsertexte für Verlauf,
+Archiv oder Favoriten benötigen Übersetzungen in allen fünf unterstützten
+Sprachen.
+
 Keep configuration ownership, adapter contracts, storage paths, service
 permissions and recurring diagnostic traps documented in `docs/`. Update tests
 with every contract change. Never add a second installation path or direct GPIO

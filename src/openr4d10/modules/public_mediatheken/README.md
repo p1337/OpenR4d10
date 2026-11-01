@@ -20,3 +20,7 @@ umgangen.
 Diagnose: Dienstbereitschaft erfordert das vorhandene `mpv`; Katalogfehler
 erscheinen als begrenzte Suchfehlermeldung. Die Quelle, Senderwerte, Limits und
 Browser-/Gerätegrenze sind in `docs/MEDIATHEK.md` dokumentiert.
+
+Der zentrale Geräteplayer unterstützt einen entprellten Suchlauf ausschließlich
+über den unteren linken Encoder, echten mpv-Pufferfortschritt sowie den
+gemeinsamen persistenten Verlauf und Favoritenstellen aller Mediatheken.

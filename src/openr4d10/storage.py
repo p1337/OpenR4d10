@@ -13,7 +13,7 @@ import threading
 from typing import Any
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 _SECRET_KEY = re.compile(
     r"(^|[._-])(password|passwd|token|secret|api[_-]?key|private[_-]?key)($|[._-])",
     re.IGNORECASE,
@@ -110,6 +110,28 @@ CREATE UNIQUE INDEX IF NOT EXISTS media_fingerprint_unique
     ON media(fingerprint) WHERE fingerprint IS NOT NULL;
 """
 
+MIGRATION_5 = """
+CREATE TABLE IF NOT EXISTS mediathek_state (
+    content_id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    topic TEXT NOT NULL DEFAULT '',
+    title TEXT NOT NULL,
+    duration_seconds INTEGER NOT NULL DEFAULT 0,
+    published_at INTEGER NOT NULL DEFAULT 0,
+    watched INTEGER NOT NULL DEFAULT 0 CHECK (watched IN (0, 1)),
+    favorite INTEGER NOT NULL DEFAULT 0 CHECK (favorite IN (0, 1)),
+    last_position_seconds REAL NOT NULL DEFAULT 0,
+    favorite_position_seconds REAL,
+    last_played_at TEXT NOT NULL,
+    watched_at TEXT
+);
+CREATE INDEX IF NOT EXISTS mediathek_state_history
+    ON mediathek_state(watched, last_played_at DESC);
+CREATE INDEX IF NOT EXISTS mediathek_state_favorites
+    ON mediathek_state(favorite, last_played_at DESC);
+"""
+
 
 def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
@@ -176,6 +198,15 @@ class StateStore:
                     (4, _now()),
                 )
                 self.connection.execute("PRAGMA user_version = 4")
+            current = 4
+        if current < 5:
+            with self.transaction():
+                self.connection.executescript(MIGRATION_5)
+                self.connection.execute(
+                    "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+                    (5, _now()),
+                )
+                self.connection.execute("PRAGMA user_version = 5")
 
     @contextmanager
     def transaction(self) -> Iterator[None]:
@@ -209,6 +240,131 @@ class StateStore:
                 "SELECT value_json FROM settings WHERE key = ?", (key,)
             ).fetchone()
         return default if row is None else json.loads(row["value_json"])
+
+    def save_mediathek_state(
+        self,
+        content_id: str,
+        metadata: dict[str, Any],
+        *,
+        position_seconds: float,
+        watched: bool = False,
+    ) -> None:
+        """Persist non-secret episode progress without its expiring media URL."""
+
+        if re.fullmatch(r"[a-f0-9]{24}", content_id) is None:
+            raise ValueError("invalid Mediathek content id")
+        now = _now()
+        with self.transaction():
+            self.connection.execute(
+                """
+                INSERT INTO mediathek_state(
+                    content_id, provider, channel, topic, title,
+                    duration_seconds, published_at, watched, favorite,
+                    last_position_seconds, favorite_position_seconds,
+                    last_played_at, watched_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, NULL, ?, ?)
+                ON CONFLICT(content_id) DO UPDATE SET
+                    provider = excluded.provider,
+                    channel = excluded.channel,
+                    topic = excluded.topic,
+                    title = excluded.title,
+                    duration_seconds = excluded.duration_seconds,
+                    published_at = excluded.published_at,
+                    watched = MAX(mediathek_state.watched, excluded.watched),
+                    last_position_seconds = excluded.last_position_seconds,
+                    last_played_at = excluded.last_played_at,
+                    watched_at = CASE
+                        WHEN mediathek_state.watched = 1 THEN mediathek_state.watched_at
+                        ELSE excluded.watched_at
+                    END
+                """,
+                (
+                    content_id,
+                    str(metadata.get("provider") or ""),
+                    str(metadata.get("channel") or ""),
+                    str(metadata.get("topic") or ""),
+                    str(metadata.get("title") or ""),
+                    max(0, int(metadata.get("duration_seconds") or 0)),
+                    max(0, int(metadata.get("timestamp") or 0)),
+                    int(watched),
+                    max(0.0, float(position_seconds)),
+                    now,
+                    now if watched else None,
+                ),
+            )
+
+    def mediathek_states(self) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self.connection.execute(
+                """
+                SELECT content_id, provider, channel, topic, title,
+                       duration_seconds, published_at, watched, favorite,
+                       last_position_seconds, favorite_position_seconds,
+                       last_played_at, watched_at
+                FROM mediathek_state
+                ORDER BY favorite DESC, watched DESC, last_played_at DESC
+                LIMIT 1000
+                """
+            ).fetchall()
+        return [
+            {
+                **dict(row),
+                "watched": bool(row["watched"]),
+                "favorite": bool(row["favorite"]),
+            }
+            for row in rows
+        ]
+
+    def mediathek_state(self, content_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            row = self.connection.execute(
+                """
+                SELECT content_id, provider, channel, topic, title,
+                       duration_seconds, published_at, watched, favorite,
+                       last_position_seconds, favorite_position_seconds,
+                       last_played_at, watched_at
+                FROM mediathek_state WHERE content_id = ?
+                """,
+                (content_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return {
+            **dict(row),
+            "watched": bool(row["watched"]),
+            "favorite": bool(row["favorite"]),
+        }
+
+    def toggle_mediathek_favorite(
+        self,
+        content_id: str,
+        metadata: dict[str, Any],
+        position_seconds: float,
+    ) -> dict[str, Any]:
+        existing = self.mediathek_state(content_id)
+        favorite = not bool(existing and existing["favorite"])
+        self.save_mediathek_state(
+            content_id,
+            metadata,
+            position_seconds=max(0.0, position_seconds),
+            watched=bool(existing and existing["watched"]),
+        )
+        with self.transaction():
+            self.connection.execute(
+                """
+                UPDATE mediathek_state
+                SET favorite = ?, favorite_position_seconds = ?
+                WHERE content_id = ?
+                """,
+                (
+                    int(favorite),
+                    max(0.0, float(position_seconds)) if favorite else None,
+                    content_id,
+                ),
+            )
+        result = self.mediathek_state(content_id)
+        assert result is not None
+        return result
 
     def ensure_services(
         self, service_ids: tuple[str, ...], default_enabled: set[str] | None = None

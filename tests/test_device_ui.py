@@ -130,6 +130,28 @@ class DeviceUiTests(unittest.TestCase):
         self.assertEqual(image.getpixel((0, 279)), (16, 32, 48))
         self.assertEqual(image.getpixel((239, 279)), (16, 32, 48))
 
+    def test_mediathek_video_draws_real_progress_cache_and_pending_seek(self) -> None:
+        state = DeviceUiState(
+            source="ARD-alpha",
+            service_index=SERVICES.index("PLAYER"),
+            playing=True,
+            video_active=True,
+            playback_position_seconds=30,
+            playback_duration_seconds=120,
+            playback_buffered_until_seconds=35,
+            mediathek_seek_pending_seconds=195,
+        )
+        image = render_device_ui(state, Image.new("RGB", (320, 180), (16, 32, 48)))
+
+        self.assertNotEqual(image.getpixel((30, 277)), (16, 32, 48))
+        self.assertNotEqual(image.getpixel((67, 277)), (16, 32, 48))
+        self.assertTrue(
+            any(
+                max(pixel) > 240
+                for pixel in image.crop((55, 160, 185, 220)).get_flattened_data()
+            )
+        )
+
     def test_media_uses_tight_equal_margins_and_smaller_top_corners(self) -> None:
         color = (220, 20, 40)
         image = render_device_ui(

@@ -3708,3 +3708,36 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Koordinaten und dieselbe `fit`-Skalierung verwenden. Ein Regressionstest muss
   Video an x=0, x=239 und y=279 nachweisen und gleichzeitig belegen, dass der
   normale Radio-Medienrand weiterhin besteht.
+
+### 2026-11-01 – Mediathek-Suchlauf, Pufferfortschritt und Verlauf
+
+- Im laufenden Mediathek-Player bleibt der obere linke Encoder ausschließlich
+  die Lautstärkesteuerung in 10-Prozent-Schritten. Er darf niemals zum Spulen
+  umgedeutet werden. Ausschließlich der untere linke Encoder beziehungsweise
+  `A`/`D` im Browser spult pro Rastung 15 Sekunden zurück oder vor.
+- Mehrere schnelle Rastungen werden sofort als große weiße relative Zeit wie
+  `+3:15` oder `-1:00` auf dem Display aufsummiert. Erst nach einer kurzen
+  Eingabepause wird genau ein relativer Sprung an den zentralen mpv-Prozess
+  gesendet. Bis zu einer Minute zählen die Rastungen jeweils 15 Sekunden;
+  oberhalb einer Minute beschleunigt jede weitere Rastung in derselben Richtung
+  auf eine Minute. Eine Gegendrehung reduziert den sichtbaren ausstehenden
+  Sprung wieder. Dadurch entstehen weder ein Neuladen pro Rastung noch eine
+  Serie langsamer Netzwerksprünge. Lautstärke, Bild und Ton bleiben getrennt
+  bedienbar.
+- Der zentrale mpv-Prozess bleibt die einzige A/V-Uhr. Für Netzmedien hält sein
+  flüchtiger RAM-Cache ungefähr fünf Sekunden Vorlauf bereit. Der gelbe untere
+  Fortschrittsglow zeigt die reale Abspielposition, die grüne Fortsetzung nur
+  den von mpv tatsächlich gemeldeten Pufferstand. Ein erfundener `Position+5`-
+  Wert, zweiter Downloader oder unabhängiger Playhead ist verboten.
+- Mediathekergebnisse erhalten einen persistenten, nicht geheimen Verlauf.
+  Vollständig beziehungsweise bis in den Schlussbereich abgespielte Folgen
+  werden als gesehen markiert, in der normalen Auswahl hinter ungesehene
+  Folgen sortiert und im Browserarchiv auffindbar. Ein PTT-Druck im sichtbaren
+  Mediathek-Player markiert die Folge als Favorit und speichert eine
+  Wiedereinstiegsstelle 15 Sekunden vor der aktuellen echten Abspielposition.
+  Rohmedienadressen bleiben dabei aus SQLite und Backups ausgeschlossen.
+- Verlauf, Archiv und Favoriten gelten senderübergreifend für alle vorhandenen
+  ARD-, ZDF-, ARTE-, 3sat-, phoenix-, Doku-, Informations- und
+  Regionalmediatheken. Die Browseransicht zeigt die Bereiche ausdrücklich und
+  vollständig fünfsprachig. Die vorhandene zentrale Quellen- und
+  Qualitätsauswahl darf dafür nicht dupliziert werden.

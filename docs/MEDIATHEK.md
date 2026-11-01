@@ -108,3 +108,19 @@ die thematisch gegliederten [ARTE-Dokumentationen](https://www.arte.tv/de/videos
 Die Indexsuche ist eine komfortable technische Quelle, nicht die rechtliche
 Verfügbarkeitszusage des Senders. Ein einzelner Beitrag kann daher trotz
 Katalogtreffer bereits abgelaufen oder im jeweiligen Land nicht abspielbar sein.
+
+## Geräte-Suchlauf, Puffer und Verlauf
+
+Der obere linke Encoder bleibt ausschließlich für die Lautstärke zuständig. Der
+untere linke Encoder spult je Rastung zunächst 15 Sekunden. Sobald der
+aufsummierte Sprung mehr als eine Minute beträgt, zählen weitere Rastungen in
+derselben Richtung minutenweise. Schnelle Eingaben werden sichtbar gesammelt
+und nach einer kurzen Ruhephase als genau ein relativer mpv-Sprung ausgeführt.
+
+Der gelbe Fortschrittsglow am unteren Bildrand folgt der echten
+Abspielposition. Seine grüne Fortsetzung zeigt ausschließlich den tatsächlich
+von mpv vorgeladenen Bereich. Gesehene Folgen und Favoriten werden ohne
+Medien-URL in SQLite gespeichert. Ein PTT-Druck im Mediathek-Player setzt oder
+entfernt einen Favoriten mit einer Wiedereinstiegsstelle 15 Sekunden vor der
+aktuellen Position. Ungesehene Folgen bleiben in der Auswahl vorn; gesehene
+Folgen erscheinen zusätzlich im Archiv.

@@ -52,6 +52,7 @@ DISPLAY_TEXT = {
         "controls": ("VOL", "SQL", "CH", "SRV"),
         "dmr_controls": ("VOL", "JMP", "TG", "SRV"),
         "rec_controls": ("0.1", "MIN/MAX", "1S", "SRV"),
+        "mediathek_controls": ("VOL", "SEEK", "CH", "SRV"),
         "dmr_on": "ON",
         "dmr_off": "OFF",
         "menu": "MENU",
@@ -109,6 +110,7 @@ DISPLAY_TEXT = {
         "controls": ("LAU", "SQL", "KAN", "DST"),
         "dmr_controls": ("LAU", "SPR", "TG", "DST"),
         "rec_controls": ("0.1", "MIN/MAX", "1S", "DST"),
+        "mediathek_controls": ("LAU", "SPUL", "KAN", "DST"),
         "dmr_on": "AN",
         "dmr_off": "AUS",
         "menu": "MENÜ",
@@ -166,6 +168,7 @@ DISPLAY_TEXT = {
         "controls": ("GŁO", "SQL", "KAN", "USŁ"),
         "dmr_controls": ("GŁO", "SKK", "TG", "USŁ"),
         "rec_controls": ("0.1", "MIN/MAX", "1S", "USŁ"),
+        "mediathek_controls": ("GŁO", "PRZ", "KAN", "USŁ"),
         "dmr_on": "WŁ",
         "dmr_off": "WYŁ",
         "menu": "MENU",
@@ -223,6 +226,7 @@ DISPLAY_TEXT = {
         "controls": ("VOL", "SQL", "CAN", "SRV"),
         "dmr_controls": ("VOL", "SAU", "TG", "SRV"),
         "rec_controls": ("0.1", "MIN/MAX", "1S", "SRV"),
+        "mediathek_controls": ("VOL", "NAV", "CAN", "SRV"),
         "dmr_on": "ON",
         "dmr_off": "OFF",
         "menu": "MENU",
@@ -280,6 +284,7 @@ DISPLAY_TEXT = {
         "controls": ("VOL", "SQL", "CAN", "SRV"),
         "dmr_controls": ("VOL", "SAL", "TG", "SRV"),
         "rec_controls": ("0.1", "MIN/MAX", "1S", "SRV"),
+        "mediathek_controls": ("VOL", "BUS", "CAN", "SRV"),
         "dmr_on": "ON",
         "dmr_off": "OFF",
         "menu": "MENÚ",
@@ -402,6 +407,11 @@ class DeviceUiState:
     playing: bool = False
     audio_active: bool = False
     video_active: bool = False
+    playback_position_seconds: float | None = None
+    playback_duration_seconds: float | None = None
+    playback_buffered_until_seconds: float | None = None
+    mediathek_seek_pending_seconds: int = 0
+    mediathek_active: bool = False
     recording: bool = False
     menu_open: bool = False
     menu_kind: str | None = None
@@ -467,6 +477,11 @@ class DeviceUiState:
             "recorder_duration_ms": self.recorder_duration_ms,
             "audio_active": self.audio_active,
             "video_active": self.video_active,
+            "playback_position_seconds": self.playback_position_seconds,
+            "playback_duration_seconds": self.playback_duration_seconds,
+            "playback_buffered_until_seconds": self.playback_buffered_until_seconds,
+            "mediathek_seek_pending_seconds": self.mediathek_seek_pending_seconds,
+            "mediathek_active": self.mediathek_active,
             "accent_color": "#{:02X}{:02X}{:02X}".format(*self.accent),
         }
 
@@ -782,6 +797,26 @@ class DeviceUiState:
         self.playing = bool(receiver.get("playing", self.playing))
         self.audio_active = bool(receiver.get("audio_active", self.playing))
         self.video_active = receiver.get("video_active") is True
+        self.mediathek_active = receiver.get("mediathek_active") is True
+        for key, attribute in (
+            ("position_seconds", "playback_position_seconds"),
+            ("duration_seconds", "playback_duration_seconds"),
+            ("buffered_until_seconds", "playback_buffered_until_seconds"),
+        ):
+            value = receiver.get(key)
+            setattr(
+                self,
+                attribute,
+                max(0.0, float(value))
+                if isinstance(value, (int, float)) and not isinstance(value, bool)
+                else None,
+            )
+        pending_seek = receiver.get("seek_pending_seconds")
+        self.mediathek_seek_pending_seconds = (
+            int(pending_seek)
+            if isinstance(pending_seek, int) and not isinstance(pending_seek, bool)
+            else 0
+        )
         self.right_action = "PAUSE" if self.playing else "PLAY"
         self.recording = bool(receiver.get("recording", False))
         self.recorder_continuous = receiver.get("continuous") is True
@@ -1423,6 +1458,69 @@ def media_mask(size: tuple[int, int]) -> Image.Image:
     return mask
 
 
+def render_video_progress_overlay(
+    region: Image.Image,
+    state: DeviceUiState,
+) -> Image.Image:
+    """Overlay real mpv progress/cache and one pending aggregated seek."""
+
+    output = region.convert("RGBA")
+    duration = state.playback_duration_seconds
+    position = state.playback_position_seconds
+    buffered = state.playback_buffered_until_seconds
+    if duration is not None and duration > 0 and position is not None:
+        played_x = round((output.width - 1) * min(1.0, position / duration))
+        buffered_x = (
+            round((output.width - 1) * min(1.0, buffered / duration))
+            if buffered is not None
+            else played_x
+        )
+        halo = Image.new("RGBA", output.size, (0, 0, 0, 0))
+        halo_draw = ImageDraw.Draw(halo)
+        y = output.height - 3
+        if buffered_x > played_x:
+            halo_draw.line(
+                (played_x, y, buffered_x, y),
+                fill=(*PLAY_GREEN, 245),
+                width=7,
+            )
+        if played_x > 0:
+            halo_draw.line(
+                (0, y, played_x, y),
+                fill=(*state.accent, 245),
+                width=7,
+            )
+        output = Image.alpha_composite(
+            output,
+            halo.filter(ImageFilter.GaussianBlur(radius=3)),
+        )
+        crisp = ImageDraw.Draw(output)
+        if buffered_x > played_x:
+            crisp.line((played_x, y, buffered_x, y), fill=(*PLAY_GREEN, 220), width=2)
+        if played_x > 0:
+            crisp.line((0, y, played_x, y), fill=(*state.accent, 235), width=2)
+
+    pending = state.mediathek_seek_pending_seconds
+    if pending:
+        sign = "+" if pending > 0 else "−"
+        absolute = abs(pending)
+        label = f"{sign}{absolute // 60}:{absolute % 60:02d}"
+        font = _font(30, bold=True)
+        draw = ImageDraw.Draw(output)
+        bounds = draw.textbbox((0, 0), label, font=font, stroke_width=2)
+        x = (output.width - (bounds[2] - bounds[0])) / 2
+        y = (output.height - (bounds[3] - bounds[1])) / 2 - bounds[1]
+        draw.text(
+            (x, y),
+            label,
+            font=font,
+            fill=(255, 255, 255, 255),
+            stroke_width=2,
+            stroke_fill=(0, 0, 0, 230),
+        )
+    return output.convert("RGB")
+
+
 def _fill_media_shape(
     image: Image.Image,
     bounds: tuple[int, int, int, int],
@@ -1544,6 +1642,8 @@ def render_device_ui(
         if state.service == "DMR"
         else text["rec_controls"]
         if state.service == "REC"
+        else text["mediathek_controls"]
+        if state.service == "PLAYER" and state.mediathek_active
         else text["controls"]
     )
     assert isinstance(controls, tuple)
@@ -1588,7 +1688,7 @@ def render_device_ui(
         19,
         20,
         str(controls[1]),
-        "25" if state.service == "DMR" else "↔" if state.service == "REC" else str(state.squelch),
+        "25" if state.service == "DMR" else "↔" if state.service == "REC" else "15S/1M" if state.mediathek_active else str(state.squelch),
         accent,
         label_offset_x=3,
         value_offset_x=71 if state.service == "REC" else None,
@@ -1883,6 +1983,7 @@ def render_device_ui(
             method=Image.Resampling.BILINEAR,
             centering=(0.5, 0.5),
         )
+        tile = render_video_progress_overlay(tile, state)
         image.paste(tile, (video_x, video_y))
     else:
         # Radio/player artwork spans the content width. ImageOps.fit

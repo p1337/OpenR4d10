@@ -158,6 +158,12 @@ and one logical input path, not a second menu surface or a fabricated PTT adapte
 
 ## Configuration and storage
 
+Mediathek-Suchläufe werden in der Anwendungsebene entprellt und anschließend als
+ein relativer Befehl an denselben zentralen mpv-Prozess übergeben. Die
+Anwendungsebene erzeugt weder einen zweiten Player noch einen eigenen A/V-Takt.
+Abspielposition, Dauer und Vorpuffer stammen aus mpv; der Verlauf speichert nur
+stabile Inhaltsmetadaten und niemals eine Rohmedienadresse.
+
 - repository defaults: `config/*.toml`
 - installed live configuration: `/etc/openr4d10/*.toml`
 - current default copies for comparison: `/etc/openr4d10/*.toml.dist`

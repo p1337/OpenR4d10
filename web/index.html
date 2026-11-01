@@ -179,7 +179,12 @@
               <video id="mediathek-video" controls playsinline preload="metadata"></video>
               <p id="mediathek-video-meta"></p>
             </section>
-            <div class="library-heading"><strong data-i18n="Results">Results</strong><span id="mediathek-result-count">0</span></div>
+            <div class="station-library-tabs mediathek-library-tabs" role="tablist" aria-label="Mediathek lists" data-i18n-aria-label="Mediathek lists">
+              <button id="mediathek-new-tab" type="button" role="tab" aria-selected="true" data-mediathek-view="new"><span data-i18n="Unwatched">Unwatched</span><span id="mediathek-new-count">0</span></button>
+              <button id="mediathek-archive-tab" type="button" role="tab" aria-selected="false" data-mediathek-view="archive"><span data-i18n="Archive">Archive</span><span id="mediathek-archive-count">0</span></button>
+              <button id="mediathek-favorites-tab" type="button" role="tab" aria-selected="false" data-mediathek-view="favorites"><span data-i18n="Favorites">Favorites</span><span id="mediathek-favorites-count">0</span></button>
+            </div>
+            <div class="library-heading"><strong id="mediathek-list-heading" data-i18n="Unwatched">Unwatched</strong><span id="mediathek-result-count">0</span></div>
             <ul id="mediathek-result-list" class="library-list mediathek-result-list"></ul>
           </section>
         </section>
@@ -279,7 +284,7 @@
             <p class="keyboard-help"><kbd>W</kbd><kbd>S</kbd> <span data-i18n="Volume">Volume</span> · <kbd>A</kbd><kbd>D</kbd> <span data-i18n="Squelch">Squelch</span> · <kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="Channel/item">Channel/item</span> · <kbd>←</kbd><kbd>→</kbd> <span data-i18n="Service">Service</span> · <kbd data-i18n="Space">Space</kbd> <span data-i18n="Menu">Menu</span> · <kbd>Enter</kbd> <span data-i18n="Select">Select</span></p>
             <div class="encoder-grid">
               <article class="encoder-control"><span data-i18n="Outer left">Outer left</span><strong><span data-i18n="Volume">Volume</span> <output id="device-volume">–</output></strong><div class="encoder-buttons"><button type="button" data-device-control="left_outer" data-steps="-1">−10</button><button type="button" data-device-control="left_outer" data-steps="1">+10</button></div></article>
-              <article class="encoder-control"><span data-i18n="Inner left">Inner left</span><strong><span data-i18n="Squelch">Squelch</span> <output id="device-squelch">–</output></strong><div class="encoder-buttons"><button type="button" data-device-control="left_inner" data-steps="-1">−</button><button type="button" data-device-control="left_inner" data-steps="1">+</button></div></article>
+              <article class="encoder-control"><span data-i18n="Inner left">Inner left</span><strong><span id="device-left-inner-label" data-i18n="Squelch">Squelch</span> <output id="device-squelch">–</output></strong><div class="encoder-buttons"><button type="button" data-device-control="left_inner" data-steps="-1">−</button><button type="button" data-device-control="left_inner" data-steps="1">+</button></div></article>
               <article class="encoder-control"><span data-i18n="Outer right">Outer right</span><strong><span data-i18n="Channel/item">Channel/item</span> <output id="device-channel">–</output></strong><div class="encoder-buttons"><button type="button" data-device-control="right_outer" data-steps="-1">−</button><button type="button" data-device-control="right_outer" data-steps="1">+</button></div></article>
               <article class="encoder-control"><span data-i18n="Inner right">Inner right</span><strong><span data-i18n="Service">Service</span> <output id="device-service">–</output></strong><div class="encoder-buttons"><button type="button" data-device-control="right_inner" data-steps="-1">−</button><button type="button" data-device-control="right_inner" data-steps="1">+</button></div></article>
             </div>

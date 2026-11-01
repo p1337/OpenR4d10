@@ -208,9 +208,25 @@ class MediathekEntry:
     website_url: str
     browser_url: str = ""
 
+    @property
+    def content_id(self) -> str:
+        """Stable opaque identity independent from an expiring stream URL."""
+
+        identity = "\0".join(
+            (
+                self.provider,
+                self.website_url,
+                self.channel,
+                self.title,
+                str(self.timestamp),
+            )
+        )
+        return hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24]
+
     def public(self) -> dict[str, object]:
         return {
             "item_id": self.item_id,
+            "content_id": self.content_id,
             "provider": self.provider,
             "service_id": self.service_id,
             "channel": self.channel,

@@ -11,6 +11,63 @@ from openr4d10.input_events import Control, InputEvent
 
 
 class AppTests(unittest.TestCase):
+    def test_mediathek_uses_only_lower_left_encoder_for_seek(self) -> None:
+        class InputDisplay:
+            def snapshot(self):
+                return {"service": "PLAYER", "menu_open": False}
+
+            def apply_input(self, _event):
+                return self.snapshot()
+
+            def apply_input_state(self, _event):
+                return self.snapshot()
+
+            def render(self, _frame):
+                pass
+
+        class Services:
+            active_service = "public_mediatheken"
+
+            def __init__(self):
+                self.requests = []
+
+            def control(self, request):
+                self.requests.append(request)
+                return {"playback": {"volume": 40}, "pending_seconds": 15}
+
+            def receiver_overlay(self, _view=None):
+                return {"service": "PLAYER", "station": "ARD-alpha", "playing": True}
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=InputDisplay(),  # type: ignore[arg-type]
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,  # type: ignore[arg-type]
+            )
+            with patch.object(app, "_start_mediathek_seek_timer"):
+                app.control({"action": "device_input", "control": "left_outer", "steps": 1})
+                app.control({"action": "device_input", "control": "left_inner", "steps": 1})
+
+        self.assertEqual(
+            services.requests,
+            [
+                {"action": "volume_step", "steps": 1},
+                {"action": "mediathek_seek_preview", "steps": 1},
+            ],
+        )
+
     def test_running_video_uses_a_dedicated_25_fps_partial_frame_clock(self) -> None:
         self.assertEqual(PLAYER_FRAME_INTERVAL_SECONDS, 0.04)
 

@@ -19,6 +19,7 @@ let stationLibraryView = "active";
 let podcastSearchQuery = "";
 let mediathekProvider = "all";
 let mediathekInitialLoadPending = false;
+let mediathekLibraryView = "new";
 let brandmeisterTalkgroups = [];
 let brandmeisterCatalog = [];
 let brandmeisterCatalogQuery = "";
@@ -840,6 +841,14 @@ function selectMediathekProvider(provider) {
   if (latestStatus?.services) renderMediathek(latestStatus.services);
 }
 
+function selectMediathekLibraryView(view) {
+  mediathekLibraryView = ["new", "archive", "favorites"].includes(view) ? view : "new";
+  for (const button of document.querySelectorAll("[data-mediathek-view]")) {
+    button.setAttribute("aria-selected", button.dataset.mediathekView === mediathekLibraryView ? "true" : "false");
+  }
+  if (latestStatus?.services) renderMediathek(latestStatus.services);
+}
+
 function renderMediathek(catalog) {
   const mediathek = catalog?.mediathek || {};
   const providers = mediathek.providers || {};
@@ -886,9 +895,32 @@ function renderMediathek(catalog) {
 
   const providerState = providers[mediathekProvider] || {};
   const results = Array.isArray(providerState.results) ? providerState.results : [];
+  const history = Array.isArray(mediathek.history) ? mediathek.history : [];
+  const cachedByContent = new Map(
+    Object.values(providers)
+      .flatMap((state) => Array.isArray(state?.results) ? state.results : [])
+      .filter((item) => item.content_id)
+      .map((item) => [item.content_id, item]),
+  );
+  const unseen = results.filter((item) => item.watched !== true);
+  const archive = history
+    .filter((item) => item.watched === true)
+    .map((item) => ({ ...item, ...(cachedByContent.get(item.content_id) || {}) }));
+  const favorites = history
+    .filter((item) => item.favorite === true)
+    .map((item) => ({ ...item, ...(cachedByContent.get(item.content_id) || {}) }));
+  setText("mediathek-new-count", unseen.length);
+  setText("mediathek-archive-count", archive.length);
+  setText("mediathek-favorites-count", favorites.length);
+  const visible = mediathekLibraryView === "archive"
+    ? archive
+    : mediathekLibraryView === "favorites"
+      ? favorites
+      : unseen;
+  setText("mediathek-list-heading", t(mediathekLibraryView === "archive" ? "Archive" : mediathekLibraryView === "favorites" ? "Favorites" : "Unwatched"));
   const list = byId("mediathek-result-list");
   list.replaceChildren();
-  for (const item of results) {
+  for (const item of visible) {
     const row = document.createElement("li");
     if (item.item_id === providerState.selected_item_id) row.dataset.active = "true";
     const copy = document.createElement("span");
@@ -899,55 +931,82 @@ function renderMediathek(catalog) {
     detail.textContent = [
       item.channel,
       item.topic,
-      mediathekPublished(item.timestamp),
+      mediathekPublished(item.timestamp ?? item.published_at),
       mediathekDuration(item.duration_seconds),
     ].filter(Boolean).join(" · ");
     const description = document.createElement("p");
-    description.textContent = item.description;
+    description.textContent = item.description || (item.favorite_position_seconds != null
+      ? t("Bookmark at {{time}}", { time: mediathekDuration(item.favorite_position_seconds) })
+      : "");
     copy.append(title, detail, description);
     const actions = document.createElement("span");
     actions.className = "library-actions";
-    const watch = document.createElement("button");
-    watch.type = "button";
-    watch.className = "library-play play-action";
-    watch.textContent = t("Watch in browser");
-    watch.addEventListener("click", () => watchMediathekItem(item));
-    const deviceAudio = document.createElement("button");
-    deviceAudio.type = "button";
-    deviceAudio.textContent = t("Audio on device");
-    deviceAudio.addEventListener("click", () => mediathekCommand("mediathek_play", {
-      provider: mediathekProvider,
-      item_id: item.item_id,
-      mode: "audio",
-    }));
-    const deviceVideo = document.createElement("button");
-    deviceVideo.type = "button";
-    deviceVideo.className = "library-play play-action";
-    deviceVideo.textContent = t("Video on device");
-    deviceVideo.addEventListener("click", () => mediathekCommand("mediathek_play", {
-      provider: mediathekProvider,
-      item_id: item.item_id,
-      mode: "video",
-    }));
-    actions.append(watch, deviceAudio, deviceVideo);
+    if (item.item_id) {
+      const playbackProvider = Object.entries(providers).find(([, state]) =>
+        Array.isArray(state?.results) && state.results.some((candidate) => candidate.item_id === item.item_id)
+      )?.[0] || mediathekProvider;
+      const watch = document.createElement("button");
+      watch.type = "button";
+      watch.className = "library-play play-action";
+      watch.textContent = t("Watch in browser");
+      watch.addEventListener("click", () => watchMediathekItem(item, playbackProvider));
+      const deviceAudio = document.createElement("button");
+      deviceAudio.type = "button";
+      deviceAudio.textContent = t("Audio on device");
+      deviceAudio.addEventListener("click", () => mediathekCommand("mediathek_play", {
+        provider: playbackProvider,
+        item_id: item.item_id,
+        mode: "audio",
+        start_seconds: item.favorite ? item.favorite_position_seconds : undefined,
+      }));
+      const deviceVideo = document.createElement("button");
+      deviceVideo.type = "button";
+      deviceVideo.className = "library-play play-action";
+      deviceVideo.textContent = t("Video on device");
+      deviceVideo.addEventListener("click", () => mediathekCommand("mediathek_play", {
+        provider: playbackProvider,
+        item_id: item.item_id,
+        mode: "video",
+        start_seconds: item.favorite ? item.favorite_position_seconds : undefined,
+      }));
+      actions.append(watch, deviceAudio, deviceVideo);
+    } else {
+      const findAgain = document.createElement("button");
+      findAgain.type = "button";
+      findAgain.textContent = t("Find again");
+      findAgain.addEventListener("click", async () => {
+        selectMediathekProvider(Object.hasOwn(providers, item.provider) ? item.provider : "all");
+        byId("mediathek-search").value = item.title;
+        await mediathekCommand("mediathek_search", { provider: mediathekProvider, query: item.title });
+        selectMediathekLibraryView(item.favorite ? "favorites" : "archive");
+      });
+      actions.append(findAgain);
+    }
     row.addEventListener("click", (event) => {
-      if (event.target.closest("button")) return;
-      mediathekCommand("mediathek_select", { provider: mediathekProvider, item_id: item.item_id });
+      if (event.target.closest("button") || !item.item_id) return;
+      const playbackProvider = Object.entries(providers).find(([, state]) =>
+        Array.isArray(state?.results) && state.results.some((candidate) => candidate.item_id === item.item_id)
+      )?.[0] || mediathekProvider;
+      mediathekCommand("mediathek_select", { provider: playbackProvider, item_id: item.item_id });
     });
     row.append(copy, actions);
     list.append(row);
   }
-  setText("mediathek-result-count", results.length);
-  if (!results.length) {
+  setText("mediathek-result-count", visible.length);
+  if (!visible.length) {
     const row = document.createElement("li");
-    row.textContent = t("No Mediathek results loaded yet.");
+    row.textContent = t(mediathekLibraryView === "archive"
+      ? "No watched programs yet."
+      : mediathekLibraryView === "favorites"
+        ? "No Mediathek favorites yet."
+        : "No unwatched Mediathek results loaded yet.");
     list.append(row);
   }
 }
 
-async function watchMediathekItem(item) {
+async function watchMediathekItem(item, provider = mediathekProvider) {
   const selected = await mediathekCommand("mediathek_select", {
-    provider: mediathekProvider,
+    provider,
     item_id: item.item_id,
   });
   if (!selected) return;
@@ -1301,7 +1360,8 @@ function renderDeviceState(state) {
   if (!state) return;
   latestDeviceState = state;
   setText("device-volume", Number.isInteger(state.volume) ? `${state.volume}%` : null);
-  setText("device-squelch", state.squelch);
+  setText("device-left-inner-label", t(state.mediathek_active ? "Seek" : "Squelch"));
+  setText("device-squelch", state.mediathek_active ? "15s / 1m" : state.squelch);
   setText("device-channel", Number.isInteger(state.channel) ? String(state.channel).padStart(3, "0") : null);
   setText("device-service", state.service);
   const pttButton = byId("ptt-button");
@@ -1692,6 +1752,9 @@ byId("podcast-subscribe-form").addEventListener("submit", async (event) => {
 });
 
 byId("mediathek-provider").addEventListener("change", (event) => selectMediathekProvider(event.currentTarget.value));
+for (const button of document.querySelectorAll("[data-mediathek-view]")) {
+  button.addEventListener("click", () => selectMediathekLibraryView(button.dataset.mediathekView));
+}
 
 byId("mediathek-search-form").addEventListener("submit", async (event) => {
   event.preventDefault();

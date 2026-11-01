@@ -16,6 +16,37 @@ from openr4d10.storage import MIGRATION_1, SCHEMA_VERSION, StateStore
 
 
 class StateStoreTests(unittest.TestCase):
+    def test_mediathek_history_and_bookmark_persist_without_url(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            store = StateStore(Path(raw).resolve() / "state.sqlite3")
+            metadata = {
+                "provider": "ard",
+                "channel": "ARD-alpha",
+                "topic": "Wissen",
+                "title": "Der Mond",
+                "duration_seconds": 120,
+                "timestamp": 1_700_000_000,
+            }
+            try:
+                store.save_mediathek_state(
+                    "0123456789abcdef01234567",
+                    metadata,
+                    position_seconds=118,
+                    watched=True,
+                )
+                favorite = store.toggle_mediathek_favorite(
+                    "0123456789abcdef01234567",
+                    metadata,
+                    103,
+                )
+                columns = set(favorite)
+            finally:
+                store.close()
+        self.assertTrue(favorite["watched"])
+        self.assertTrue(favorite["favorite"])
+        self.assertEqual(favorite["favorite_position_seconds"], 103)
+        self.assertFalse({"source_url", "website_url", "browser_url"} & columns)
+
     def test_v2_service_rows_receive_stable_manifest_positions(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             path = Path(raw).resolve() / "state.sqlite3"
@@ -56,6 +87,43 @@ class StateStoreTests(unittest.TestCase):
 
 
 class ServiceCatalogTests(unittest.TestCase):
+    def test_mediathek_seek_preview_accelerates_after_one_minute_and_commits_once(self) -> None:
+        class State:
+            state = "playing"
+            source = "media"
+            volume = 30
+            paused = False
+
+            def as_dict(self):
+                return {"state": self.state, "source": self.source, "volume": self.volume, "paused": self.paused}
+
+        class Player:
+            def __init__(self):
+                self.state = State()
+                self.seeks = []
+
+            def seek_relative(self, seconds):
+                self.seeks.append(seconds)
+                return self.state.as_dict()
+
+            def close(self):
+                pass
+
+        with tempfile.TemporaryDirectory() as raw:
+            player = Player()
+            catalog = ServiceCatalog(Path(raw).resolve(), player=player)  # type: ignore[arg-type]
+            catalog.active_service = "public_mediatheken"
+            try:
+                for _ in range(4):
+                    preview = catalog.control({"action": "mediathek_seek_preview", "steps": 1})
+                self.assertEqual(preview["pending_seconds"], 60)
+                preview = catalog.control({"action": "mediathek_seek_preview", "steps": 1})
+                self.assertEqual(preview["pending_seconds"], 120)
+                committed = catalog.control({"action": "mediathek_seek_commit"})
+            finally:
+                catalog.close()
+        self.assertEqual(player.seeks, [120])
+        self.assertEqual(committed["pending_seconds"], 0)
     def test_recorded_song_uses_media_music_artist_layout(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw).resolve()

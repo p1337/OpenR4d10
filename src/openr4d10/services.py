@@ -245,6 +245,8 @@ class ServiceCatalog:
         self._active_mediathek_results: tuple[MediathekEntry, ...] = ()
         self._active_mediathek_item: dict[str, object] | None = None
         self._active_mediathek_mode = "audio"
+        self._mediathek_seek_pending_seconds = 0
+        self._mediathek_progress_saved_at = 0.0
         external_ids = {
             item.service_id
             for item in BUILTIN_SERVICES
@@ -1681,13 +1683,20 @@ class ServiceCatalog:
                     ),
                 }
             )
+        mediathek_history = self.store.mediathek_states()
+        mediathek_history_by_id = {
+            str(item["content_id"]): item for item in mediathek_history
+        }
         mediathek_providers = {}
         for provider in self._mediathek_results:
             results = self._mediathek_results[provider]
             mediathek_providers[provider] = {
                 "query": self._mediathek_queries[provider],
                 "selected_item_id": self._mediathek_selected[provider],
-                "results": [item.public() for item in results],
+                "results": [
+                    self._mediathek_public_item(item, mediathek_history_by_id)
+                    for item in results
+                ],
             }
         return {
             "schema_version": SCHEMA_VERSION,
@@ -1747,6 +1756,7 @@ class ServiceCatalog:
                     if self.active_service in MEDIATHEK_SERVICE_IDS
                     else None
                 ),
+                "history": mediathek_history,
                 "limits": {
                     "results_per_provider": MediathekCatalog.MAX_RESULTS,
                     "response_bytes": MediathekCatalog.MAX_RESPONSE_BYTES,
@@ -2818,12 +2828,19 @@ class ServiceCatalog:
             provider = request.get("provider")
             item_id = request.get("item_id")
             mode = request.get("mode", "audio")
+            start_seconds = request.get("start_seconds", 0.0)
             if not isinstance(provider, str) or provider not in self._mediathek_results:
                 raise ValueError("mediathek_play requires a known provider")
             if not isinstance(item_id, str):
                 raise ValueError("mediathek_play requires an item id")
             if mode not in {"audio", "video"}:
                 raise ValueError("mediathek_play mode must be audio or video")
+            if (
+                isinstance(start_seconds, bool)
+                or not isinstance(start_seconds, (int, float))
+                or not 0 <= float(start_seconds) <= 86400
+            ):
+                raise ValueError("mediathek_play start_seconds must be between 0 and 86400")
             item = next(
                 (
                     candidate
@@ -2839,6 +2856,7 @@ class ServiceCatalog:
                 item,
                 result_set=self._mediathek_results[provider],
                 mode=mode,
+                start_seconds=float(start_seconds),
             )
             return {
                 "provider": provider,
@@ -2885,6 +2903,66 @@ class ServiceCatalog:
                 "mode": self._active_mediathek_mode,
                 "playback": self.player.state.as_dict(),
             }
+        elif action == "mediathek_seek_preview":
+            steps = request.get("steps")
+            if (
+                isinstance(steps, bool)
+                or not isinstance(steps, int)
+                or steps == 0
+                or abs(steps) > 10
+            ):
+                raise ValueError(
+                    "Mediathek seek steps must be between -10 and 10, excluding zero"
+                )
+            if self.active_service not in MEDIATHEK_SERVICE_IDS:
+                raise ValueError("no active Mediathek playback")
+            for _ in range(abs(steps)):
+                direction = 1 if steps > 0 else -1
+                pending = self._mediathek_seek_pending_seconds
+                same_direction = pending == 0 or (pending > 0) == (direction > 0)
+                accelerated = abs(pending) >= 60 if same_direction else abs(pending) > 60
+                pending += direction * (60 if accelerated else 15)
+                self._mediathek_seek_pending_seconds = max(-21600, min(21600, pending))
+            return {
+                "pending_seconds": self._mediathek_seek_pending_seconds,
+                "playback": self.player.state.as_dict(),
+            }
+        elif action == "mediathek_seek_commit":
+            if self.active_service not in MEDIATHEK_SERVICE_IDS:
+                self._mediathek_seek_pending_seconds = 0
+                raise ValueError("no active Mediathek playback")
+            pending = self._mediathek_seek_pending_seconds
+            self._mediathek_seek_pending_seconds = 0
+            if pending:
+                seeker = getattr(self.player, "seek_relative", None)
+                if not callable(seeker):
+                    raise RuntimeError("the media player does not support relative seeking")
+                seeker(pending)
+            return {
+                "pending_seconds": 0,
+                "seek_seconds": pending,
+                "playback": self.player.state.as_dict(),
+            }
+        elif action == "mediathek_favorite_toggle":
+            if (
+                self.active_service not in MEDIATHEK_SERVICE_IDS
+                or self._active_mediathek_item is None
+            ):
+                raise ValueError("no active Mediathek item")
+            metrics = self.mediathek_playback_metrics()
+            position = metrics.get("position_seconds")
+            bookmark = max(0.0, float(position or 0.0) - 15.0)
+            content_id = str(self._active_mediathek_item.get("content_id") or "")
+            state = self.store.toggle_mediathek_favorite(
+                content_id,
+                self._active_mediathek_item,
+                bookmark,
+            )
+            self._active_mediathek_item.update(
+                favorite=state["favorite"],
+                favorite_position_seconds=state["favorite_position_seconds"],
+            )
+            return {"favorite": state["favorite"], "bookmark_seconds": bookmark}
         elif action == "adapter_call":
             service_id = request.get("service_id")
             operation = request.get("operation")
@@ -3183,6 +3261,7 @@ class ServiceCatalog:
         *,
         result_set: list[MediathekEntry] | None = None,
         mode: str | None = None,
+        start_seconds: float = 0.0,
     ) -> None:
         """Load one cached result through the sole synchronized A/V owner."""
 
@@ -3197,6 +3276,8 @@ class ServiceCatalog:
         self._stop_brandmeister_for_audio_owner()
         self._stop_ambient_layers()
         self.player.load(source, video_enabled=selected_mode == "video")
+        if start_seconds > 0:
+            self.player.seek_absolute(start_seconds)
         self.active_service = item.service_id
         self.active_preset_id = None
         self.active_station_id = None
@@ -3206,8 +3287,76 @@ class ServiceCatalog:
         self._active_mediathek_provider = provider
         if result_set is not None:
             self._active_mediathek_results = tuple(result_set)
-        self._active_mediathek_item = item.public()
+        self.store.save_mediathek_state(
+            item.content_id,
+            item.public(),
+            position_seconds=0.0,
+        )
+        self._active_mediathek_item = self._mediathek_public_item(item)
         self._active_mediathek_mode = selected_mode
+        self._mediathek_seek_pending_seconds = 0
+        self._mediathek_progress_saved_at = 0.0
+
+    def _mediathek_public_item(
+        self,
+        item: MediathekEntry,
+        states: dict[str, dict[str, object]] | None = None,
+    ) -> dict[str, object]:
+        public = item.public()
+        saved = (
+            states.get(item.content_id)
+            if states is not None
+            else self.store.mediathek_state(item.content_id)
+        )
+        public.update(
+            watched=bool(saved and saved["watched"]),
+            favorite=bool(saved and saved["favorite"]),
+            last_position_seconds=(
+                float(saved["last_position_seconds"]) if saved else 0.0
+            ),
+            favorite_position_seconds=(
+                saved["favorite_position_seconds"] if saved else None
+            ),
+        )
+        return public
+
+    def mediathek_playback_metrics(self) -> dict[str, object]:
+        """Expose only real central-player time/cache values to the compositor."""
+
+        metrics = getattr(self.player, "playback_metrics", None)
+        values = metrics() if callable(metrics) else {}
+        position = values.get("position_seconds")
+        duration = values.get("duration_seconds")
+        now = time.monotonic()
+        if (
+            self._active_mediathek_item is not None
+            and isinstance(position, (int, float))
+            and not isinstance(position, bool)
+            and now - self._mediathek_progress_saved_at >= 5.0
+        ):
+            watched = (
+                isinstance(duration, (int, float))
+                and not isinstance(duration, bool)
+                and float(duration) > 0
+                and float(position) >= max(float(duration) * 0.9, float(duration) - 30.0)
+            )
+            content_id = str(self._active_mediathek_item.get("content_id") or "")
+            self.store.save_mediathek_state(
+                content_id,
+                self._active_mediathek_item,
+                position_seconds=float(position),
+                watched=watched,
+            )
+            self._active_mediathek_item["last_position_seconds"] = float(position)
+            if watched:
+                self._active_mediathek_item["watched"] = True
+            self._mediathek_progress_saved_at = now
+        return {
+            "position_seconds": position,
+            "duration_seconds": duration,
+            "buffered_until_seconds": values.get("buffered_until_seconds"),
+            "seek_pending_seconds": self._mediathek_seek_pending_seconds,
+        }
 
     def device_video_frame(self) -> bytes | None:
         """Poll one synchronized frame only for Mediathek video mode."""
@@ -4033,6 +4182,17 @@ class ServiceCatalog:
             "video_active": (
                 self.active_service in MEDIATHEK_SERVICE_IDS
                 and self._active_mediathek_mode == "video"
+            ),
+            "mediathek_active": self.active_service in MEDIATHEK_SERVICE_IDS,
+            **(
+                self.mediathek_playback_metrics()
+                if self.active_service in MEDIATHEK_SERVICE_IDS
+                else {
+                    "position_seconds": None,
+                    "duration_seconds": None,
+                    "buffered_until_seconds": None,
+                    "seek_pending_seconds": 0,
+                }
             ),
             "recording": (
                 self.recorder.state.state == "recording" or buffered_recording

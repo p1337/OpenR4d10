@@ -33,6 +33,7 @@ DMR_FRAME_INTERVAL_SECONDS = 0.1
 PLAYER_FRAME_INTERVAL_SECONDS = 0.04
 RECORDER_INTERACTION_QUIET_SECONDS = 0.2
 DMR_PTT_HOLD_SECONDS = 2.0
+MEDIATHEK_SEEK_QUIET_SECONDS = 0.45
 
 
 class OpenR4d10App:
@@ -72,6 +73,8 @@ class OpenR4d10App:
         self._dmr_hold_timer: threading.Timer | None = None
         self._dmr_hold_generation = 0
         self._dmr_hold_triggered = False
+        self._mediathek_seek_timer: threading.Timer | None = None
+        self._mediathek_seek_generation = 0
         self._voice_last_release_at: float | None = None
         self._voice_pressed_at: float | None = None
         self._voice_ignore_release = False
@@ -124,6 +127,7 @@ class OpenR4d10App:
             LOG.info("Received signal %s; stopping", signum)
         self.stop_event.set()
         self._cancel_dmr_hold_timer()
+        self._cancel_mediathek_seek_timer()
 
     def _recorder_interaction_active(self) -> bool:
         return (
@@ -154,6 +158,47 @@ class OpenR4d10App:
         timer.daemon = True
         self._dmr_hold_timer = timer
         timer.start()
+
+    def _cancel_mediathek_seek_timer(self) -> None:
+        self._mediathek_seek_generation += 1
+        timer = self._mediathek_seek_timer
+        self._mediathek_seek_timer = None
+        if timer is not None:
+            timer.cancel()
+
+    def _start_mediathek_seek_timer(self) -> None:
+        self._cancel_mediathek_seek_timer()
+        generation = self._mediathek_seek_generation
+        timer = threading.Timer(
+            MEDIATHEK_SEEK_QUIET_SECONDS,
+            self._commit_mediathek_seek,
+            args=(generation,),
+        )
+        timer.daemon = True
+        self._mediathek_seek_timer = timer
+        timer.start()
+
+    def _commit_mediathek_seek(self, generation: int) -> None:
+        """Commit one accumulated seek without blocking encoder detents."""
+
+        try:
+            with self._device_input_lock:
+                if (
+                    self.stop_event.is_set()
+                    or generation != self._mediathek_seek_generation
+                    or self.services is None
+                ):
+                    return
+                self._mediathek_seek_timer = None
+                self._interaction_generation += 1
+                try:
+                    self.services.control({"action": "mediathek_seek_commit"})
+                    self.render_interaction_once("PLAYER")
+                finally:
+                    self._last_device_input_at = time.perf_counter()
+                    self._interaction_generation += 1
+        except Exception:
+            LOG.exception("Mediathek seek commit failed")
 
     def _on_dmr_hold_threshold(self, generation: int) -> None:
         """Resolve a still-held DMR PTT press through the serialized input path."""
@@ -230,11 +275,15 @@ class OpenR4d10App:
         if self.services is None:
             return None
         provider = getattr(self.services, "device_video_frame", None)
+        metrics_provider = getattr(self.services, "mediathek_playback_metrics", None)
+        metrics_setter = getattr(self.display, "set_playback_metrics", None)
         presenter = getattr(self.display, "present_video_frame", None)
         setter = getattr(self.display, "set_video_frame", None)
         if not callable(provider):
             return None
         payload = provider()
+        if callable(metrics_provider) and callable(metrics_setter):
+            metrics_setter(metrics_provider())
         if payload is None:
             return None
         if callable(presenter):
@@ -518,6 +567,17 @@ class OpenR4d10App:
             media_result = self.services.control(
                 {"action": "voice_recorder_seek", "delta_ms": event.steps * 100}
             )
+        elif (
+            self.services is not None
+            and event.control == Control.LEFT_INNER
+            and not menu_open
+            and selected_service == "PLAYER"
+            and self.services.active_service in MEDIATHEK_SERVICE_IDS
+        ):
+            media_result = self.services.control(
+                {"action": "mediathek_seek_preview", "steps": event.steps}
+            )
+            self._start_mediathek_seek_timer()
         elif self.services is not None and event.control == Control.LEFT_OUTER:
             media_result = self.services.control(
                 {"action": "volume_step", "steps": event.steps}
@@ -686,6 +746,17 @@ class OpenR4d10App:
         elif (
             self.services is not None
             and event.control == Control.PTT
+            and event.active is True
+            and not menu_open
+            and selected_service == "PLAYER"
+            and self.services.active_service in MEDIATHEK_SERVICE_IDS
+        ):
+            media_result = self.services.control(
+                {"action": "mediathek_favorite_toggle"}
+            )
+        elif (
+            self.services is not None
+            and event.control == Control.PTT
             and not menu_open
             and selected_service == "RADIO"
         ):
@@ -788,6 +859,14 @@ class OpenR4d10App:
                 Control.RIGHT_PRESS,
             }
         )
+        mediathek_seek_event = (
+            selected_service == "PLAYER"
+            and not menu_open
+            and self.services is not None
+            and self.services.active_service in MEDIATHEK_SERVICE_IDS
+            and event.control == Control.LEFT_INNER
+            and media_result is not None
+        )
         state_only_handler = getattr(self.display, "apply_input_state", None)
         service_navigation_event = (
             event.control == Control.RIGHT_INNER
@@ -809,7 +888,7 @@ class OpenR4d10App:
                     recording=recording_state.get("state") == "recording",
                     continuous=recording_state.get("continuous") is True,
                 )
-        elif recorder_semantic_event:
+        elif recorder_semantic_event or mediathek_seek_event:
             # The service result is authoritative.  A presentation-only
             # apply_input() here would transfer one stale full frame before the
             # resolved recorder frame and doubles cursor latency.
@@ -834,6 +913,7 @@ class OpenR4d10App:
         service_changed = new_service != selected_service
         if self.services is not None and service_changed:
             if selected_service == "PLAYER":
+                self._cancel_mediathek_seek_timer()
                 self._clear_device_video_frame()
             if selected_service == "DMR":
                 self._ptt_pressed_at = None
@@ -1012,6 +1092,7 @@ class OpenR4d10App:
 
     def close(self) -> None:
         self._cancel_dmr_hold_timer()
+        self._cancel_mediathek_seek_timer()
         close_display = getattr(self.display, "close", None)
         if callable(close_display):
             close_display()

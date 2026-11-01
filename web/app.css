@@ -337,6 +337,7 @@ kbd { display: inline-block; min-width: 24px; padding: 3px 6px; border: 1px soli
   font-weight: 800;
 }
 .station-library-tabs button span:last-child { font-variant-numeric: tabular-nums; }
+.mediathek-library-tabs { grid-template-columns: repeat(3, 1fr); margin-bottom: 14px; }
 .station-library-panel[hidden] { display: none; }
 .station-library-panel .services-note { margin: 12px 2px 0; }
 .station-list-scroll { max-height: 620px; overflow: auto; padding-right: 3px; }

@@ -84,6 +84,9 @@ class PlaybackState:
     volume: int = 30
     paused: bool = False
     error: str | None = None
+    position_seconds: float | None = None
+    duration_seconds: float | None = None
+    buffered_until_seconds: float | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -120,6 +123,7 @@ class MpvEngine:
         self._stale_video_capture_paths: set[Path] = set()
         self._video_capture_pending = False
         self._video_capture_started_at = 0.0
+        self._metrics_updated_at = 0.0
 
     def _new_video_capture_path(self) -> Path:
         return self.runtime_directory / (
@@ -135,6 +139,10 @@ class MpvEngine:
             "--vo=null",
             "--vo-null-fps=25",
             "--video-sync=audio",
+            "--cache=auto",
+            "--cache-secs=5",
+            "--cache-pause=yes",
+            "--cache-pause-wait=1",
             "--screenshot-sw=yes",
             "--screenshot-high-bit-depth=no",
             "--screenshot-jpeg-quality=45",
@@ -457,6 +465,7 @@ class MpvEngine:
             raise ValueError("video_enabled must be a boolean")
         approved = validate_media_source(source, self.media_roots)
         self._reset_video_capture()
+        self._reset_playback_metrics()
         with self._lock:
             try:
                 self._command(
@@ -487,6 +496,7 @@ class MpvEngine:
             raise ValueError("start position must be a finite number")
         approved = validate_media_source(source, self.media_roots)
         self._reset_video_capture()
+        self._reset_playback_metrics()
         position = max(0.0, float(start_seconds))
         with self._lock:
             try:
@@ -525,6 +535,7 @@ class MpvEngine:
             raise ValueError("playlist requires at least one media source")
         approved = [validate_media_source(item, self.media_roots) for item in sources]
         self._reset_video_capture()
+        self._reset_playback_metrics()
         with self._lock:
             try:
                 response = self._command(["loadfile", approved[0], "replace"])
@@ -578,7 +589,88 @@ class MpvEngine:
         position = max(0.0, float(seconds))
         with self._lock:
             self._command(["seek", position, "absolute", "exact"])
+            self.state.position_seconds = position
+            self._metrics_updated_at = 0.0
             return self.state.as_dict()
+
+    def seek_relative(self, seconds: float) -> dict[str, Any]:
+        """Seek the active A/V clock once without reloading its source."""
+
+        if (
+            isinstance(seconds, bool)
+            or not isinstance(seconds, (int, float))
+            or not math.isfinite(float(seconds))
+            or float(seconds) == 0.0
+        ):
+            raise ValueError("relative seek must be a finite non-zero number")
+        offset = float(seconds)
+        with self._lock:
+            self._command(["seek", offset, "relative", "exact"])
+            if self.state.position_seconds is not None:
+                self.state.position_seconds = max(
+                    0.0,
+                    self.state.position_seconds + offset,
+                )
+            self._metrics_updated_at = 0.0
+            return self.state.as_dict()
+
+    @staticmethod
+    def _finite_nonnegative(value: object) -> float | None:
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
+        ):
+            return None
+        return max(0.0, float(value))
+
+    def _reset_playback_metrics(self) -> None:
+        self.state.position_seconds = None
+        self.state.duration_seconds = None
+        self.state.buffered_until_seconds = None
+        self._metrics_updated_at = 0.0
+
+    def playback_metrics(self, *, max_age_seconds: float = 0.25) -> dict[str, float | None]:
+        """Return bounded real mpv clock/cache values with a short IPC cache."""
+
+        now = time.monotonic()
+        if now - self._metrics_updated_at >= max(0.0, max_age_seconds):
+            with self._lock:
+                try:
+                    position = self._finite_nonnegative(
+                        self._command(["get_property", "time-pos"]).get("data")
+                    )
+                    duration = self._finite_nonnegative(
+                        self._command(["get_property", "duration"]).get("data")
+                    )
+                    buffered = self._finite_nonnegative(
+                        self._command(
+                            ["get_property", "demuxer-cache-duration"]
+                        ).get("data")
+                    )
+                except (OSError, json.JSONDecodeError, MediaError):
+                    position = self.state.position_seconds
+                    duration = self.state.duration_seconds
+                    buffered = None
+                if position is not None:
+                    self.state.position_seconds = position
+                if duration is not None:
+                    self.state.duration_seconds = duration
+                self.state.buffered_until_seconds = (
+                    min(duration, position + buffered)
+                    if position is not None
+                    and duration is not None
+                    and buffered is not None
+                    else position + buffered
+                    if position is not None and buffered is not None
+                    else None
+                )
+                self._metrics_updated_at = now
+        return {
+            "position_seconds": self.state.position_seconds,
+            "duration_seconds": self.state.duration_seconds,
+            "buffered_until_seconds": self.state.buffered_until_seconds,
+        }
 
     def position_seconds(self) -> float | None:
         try:
@@ -599,6 +691,7 @@ class MpvEngine:
 
     def stop(self) -> dict[str, Any]:
         self._reset_video_capture()
+        self._reset_playback_metrics()
         with self._lock:
             if self._process is not None and self._process.poll() is None:
                 self._command(["stop"])

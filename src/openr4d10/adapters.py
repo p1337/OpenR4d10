@@ -30,6 +30,7 @@ from .device_ui import (
     image_region_to_rgb565,
     image_to_rgb565,
     render_device_ui,
+    render_video_progress_overlay,
 )
 from .input_events import Control, InputEvent
 from .models import Frame
@@ -401,6 +402,30 @@ class WhisplayDisplay:
         with self._lock:
             self._video_frame = frame
 
+    def set_playback_metrics(self, metrics: Mapping[str, object]) -> None:
+        """Update compositor-only mpv timing without a full panel redraw."""
+
+        with self._lock:
+            for key, attribute in (
+                ("position_seconds", "playback_position_seconds"),
+                ("duration_seconds", "playback_duration_seconds"),
+                ("buffered_until_seconds", "playback_buffered_until_seconds"),
+            ):
+                value = metrics.get(key)
+                setattr(
+                    self.state,
+                    attribute,
+                    max(0.0, float(value))
+                    if isinstance(value, (int, float)) and not isinstance(value, bool)
+                    else None,
+                )
+            pending = metrics.get("seek_pending_seconds")
+            self.state.mediathek_seek_pending_seconds = (
+                int(pending)
+                if isinstance(pending, int) and not isinstance(pending, bool)
+                else 0
+            )
+
     @staticmethod
     def _decode_video_frame(payload: bytes) -> Image.Image:
         if not isinstance(payload, bytes) or not 4 <= len(payload) <= 4 * 1024 * 1024:
@@ -435,6 +460,7 @@ class WhisplayDisplay:
                 method=Image.Resampling.BILINEAR,
                 centering=(0.5, 0.5),
             )
+            region = render_video_progress_overlay(region, self.state)
             show_region = getattr(self.panel, "show_region", None)
             if not callable(show_region):
                 image = self._last_image.copy() if self._last_image is not None else self._render_image()

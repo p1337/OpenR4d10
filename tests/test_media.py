@@ -79,12 +79,36 @@ class ProcessBoundaryTests(unittest.TestCase):
         self.assertIn("--vo=null", command)
         self.assertIn("--vo-null-fps=25", command)
         self.assertIn("--video-sync=audio", command)
+        self.assertIn("--cache=auto", command)
+        self.assertIn("--cache-secs=5", command)
         self.assertIn("--screenshot-sw=yes", command)
         self.assertIn("--screenshot-jpeg-quality=45", command)
         self.assertIn(
             "--user-agent=OpenR4d10 (+https://github.com/p1337/OpenR4d10)",
             command,
         )
+
+    def test_relative_seek_is_one_central_mpv_command(self) -> None:
+        engine = MpvEngine(Path("/usr/bin/mpv"))
+        engine._command = Mock(return_value={})  # type: ignore[method-assign]
+        engine.state.position_seconds = 40.0
+
+        engine.seek_relative(75)
+
+        engine._command.assert_called_once_with(["seek", 75.0, "relative", "exact"])
+        self.assertEqual(engine.state.position_seconds, 115.0)
+
+    def test_playback_metrics_report_real_buffer_endpoint(self) -> None:
+        engine = MpvEngine(Path("/usr/bin/mpv"))
+        engine._command = Mock(  # type: ignore[method-assign]
+            side_effect=[{"data": 20.0}, {"data": 120.0}, {"data": 5.0}]
+        )
+
+        metrics = engine.playback_metrics(max_age_seconds=0)
+
+        self.assertEqual(metrics["position_seconds"], 20.0)
+        self.assertEqual(metrics["duration_seconds"], 120.0)
+        self.assertEqual(metrics["buffered_until_seconds"], 25.0)
 
     def test_video_frame_uses_one_nonblocking_runtime_screenshot(self) -> None:
         class Ipc:

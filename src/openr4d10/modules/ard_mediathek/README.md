@@ -15,3 +15,7 @@ und Podcasts. Nur der Video-Modus übergibt dessen synchrones aktuelles Bild mit
 höchstens 25 FPS als begrenztes Teilflächenupdate an das Whisplay; normale
 Vollbilder bleiben bei 10 FPS. Der vollständige Senderkatalog und seine
 Grenzen stehen in `docs/MEDIATHEK.md`.
+
+Der zentrale Geräteplayer unterstützt einen entprellten Suchlauf ausschließlich
+über den unteren linken Encoder, echten mpv-Pufferfortschritt sowie den
+gemeinsamen persistenten Verlauf und Favoritenstellen aller Mediatheken.
