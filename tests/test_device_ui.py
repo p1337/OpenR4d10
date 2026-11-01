@@ -477,6 +477,7 @@ class DeviceUiTests(unittest.TestCase):
         image = render_device_ui(state)
         self.assertNotEqual(image.getpixel((7, 180)), (6, 12, 15))
         self.assertNotEqual(image.getpixel((120, 71)), (6, 12, 15))
+        self.assertNotEqual(image.getpixel((0, 180)), state.accent)
 
     def test_play_control_is_below_battery_and_footer_is_empty(self) -> None:
         state = DeviceUiState(playing=True, service_index=1)

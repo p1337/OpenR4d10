@@ -1417,7 +1417,6 @@ def render_device_ui(
     draw = ImageDraw.Draw(image)
 
     if state.service in {"SYSTEM", "REC"}:
-        draw.rectangle((0, content_top, 3, HEIGHT - 1), fill=accent)
         heading_font = _font(19, bold=True)
         body_font = _font(13, bold=True)
         small_font = _font(10)

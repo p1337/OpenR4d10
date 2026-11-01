@@ -2910,6 +2910,9 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Statusleiste und vor dem dienstspezifischen Inhalt komponiert. Recorder,
   Systemansicht und jeder zukünftig registrierte Plugin-Dienst erhalten ihn
   dadurch automatisch und dürfen ihn weder selbst nachbauen noch auslassen.
+- Der frühere harte linke Akzentstreifen im gemeinsamen `SYSTEM`-/`REC`-
+  Sonderzweig wird entfernt. Er war ein dienstspezifischer Rahmenrest und darf
+  nicht zusätzlich über dem zentralen weichen Glow liegen.
 - Nur Vollbildzustände, die ausdrücklich keine normale Dienstansicht sind,
   bleiben ohne Player-Glow: geöffnete Gerätemenüs sowie die WLAN-Hotspot-
   Einrichtung. Deren eigene klare Navigationsmarkierung bleibt unverändert.
