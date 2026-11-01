@@ -73,8 +73,10 @@ the installer report exactly which adapters still need configuration.
   VoiceRecorder immediately stops radio, podcasts/local media, Ambient layers
   and BrandMeister; the two left axes provide 0.1-second fine seek and
   start/end jumps, the upper right axis seeks by one second, and the right
-  press plays or pauses from the cursor; recording from an earlier cursor
-  replaces only the covered interval and preserves the untouched tail;
+  press plays or pauses from the cursor; pressing Play at the exact end rewinds
+  once to zero and starts from the beginning without enabling a loop;
+  recording from an earlier cursor replaces only the covered interval and
+  preserves the untouched tail;
   recorder playback is fixed at 100% and restores the prior service volume on exit
 - collision-free VoiceRecorder header: the start/end axis is labelled
   `MIN/MAX`, while its yellow `↔` value and the 0.1-second `±` value share a

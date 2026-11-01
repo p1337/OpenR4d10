@@ -1892,7 +1892,15 @@ class ServiceCatalog:
             if not isinstance(path, Path):
                 raise ValueError("record something before playback")
             voice = self.recorder.voice_snapshot()
-            start_seconds = int(voice.get("position_ms") or 0) / 1000.0
+            position_ms = int(voice.get("position_ms") or 0)
+            duration_ms = int(voice.get("duration_ms") or 0)
+            if duration_ms > 0 and position_ms >= duration_ms:
+                boundary = getattr(self.recorder, "voice_boundary", None)
+                if not callable(boundary):
+                    raise RuntimeError("voice recording navigation is unavailable")
+                voice = boundary(end=False)
+                position_ms = int(voice.get("position_ms") or 0)
+            start_seconds = position_ms / 1000.0
             load_at = getattr(self.player, "load_at", None)
             if callable(load_at):
                 load_at(str(path), start_seconds)

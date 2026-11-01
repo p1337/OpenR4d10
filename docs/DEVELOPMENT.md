@@ -80,6 +80,9 @@ of the single mpv `loadfile` command and that consecutive 10 Hz mpv positions
 advance the white playhead. Never reintroduce a separate seek immediately after
 an asynchronous load, and never persist every live 100 ms position sample to
 `edit.json`; only pause, stop and explicit navigation are persistence points.
+They must additionally prove that Play at a non-empty recording's exact end
+persists cursor zero and loads from zero, while a cursor before the end remains
+unchanged. This is an explicit replay action, never an automatic loop.
 
 The real-device performance gate measures semantic control, renderer/RGB565,
 SPI presentation and browser preview separately. Normal full-frame starts are

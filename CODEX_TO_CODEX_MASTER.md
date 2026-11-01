@@ -3370,3 +3370,18 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   vorhandenen ffmpeg-Prozessrand mit dem Concat-Demuxer und Stream-Copy; das
   Ergebnis ist eine einzige zusammenhängend dekodierbare MP3. Rohes
   Byte-Anhängen von Sprachsegmenten ist verboten.
+
+### 2026-11-01 – Recorder-Play am Dateiende startet wieder von vorn
+
+- Nach einer Aufnahme steht der sichtbare Recorder-Cursor absichtlich exakt am
+  Ende der Arbeitsdatei. Ein rechter Kurzdruck beziehungsweise Enter darf diese
+  Endposition nicht als mpv-Startzeit übernehmen, weil die Datei dann sofort
+  EOF erreicht und kein Ton hörbar wird.
+- Startet der Benutzer die Wiedergabe bei `position_ms >= duration_ms` und ist
+  die Aufnahme nicht leer, setzt derselbe vorhandene Recorderpfad den Cursor
+  zuerst persistent auf 0 und lädt anschließend dieselbe Arbeitsdatei atomar
+  ab dem Anfang. An jeder echten Position vor dem Ende wird weiterhin genau ab
+  dem sichtbaren Cursor abgespielt.
+- Diese Rückkehr zum Anfang ist kein Loop: Nach dem nächsten natürlichen
+  Dateiende bleibt die Wiedergabe wie bisher beendet. Erneutes Enter startet
+  nur auf ausdrücklichen Benutzerwunsch wieder bei 0.

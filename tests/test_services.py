@@ -1458,6 +1458,153 @@ class ServiceCatalogTests(unittest.TestCase):
         self.assertFalse(catalog._voice_playback_active)
         self.assertEqual(catalog.recorder.followed_positions, [])  # type: ignore[attr-defined]
 
+    def test_voice_play_at_end_rewinds_once_and_starts_real_audio_at_zero(self) -> None:
+        class State:
+            state = "stopped"
+            volume = 100
+            paused = False
+            error = None
+
+            def as_dict(self):
+                return {
+                    "state": self.state,
+                    "volume": self.volume,
+                    "paused": self.paused,
+                    "error": self.error,
+                }
+
+        class Player:
+            def __init__(self):
+                self.state = State()
+                self.loads = []
+
+            def load_at(self, path, start_seconds):
+                self.loads.append((path, start_seconds))
+                self.state.state = "playing"
+                return self.state.as_dict()
+
+            def close(self):
+                pass
+
+        class Recorder:
+            def __init__(self, path):
+                self.state = State()
+                self.path = path
+                self.position_ms = 5000
+                self.boundaries = []
+
+            def voice_playback_path(self):
+                return self.path
+
+            def voice_snapshot(self):
+                return {
+                    "state": "paused",
+                    "session_active": True,
+                    "position_ms": self.position_ms,
+                    "duration_ms": 5000,
+                    "timeline": [],
+                }
+
+            def voice_boundary(self, *, end):
+                self.boundaries.append(end)
+                self.position_ms = 5000 if end else 0
+                return self.voice_snapshot()
+
+            def close(self):
+                pass
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            voice = root / "media" / "VoiceRecorder" / "working.mp3"
+            voice.parent.mkdir(parents=True)
+            voice.write_bytes(b"voice")
+            player = Player()
+            recorder = Recorder(voice)
+            catalog = ServiceCatalog(
+                root,
+                player=player,  # type: ignore[arg-type]
+                recorder=recorder,  # type: ignore[arg-type]
+            )
+            catalog.active_service = "recorder"
+            try:
+                result = catalog.control({"action": "voice_recorder_play_toggle"})
+            finally:
+                catalog.close()
+
+        self.assertEqual(recorder.boundaries, [False])
+        self.assertEqual(recorder.position_ms, 0)
+        self.assertEqual(player.loads, [(str(voice), 0.0)])
+        self.assertEqual(result["playback"]["state"], "playing")
+
+    def test_voice_play_before_end_keeps_the_visible_cursor(self) -> None:
+        class State:
+            state = "stopped"
+            volume = 100
+            paused = False
+            error = None
+
+            def as_dict(self):
+                return {"state": self.state, "volume": self.volume}
+
+        class Player:
+            def __init__(self):
+                self.state = State()
+                self.loads = []
+
+            def load_at(self, path, start_seconds):
+                self.loads.append((path, start_seconds))
+                self.state.state = "playing"
+                return self.state.as_dict()
+
+            def close(self):
+                pass
+
+        class Recorder:
+            def __init__(self, path):
+                self.state = State()
+                self.path = path
+                self.boundaries = []
+
+            def voice_playback_path(self):
+                return self.path
+
+            def voice_snapshot(self):
+                return {
+                    "state": "paused",
+                    "session_active": True,
+                    "position_ms": 2400,
+                    "duration_ms": 5000,
+                    "timeline": [],
+                }
+
+            def voice_boundary(self, *, end):
+                self.boundaries.append(end)
+                return self.voice_snapshot()
+
+            def close(self):
+                pass
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            voice = root / "media" / "VoiceRecorder" / "working.mp3"
+            voice.parent.mkdir(parents=True)
+            voice.write_bytes(b"voice")
+            player = Player()
+            recorder = Recorder(voice)
+            catalog = ServiceCatalog(
+                root,
+                player=player,  # type: ignore[arg-type]
+                recorder=recorder,  # type: ignore[arg-type]
+            )
+            catalog.active_service = "recorder"
+            try:
+                catalog.control({"action": "voice_recorder_play_toggle"})
+            finally:
+                catalog.close()
+
+        self.assertEqual(recorder.boundaries, [])
+        self.assertEqual(player.loads, [(str(voice), 2.4)])
+
     def test_voice_recorder_open_stops_playback_and_uses_one_resumable_session(self) -> None:
         class State:
             volume = 30

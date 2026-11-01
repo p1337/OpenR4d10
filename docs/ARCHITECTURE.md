@@ -268,9 +268,12 @@ and the ICY radio buffer. Its pending directory contains an atomically updated
 edit manifest plus one working MP3. The logical cursor is moved in one-second
 steps by `right_outer`, in 0.1-second fine steps by `left_outer`, or directly
 to start/end by `left_inner`; `right_press` uses exact absolute mpv seek and
-toggles playback from that cursor. A later PTT capture uses ffmpeg through an
-argument-only boundary to splice the new stereo segment over the covered
-interval while preserving the prefix and any unreached suffix. The manifest
+toggles playback from that cursor. If the cursor is exactly at or beyond the
+non-empty working file's end, that explicit Play action first persists cursor
+zero and starts from the beginning; it does not enable looping. A later PTT
+capture uses ffmpeg through an argument-only boundary to splice the new stereo
+segment over the covered interval while preserving the prefix and any
+unreached suffix. The manifest
 and captured segment remain recoverable until the working MP3 is replaced.
 Leaving the service finalizes that working file in the fixed
 `Media/VoiceRecorder/JJMMTT` tree. Recorder playback temporarily owns a fixed
