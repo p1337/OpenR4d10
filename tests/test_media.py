@@ -120,7 +120,11 @@ class ProcessBoundaryTests(unittest.TestCase):
 
         self.assertEqual(
             commands,
-            [["loadfile", str(voice), "replace", -1, {"start": "1.235"}]],
+            [
+                ["set_property", "loop-playlist", "no"],
+                ["loadfile", str(voice), "replace", -1, {"start": "1.235"}],
+                ["set_property", "pause", False],
+            ],
         )
         self.assertEqual(state["state"], "playing")
         self.assertFalse(state["paused"])

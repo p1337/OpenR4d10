@@ -250,7 +250,9 @@ class MpvEngine:
         approved = validate_media_source(source, self.media_roots)
         with self._lock:
             try:
+                self._command(["set_property", "loop-playlist", "no"])
                 self._command(["loadfile", approved, "replace"])
+                self._command(["set_property", "pause", False])
             except (OSError, json.JSONDecodeError, MediaError) as exc:
                 self.state.state = "error"
                 self.state.error = str(exc)
@@ -274,6 +276,7 @@ class MpvEngine:
         position = max(0.0, float(start_seconds))
         with self._lock:
             try:
+                self._command(["set_property", "loop-playlist", "no"])
                 self._events.clear()
                 self._command(
                     [
@@ -284,6 +287,7 @@ class MpvEngine:
                         {"start": f"{position:.3f}"},
                     ]
                 )
+                self._command(["set_property", "pause", False])
                 self._wait_for_audio_start()
             except (OSError, json.JSONDecodeError, MediaError) as exc:
                 self.state.state = "error"
@@ -313,6 +317,7 @@ class MpvEngine:
                 if shuffle and len(approved) > 1:
                     self._command(["playlist-shuffle"])
                 self._command(["set_property", "loop-playlist", "inf" if loop else "no"])
+                self._command(["set_property", "pause", False])
             except (OSError, json.JSONDecodeError, MediaError) as exc:
                 self.state.state = "error"
                 self.state.error = str(exc)

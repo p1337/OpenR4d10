@@ -3346,3 +3346,11 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Abnahme. Radio auf demselben zentralen Player öffnet den Whisplay-ALSA-Pfad
   bereits korrekt; eine Abweichung ist deshalb im Recorder-Datei-/Ladepfad zu
   beheben und nicht mit einem zweiten Player zu umgehen.
+- Die reale Abnahme von 0.10.80 zeigte zusätzlich, dass mpv globale
+  Wiedergabeeigenschaften dienstübergreifend beibehält: `pause=yes` aus einer
+  vorherigen Wiedergabe kann eine neu geladene Sprachaufnahme bei 0,0 Sekunden
+  festhalten, und `loop-playlist=inf` aus AmbientR4D10 kann dieselbe Aufnahme
+  nach dem Ende ungewollt wieder von vorn starten. Vor jedem Einzeldatei-Load
+  werden daher die echten mpv-Eigenschaften `pause=no` und
+  `loop-playlist=no` gesetzt. Interne Python-Flags allein reichen nicht; sie
+  dürfen niemals vom tatsächlichen mpv-Zustand abweichen.
