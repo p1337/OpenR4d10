@@ -53,7 +53,10 @@ use the same renderer and fall back to English for unknown language codes.
 Header tests additionally compare the visible bounding-box top of every
 localized control label with its associated value; a fixed origin offset is
 insufficient because the two font sizes have different metrics. They also
-require the mirrored right-side order and one common right label edge.
+require the mirrored right-side order and one common right label edge. The
+VoiceRecorder additionally uses `MIN/MAX` for its boundary axis and one fixed
+x=84 value column for both yellow left-axis values; tests measure a minimum
+six-pixel clearance from each label.
 
 Recorder performance regressions must prove that a PTT press/release does not
 call the normal display snapshot, `apply_input()` redraw or `render_once()`
@@ -63,6 +66,24 @@ after dense waveform bars, live elapsed position, file-probed segment duration
 and the verified four-core split: background `{0,1}`, UI `{2}`, input `{3}`.
 Do not move telemetry or remote artwork lookup back into the 5 Hz recorder
 frame path.
+
+## Release gate and device provenance
+
+Local tests are necessary but never sufficient for a Pi release. After every
+push, the GitHub Actions run for that exact commit SHA must finish successfully
+for every configured Python version before the web updater or bootstrap is run
+on the device. A failed, cancelled, skipped or still-running workflow blocks
+deployment. Do not infer portability from a green Windows run: the physical
+renderer deliberately uses Linux DejaVu font metrics, which can change fitted
+text compared with Pillow's Windows fallback.
+
+The device receives source only through the fixed GitHub `main` bootstrap and
+the archive it downloads. Never edit files below `/opt/openr4d10/current`, a
+release directory, `/usr/local/bin`, `/usr/local/sbin` or the installed systemd
+units to repair an application defect. Fix, test, commit and push the source;
+wait for the exact GitHub commit to turn green; only then deploy it. Runtime
+configuration under `/etc/openr4d10` and persistent state below
+`/var/lib/openr4d10` remain device-owned and are not source patches.
 
 The normal `run` command also creates a migrated non-secret state database in
 the configured state directory. Tests must always point this at a temporary

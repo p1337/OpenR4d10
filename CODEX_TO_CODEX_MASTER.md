@@ -3187,3 +3187,19 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   aufgenommen. Die fünf Streams wurden am realen Pi mit `ffprobe` als
   dekodierbares MP3 beziehungsweise AAC geprüft; offizielle Senderseiten
   dokumentieren die verantwortlichen Player beziehungsweise Direktstreams.
+
+### 2026-11-01 – Kollisionsfreier Recorder-Funktionskopf und grüne Release-Schranke
+
+- Im Funktionskopf der Sprachaufzeichnung heißt die Grenzsprung-Achse nicht
+  mehr das unklare `RAND`, sondern eindeutig `MIN/MAX`. Diese mathematisch
+  verständliche Kurzform gilt in allen Gerätesprachen.
+- Die gelben Recorderwerte `±` für die 0,1-Sekunden-Feinbewegung und `↔` für
+  den Sprung zu Minimum/Maximum verwenden links eine gemeinsame feste, weiter
+  rechts liegende Wertspalte. Sie dürfen weder `0.1` noch `MIN/MAX` berühren
+  oder überlagern und müssen untereinander exakt ausgerichtet bleiben.
+- Ein Pi-Update darf nicht mehr als fertig oder freigegeben gelten, solange
+  der GitHub-Actions-Lauf des exakt auszuliefernden Commits rot, abgebrochen
+  oder noch nicht abgeschlossen ist. Lokale Tests ergänzen diese Schranke,
+  ersetzen sie aber nicht. Der Pi erhält weiterhin ausschließlich das feste
+  GitHub-Archiv über `bootstrap.sh`; direkte Quellcodeänderungen unter
+  `/opt/openr4d10` oder an installierten Helfern sind verboten.

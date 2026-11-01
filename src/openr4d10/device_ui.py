@@ -42,7 +42,7 @@ DISPLAY_TEXT = {
     "en": {
         "controls": ("VOL", "SQL", "CH", "SRV"),
         "dmr_controls": ("VOL", "JMP", "TG", "SRV"),
-        "rec_controls": ("0.1", "EDGE", "1S", "SRV"),
+        "rec_controls": ("0.1", "MIN/MAX", "1S", "SRV"),
         "dmr_on": "ON",
         "dmr_off": "OFF",
         "menu": "MENU",
@@ -99,7 +99,7 @@ DISPLAY_TEXT = {
     "de": {
         "controls": ("LAU", "SQL", "KAN", "DST"),
         "dmr_controls": ("LAU", "SPR", "TG", "DST"),
-        "rec_controls": ("0.1", "RAND", "1S", "DST"),
+        "rec_controls": ("0.1", "MIN/MAX", "1S", "DST"),
         "dmr_on": "AN",
         "dmr_off": "AUS",
         "menu": "MENÜ",
@@ -156,7 +156,7 @@ DISPLAY_TEXT = {
     "pl": {
         "controls": ("GŁO", "SQL", "KAN", "USŁ"),
         "dmr_controls": ("GŁO", "SKK", "TG", "USŁ"),
-        "rec_controls": ("0.1", "KR", "1S", "USŁ"),
+        "rec_controls": ("0.1", "MIN/MAX", "1S", "USŁ"),
         "dmr_on": "WŁ",
         "dmr_off": "WYŁ",
         "menu": "MENU",
@@ -213,7 +213,7 @@ DISPLAY_TEXT = {
     "fr": {
         "controls": ("VOL", "SQL", "CAN", "SRV"),
         "dmr_controls": ("VOL", "SAU", "TG", "SRV"),
-        "rec_controls": ("0.1", "BORD", "1S", "SRV"),
+        "rec_controls": ("0.1", "MIN/MAX", "1S", "SRV"),
         "dmr_on": "ON",
         "dmr_off": "OFF",
         "menu": "MENU",
@@ -270,7 +270,7 @@ DISPLAY_TEXT = {
     "es": {
         "controls": ("VOL", "SQL", "CAN", "SRV"),
         "dmr_controls": ("VOL", "SAL", "TG", "SRV"),
-        "rec_controls": ("0.1", "BOR", "1S", "SRV"),
+        "rec_controls": ("0.1", "MIN/MAX", "1S", "SRV"),
         "dmr_on": "ON",
         "dmr_off": "OFF",
         "menu": "MENÚ",
@@ -960,6 +960,7 @@ def _control_value(
     *,
     mirrored: bool = False,
     label_offset_x: int = 0,
+    value_offset_x: int | None = None,
 ) -> None:
     # The physical 240 px panel needs the reviewed 1.2x larger header controls.
     small = _font(12, bold=True)
@@ -972,7 +973,7 @@ def _control_value(
         label_x = x + 90 - label_box[2]
     else:
         label_x = x + label_offset_x
-        value_x = x + 34
+        value_x = x + (34 if value_offset_x is None else value_offset_x)
     draw.text(
         (label_x, glyph_top - label_box[1]),
         label,
@@ -1527,6 +1528,7 @@ def render_device_ui(
         "±" if state.service == "REC" else f"{state.volume}%",
         accent,
         label_offset_x=3,
+        value_offset_x=65 if state.service == "REC" else None,
     )
     _control_value(
         draw,
@@ -1536,6 +1538,7 @@ def render_device_ui(
         "25" if state.service == "DMR" else "↔" if state.service == "REC" else str(state.squelch),
         accent,
         label_offset_x=3,
+        value_offset_x=65 if state.service == "REC" else None,
     )
     _control_value(
         draw,

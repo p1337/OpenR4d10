@@ -235,6 +235,32 @@ class DeviceUiTests(unittest.TestCase):
             render_device_ui(state)
         self.assertIn("PLAY", labels)
 
+    def test_recorder_header_uses_min_max_and_a_non_overlapping_value_column(self) -> None:
+        positions = {}
+        original_text = ImageDraw.ImageDraw.text
+
+        def capture_text(draw, xy, text, *args, **kwargs):
+            positions.setdefault(str(text), (xy, kwargs.get("font")))
+            return original_text(draw, xy, text, *args, **kwargs)
+
+        state = DeviceUiState(
+            service_index=SERVICES.index("REC"),
+            language="de",
+        )
+        with patch.object(ImageDraw.ImageDraw, "text", new=capture_text):
+            render_device_ui(state)
+
+        measure = ImageDraw.Draw(Image.new("RGB", (120, 40)))
+        self.assertIn("MIN/MAX", positions)
+        self.assertNotIn("RAND", positions)
+        self.assertEqual(positions["±"][0][0], 84)
+        self.assertEqual(positions["↔"][0][0], 84)
+        for label, value in (("0.1", "±"), ("MIN/MAX", "↔")):
+            label_xy, label_font = positions[label]
+            value_xy, _ = positions[value]
+            label_right = measure.textbbox(label_xy, label, font=label_font)[2]
+            self.assertLessEqual(label_right + 6, value_xy[0])
+
     def test_dmr_view_pins_active_call_above_scrollable_catalog_rows(self) -> None:
         state = DeviceUiState(
             service_index=SERVICES.index("DMR"),
@@ -276,7 +302,7 @@ class DeviceUiTests(unittest.TestCase):
         self.assertIn("TG 262", drawn)
         self.assertTrue(any("DL1TEST" in value for value in drawn))
         self.assertIn("TG 91  Worldwide", drawn)
-        self.assertIn("TG 3100  Inactive example", drawn)
+        self.assertTrue(any(value.startswith("TG 3100  Inactive exa") for value in drawn))
         self.assertIn("2/1700", drawn)
         self.assertIn("ON", drawn)
         self.assertIn("OFF", drawn)
@@ -720,7 +746,7 @@ class DeviceUiTests(unittest.TestCase):
         self.assertEqual(state.squelch, 5)
         drawn = self._drawn_text(state)
         self.assertIn("KLANGLAGEN", drawn)
-        self.assertIn("Streuobstwiese & Vögel", drawn)
+        self.assertTrue(any(value.startswith("Streuobstwiese & ") for value in drawn))
         self.assertIn("30%", drawn)
         self.assertIn("Mix speichern", drawn)
 

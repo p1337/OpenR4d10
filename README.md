@@ -76,6 +76,9 @@ the installer report exactly which adapters still need configuration.
   press plays or pauses from the cursor; recording from an earlier cursor
   replaces only the covered interval and preserves the untouched tail;
   recorder playback is fixed at 100% and restores the prior service volume on exit
+- collision-free VoiceRecorder header: the start/end axis is labelled
+  `MIN/MAX`, while its yellow `↔` value and the 0.1-second `±` value share a
+  separate right-aligned column instead of touching their labels
 - restored VoiceRecorder startup uses that same exclusive entry lifecycle
   before the web server, boot wait or first recorder frame; rebooting into the
   last `REC` view can therefore never leave BrandMeister or another stream audible
@@ -111,6 +114,8 @@ the installer report exactly which adapters still need configuration.
   the five active TGs to replace;
   no account password or user token
 - standard-library-only test suite and GitHub Actions CI
+- strict release gate: the exact commit must pass GitHub Actions before a Pi
+  update is considered releasable; the device is never patched in place
 
 Project terminology is strict: **PTT always means the separate physical
 Whisplay hardware button on BCM17**. Held Backspace is only its browser
