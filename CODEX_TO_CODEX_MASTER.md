@@ -3473,3 +3473,20 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   auf 100 Millisekunden begrenzten Interaktions-Zeichenpfad wie der Recorder.
   Das Display bleibt damit bei höchstens 10 FPS; eine zweite GPIO-, Eingabe-
   oder Netzwerkabfrageschleife ist verboten.
+
+### 2026-11-01 – Whisplay-Warmup darf keinen systemd-Bootzyklus erzeugen
+
+- Der reale Neustart nach 0.10.89 hat einen zuvor nur auf echter Hardware
+  sichtbaren Ordnungszyklus nachgewiesen: Der Hersteller-Warmup war zugleich
+  von `multi-user.target` gewollt und explizit danach angeordnet, während
+  `openr4d10-audio-max` auf den Warmup und die Hauptanwendung wiederum auf
+  `openr4d10-audio-max` wartete. systemd löschte deshalb die Startjobs für
+  Maximalpegel und Hauptanwendung; das Display blieb in der Bootanimation und
+  der Herstellerwert 80 aktiv.
+- Der vendorte Warmup behält seinen begrenzten Karten-Wartepfad, wird aber nur
+  noch nach `sound.target` und `alsa-restore.service` geordnet. Er darf nicht
+  `After=multi-user.target` enthalten. Danach setzt der versionierte
+  `openr4d10-audio-max` weiterhin 100 und erst danach startet OpenR4d10.
+- Ein Installer-Vertragstest muss diese vollständige Kette prüfen und jede
+  erneute Warmup-Abhängigkeit von `multi-user.target` ablehnen. Ein grüner CI-
+  Stand ohne diese statische Zyklusprüfung reicht nicht als Freigabe.

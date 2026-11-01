@@ -671,7 +671,7 @@ echo "[8/8] Installing boot defaults ..."
 cat >/etc/systemd/system/whisplay-soundcard-warmup.service <<'EOF'
 [Unit]
 Description=Whisplay Sound Card boot setup
-After=sound.target alsa-restore.service multi-user.target
+After=sound.target alsa-restore.service
 
 [Service]
 Type=oneshot

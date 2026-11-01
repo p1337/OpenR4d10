@@ -80,6 +80,20 @@ class InstallerContractTests(unittest.TestCase):
         self.assertIn("ExecStart=/usr/local/sbin/openr4d10-audio-max", audio_service)
         self.assertIn("User=root", audio_service)
         self.assertIn("After=openr4d10-audio-max.service", application_service)
+        vendor_audio_installer = (
+            repository
+            / "vendor"
+            / "pisugar-whisplay"
+            / "audio"
+            / "scripts"
+            / "install.sh"
+        ).read_text(encoding="utf-8")
+        warmup_unit = vendor_audio_installer.split(
+            "cat >/etc/systemd/system/whisplay-soundcard-warmup.service <<'EOF'",
+            1,
+        )[1].split("\nEOF", 1)[0]
+        self.assertIn("After=sound.target alsa-restore.service", warmup_unit)
+        self.assertNotIn("multi-user.target", warmup_unit.split("[Service]", 1)[0])
         self.assertIn("boot/openr4d10-backlight", installer)
         self.assertIn("Backing up persistent OpenR4d10 state before the update", installer)
         self.assertIn("from openr4d10.backup import create_backup", installer)

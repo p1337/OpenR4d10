@@ -325,6 +325,11 @@ bounded mixer change before the unprivileged application starts; it does not
 patch the vendored driver or apply digital gain above unity. On the confirmed
 WM8960 lookup table this moves the output control from raw 118 (about -3 dB) to
 raw 126 (about +5 dB), using the previously unused 8 dB codec-output range.
+The manufacturer warm-up is ordered after `sound.target` and
+`alsa-restore.service`, but never after `multi-user.target`: the maximum-gain
+one-shot waits for that warm-up and the application waits for the one-shot.
+This acyclic order is contract-tested because an earlier circular order caused
+systemd to discard both application start jobs on real hardware.
 
 On 2026-11-01 a one-second target probe captured `whisplaysound` through
 `ffmpeg` at 48 kHz with two channels and encoded a valid MP3 through the

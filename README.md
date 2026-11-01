@@ -63,7 +63,8 @@ the installer report exactly which adapters still need configuration.
   stream recording through shell-free ffmpeg/Opus
 - boot-persistent maximum clean Whisplay speaker gain: the bounded ALSA
   `speaker` control is set to 100 after codec warm-up while digital source gain
-  remains capped at 100 to avoid fabricated overdrive
+  remains capped at 100 to avoid fabricated overdrive; the warm-up/application
+  order is regression-tested against systemd boot cycles
 - bounded RSS/Atom reader and a persistent sortable camera library for
   credential-free Snapshot, MJPEG and RTSP sources with frame limits, image
   validation and safe local JPEG re-encoding
