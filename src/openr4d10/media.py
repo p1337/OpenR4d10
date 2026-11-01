@@ -130,7 +130,7 @@ class MpvEngine:
             _target_path_string(self.executable),
             "--no-config",
             "--idle=yes",
-            "--video=yes",
+            "--video=auto",
             "--vo=null",
             "--vo-null-fps=10",
             "--video-sync=audio",

@@ -34,6 +34,10 @@ Bild. Während Pause bleibt dieses Bild ohne nutzlose 10-Hz-Neuzeichnung stehen;
 die ebenfalls asynchronen mpv-Antworten werden begrenzt und nicht blockierend
 aus dem privaten Steuerkanal entfernt.
 
+Auf Raspberry Pi OS Trixie wird die Videospur mit dem dort tatsächlich
+unterstützten mpv-0.40-Wert `--video=auto` aktiviert. `--video=yes` ist auf
+diesem Ziel ungültig und wird durch einen Vertragstest ausgeschlossen.
+
 ## Katalog und Sender
 
 Der gemeinsame Adapter verwendet die dokumentierte, schlüssellose POST-Abfrage

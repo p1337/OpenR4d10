@@ -3639,3 +3639,9 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   begrenzt und nicht blockierend aus demselben privaten Socket entfernt. Sie
   darf sich bei langer Videowiedergabe niemals bis zu einem vollen Socket-
   Puffer ansammeln und dadurch spätere Nutzereingaben verzögern.
+- Raspberry Pi OS Trixie liefert auf dem realen Zielgerät mpv 0.40. Dessen
+  `--video`-Schalter akzeptiert `auto`, `no` oder eine Spur-ID, aber nicht
+  `yes`. Der zentrale Player muss deshalb `--video=auto` verwenden; ein
+  Vertragstest verbietet das syntaktisch naheliegende, auf dem Pi aber fatal
+  ungültige `--video=yes`. Diese Zielsyntax ist vor jeder Freigabe zusätzlich
+  mit dem wirklich installierten mpv zu prüfen.

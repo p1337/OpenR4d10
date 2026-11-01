@@ -74,6 +74,8 @@ class ProcessBoundaryTests(unittest.TestCase):
         self.assertIn("--audio-device=alsa/whisplaysound", command)
         self.assertIn("--audio-fallback-to-null=no", command)
         self.assertNotIn("--no-video", command)
+        self.assertIn("--video=auto", command)
+        self.assertNotIn("--video=yes", command)
         self.assertIn("--vo=null", command)
         self.assertIn("--vo-null-fps=10", command)
         self.assertIn("--video-sync=audio", command)
