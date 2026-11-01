@@ -253,8 +253,8 @@ class DeviceUiTests(unittest.TestCase):
         measure = ImageDraw.Draw(Image.new("RGB", (120, 40)))
         self.assertIn("MIN/MAX", positions)
         self.assertNotIn("RAND", positions)
-        self.assertEqual(positions["±"][0][0], 84)
-        self.assertEqual(positions["↔"][0][0], 84)
+        self.assertEqual(positions["±"][0][0], 90)
+        self.assertEqual(positions["↔"][0][0], 90)
         for label, value in (("0.1", "±"), ("MIN/MAX", "↔")):
             label_xy, label_font = positions[label]
             value_xy, _ = positions[value]

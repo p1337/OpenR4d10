@@ -1528,7 +1528,7 @@ def render_device_ui(
         "±" if state.service == "REC" else f"{state.volume}%",
         accent,
         label_offset_x=3,
-        value_offset_x=65 if state.service == "REC" else None,
+        value_offset_x=71 if state.service == "REC" else None,
     )
     _control_value(
         draw,
@@ -1538,7 +1538,7 @@ def render_device_ui(
         "25" if state.service == "DMR" else "↔" if state.service == "REC" else str(state.squelch),
         accent,
         label_offset_x=3,
-        value_offset_x=65 if state.service == "REC" else None,
+        value_offset_x=71 if state.service == "REC" else None,
     )
     _control_value(
         draw,

@@ -277,7 +277,7 @@ Leaving the service finalizes that working file in the fixed
 100-percent player level; its entry remembers and its exit restores the prior
 global service volume. The recorder header names the boundary axis `MIN/MAX`.
 Its yellow `↔` value and the fine-seek `±` value share a recorder-only fixed
-column at x=84, leaving at least six pixels after the corresponding label.
+column at x=90, leaving at least six pixels after the corresponding label.
 Normal service headers retain their existing compact value column.
 
 VoiceRecorder PTT edges are a separate latency-critical path inside that same

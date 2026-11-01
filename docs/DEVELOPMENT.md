@@ -55,7 +55,7 @@ localized control label with its associated value; a fixed origin offset is
 insufficient because the two font sizes have different metrics. They also
 require the mirrored right-side order and one common right label edge. The
 VoiceRecorder additionally uses `MIN/MAX` for its boundary axis and one fixed
-x=84 value column for both yellow left-axis values; tests measure a minimum
+x=90 value column for both yellow left-axis values; tests measure a minimum
 six-pixel clearance from each label.
 
 Recorder performance regressions must prove that a PTT press/release does not

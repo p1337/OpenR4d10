@@ -3195,7 +3195,7 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   verständliche Kurzform gilt in allen Gerätesprachen.
 - Die gelben Recorderwerte `±` für die 0,1-Sekunden-Feinbewegung und `↔` für
   den Sprung zu Minimum/Maximum verwenden links eine gemeinsame feste, weiter
-  rechts liegende Wertspalte. Sie dürfen weder `0.1` noch `MIN/MAX` berühren
+  rechts bei x=90 liegende Wertspalte. Sie dürfen weder `0.1` noch `MIN/MAX` berühren
   oder überlagern und müssen untereinander exakt ausgerichtet bleiben.
 - Ein Pi-Update darf nicht mehr als fertig oder freigegeben gelten, solange
   der GitHub-Actions-Lauf des exakt auszuliefernden Commits rot, abgebrochen
