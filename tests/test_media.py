@@ -142,11 +142,11 @@ class ProcessBoundaryTests(unittest.TestCase):
 
     def test_stale_end_file_cannot_stop_newer_playlist_entry(self) -> None:
         engine = MpvEngine(Path("/usr/bin/mpv"))
+        engine._remember_loaded_entry(
+            {"data": {"playlist_entry_id": 22}, "error": "success"}
+        )
         engine.state.state = "playing"
 
-        engine._remember_event(
-            {"event": "start-file", "playlist_entry_id": 22}
-        )
         engine._remember_event(
             {
                 "event": "end-file",
@@ -163,6 +163,12 @@ class ProcessBoundaryTests(unittest.TestCase):
                 for event in engine._events
             )
         )
+
+        engine.state.state = "stopped"
+        engine._remember_event(
+            {"event": "start-file", "playlist_entry_id": 22}
+        )
+        self.assertEqual(engine.state.state, "playing")
 
         engine._remember_event(
             {

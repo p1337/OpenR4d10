@@ -44,7 +44,9 @@ Beim Ersetzen eines laufenden Beitrags ordnet der Player jedes mpv-
 `start-file`/`end-file`-Paar über dessen `playlist_entry_id` zu. Ein verspätetes
 Endereignis der vorherigen Quelle darf dadurch den bereits laufenden neuen
 Beitrag nicht mehr fälschlich als gestoppt melden oder dessen Videotakt
-abschalten.
+abschalten. Die neue ID wird bereits aus der erfolgreichen `loadfile`-Antwort
+übernommen, weil mpv 0.40 diese Antwort vor dem alten Endereignis sendet;
+`start-file` bestätigt anschließend den laufenden Zustand.
 
 Auf Raspberry Pi OS Trixie wird die Videospur mit dem dort tatsächlich
 unterstützten mpv-0.40-Wert `--video=auto` aktiviert. `--video=yes` ist auf

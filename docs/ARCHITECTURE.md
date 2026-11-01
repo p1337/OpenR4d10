@@ -256,7 +256,10 @@ second decoder or synthetic clock. `StreamRecorder` invokes ffmpeg through an ar
 `shell=False` semantics and writes 64-kbit/s Opus below the state directory.
 The engine associates asynchronous `start-file` and `end-file` events by mpv's
 `playlist_entry_id`; an end event from a replaced entry cannot overwrite the
-state of the newer entry that is already playing.
+state of the newer entry that is already playing. The successful `loadfile`
+response publishes the new entry ID before those asynchronous events on mpv
+0.40, so it becomes authoritative immediately; `start-file` then confirms the
+playing state.
 Network URLs are limited to HTTP(S), reject embedded credentials and are
 redacted before appearing in status. Local media must resolve below the
 approved media directory.

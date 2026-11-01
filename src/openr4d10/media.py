@@ -374,6 +374,9 @@ class MpvEngine:
         if name == "start-file":
             if entry_id is not None:
                 self._active_playlist_entry_id = entry_id
+            self.state.state = "playing"
+            self.state.paused = False
+            self.state.error = None
             self._events.append(event)
             return
         if name != "end-file":
@@ -393,6 +396,14 @@ class MpvEngine:
         if reason == "error":
             detail = str(event.get("file_error") or event.get("error") or "unknown")
             self.state.error = f"mpv playback failed: {detail}"
+
+    def _remember_loaded_entry(self, response: dict[str, Any]) -> None:
+        """Adopt the new mpv entry before its asynchronous events arrive."""
+
+        data = response.get("data")
+        entry_id = data.get("playlist_entry_id") if isinstance(data, dict) else None
+        if isinstance(entry_id, int) and not isinstance(entry_id, bool):
+            self._active_playlist_entry_id = entry_id
 
     def _wait_for_audio_start(self) -> None:
         """Wait for decoded output, rejecting delayed local-file failures."""
@@ -452,7 +463,8 @@ class MpvEngine:
                     ["set_property", "vid", "auto" if video_enabled else "no"]
                 )
                 self._command(["set_property", "loop-playlist", "no"])
-                self._command(["loadfile", approved, "replace"])
+                response = self._command(["loadfile", approved, "replace"])
+                self._remember_loaded_entry(response)
                 self._command(["set_property", "pause", False])
             except (OSError, json.JSONDecodeError, MediaError) as exc:
                 self.state.state = "error"
@@ -480,7 +492,7 @@ class MpvEngine:
             try:
                 self._command(["set_property", "loop-playlist", "no"])
                 self._events.clear()
-                self._command(
+                response = self._command(
                     [
                         "loadfile",
                         approved,
@@ -489,6 +501,7 @@ class MpvEngine:
                         {"start": f"{position:.3f}"},
                     ]
                 )
+                self._remember_loaded_entry(response)
                 self._command(["set_property", "pause", False])
                 self._wait_for_audio_start()
             except (OSError, json.JSONDecodeError, MediaError) as exc:
@@ -514,7 +527,8 @@ class MpvEngine:
         self._reset_video_capture()
         with self._lock:
             try:
-                self._command(["loadfile", approved[0], "replace"])
+                response = self._command(["loadfile", approved[0], "replace"])
+                self._remember_loaded_entry(response)
                 for source in approved[1:]:
                     self._command(["loadfile", source, "append"])
                 if shuffle and len(approved) > 1:

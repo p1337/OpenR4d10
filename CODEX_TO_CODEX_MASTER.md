@@ -3679,8 +3679,14 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   `playlist_entry_id`-Werte aus `start-file` und `end-file`. Nur ein
   Endereignis der aktuellsten gestarteten Playlistposition darf den sichtbaren
   Wiedergabezustand beenden; ein Endereignis einer ersetzten älteren Position
-  wird als veraltet verworfen. Für ältere Testdoubles ohne ID bleibt das
-  bisherige Verhalten erhalten.
+  wird als veraltet verworfen. Auf dem realen mpv 0.40 trifft die erfolgreiche
+  `loadfile`-Antwort mit der neuen `playlist_entry_id` vor dem alten
+  `end-file` und dem neuen `start-file` ein. Deshalb übernimmt der Player die
+  neue ID bereits aus dieser Antwort; erst auf `start-file` zu warten ist zu
+  spät. `start-file` stellt den Zustand zusätzlich verbindlich auf `playing`,
+  falls die beiden asynchronen Ereignisse erst nach Rückkehr des Ladebefehls
+  verarbeitet werden. Für ältere Testdoubles ohne ID bleibt das bisherige
+  Verhalten erhalten.
 - Ein Regressionstest muss die reale Reihenfolge „neuer Start, danach altes
   Ende“ abbilden und beweisen, dass der neue Stream weiter als `playing`
   gemeldet wird. Die Abnahme auf dem Pi muss anschließend Status,
