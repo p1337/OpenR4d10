@@ -77,6 +77,12 @@ deployment. Do not infer portability from a green Windows run: the physical
 renderer deliberately uses Linux DejaVu font metrics, which can change fitted
 text compared with Pillow's Windows fallback.
 
+A red workflow is priority one, not a hand-off item. The active development
+task remains unfinished: inspect the failing job and its logs immediately,
+repair the repository, push the correction and repeat until the newest exact
+commit is fully green. Never leave a known red `main` for a later session and
+never report completion while it remains red.
+
 The device receives source only through the fixed GitHub `main` bootstrap and
 the archive it downloads. Never edit files below `/opt/openr4d10/current`, a
 release directory, `/usr/local/bin`, `/usr/local/sbin` or the installed systemd

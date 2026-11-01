@@ -3200,6 +3200,13 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 - Ein Pi-Update darf nicht mehr als fertig oder freigegeben gelten, solange
   der GitHub-Actions-Lauf des exakt auszuliefernden Commits rot, abgebrochen
   oder noch nicht abgeschlossen ist. Lokale Tests ergänzen diese Schranke,
-  ersetzen sie aber nicht. Der Pi erhält weiterhin ausschließlich das feste
-  GitHub-Archiv über `bootstrap.sh`; direkte Quellcodeänderungen unter
-  `/opt/openr4d10` oder an installierten Helfern sind verboten.
+  ersetzen sie aber nicht. **Ein roter Lauf ist immer Priorität 1:** Die
+  arbeitende Codex-Instanz darf die Aufgabe nicht als abgeschlossen melden,
+  den Fehler nicht liegen lassen und nicht auf eine spätere Sitzung
+  verschieben. Sie muss sofort Logs und fehlgeschlagene Schritte untersuchen,
+  die Ursache im Repository beheben, erneut pushen und diesen Zyklus so lange
+  fortsetzen, bis der GitHub-Lauf des neuesten exakten Commits vollständig
+  grün ist. Erst danach darf sie den Pi aktualisieren. Der Pi erhält weiterhin
+  ausschließlich das feste GitHub-Archiv über `bootstrap.sh`; direkte
+  Quellcodeänderungen unter `/opt/openr4d10` oder an installierten Helfern sind
+  verboten.
