@@ -752,6 +752,31 @@ class ServiceCatalogTests(unittest.TestCase):
                         for item in catalog._brandmeister_device_entries(allow_network=False)[2:]
                     )
                 )
+                disabled = catalog.control(
+                    {"action": "brandmeister_toggle_selected"}
+                )
+                self.assertFalse(disabled["enabled"])
+                self.assertEqual(disabled["talkgroup"], 117)
+                disabled_snapshot = catalog.snapshot()["brandmeister"]
+                self.assertEqual(disabled_snapshot["selected_talkgroup"], 91)
+                disabled_frame = catalog.receiver_overlay("DMR")
+                self.assertEqual(disabled_frame["catalog_position"], 1)
+                self.assertEqual(disabled_frame["catalog_rows"][0]["talkgroup"], 91)
+                self.assertTrue(disabled_frame["catalog_rows"][0]["selected"])
+                self.assertTrue(disabled_frame["catalog_rows"][0]["enabled"])
+                disabled_entry = next(
+                    item
+                    for item in catalog._brandmeister_device_entries(allow_network=False)
+                    if item["talkgroup"] == 117
+                )
+                self.assertFalse(disabled_entry["enabled"])
+
+                catalog.control({"action": "brandmeister_step", "steps": 1})
+                reenabled = catalog.control(
+                    {"action": "brandmeister_toggle_selected"}
+                )
+                self.assertTrue(reenabled["enabled"])
+                self.assertEqual(reenabled["talkgroup"], 117)
                 started = catalog.control({"action": "brandmeister_toggle"})
                 self.assertEqual(started["brandmeister"]["talkgroups"], [91, 117])
                 self.assertEqual(started["brandmeister"]["volume"], 40)

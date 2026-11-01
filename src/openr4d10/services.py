@@ -2395,8 +2395,19 @@ class ServiceCatalog:
                 }
             metadata["enabled"] = enabled
             self.store.update_channel(int(channel["id"]), str(channel["name"]), metadata)
-            self.selected_brandmeister_talkgroup = talkgroup
-            self.selected_brandmeister_channel_id = int(channel["id"])
+            next_talkgroup = talkgroup
+            next_channel = channel
+            if not enabled:
+                remaining_enabled = self._enabled_brandmeister_talkgroups()
+                if remaining_enabled:
+                    next_talkgroup = remaining_enabled[0]
+                    remaining_channel = self._saved_brandmeister_channel_for_talkgroup(
+                        next_talkgroup
+                    )
+                    if remaining_channel is not None:
+                        next_channel = remaining_channel
+            self.selected_brandmeister_talkgroup = next_talkgroup
+            self.selected_brandmeister_channel_id = int(next_channel["id"])
             state = self._reconfigure_brandmeister_receiver()
             return {
                 "channel_id": int(channel["id"]),

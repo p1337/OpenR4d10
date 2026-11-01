@@ -291,6 +291,11 @@ wall-clock sleep and prove both the pre-threshold cancellation and post-threshol
 release behavior. A sixth activation must be
 tested as an explicit five-row replacement transaction, including cancellation;
 it must never evict a TG implicitly.
+Device-catalog tests must also disable a selected enabled TG and prove that the
+cursor returns to catalog position one on the first remaining enabled row,
+while the disabled TG remains off. Re-enable it explicitly before subsequent
+receiver-subscription assertions; selection movement must never masquerade as
+an enable action.
 While the device menu is open, browser Up/Down must follow the visible list
 direction without changing the physical `right_outer` semantics. An open device
 menu owns those two arrow keys even if a dashboard search/input field still has

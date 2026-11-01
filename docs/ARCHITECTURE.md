@@ -433,6 +433,10 @@ waiting for release. That subsequent release is consumed. A pending sixth
 activation is an explicit state with a bounded five-row replacement list; only
 confirmation performs the atomic disable/enable swap, and cancel preserves the
 prior subscriptions.
+Because the device catalog is enabled-first, disabling the selected TG also
+selects the first remaining enabled row after the same atomic metadata update.
+This changes only cursor state; it never enables another TG. With no remaining
+enabled row, the just-disabled TG remains the deterministic selection.
 
 Curated radio and news source definitions remain reviewable data in `presets.py`,
 separate from playback and parser logic. Radio definitions are seeded exactly

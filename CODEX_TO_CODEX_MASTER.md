@@ -3411,3 +3411,14 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 - Die zentrale Innenfläche des Zurück-Tastenfelds samt Pfeil wird gegen beide
   DMR-Menütypen getestet. Eine rein textuelle Inhaltsprüfung reicht für diese
   Geometrie-Regression nicht aus.
+
+### 2026-11-01 – DMR-Aus schickt die Markierung zur ersten aktiven TG
+
+- Wird die im Gerätekatalog markierte aktive Talkgroup per PTT ausgeschaltet,
+  darf die Markierung der nun deaktivierten Zeile nicht in den inaktiven
+  Katalogblock nach unten folgen. Sie springt stattdessen auf die erste noch
+  aktive Talkgroup im enabled-first-Block und die Anzeige bleibt oben.
+- Diese Cursorbewegung aktiviert keine andere Talkgroup und verändert außer
+  der ausdrücklich ausgeschalteten TG kein Abonnement. Bleibt keine aktive TG
+  übrig, bleibt die gerade deaktivierte Zeile als deterministischer Fallback
+  markiert.

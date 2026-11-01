@@ -49,6 +49,11 @@ already saved entry when the button is released. Holding PTT for two seconds
 opens a country list immediately at the threshold while PTT remains held; the
 following release is consumed and cannot toggle a talkgroup or close the new
 menu. The list is derived from the bounded cached official catalog.
+After an enabled talkgroup is disabled, the device selection returns to the
+first remaining enabled talkgroup at the top of the enabled-first list. It does
+not follow the disabled row into the inactive catalog and does not implicitly
+enable a different talkgroup. If no enabled talkgroup remains, the disabled
+row stays selected as the only deterministic fallback.
 The right outer axis selects a country and the right press applies that browse
 filter. The filter applies only to the inactive add-catalog below the
 enabled-first block: all currently enabled talkgroups remain visible and

@@ -129,7 +129,9 @@ the installer report exactly which adapters still need configuration.
   short PTT toggles the marked TG and a two-second PTT hold opens the country
   filter immediately at the threshold while the button is still held, without
   transmitting; the following release is consumed, and activating a sixth TG
-  explicitly asks which of the five active TGs to replace;
+  explicitly asks which of the five active TGs to replace; disabling a marked
+  TG returns the device cursor to the first remaining active TG instead of
+  following the disabled row into the inactive catalog;
   no account password or user token
 - standard-library-only test suite and GitHub Actions CI
 - strict release gate: the exact commit must pass GitHub Actions before a Pi
