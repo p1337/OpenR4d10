@@ -2876,3 +2876,14 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   `Welche ersetzen?` mit den fünf aktiven Gruppen. Rechts außen wählt die zu
   ersetzende TG, rechter Druck führt den Tausch aus, PTT bricht ohne Änderung
   ab. Der Browser bietet dieselbe Auswahl vor dem Aktivieren einer sechsten TG.
+
+### 2026-11-01 – Reale BCM22-PWM-Knotenbezeichnung
+
+- Der Raspberry-Pi-Device-Tree schreibt die Unit-Adresse des BCM22-PWM-Overlays
+  hexadezimal als `pwm_gpio@16`. Ein Helfer, der nur den scheinbar naheliegenden
+  Dezimalnamen `pwm_gpio@22` prüft, findet das reale `/sys/class/pwm/pwmchip*`
+  nicht und lässt Backlight-Initialisierung sowie Bootanimation scheitern.
+- Der feste Root-Helfer akzeptiert deshalb ausschließlich `pwm_gpio@16` als
+  reales Ziel und `pwm_gpio@22` als Kompatibilitätsschreibweise. Overlay und
+  physischer BCM bleiben unverändert `gpio=22`; es wird kein anderer Pin
+  freigegeben.

@@ -20,7 +20,10 @@ find_pwm_chip() {
     for chip in /sys/class/pwm/pwmchip*; do
         [[ -d "$chip" ]] || continue
         node="$(basename -- "$(readlink -f -- "$chip/device/of_node" 2>/dev/null || true)")"
-        if [[ "$node" == pwm_gpio@22 ]]; then
+        # Device-tree unit addresses are hexadecimal. BCM22 therefore appears
+        # as pwm_gpio@16 on the real Pi, while older test trees used the
+        # human-readable decimal suffix. Accept only these two exact forms.
+        if [[ "$node" == pwm_gpio@16 || "$node" == pwm_gpio@22 ]]; then
             printf '%s\n' "$chip"
             return 0
         fi
@@ -36,7 +39,7 @@ open_pwm() {
         sleep 0.1
     done
     [[ -n "$chip" ]] || {
-        echo "OpenR4d10 kernel PWM for pwm_gpio@22 is unavailable; reboot after installing the overlay." >&2
+        echo "OpenR4d10 kernel PWM for BCM22 (pwm_gpio@16) is unavailable; reboot after installing the overlay." >&2
         return 1
     }
     [[ "$(<"$chip/npwm")" == 1 ]] || {

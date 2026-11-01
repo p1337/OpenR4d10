@@ -146,7 +146,9 @@ reintroduce `threading`, `sleep`, `Event.wait` or `lgpio.tx_pwm`: normal
 userspace scheduling caused load-correlated brighter and darker jumps on the
 real battery-powered Pi. Unit tests must require the exact
 `dtoverlay=pwm-gpio,gpio=22`, the fixed root helper/path boundary, active-low
-duty mapping and an atomic, deduplicated 0–100 request. The application must
+polarity, and the real device-tree unit-address spelling `pwm_gpio@16` (hex for
+BCM22). The helper may retain `pwm_gpio@22` only as a compatibility spelling.
+Tests also require the duty mapping and an atomic, deduplicated 0–100 request. The application must
 not receive sysfs write access.
 
 The early initializer owns BCM22 before the native animation and sets 0

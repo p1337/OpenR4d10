@@ -90,6 +90,7 @@ class InstallerContractTests(unittest.TestCase):
 
         self.assertIn("dtoverlay=pwm-gpio,gpio=22", boot_installer)
         self.assertIn("openr4d10-backlight-init.service", boot_installer)
+        self.assertIn('"$node" == pwm_gpio@16', helper)
         self.assertIn("pwm_gpio@22", helper)
         self.assertIn("PERIOD_NS=1000000", helper)
         self.assertIn("PathExists=/run/openr4d10-backlight/brightness.request", path_unit)
