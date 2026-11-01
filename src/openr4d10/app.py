@@ -62,6 +62,7 @@ class OpenR4d10App:
         )
         self.stop_event = threading.Event()
         self._device_input_lock = threading.Lock()
+        self._interaction_generation = 0
         self._last_device_input_at = 0.0
         self._status_lock = threading.Lock()
         self._view_initialized = False
@@ -110,7 +111,12 @@ class OpenR4d10App:
             raise RuntimeError("the configured display does not accept device input")
         self._last_device_input_at = time.perf_counter()
         with self._device_input_lock:
-            return self._apply_device_event(event, handler)
+            self._interaction_generation += 1
+            try:
+                return self._apply_device_event(event, handler)
+            finally:
+                self._last_device_input_at = time.perf_counter()
+                self._interaction_generation += 1
 
     def request_stop(self, signum: int | None = None, _frame: object = None) -> None:
         if signum is not None:
@@ -179,22 +185,29 @@ class OpenR4d10App:
                 self._dmr_hold_timer = None
                 self._dmr_hold_triggered = True
                 self._last_device_input_at = time.perf_counter()
-                self.services.control({"action": "brandmeister_country_menu_open"})
+                self._interaction_generation += 1
+                try:
+                    self.services.control({"action": "brandmeister_country_menu_open"})
 
-                hold_event = InputEvent(
-                    Control.PTT,
-                    held_seconds=DMR_PTT_HOLD_SECONDS,
-                    active=False,
-                )
-                state_only_handler = getattr(self.display, "apply_input_state", None)
-                handler = getattr(self.display, "apply_input", None)
-                if callable(state_only_handler):
-                    state_only_handler(hold_event)
-                elif callable(handler):
-                    handler(hold_event)
-                else:
-                    raise RuntimeError("the configured display does not accept device input")
-                self.render_interaction_once("DMR")
+                    hold_event = InputEvent(
+                        Control.PTT,
+                        held_seconds=DMR_PTT_HOLD_SECONDS,
+                        active=False,
+                    )
+                    state_only_handler = getattr(self.display, "apply_input_state", None)
+                    handler = getattr(self.display, "apply_input", None)
+                    if callable(state_only_handler):
+                        state_only_handler(hold_event)
+                    elif callable(handler):
+                        handler(hold_event)
+                    else:
+                        raise RuntimeError(
+                            "the configured display does not accept device input"
+                        )
+                    self.render_interaction_once("DMR")
+                finally:
+                    self._last_device_input_at = time.perf_counter()
+                    self._interaction_generation += 1
         except Exception:
             LOG.exception("DMR PTT hold action failed")
 
@@ -325,12 +338,17 @@ class OpenR4d10App:
                 raise RuntimeError("service control is unavailable")
             if request.get("action") == "mediathek_play":
                 with self._device_input_lock:
-                    result = self.services.control(request)
-                    self.render_interaction_once("PLAYER")
-                    snapshot = getattr(self.display, "snapshot", None)
-                    if callable(snapshot):
-                        result["device_ui"] = snapshot()
-                    return result
+                    self._interaction_generation += 1
+                    try:
+                        result = self.services.control(request)
+                        self.render_interaction_once("PLAYER")
+                        snapshot = getattr(self.display, "snapshot", None)
+                        if callable(snapshot):
+                            result["device_ui"] = snapshot()
+                        return result
+                    finally:
+                        self._last_device_input_at = time.perf_counter()
+                        self._interaction_generation += 1
             return self.services.control(request)
 
         raw_control = request.get("control")
@@ -384,7 +402,12 @@ class OpenR4d10App:
         )
         self._last_device_input_at = time.perf_counter()
         with self._device_input_lock:
-            return self._apply_device_event(event, handler)
+            self._interaction_generation += 1
+            try:
+                return self._apply_device_event(event, handler)
+            finally:
+                self._last_device_input_at = time.perf_counter()
+                self._interaction_generation += 1
 
     def _apply_device_event(self, event: InputEvent, handler: Any) -> dict[str, object]:
         """Resolve one logical input and repaint it as one serialized action."""
@@ -877,14 +900,20 @@ class OpenR4d10App:
         self._pending_initial_view_overlay = overlay
         self._view_initialized = True
 
-    def render_once(self) -> None:
+    def render_once(self, *, periodic_generation: int | None = None) -> None:
+        if periodic_generation is not None and (
+            periodic_generation % 2 != 0
+            or periodic_generation != self._interaction_generation
+        ):
+            return
         receiver, receiver_error = self._safe_read(self.receiver, "receiver")
         self._last_receiver_telemetry = dict(receiver)
+        pending_initial_overlay = False
         if self.services is not None:
             self._initialize_restored_view()
             if self._pending_initial_view_overlay is not None:
                 overlay = self._pending_initial_view_overlay
-                self._pending_initial_view_overlay = None
+                pending_initial_overlay = True
             else:
                 snapshot = getattr(self.display, "snapshot", None)
                 current_ui = snapshot() if callable(snapshot) else {}
@@ -898,6 +927,13 @@ class OpenR4d10App:
         power, power_error = self._safe_read(self.power, "power")
         self._last_power_telemetry = dict(power)
         errors = [error for error in (receiver_error, power_error) if error]
+        if periodic_generation is not None and (
+            periodic_generation % 2 != 0
+            or periodic_generation != self._interaction_generation
+        ):
+            return
+        if pending_initial_overlay:
+            self._pending_initial_view_overlay = None
         self._publish(dashboard_frame(self.config.title, receiver, power, errors))
 
     def render_recorder_once(self) -> None:
@@ -905,14 +941,29 @@ class OpenR4d10App:
 
         self.render_interaction_once("REC")
 
-    def render_interaction_once(self, view_service: str) -> None:
+    def render_interaction_once(
+        self,
+        view_service: str,
+        *,
+        periodic_generation: int | None = None,
+    ) -> None:
         """Resolve one interactive view from cached telemetry and repaint once."""
 
+        if periodic_generation is not None and (
+            periodic_generation % 2 != 0
+            or periodic_generation != self._interaction_generation
+        ):
+            return
         if self.services is None or not self._last_receiver_telemetry:
-            self.render_once()
+            self.render_once(periodic_generation=periodic_generation)
             return
         receiver = dict(self._last_receiver_telemetry)
         receiver.update(self.services.receiver_overlay(view_service))
+        if periodic_generation is not None and (
+            periodic_generation % 2 != 0
+            or periodic_generation != self._interaction_generation
+        ):
+            return
         self._publish(
             dashboard_frame(
                 self.config.title,
@@ -967,6 +1018,10 @@ class OpenR4d10App:
             while not self.stop_event.is_set():
                 cycle_started = time.monotonic()
                 try:
+                    periodic_generation = self._interaction_generation
+                    if periodic_generation % 2 != 0:
+                        self.stop_event.wait(0.01)
+                        continue
                     input_context = getattr(self.display, "input_context", None)
                     context = input_context() if callable(input_context) else {}
                     interactive_service = (
@@ -979,18 +1034,26 @@ class OpenR4d10App:
                         and self._last_receiver_telemetry
                     ):
                         if interactive_service == "DMR":
-                            self.render_interaction_once("DMR")
+                            self.render_interaction_once(
+                                "DMR",
+                                periodic_generation=periodic_generation,
+                            )
                             frame_interval = DMR_FRAME_INTERVAL_SECONDS
                         else:
                             if not self._recorder_interaction_active():
-                                self.render_recorder_once()
+                                self.render_interaction_once(
+                                    "REC",
+                                    periodic_generation=periodic_generation,
+                                )
                             frame_interval = RECORDER_FRAME_INTERVAL_SECONDS
                         delay = max(
                             0.0,
                             frame_interval - (time.monotonic() - cycle_started),
                         )
                     else:
-                        self.render_once()
+                        self.render_once(
+                            periodic_generation=periodic_generation,
+                        )
                         delay = self.config.refresh_interval_seconds
                 except (AdapterError, OSError, ValueError) as exc:
                     LOG.error("Display adapter failed: %s", exc)

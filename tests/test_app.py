@@ -986,6 +986,63 @@ class AppTests(unittest.TestCase):
             ],
         )
 
+    def test_stale_periodic_dmr_frame_cannot_restore_dmr_after_navigation(self) -> None:
+        class InputDisplay:
+            def __init__(self) -> None:
+                self.service = "PLAYER"
+                self.render_calls = 0
+
+            def render(self, frame) -> None:
+                self.render_calls += 1
+                receiver = frame.fields.get("receiver", {})
+                self.service = str(receiver.get("service") or self.service)
+
+        class Services:
+            active_service = "brandmeister"
+
+            def __init__(self) -> None:
+                self.invalidate = None
+
+            def receiver_overlay(self, view_service=None):
+                if view_service == "DMR" and self.invalidate is not None:
+                    self.invalidate()
+                return {
+                    "service": view_service,
+                    "station": view_service,
+                    "title": view_service,
+                    "playing": view_service == "DMR",
+                }
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            display = InputDisplay()
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=display,  # type: ignore[arg-type]
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,  # type: ignore[arg-type]
+            )
+            app._last_receiver_telemetry = {"hostname": "OpenR4d10"}
+            app._last_power_telemetry = {"battery_percent": 90}
+            app._interaction_generation = 2
+            services.invalidate = lambda: setattr(app, "_interaction_generation", 4)
+
+            app.render_interaction_once("DMR", periodic_generation=2)
+            app.render_interaction_once("PLAYER")
+
+        self.assertEqual(display.render_calls, 1)
+        self.assertEqual(display.service, "PLAYER")
+
     def test_service_navigation_uses_one_resolved_cached_frame(self) -> None:
         class InputDisplay:
             def __init__(self) -> None:

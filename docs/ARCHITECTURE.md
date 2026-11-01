@@ -335,6 +335,11 @@ changes its ordered state under the display lock without transferring an
 intermediate panel image, application entry/exit lifecycle work is resolved,
 and one final cached-telemetry frame is presented. Debouncing or coalescing may
 bound event pressure, but it must preserve the resulting rotary distance.
+Periodic frames also carry the interaction generation captured before their
+overlay work. If an input transaction starts or finishes before publication,
+that stale periodic frame is discarded. The resolved interaction frame itself
+does not use this discard guard. This prevents a precomputed 10 Hz DMR frame
+from restoring DMR after the service axis has already presented another view.
 
 The local control server uses persistent HTTP/1.1 connections and disables
 Nagle buffering on accepted LAN sockets. Browser key repeats therefore reuse a

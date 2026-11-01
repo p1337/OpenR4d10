@@ -3580,3 +3580,18 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Mediathek-Wiedergabe fort. Die Geräte-Kanalnummer entspricht der sichtbaren
   einsbasierten Position in der aktiven Ergebnisliste. Die Bedienung muss
   weiterhin über denselben serialisierten Eingabe- und Ein-Frame-Pfad laufen.
+
+### 2026-11-01 – Ein alter DMR-Frame darf die Dienstwahl nicht zurücksetzen
+
+- Die Beobachtung, dass Links/Rechts kurz einen anderen Dienst zeigt und danach
+  wieder DMR erscheint, ist kein gewünschtes Folgen des aktiven Audiobesitzers.
+  Sie entsteht, wenn der 10-Hz-DMR-Refresh seine Ansicht bereits vor der
+  Eingabe aufgelöst hat, aber erst nach dem fertigen Eingabeframe veröffentlicht.
+- Jeder periodische Frame erhält deshalb die Interaktionsgeneration, mit der er
+  begonnen wurde. Beginnt oder endet während seiner Auflösung eine Geräte- oder
+  Browserinteraktion, wird ausschließlich dieser alte periodische Frame
+  verworfen. Das von der Eingabe angeforderte Endbild wird niemals verworfen.
+- DMR oder ein anderer Audiowner darf nach dem Dienstwechsel weiter im
+  Hintergrund laufen, aber weder `DeviceUiState.service` noch die sichtbare
+  Ansicht zurücksetzen. Diese Sperre gilt für alle periodischen Dienstframes,
+  nicht nur als DMR-Sonderfall.
