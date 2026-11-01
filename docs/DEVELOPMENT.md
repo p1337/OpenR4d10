@@ -201,7 +201,9 @@ release after two seconds opens the country filter. A sixth activation must be
 tested as an explicit five-row replacement transaction, including cancellation;
 it must never evict a TG implicitly.
 While the device menu is open, browser Up/Down must follow the visible list
-direction without changing the physical `right_outer` semantics. It remains an input indication, not an audio claim,
+direction without changing the physical `right_outer` semantics. An open device
+menu owns those two arrow keys even if a dashboard search/input field still has
+browser focus; all other keys retain the editable-field protection. It remains an input indication, not an audio claim,
 until a real authorized service adapter consumes it.
 
 Volume and radio-channel regression tests must make the same distinction:

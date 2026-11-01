@@ -47,6 +47,8 @@ class WebTests(unittest.TestCase):
         self.assertNotIn("KeyQ", script)
         self.assertIn('control: "ptt", active', script)
         self.assertIn("isEditableTarget", script)
+        self.assertIn("deviceMenuOwnsArrowKey", script)
+        self.assertIn('latestDeviceState?.menu_open === true', script)
         self.assertIn('KeyW: { control: "left_outer", steps: 1 }', script)
         self.assertIn('KeyA: { control: "left_inner", steps: -1 }', script)
         self.assertIn('ArrowUp: { control: "right_outer", steps: -1 }', script)

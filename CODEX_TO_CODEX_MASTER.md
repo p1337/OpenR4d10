@@ -2892,3 +2892,13 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Ihre Unit benötigt deshalb genau `ReadWritePaths=/run/openr4d10-backlight`;
   ohne diesen Pfad scheitert sie real mit `open backlight request: Read-only
   file system`. Weitere schreibbare Systempfade sind nicht zulässig.
+
+### 2026-11-01 – Pfeiltasten im geräteinternen DMR-Menü
+
+- Ein geöffnetes Gerätemenü besitzt im Browser die Tasten Pfeil hoch und Pfeil
+  runter auch dann, wenn zuvor ein Such- oder Eingabefeld den DOM-Fokus behalten
+  hat. Sonst sieht Robert zwar die DMR-Länderliste auf dem Live-Display, die
+  bisherige allgemeine Eingabefeld-Sperre verschluckt aber beide Scrolltasten.
+- Die Ausnahme gilt ausschließlich für diese zwei Navigationspfeile bei
+  `device_ui.menu_open=true`. Backspace bleibt in editierbaren Feldern die
+  Löschtaste und alle anderen Schutzregeln bleiben unverändert.

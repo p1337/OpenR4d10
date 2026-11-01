@@ -1,3 +1,3 @@
 """OpenR4d10 application package."""
 
-__version__ = "0.10.60"
+__version__ = "0.10.61"

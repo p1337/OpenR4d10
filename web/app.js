@@ -1304,6 +1304,11 @@ function isEditableTarget(target) {
   );
 }
 
+function deviceMenuOwnsArrowKey(code) {
+  return latestDeviceState?.menu_open === true
+    && ["ArrowUp", "ArrowDown"].includes(code);
+}
+
 let pttKeyActive = false;
 let pttQueue = Promise.resolve();
 
@@ -1316,7 +1321,8 @@ function setPttInput(active) {
 }
 
 document.addEventListener("keydown", (event) => {
-  if (event.altKey || event.ctrlKey || event.metaKey || isEditableTarget(event.target)) return;
+  if (event.altKey || event.ctrlKey || event.metaKey) return;
+  if (isEditableTarget(event.target) && !deviceMenuOwnsArrowKey(event.code)) return;
   if (event.code === "Backspace") {
     event.preventDefault();
     if (!event.repeat) setPttInput(true);
