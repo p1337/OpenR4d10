@@ -198,6 +198,7 @@ class ProcessBoundaryTests(unittest.TestCase):
 
     def test_voice_recorder_uses_stereo_whisplay_alsa_and_resumable_mp3_segments(self) -> None:
         calls = []
+        edit_commands = []
 
         def fake_popen(command, **kwargs):
             calls.append((command, kwargs))
@@ -206,6 +207,10 @@ class ProcessBoundaryTests(unittest.TestCase):
             )
             return FakeProcess()
 
+        def fake_edit(command):
+            edit_commands.append(command)
+            Path(command[-1]).write_bytes(b"joined")
+
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw).resolve()
             voice_root = root / "media" / "VoiceRecorder"
@@ -213,6 +218,7 @@ class ProcessBoundaryTests(unittest.TestCase):
                 root / "recordings",
                 voice_root=voice_root,
                 popen=fake_popen,
+                edit_runner=fake_edit,
             )
             started = recorder.voice_start()
             self.assertEqual(started["state"], "recording")
@@ -228,9 +234,13 @@ class ProcessBoundaryTests(unittest.TestCase):
             recorder.voice_pause()
             finalized = recorder.voice_finalize()
             output = next(voice_root.glob("??????/??????_??????_VoiceRecorder.mp3"))
-            self.assertEqual(output.read_bytes(), b"firstsecond")
+            self.assertEqual(output.read_bytes(), b"joined")
             self.assertEqual(finalized["output"], output.name)
             self.assertFalse(any(voice_root.rglob(".pending-*")))
+            self.assertEqual(len(edit_commands), 1)
+            self.assertIn("concat", edit_commands[0])
+            self.assertIn("copy", edit_commands[0])
+            self.assertFalse(any(voice_root.rglob("*.concat.txt")))
 
     def test_voice_recorder_recovers_pending_segments_after_restart(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

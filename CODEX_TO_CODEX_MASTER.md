@@ -3354,3 +3354,11 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   werden daher die echten mpv-Eigenschaften `pause=no` und
   `loop-playlist=no` gesetzt. Interne Python-Flags allein reichen nicht; sie
   dürfen niemals vom tatsächlichen mpv-Zustand abweichen.
+- Eine weitere reale 0.10.81-Messung trennte interne Dauer und tatsächlich
+  dekodierbare Dauer: Mehrere einzeln abgeschlossene MP3-Segmente dürfen nicht
+  als rohe Bytes aneinandergehängt werden. Dabei kann der Decoder bereits am
+  ersten Segment Dateiende melden, obwohl der Recorder die Summe aller
+  Segmentdauern anzeigt. Append und Crash-Recovery verwenden deshalb den
+  vorhandenen ffmpeg-Prozessrand mit dem Concat-Demuxer und Stream-Copy; das
+  Ergebnis ist eine einzige zusammenhängend dekodierbare MP3. Rohes
+  Byte-Anhängen von Sprachsegmenten ist verboten.

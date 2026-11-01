@@ -749,6 +749,38 @@ class StreamRecorder:
             str(output),
         ]
 
+    def _voice_concat_command(self, manifest: Path, output: Path) -> list[str]:
+        """Remux complete MP3 segments into one decoder-visible timeline."""
+
+        return [
+            _target_path_string(self.executable),
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "warning",
+            "-y",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            str(manifest),
+            "-map",
+            "0:a:0",
+            "-c:a",
+            "copy",
+            "-vn",
+            str(output),
+        ]
+
+    @staticmethod
+    def _write_voice_concat_manifest(target: Path, sources: tuple[Path, ...]) -> None:
+        def entry(source: Path) -> str:
+            escaped = str(source).replace("'", "'\\''")
+            return f"file '{escaped}'\n"
+
+        target.write_text("".join(entry(source) for source in sources), encoding="utf-8")
+
     def _commit_voice_segment(self, segment_ms: int) -> None:
         segment = self._voice_active_segment
         working = self._voice_working
@@ -760,14 +792,15 @@ class StreamRecorder:
             segment.replace(working)
             self._voice_duration_ms = segment_ms
         elif start_ms >= self._voice_duration_ms:
-            temporary = working.with_suffix(".append.tmp")
-            with temporary.open("wb") as target:
-                for source_path in (working, segment):
-                    with source_path.open("rb") as source:
-                        while chunk := source.read(1024 * 1024):
-                            target.write(chunk)
-                target.flush()
-                os.fsync(target.fileno())
+            temporary = working.with_suffix(".append.tmp.mp3")
+            manifest = working.with_suffix(".append.concat.txt")
+            self._write_voice_concat_manifest(manifest, (working, segment))
+            try:
+                self.edit_runner(self._voice_concat_command(manifest, temporary))
+            finally:
+                manifest.unlink(missing_ok=True)
+            if not temporary.is_file() or temporary.stat().st_size == 0:
+                raise MediaError("voice append did not create an output file")
             temporary.replace(working)
             segment.unlink(missing_ok=True)
             self._voice_duration_ms += segment_ms
