@@ -204,9 +204,10 @@ class WebTests(unittest.TestCase):
         self.assertNotIn("Geräteansicht", html)
         self.assertNotIn("device-screen-title", html)
         self.assertIn('data-i18n="LIVE DISPLAY"', html)
-        self.assertIn('href="/controls-overview.svg"', html)
+        self.assertIn('href="/service-controls.svg"', html)
         self.assertIn('data-i18n="CONTROL GUIDE"', html)
         self.assertTrue(web_root.joinpath("controls-overview.svg").is_file())
+        self.assertTrue(web_root.joinpath("service-controls.svg").is_file())
         hardware_guide = web_root.joinpath("controls-overview.svg").read_text(
             encoding="utf-8"
         )
@@ -217,6 +218,15 @@ class WebTests(unittest.TestCase):
         self.assertIn("Whisplay HAT", hardware_guide)
         self.assertIn("Raspberry Pi Zero 2 W", hardware_guide)
         self.assertIn("PiSugar 3 + Akku", hardware_guide)
+        service_guide = web_root.joinpath("service-controls.svg").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('fill="#fff"', service_guide)
+        self.assertIn("Alle 16 aktuell aktivierten Dienste", service_guide)
+        self.assertIn("13 bereit · 3 mit Konfigurationsbedarf", service_guide)
+        self.assertIn("Funktionen am Gerät", service_guide)
+        self.assertIn("Keine native", service_guide)
+        self.assertEqual(service_guide.count("OpenR4d10 · Whisplay-Front"), 16)
         self.assertEqual(translations["locales"], ["en", "de", "pl", "fr", "es"])
         messages = translations["messages"]
         html_keys = {

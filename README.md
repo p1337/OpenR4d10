@@ -378,7 +378,11 @@ SVG quick-reference sheets are suitable for the browser, repository and print.
 The hardware sheet is a source-grounded component map of the real Whisplay
 front/back and Whisplay → Pi Zero 2 W → PiSugar 3 stack. It must never invent
 an enclosure or button position; planned encoders remain visibly separate from
-already fitted hardware until they have been measured.
+already fitted hardware until they have been measured. The separate white
+service-comparison sheet covers every currently enabled service in one repeated
+layout: real captured Whisplay view on the left and that service's exact
+controls on the right. Ready, browser-only and configuration-required services
+remain visibly distinct instead of receiving a fabricated native screen.
 
 BrandMeister replaces the otherwise meaningless Squelch assignment in its
 device view. The right outer axis browses the complete official talkgroup

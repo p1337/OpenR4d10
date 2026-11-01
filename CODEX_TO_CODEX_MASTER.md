@@ -3807,7 +3807,7 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   sofort sichtbar sein.
 - `docs/USER_GUIDE_CONTROLS.md` ist die nutzerbezogene Bedienwahrheit. Die
   skalierbaren SVGs `web/controls-overview.svg` und
-  `docs/assets/openr4d10-service-controls.svg` bilden die kompakte
+  `web/service-controls.svg` bilden die kompakte
   Quick-Start- und Dienstmatrix für Browser, README und Druck.
 - Eine Bediengrafik darf niemals aus dem gewünschten „Flipper-Zero-artig
   verständlichen“ Dokumentationsstil ein fiktives Handheldgehäuse oder
@@ -3818,6 +3818,17 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   müssen optisch getrennt als Planung erscheinen. Ihre endgültige Position,
   GPIOs und Gehäuseöffnungen bleiben bis zur realen Vermessung ausdrücklich
   offen. Die Grafik ist keine Bohr-, Gehäuse- oder Leiterplattenschablone.
+- Der eigentliche Dienstvergleich verwendet einen weißen, druckbaren
+  Hintergrund und wiederholt für jeden aktuell aktivierten Dienst exakt dasselbe
+  Layout: links die reale Whisplay-Front mit einem direkt vom laufenden Gerät
+  aufgenommenen 240-x-280-Dienstbild, rechts die dort gültigen Encoder-,
+  Klick-, PTT- und Powerfunktionen. Alle aktivierten Dienste müssen in dieser
+  Übersicht vorkommen. Bereite, browser-only und nur aktivierte aber noch
+  konfigurationsbedürftige Dienste bleiben klar unterscheidbar. Gemeinsame
+  PLAYER-Ansichten dürfen erkennbar geteilt werden; fehlende native Ansichten
+  erhalten niemals ein erfundenes Displaybild. Die alte reine Textkartenmatrix
+  erfüllt diesen visuellen Intuitivitätsvergleich nicht und darf ihn nicht
+  ersetzen.
 - RSS und Webcams werden bis zur Implementierung eigener nativer Ansichten
   ehrlich als browserverwaltet dokumentiert. Podcasts und lokale Medien teilen
   die vorhandene PLAYER-Ausgabe, während Abos beziehungsweise Bibliothek im

@@ -10,8 +10,15 @@ Die zugehörigen, frei skalierbaren Bediengrafiken sind:
 
 - [`controls-overview.svg`](../web/controls-overview.svg) – Hardware und
   Grundbelegung;
-- [`openr4d10-service-controls.svg`](assets/openr4d10-service-controls.svg) –
-  Dienstmatrix mit allen heute nutzbaren Ansichten.
+- [`service-controls.svg`](../web/service-controls.svg) – weiß hinterlegter,
+  druckbarer Bedienvergleich aller 16 aktuell aktivierten Dienste: 13 sind
+  bereit, drei benötigen noch Konfiguration. Jede Zeile
+  zeigt links die reale Whisplay-Front mit einem direkt vom laufenden Gerät
+  aufgenommenen Dienstbild und rechts ausschließlich die dort gültigen
+  Funktionen. RSS und Webcams werden ausdrücklich als browser-only gezeigt,
+  statt eine noch nicht vorhandene native Ansicht zu erfinden. Dasselbe gilt
+  für aktivierte Adapterverträge ohne Geräteansicht; ihr Konfigurationsbedarf
+  bleibt in der Tafel sichtbar.
 
 Die Hardwaregrafik bildet ausschließlich den belegten realen Platinenstack ab:
 Whisplay vorne, Raspberry Pi Zero 2 W in der Mitte und PiSugar 3 hinten. Ihre
