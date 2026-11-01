@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+import math
 from pathlib import Path
 from typing import Mapping
 
@@ -75,6 +76,12 @@ DISPLAY_TEXT = {
         "select_channel_play": "Select a channel and press PLAY",
         "select_talkgroups_play": "Select talkgroups and press PLAY",
         "recording_controls": "Recording controls",
+        "voice_recorder": "Voice Recorder",
+        "voice_hold": "Hold PTT to record",
+        "voice_recording": "Recording",
+        "voice_continuous": "Continuous recording",
+        "voice_paused": "Recording paused",
+        "voice_mics": "Right mic above · left mic below",
         "ready": "Ready",
         "paused": "Paused",
         "audio_stream_active": "Audio stream active",
@@ -125,6 +132,12 @@ DISPLAY_TEXT = {
         "select_channel_play": "Kanal wählen und PLAY drücken",
         "select_talkgroups_play": "Talkgroups wählen und PLAY drücken",
         "recording_controls": "Aufnahmesteuerung",
+        "voice_recorder": "Sprachaufzeichnung",
+        "voice_hold": "PTT halten zum Aufnehmen",
+        "voice_recording": "Aufnahme läuft",
+        "voice_continuous": "Daueraufnahme",
+        "voice_paused": "Aufnahme pausiert",
+        "voice_mics": "Rechtes Mikro oben · linkes unten",
         "ready": "Bereit",
         "paused": "Pausiert",
         "audio_stream_active": "Audiostream aktiv",
@@ -175,6 +188,12 @@ DISPLAY_TEXT = {
         "select_channel_play": "Wybierz kanał i naciśnij GRAJ",
         "select_talkgroups_play": "Wybierz grupy i naciśnij GRAJ",
         "recording_controls": "Sterowanie nagrywaniem",
+        "voice_recorder": "Rejestrator głosu",
+        "voice_hold": "Przytrzymaj PTT, aby nagrywać",
+        "voice_recording": "Nagrywanie",
+        "voice_continuous": "Nagrywanie ciągłe",
+        "voice_paused": "Nagrywanie wstrzymane",
+        "voice_mics": "Prawy mikrofon nad · lewy pod",
         "ready": "Gotowe",
         "paused": "Pauza",
         "audio_stream_active": "Strumień audio aktywny",
@@ -225,6 +244,12 @@ DISPLAY_TEXT = {
         "select_channel_play": "Choisir un canal puis LIRE",
         "select_talkgroups_play": "Choisir des groupes puis LIRE",
         "recording_controls": "Commandes d’enregistrement",
+        "voice_recorder": "Enregistreur vocal",
+        "voice_hold": "Maintenir PTT pour enregistrer",
+        "voice_recording": "Enregistrement",
+        "voice_continuous": "Enregistrement continu",
+        "voice_paused": "Enregistrement en pause",
+        "voice_mics": "Micro droit en haut · gauche en bas",
         "ready": "Prêt",
         "paused": "En pause",
         "audio_stream_active": "Flux audio actif",
@@ -275,6 +300,12 @@ DISPLAY_TEXT = {
         "select_channel_play": "Elige un canal y pulsa PLAY",
         "select_talkgroups_play": "Elige grupos y pulsa PLAY",
         "recording_controls": "Controles de grabación",
+        "voice_recorder": "Grabadora de voz",
+        "voice_hold": "Mantén PTT para grabar",
+        "voice_recording": "Grabando",
+        "voice_continuous": "Grabación continua",
+        "voice_paused": "Grabación en pausa",
+        "voice_mics": "Micrófono derecho arriba · izquierdo abajo",
         "ready": "Listo",
         "paused": "En pausa",
         "audio_stream_active": "Flujo de audio activo",
@@ -296,6 +327,12 @@ DEVICE_TEXT_KEYS = {
     "Select a channel and press play": "select_channel_play",
     "Select talkgroups and press play": "select_talkgroups_play",
     "Recording controls": "recording_controls",
+    "Voice Recorder": "voice_recorder",
+    "Hold PTT to record": "voice_hold",
+    "Recording": "voice_recording",
+    "Continuous recording": "voice_continuous",
+    "Recording paused": "voice_paused",
+    "Right microphone above · left microphone below": "voice_mics",
     "Ready": "ready",
     "Paused": "paused",
     "Audio stream active": "audio_stream_active",
@@ -339,6 +376,9 @@ class DeviceUiState:
     ambient_layer_rows: list[dict[str, object]] = field(default_factory=list)
     ambient_layer_position: int = 0
     ambient_layer_count: int = 0
+    recorder_timeline: list[list[int]] = field(default_factory=list)
+    recorder_continuous: bool = False
+    recorder_output: str | None = None
     title: str = "System online"
     subtitle: str = "Receiver ready"
     playing: bool = False
@@ -400,6 +440,9 @@ class DeviceUiState:
             "ambient_layer_rows": [dict(item) for item in self.ambient_layer_rows],
             "ambient_layer_position": self.ambient_layer_position,
             "ambient_layer_count": self.ambient_layer_count,
+            "recorder_timeline": [list(item) for item in self.recorder_timeline],
+            "recorder_continuous": self.recorder_continuous,
+            "recorder_output": self.recorder_output,
             "accent_color": "#{:02X}{:02X}{:02X}".format(*self.accent),
         }
 
@@ -707,6 +750,21 @@ class DeviceUiState:
         self.playing = bool(receiver.get("playing", self.playing))
         self.right_action = "PAUSE" if self.playing else "PLAY"
         self.recording = bool(receiver.get("recording", False))
+        self.recorder_continuous = receiver.get("continuous") is True
+        output = receiver.get("output")
+        self.recorder_output = str(output)[:128] if isinstance(output, str) else None
+        self.recorder_timeline = []
+        timeline = receiver.get("timeline")
+        if isinstance(timeline, list):
+            for item in timeline[-96:]:
+                if not isinstance(item, (list, tuple)) or len(item) != 2:
+                    continue
+                left, right = item
+                if any(isinstance(value, bool) or not isinstance(value, int) for value in (left, right)):
+                    continue
+                self.recorder_timeline.append(
+                    [max(0, min(100, left)), max(0, min(100, right))]
+                )
         volume = receiver.get("volume")
         if isinstance(volume, int) and not isinstance(volume, bool):
             self.volume = max(0, min(100, volume))
@@ -972,6 +1030,8 @@ def _draw_player_edge_glow(
     image: Image.Image,
     top: int,
     accent: tuple[int, int, int],
+    *,
+    strength: float = 1.0,
 ) -> None:
     """Glow inward from the physical player contour without a crisp line."""
     padding = 24
@@ -1045,7 +1105,10 @@ def _draw_player_edge_glow(
     corner_balance = corner_balance.filter(ImageFilter.GaussianBlur(radius=10))
     alpha = ImageChops.multiply(visible.getchannel("A"), panel_mask)
     alpha = alpha.point(
-        [min(248, round(level * PLAYER_GLOW_STRENGTH)) for level in range(256)]
+        [
+            min(248, round(level * PLAYER_GLOW_STRENGTH * max(1.0, min(2.0, strength))))
+            for level in range(256)
+        ]
     )
     visible.putalpha(ImageChops.multiply(alpha, corner_balance))
     image.alpha_composite(visible)
@@ -1303,6 +1366,77 @@ def _outline_media_shape(
     image.paste((*color, 255), (x0, y0, x1 + 1, y1 + 1), border)
 
 
+def _draw_voice_recorder(
+    draw: ImageDraw.ImageDraw,
+    state: DeviceUiState,
+    text: Mapping[str, object],
+    content_top: int,
+) -> None:
+    title_font = _font(17, bold=True)
+    small_font = _font(9, bold=True)
+    hint_font = _font(8)
+    draw.text(
+        (13, content_top + 5),
+        _fit_text(draw, str(text["voice_recorder"]), title_font, 212),
+        font=title_font,
+        fill=(245, 248, 249),
+    )
+    status = (
+        str(text["voice_continuous"])
+        if state.recording and state.recorder_continuous
+        else str(text["voice_recording"])
+        if state.recording
+        else str(text["voice_paused"])
+        if state.recorder_output
+        else str(text["voice_hold"])
+    )
+    status_color = (255, 86, 86) if state.recording else state.accent
+    if state.recording:
+        draw.ellipse((14, content_top + 31, 22, content_top + 39), fill=status_color)
+    draw.text(
+        (27 if state.recording else 14, content_top + 28),
+        _fit_text(draw, status, small_font, 198),
+        font=small_font,
+        fill=status_color,
+    )
+    draw.text(
+        (14, content_top + 43),
+        _fit_text(draw, str(text["voice_mics"]), hint_font, 212),
+        font=hint_font,
+        fill=(156, 171, 174),
+    )
+
+    left, top, right, bottom = 10, content_top + 59, 229, HEIGHT - 12
+    middle = (top + bottom) // 2
+    draw.rounded_rectangle(
+        (left, top, right, bottom),
+        radius=10,
+        fill=(7, 17, 20),
+        outline=(45, 62, 66),
+        width=1,
+    )
+    draw.line((left + 6, middle, right - 6, middle), fill=(70, 86, 90), width=1)
+    samples = state.recorder_timeline[-96:]
+    if not samples:
+        draw.text(
+            (left + 14, middle - 5),
+            _fit_text(draw, str(text["voice_hold"]), hint_font, 180),
+            font=hint_font,
+            fill=(105, 123, 127),
+        )
+        return
+    usable_width = right - left - 14
+    step = usable_width / max(1, len(samples) - 1)
+    amplitude = max(8, (bottom - top) // 2 - 8)
+    for index, sample in enumerate(samples):
+        sample_left, sample_right = sample
+        x = round(left + 7 + index * step)
+        upper = round(amplitude * sample_right / 100)
+        lower = round(amplitude * sample_left / 100)
+        draw.line((x, middle - upper, x, middle), fill=(255, 92, 92), width=1)
+        draw.line((x, middle, x, middle + lower), fill=state.accent, width=1)
+
+
 def render_device_ui(
     state: DeviceUiState,
     artwork: Image.Image | None = None,
@@ -1318,6 +1452,8 @@ def render_device_ui(
         right_action = "OK"
     elif state.service in {"RADIO", "AMBIENT", "DMR", "PLAYER"}:
         right_action = str(text["pause"] if state.playing else text["play"])
+    elif state.service == "REC":
+        right_action = "PTT"
     else:
         right_action = str(text["info"])
 
@@ -1413,10 +1549,25 @@ def render_device_ui(
     # The rounded glow is a compositor-owned service-view layer, not a service
     # decoration. Keep it ahead of every service-specific early return so the
     # recorder and newly registered plugin views inherit it automatically.
-    _draw_player_edge_glow(image, content_top, accent)
+    recording_glow = state.service in {"RADIO", "REC"} and state.recording
+    glow_accent = (207, 38, 49) if recording_glow else accent
+    glow_strength = 1.0
+    if recording_glow and state.recorder_continuous:
+        phase = datetime.now().timestamp() * (2.0 * math.pi / 2.4)
+        glow_strength = 1.5 + 0.5 * math.sin(phase)
+    _draw_player_edge_glow(
+        image,
+        content_top,
+        glow_accent,
+        strength=glow_strength,
+    )
     draw = ImageDraw.Draw(image)
 
-    if state.service in {"SYSTEM", "REC"}:
+    if state.service == "REC":
+        _draw_voice_recorder(draw, state, text, content_top)
+        return image.convert("RGB")
+
+    if state.service == "SYSTEM":
         heading_font = _font(19, bold=True)
         body_font = _font(13, bold=True)
         small_font = _font(10)

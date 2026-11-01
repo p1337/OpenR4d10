@@ -2919,3 +2919,74 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 - Ein Regressionstest prüft den Glow für sämtliche registrierten Dienste und
   insbesondere für den Recorder. Neue Renderer-Zweige dürfen nicht vor der
   zentralen Kompositionsstufe zurückkehren.
+
+### 2026-11-01 – Sprachaufzeichnung mit PTT und Stereo-Timeline
+
+- Der sichtbare deutsche Dienstname `RECORDER` lautet **Sprachaufzeichnung**.
+  Beim Öffnen übernimmt dieser Dienst Audio exklusiv und beendet Radio-, DMR-,
+  Ambient- sowie sonstige laufende Wiedergabe, damit Lautsprecher und Mikrofone
+  keine Rückkopplung erzeugen.
+- Ein gedrückter PTT-/Whisplay-Taster zeichnet die beiden Whisplay-
+  Mikrofonkanäle auf; währenddessen wird ausschließlich der zentral komponierte
+  Display-Glow rot. Beim Loslassen pausiert die Aufnahme und der Glow kehrt zur
+  normalen Akzentfarbe zurück. Ein erneuter Druck setzt dieselbe laufende
+  Aufnahme fort, statt ungefragt eine neue Datei zu erzeugen.
+- Ein PTT-Doppelklick startet die Daueraufnahme. Solange sie läuft, beendet der
+  nächste normale PTT-Klick oder ein weiterer Doppelklick die Daueraufnahme und
+  finalisiert den bis dahin geschriebenen Stand. Die normale PTT-Haltefunktion
+  bleibt außerhalb des Dauerbetriebs zusätzlich verfügbar. Die Erkennung
+  erfolgt auf dem vorhandenen zentralen logischen PTT-Pfad und nicht durch eine
+  zweite GPIO-Auswertung.
+- Die Geräteansicht zeigt eine fortlaufende Stereo-Timeline: Pegelausschläge
+  des rechten Mikrofons laufen oberhalb, die des linken Mikrofons unterhalb der
+  Mittellinie. Bei pausierter Aufnahme steht die Timeline; beim Fortsetzen wird
+  sie an derselben Aufnahme weitergeführt.
+- Audiodaten werden bereits während der Aufnahme in eine absturzfeste lokale
+  Arbeitsdatei geschrieben. Verlassen der Recorderansicht finalisiert die
+  aktuelle Aufnahme automatisch; Ausschalten oder Dienstabsturz darf bereits
+  geschriebene Sprache nicht verwerfen.
+- Fertige Dateien liegen unter der Medienbibliothek im festen Bereich
+  `VoiceRecorder/JJMMTT/`. Ordner heißen `JJMMTT`, Dateien verwenden den
+  Startzeitpunkt und exakt das Schema
+  `JJMMTT_HHMMSS_VoiceRecorder.mp3`. Die offensichtliche Tippvariante
+  `VioceRecorder` wird nicht verwendet.
+- Der Musikplayer zeigt diesen Bereich als eigenen Ordner `VoiceRecorder` mit
+  Datumsunterordnern. Dateien aus Sprachaufzeichnung werden nicht mit
+  Radio-Liedern oder deren Interpretensortierung vermischt.
+
+### 2026-11-01 – Stream-Aufnahme bleibt im Dienst und markiert speicherwürdige Titel
+
+- Stream-Aufzeichnung bleibt eine Funktion des jeweiligen Streamingdienstes
+  und wird nicht in den separaten Mikrofon-Dienst `Sprachaufzeichnung`
+  verschoben. Der Sprachrecorder nimmt ausschließlich die Whisplay-Mikrofone
+  auf; der Radio-Ringspeicher bleibt Teil des Radios.
+- Das Radio puffert jeden laufenden Titel nur vorläufig vollständig. Endet ein
+  Titel ohne PTT-Markierung und ohne aktiven Dauerbetrieb, wird sein temporärer
+  Mitschnitt sofort verworfen. Ein normaler PTT-Klick markiert exakt den
+  aktuellen Titel als speicherwürdig; der Glow bleibt bis zur Titelgrenze rot.
+- Ein markierter Titel wird als MP3 im Interpretenordner abgelegt. Ordnername
+  ist der Interpret unter dem festen Musikbereich `Media/Music`, Dateiname
+  exakt `Interpret - Lied.mp3`, zum Beispiel
+  `Media/Music/Gorillaz/Gorillaz - Feel Good Inc.mp3`. Die sichtbaren Namen verwenden den
+  normalen Bindestrich wie vorgegeben. Unbekannte oder widersprüchliche
+  Metadaten bleiben im dokumentierten Prüfbereich und werden nicht erfunden.
+- Die beiden Aufnahmearten dürfen nicht im selben Ordner landen:
+  Radio-/Streamtitel liegen ausschließlich unter `Media/Music/<Interpret>/`,
+  Sprachaufnahmen ausschließlich unter `Media/VoiceRecorder/JJMMTT/`.
+  Eine Aktualisierung übernimmt den früheren Bereich `Media/recorded`
+  verlustfrei nach `Media/Music`, ohne beliebige Benutzerordner umzudeuten.
+- Ein PTT-Doppelklick startet den Radio-Dauerbetrieb „alle Titel behalten“;
+  jeder folgende sauber abgegrenzte Titel wird gespeichert. Solange eine
+  Daueraufnahme läuft, beendet der nächste normale PTT-Klick oder ein weiterer
+  Doppelklick den Dauerbetrieb. Da im Dauerbetrieb ohnehin jeder Titel erhalten
+  wird, hat der normale Klick dort keine zusätzliche Markierungsbedeutung.
+- Bei einem einzelnen markierten Radiotitel leuchtet der zentral komponierte
+  Glow rot. Bei Daueraufnahme pulsiert der rote Glow langsam zwischen der
+  normalen Standard-Glowstärke und ungefähr der doppelten maximalen Stärke
+  beziehungsweise Deckkraft. Derselbe Puls gilt für die Daueraufnahme des
+  Sprachrecorders; eine normale gehaltene Sprachaufnahme zeigt konstant Rot.
+- **DMR/BrandMeister ist ausdrücklich von jeder Aufnahmefunktion ausgeschlossen.**
+  HoseLine bleibt ein reiner Empfangsdienst. Dort schaltet PTT ausschließlich
+  Talkgroups beziehungsweise bedient Filter und Navigation wie dokumentiert;
+  weder kurzer noch doppelter oder langer PTT-Druck startet eine Aufnahme,
+  markiert Audio oder aktiviert einen roten Aufnahme-Glow.

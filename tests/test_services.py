@@ -11,6 +11,7 @@ from urllib.parse import urlsplit
 from openr4d10.services import BUILTIN_SERVICES, ServiceCatalog
 from openr4d10.content import DWD_RADAR_GIF_URL
 from openr4d10.presets import FEED_BY_ID, RADIO_BY_ID
+from openr4d10.radio_capture import BufferedTrack
 from openr4d10.storage import MIGRATION_1, SCHEMA_VERSION, StateStore
 
 
@@ -55,6 +56,71 @@ class StateStoreTests(unittest.TestCase):
 
 
 class ServiceCatalogTests(unittest.TestCase):
+    def test_recorded_song_uses_media_music_artist_layout(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            catalog = ServiceCatalog(root, executable_lookup=lambda _name: None)
+            try:
+                stored = catalog._store_buffered_track(
+                    BufferedTrack(
+                        payload=b"mpeg-audio",
+                        content_type="audio/mpeg",
+                        stream_title="Gorillaz - Feel Good Inc",
+                        artist="Gorillaz",
+                        title="Feel Good Inc",
+                        started_at="2026-11-01T08:21:59+00:00",
+                        truncated=False,
+                    )
+                )
+                expected = (
+                    root
+                    / "media"
+                    / "Music"
+                    / "Gorillaz"
+                    / "Gorillaz - Feel Good Inc.mp3"
+                )
+                self.assertTrue(stored)
+                self.assertTrue(expected.is_file())
+                item = next(
+                    entry for entry in catalog.snapshot()["media"]
+                    if entry["source_kind"] == "radio"
+                )
+                self.assertEqual(item["folder"], "Music/Gorillaz")
+            finally:
+                catalog.close()
+
+    def test_legacy_recorded_tree_moves_to_music_without_losing_favorite(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            old = root / "media" / "recorded" / "Artist" / "Artist - Song.mp3"
+            old.parent.mkdir(parents=True)
+            old.write_bytes(b"audio")
+            store = StateStore(root / "openr4d10.sqlite3")
+            media_id = store.add_recorded_media(
+                old,
+                artist="Artist",
+                title="Song",
+                size_bytes=5,
+                checksum="legacy-checksum",
+                normalized_key="artistsong",
+                fingerprint=None,
+                review_required=False,
+            )
+            store.set_media_favorite(media_id, True)
+            store.close()
+
+            catalog = ServiceCatalog(root)
+            try:
+                target = root / "media" / "Music" / "Artist" / "Artist - Song.mp3"
+                self.assertFalse(old.exists())
+                self.assertTrue(target.is_file())
+                item = catalog.store.media_item(media_id)
+                self.assertEqual(item["path"], str(target))
+                self.assertTrue(item["favorite"])
+                self.assertEqual(item["source_kind"], "radio")
+            finally:
+                catalog.close()
+
     def test_weather_radar_upgrade_preserves_customization_and_deletion(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw).resolve()
@@ -1263,18 +1329,122 @@ class ServiceCatalogTests(unittest.TestCase):
             root = Path(raw).resolve()
             catalog = ServiceCatalog(root)
             media_root = root / "media"
-            media_root.mkdir()
+            media_root.mkdir(exist_ok=True)
             audio = media_root / "song.mp3"
+            voice = (
+                media_root
+                / "VoiceRecorder"
+                / "261101"
+                / "261101_082159_VoiceRecorder.mp3"
+            )
             ignored = media_root / "notes.txt"
             audio.write_bytes(b"audio")
+            voice.parent.mkdir(parents=True)
+            voice.write_bytes(b"voice")
             ignored.write_text("not media", encoding="utf-8")
             try:
-                self.assertEqual(catalog.scan_media(), 1)
+                self.assertEqual(catalog.scan_media(), 2)
                 snapshot = catalog.snapshot()
-                self.assertEqual(snapshot["media"][0]["title"], "song")
-                self.assertNotIn("path", snapshot["media"][0])
+                song = next(item for item in snapshot["media"] if item["title"] == "song")
+                recorded = next(
+                    item for item in snapshot["media"] if item["source_kind"] == "voice"
+                )
+                self.assertNotIn("path", song)
+                self.assertEqual(recorded["folder"], "VoiceRecorder/261101")
+                self.assertEqual(
+                    recorded["title"], "261101_082159_VoiceRecorder"
+                )
                 audio.unlink()
+                voice.unlink()
                 self.assertEqual(catalog.scan_media(), 0)
                 self.assertEqual(catalog.snapshot()["media"], [])
             finally:
                 catalog.close()
+
+    def test_voice_recorder_open_stops_playback_and_uses_one_resumable_session(self) -> None:
+        class State:
+            volume = 30
+            state = "stopped"
+
+            def as_dict(self):
+                return {"state": self.state, "volume": self.volume}
+
+        class Player:
+            def __init__(self) -> None:
+                self.state = State()
+                self.stops = 0
+
+            def stop(self):
+                self.stops += 1
+                self.state.state = "stopped"
+
+            def close(self):
+                pass
+
+        class Recorder:
+            def __init__(self) -> None:
+                self.state = State()
+                self.calls = []
+                self.snapshot = {
+                    "state": "stopped",
+                    "continuous": False,
+                    "session_active": False,
+                    "timeline": [],
+                }
+
+            def voice_snapshot(self):
+                return dict(self.snapshot)
+
+            def voice_start(self, *, continuous=False):
+                self.calls.append(("start", continuous))
+                self.snapshot.update(
+                    state="recording",
+                    continuous=continuous,
+                    session_active=True,
+                )
+                return self.voice_snapshot()
+
+            def voice_pause(self):
+                self.calls.append(("pause", False))
+                self.snapshot.update(state="paused", continuous=False)
+                return self.voice_snapshot()
+
+            def voice_finalize(self):
+                self.calls.append(("finalize", False))
+                self.snapshot.update(
+                    state="stopped", continuous=False, session_active=False
+                )
+                return self.voice_snapshot()
+
+            def close(self):
+                pass
+
+        with tempfile.TemporaryDirectory() as raw:
+            player = Player()
+            recorder = Recorder()
+            catalog = ServiceCatalog(
+                Path(raw).resolve(), player=player, recorder=recorder
+            )
+            try:
+                catalog.control({"action": "voice_recorder_open"})
+                catalog.control({"action": "voice_recorder_hold"})
+                catalog.control({"action": "voice_recorder_pause"})
+                catalog.control({"action": "voice_recorder_continuous"})
+                overlay = catalog.receiver_overlay("REC")
+                catalog.control({"action": "voice_recorder_close"})
+            finally:
+                catalog.close()
+
+        self.assertEqual(player.stops, 1)
+        self.assertEqual(overlay["service"], "REC")
+        self.assertTrue(overlay["recording"])
+        self.assertTrue(overlay["continuous"])
+        self.assertEqual(
+            recorder.calls,
+            [
+                ("start", False),
+                ("pause", False),
+                ("start", True),
+                ("finalize", False),
+            ],
+        )

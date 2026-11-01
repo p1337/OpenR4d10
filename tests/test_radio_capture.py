@@ -59,8 +59,8 @@ class RecordedMediaStorageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw).resolve()
             store = StateStore(root / "state.sqlite3")
-            first = root / "Artist" / "Artist – Song.mp3"
-            first.parent.mkdir()
+            first = root / "Media" / "Music" / "Artist" / "Artist - Song.mp3"
+            first.parent.mkdir(parents=True)
             first.write_bytes(b"audio")
             media_id = store.add_recorded_media(
                 first,

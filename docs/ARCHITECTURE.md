@@ -238,8 +238,12 @@ track is retained in memory. A radio-context PTT press marks that buffer for
 storage; the next metadata title boundary atomically writes the complete
 available track beginning. Continuous mode marks every delimited track. Missing
 or malformed metadata is never guessed: the bounded material remains a review
-item. The library normalizes `Artist – Song`, stores by artist, checks metadata,
-checksum and Chromaprint fingerprint duplicates, and never exposes local paths.
+item. The library normalizes `Artist - Song.mp3` and stores it below the fixed
+`Media/Music/<Artist>/` tree. Whisplay microphone captures use the separate
+`Media/VoiceRecorder/JJMMTT/` tree. The library checks metadata, checksum and
+Chromaprint fingerprint duplicates and never exposes local paths. Startup moves
+only the former managed `Media/recorded` tree into `Media/Music`; arbitrary user
+folders are never reclassified.
 The real SWR3 ICY format `Title / Artist` is the one verified reverse-order
 case and is normalized to `Artist – Title`; unknown formats remain verbatim.
 Optional covers use rate-limited MusicBrainz search and Cover Art Archive data,

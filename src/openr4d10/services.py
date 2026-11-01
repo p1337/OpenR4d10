@@ -125,7 +125,7 @@ BUILTIN_SERVICES = (
     ServiceManifest("ambient", "AmbientR4D10", "audio", "Looping café, nature, water, rain and night soundscapes", ("playback", "scenes", "loop"), "process", ("mpv",)),
     ServiceManifest("anker_solix", "Anker SOLIX", "energy", "Live photovoltaic, home, grid and battery telemetry", ("energy", "solar", "battery"), "external", requires_credentials=True, credential_hint="Prefer supported local Modbus TCP devices; otherwise configure the isolated community cloud adapter locally."),
     ServiceManifest("local_media", "Local Media", "audio", "Local MP3, FLAC, MP4 and recordings", ("playback", "library"), "process", ("mpv",)),
-    ServiceManifest("recorder", "Recorder", "audio", "Record supported audio sources", ("recording", "library"), "process", ("ffmpeg",)),
+    ServiceManifest("recorder", "Voice Recorder", "audio", "Stereo PTT voice recording from the Whisplay microphones", ("recording", "library"), "process", ("ffmpeg",)),
     ServiceManifest("brandmeister", "BrandMeister", "radio", "Receive-only DMR audio through native HoseLine", ("playback", "talkgroups"), "process", ("aplay",)),
     ServiceManifest("remote_sdr", "Remote SDR", "radio", "OpenWebRX or another configured remote receiver", ("playback", "channels", "squelch"), "external"),
     ServiceManifest("private_ptt", "Private PTT", "voice", "Private push-to-talk between explicitly paired devices", ("ptt", "playback", "recording"), "external", requires_credentials=True, credential_hint="Pair devices locally; never ship a shared key."),
@@ -173,11 +173,13 @@ class ServiceCatalog:
         self.store = StateStore(state_directory / "openr4d10.sqlite3")
         self.executable_lookup = executable_lookup
         self.media_root = state_directory / "media"
+        self.music_root = self.media_root / "Music"
         self.cover_root = state_directory / "cache" / "track-covers"
         self.player = player or MpvEngine(media_roots=(self.media_root,))
         self.recorder = recorder or StreamRecorder(
             state_directory / "recordings",
             media_roots=(self.media_root,),
+            voice_root=self.media_root / "VoiceRecorder",
         )
         self.feed_reader = feed_reader or FeedReader()
         self.podcast_reader = podcast_reader or PodcastReader()
@@ -356,6 +358,11 @@ class ServiceCatalog:
             )
         self._initial_view_resolved = False
         self._ambient_prefetch_started = False
+        # Keep the documented media layout stable before rebuilding the index.
+        self._migrate_legacy_recorded_music()
+        # Index finalized/recovered voice recordings on every startup so a
+        # power loss never leaves an existing MP3 invisible in the player.
+        self.scan_media()
 
     def start_brandmeister_receiver(self) -> None:
         """Restore the persisted receive-only scanner in the real service process."""
@@ -776,6 +783,22 @@ class ServiceCatalog:
             self._stop_ambient_layers()
         if self.active_service == "brandmeister":
             self.brandmeister.stop()
+
+    def _open_voice_recorder(self) -> dict[str, object]:
+        """Give microphone capture exclusive ownership and silence playback."""
+        self._require_enabled("recorder")
+        self.brandmeister.stop()
+        self._stop_ambient_layers()
+        self.player.stop()
+        if self.radio_buffer is not None:
+            self.radio_buffer.stop(flush=True)
+        self.active_service = "recorder"
+        self.active_preset_id = None
+        self.active_station_id = None
+        self._active_podcast_episode = None
+        self.active_ambient_scene_id = None
+        snapshot = getattr(self.recorder, "voice_snapshot", None)
+        return snapshot() if callable(snapshot) else self.recorder.state.as_dict()
 
     def _upgrade_germany_weather_default(self) -> None:
         """Change only the untouched seeded Germany channel; never recreate it."""
@@ -1206,18 +1229,60 @@ class ServiceCatalog:
         normalized_key = self._track_key(track.artist, track.title)
         if self.store.media_duplicate(normalized_key, None, checksum) is not None:
             return False
-        artist_root = (self.media_root / "recorded" / artist).resolve()
-        media_root = self.media_root.resolve()
-        if not artist_root.is_relative_to(media_root):
-            raise ValueError("recorded track path escaped the media root")
+        artist_root = (self.music_root / artist).resolve()
+        music_root = self.music_root.resolve()
+        if not artist_root.is_relative_to(music_root):
+            raise ValueError("recorded track path escaped the music root")
         artist_root.mkdir(parents=True, exist_ok=True, mode=0o750)
-        suffix = ".mp3" if "mpeg" in track.content_type else ".aac"
-        basename = self._track_part(f"{artist} – {title}", "Unbekannt – Aufnahme", 220)
-        output = artist_root / f"{basename}{suffix}"
+        basename = self._track_part(
+            f"{artist} - {title}", "Unbekannt - Aufnahme", 220
+        )
+        output = artist_root / f"{basename}.mp3"
         if output.exists():
-            output = artist_root / f"{basename} – {checksum[:8]}{suffix}"
-        temporary = output.with_name(output.stem + ".part" + output.suffix)
-        temporary.write_bytes(track.payload)
+            output = artist_root / f"{basename} - {checksum[:8]}.mp3"
+        temporary = output.with_name(output.stem + ".part.mp3")
+        if "mpeg" in track.content_type or "mp3" in track.content_type:
+            temporary.write_bytes(track.payload)
+        else:
+            executable = self.executable_lookup("ffmpeg")
+            if executable is None:
+                raise RuntimeError("ffmpeg is required to store radio tracks as MP3")
+            input_format = "aac" if "aac" in track.content_type else None
+            command = [
+                executable,
+                "-nostdin",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+            ]
+            if input_format is not None:
+                command.extend(("-f", input_format))
+            command.extend(
+                (
+                    "-i",
+                    "pipe:0",
+                    "-map",
+                    "0:a:0",
+                    "-c:a",
+                    "libmp3lame",
+                    "-b:a",
+                    "192k",
+                    "-vn",
+                    "-y",
+                    str(temporary),
+                )
+            )
+            result = subprocess.run(
+                command,
+                input=track.payload,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+                timeout=180,
+            )
+            if result.returncode != 0 or not temporary.is_file():
+                temporary.unlink(missing_ok=True)
+                raise RuntimeError("radio track could not be encoded as MP3")
         try:
             fingerprint = self._fingerprint(temporary)
             if self.store.media_duplicate(normalized_key, fingerprint, checksum) is not None:
@@ -1371,23 +1436,41 @@ class ServiceCatalog:
             if selected_podcast is not None
             else []
         )
-        media = [
-            {
-                "id": item["id"],
-                "artist": item["artist"],
-                "title": item["title"],
-                "size_bytes": item["size_bytes"],
-                "favorite": bool(item["favorite"]),
-                "review_required": bool(item["review_required"]),
-                "source_kind": item["source_kind"],
-                "cover": (
-                    f"/api/media-cover/{item['id']}"
-                    if item["cover_file"]
-                    else None
-                ),
-            }
-            for item in self.store.media_items()
-        ]
+        media = []
+        for item in self.store.media_items():
+            folder = "Media"
+            try:
+                relative = Path(str(item["path"])).resolve().relative_to(
+                    self.media_root.resolve()
+                )
+                if item["source_kind"] in {"radio", "voice"} and len(relative.parts) >= 2:
+                    folder = "/".join(relative.parts[:-1])
+            except (OSError, ValueError):
+                pass
+            media.append(
+                {
+                    "id": item["id"],
+                    "artist": item["artist"],
+                    "title": item["title"],
+                    "size_bytes": item["size_bytes"],
+                    "favorite": bool(item["favorite"]),
+                    "review_required": bool(item["review_required"]),
+                    "source_kind": item["source_kind"],
+                    "folder": folder,
+                    "cover": (
+                        f"/api/media-cover/{item['id']}"
+                        if item["cover_file"]
+                        else None
+                    ),
+                }
+            )
+        media.sort(
+            key=lambda item: (
+                1 if item["source_kind"] == "voice" else 0,
+                str(item["folder"]).casefold(),
+                str(item["title"]).casefold(),
+            )
+        )
         weather_channels = []
         for channel, item in enumerate(self.store.channels("weather"), start=1):
             metadata = item.get("metadata")
@@ -1527,7 +1610,11 @@ class ServiceCatalog:
             "active_service": self.active_service,
             "selected_preset": self._selected_preset(),
             "playback": self.player.state.as_dict(),
-            "recording": self.recorder.state.as_dict(),
+            "recording": (
+                self.recorder.voice_snapshot()
+                if callable(getattr(self.recorder, "voice_snapshot", None))
+                else self.recorder.state.as_dict()
+            ),
             "radio_buffer": (
                 self.radio_buffer.snapshot()
                 if self.radio_buffer is not None
@@ -1616,7 +1703,11 @@ class ServiceCatalog:
                     self._active_podcast_episode = None
                     self.active_ambient_scene_id = None
                 if service_id == "recorder":
-                    self.recorder.stop()
+                    finalize = getattr(self.recorder, "voice_finalize", None)
+                    if callable(finalize):
+                        finalize()
+                    else:
+                        self.recorder.stop()
             self.store.set_service_enabled(service_id, enabled)
             return {"service_id": service_id, "enabled": enabled}
         if action == "service_move":
@@ -1694,6 +1785,34 @@ class ServiceCatalog:
                 self.player.set_volume(volume)
                 if self.active_service == "ambient":
                     self._sync_ambient_layers()
+        elif action == "voice_recorder_open":
+            return {"recording": self._open_voice_recorder()}
+        elif action in {"voice_recorder_hold", "voice_recorder_continuous"}:
+            self._require_enabled("recorder")
+            if self.active_service != "recorder":
+                self._open_voice_recorder()
+            start = getattr(self.recorder, "voice_start", None)
+            if not callable(start):
+                raise RuntimeError("voice recording is unavailable")
+            return {
+                "recording": start(
+                    continuous=action == "voice_recorder_continuous"
+                )
+            }
+        elif action == "voice_recorder_pause":
+            pause = getattr(self.recorder, "voice_pause", None)
+            if not callable(pause):
+                raise RuntimeError("voice recording is unavailable")
+            return {"recording": pause()}
+        elif action == "voice_recorder_close":
+            finalize = getattr(self.recorder, "voice_finalize", None)
+            if not callable(finalize):
+                raise RuntimeError("voice recording is unavailable")
+            recording = finalize()
+            self.scan_media()
+            if self.active_service == "recorder":
+                self.active_service = "system"
+            return {"recording": recording}
         elif action == "record_start":
             self._require_enabled("recorder")
             source = request.get("source")
@@ -3062,11 +3181,62 @@ class ServiceCatalog:
                 size = resolved.stat().st_size
             except OSError:
                 continue
-            self.store.upsert_media("local_media", resolved, size)
+            relative = resolved.relative_to(root)
+            source_kind = (
+                "voice"
+                if len(relative.parts) >= 3
+                and relative.parts[0] == "VoiceRecorder"
+                and re.fullmatch(r"\d{6}", relative.parts[1]) is not None
+                and re.fullmatch(
+                    r"\d{6}_\d{6}_VoiceRecorder\.mp3",
+                    relative.name,
+                ) is not None
+                else "radio"
+                if len(relative.parts) >= 3
+                and relative.parts[0] == "Music"
+                else "local"
+            )
+            self.store.upsert_media(
+                "local_media", resolved, size, source_kind=source_kind
+            )
             present.add(str(resolved))
             count += 1
         self.store.remove_missing_media("local_media", present)
         return count
+
+    def _migrate_legacy_recorded_music(self) -> None:
+        """Move only the former managed recording tree into ``Media/Music``."""
+        legacy_root = self.media_root / "recorded"
+        if not legacy_root.is_dir():
+            return
+        self.music_root.mkdir(parents=True, exist_ok=True, mode=0o750)
+        music_root = self.music_root.resolve()
+        for source in sorted(legacy_root.rglob("*")):
+            if not source.is_file() or source.suffix.lower() not in MEDIA_EXTENSIONS:
+                continue
+            relative = source.relative_to(legacy_root)
+            target = (self.music_root / relative).resolve()
+            if not target.is_relative_to(music_root):
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
+            if target.exists():
+                digest = hashlib.sha256(source.read_bytes()).hexdigest()[:8]
+                target = target.with_name(f"{target.stem} - {digest}{target.suffix}")
+            os.replace(source, target)
+            self.store.relocate_media_path(source.resolve(), target, target.stat().st_size)
+        for directory in sorted(
+            (item for item in legacy_root.rglob("*") if item.is_dir()),
+            key=lambda item: len(item.parts),
+            reverse=True,
+        ):
+            try:
+                directory.rmdir()
+            except OSError:
+                pass
+        try:
+            legacy_root.rmdir()
+        except OSError:
+            pass
 
     def content_asset(self, path: str) -> tuple[str, bytes] | None:
         if path == "brandmeister-talkgroups.json":
@@ -3319,7 +3489,7 @@ class ServiceCatalog:
                 "SYSTEM": ("OPENR4D10", "System online", "Receiver ready"),
                 "PLAYER": ("LOCAL MEDIA", "Local media", "Select media and press play"),
                 "DMR": ("DMR", "Digital radio", "Select a channel and press play"),
-                "REC": ("RECORDER", "Recorder", "Recording controls"),
+                "REC": ("Voice Recorder", "Voice Recorder", "Hold PTT to record"),
             }
             station, title, subtitle = defaults.get(
                 requested,
@@ -3331,6 +3501,36 @@ class ServiceCatalog:
                 "title": title,
                 "subtitle": subtitle,
                 "playing": False,
+                "volume": playback.volume,
+            }
+        if requested == "REC" or self.active_service == "recorder":
+            snapshot = getattr(self.recorder, "voice_snapshot", None)
+            voice = (
+                snapshot()
+                if callable(snapshot)
+                else self.recorder.state.as_dict()
+            )
+            state = str(voice.get("state") or "stopped")
+            continuous = voice.get("continuous") is True
+            title = (
+                "Continuous recording"
+                if state == "recording" and continuous
+                else "Recording"
+                if state == "recording"
+                else "Recording paused"
+                if voice.get("session_active") is True
+                else "Hold PTT to record"
+            )
+            return {
+                "service": "REC",
+                "station": "Voice Recorder",
+                "title": title,
+                "subtitle": "Right microphone above · left microphone below",
+                "playing": False,
+                "recording": state == "recording",
+                "continuous": continuous,
+                "timeline": voice.get("timeline") or [],
+                "output": voice.get("output"),
                 "volume": playback.volume,
             }
         if playback.state not in {"playing", "paused"}:
@@ -3352,11 +3552,13 @@ class ServiceCatalog:
         )
         track_line = "No title information"
         buffered_recording = False
+        buffered_continuous = False
         if self.active_service == "webradio" and self.radio_buffer is not None:
             buffered = self.radio_buffer.snapshot()
+            buffered_continuous = buffered.get("continuous") is True
             buffered_recording = (
                 buffered.get("keep_current") is True
-                or buffered.get("continuous") is True
+                or buffered_continuous
             )
             track_line = self._radio_track_line(buffered) or track_line
         elif self.active_service == "podcasts" and self._active_podcast_episode is not None:
@@ -3389,6 +3591,7 @@ class ServiceCatalog:
             "recording": (
                 self.recorder.state.state == "recording" or buffered_recording
             ),
+            "continuous": buffered_continuous,
             "volume": playback.volume,
             "preset_id": (
                 selected["preset_id"] if selected is not None else ambient_preset_id
@@ -3434,6 +3637,7 @@ class ServiceCatalog:
             for worker in workers:
                 worker.join(timeout=max(0.0, remaining / len(workers)))
         self.recorder.close()
+        self.scan_media()
         self.brandmeister.close()
         self._stop_ambient_layers()
         if self.radio_buffer is not None:

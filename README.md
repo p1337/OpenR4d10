@@ -67,7 +67,8 @@ the installer report exactly which adapters still need configuration.
 - persistent, ordered web-radio library and bounded local-media library scanning
 - ICY-aware radio pre-buffer: PTT retains the current song including its
   buffered beginning; optional continuous capture splits on title metadata,
-  suppresses duplicates and stores `Artist – Song` by artist
+  suppresses duplicates and stores `Media/Music/Artist/Artist - Song.mp3`;
+  microphone recordings remain separate below `Media/VoiceRecorder/JJMMTT`
 - silent ICY title lookup in the radio view before audible Play, with localized
   non-technical fallback text when a station supplies no title
 - simple recorded-music player with favorites, `My Soundmix`, shuffle,

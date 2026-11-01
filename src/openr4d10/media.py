@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from collections import deque
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime, timedelta
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import socket
 import subprocess
@@ -278,6 +280,10 @@ class RecordingState:
     source: str | None = None
     output: str | None = None
     error: str | None = None
+    mode: str = "stream"
+    continuous: bool = False
+    session_active: bool = False
+    timeline: list[list[int]] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -287,13 +293,15 @@ PopenFactory = Callable[..., subprocess.Popen[bytes]]
 
 
 class StreamRecorder:
-    """Record one approved stream to Opus without invoking a shell."""
+    """Record one approved stream or one resumable Whisplay voice session."""
 
     def __init__(
         self,
         recordings_root: Path,
         executable: Path = Path("/usr/bin/ffmpeg"),
         media_roots: tuple[Path, ...] = (Path("/var/lib/openr4d10/media"),),
+        voice_root: Path | None = None,
+        capture_device: str = "whisplaysound",
         popen: PopenFactory = subprocess.Popen,
     ) -> None:
         if not recordings_root.is_absolute() or not _is_absolute_target_path(executable):
@@ -301,9 +309,23 @@ class StreamRecorder:
         self.recordings_root = recordings_root
         self.executable = executable
         self.media_roots = media_roots
+        self.voice_root = voice_root or recordings_root / "VoiceRecorder"
+        if not self.voice_root.is_absolute():
+            raise ValueError("voice recorder root must be absolute")
+        if not re.fullmatch(r"[A-Za-z0-9_.:-]{1,80}", capture_device):
+            raise ValueError("invalid ALSA capture device")
+        self.capture_device = capture_device
         self.popen = popen
         self.process: subprocess.Popen[bytes] | None = None
         self.state = RecordingState()
+        self._voice_session_dir: Path | None = None
+        self._voice_output: Path | None = None
+        self._voice_segment_index = 0
+        self._voice_timeline: deque[list[int]] = deque(maxlen=96)
+        self._voice_levels: dict[int, int] = {1: 0, 2: 0}
+        self._voice_stats_thread: threading.Thread | None = None
+        self._voice_lock = threading.RLock()
+        self._recover_voice_sessions()
 
     def command_line(self, source: str, output: Path) -> list[str]:
         return [
@@ -347,21 +369,238 @@ class StreamRecorder:
             state="recording",
             source=public_source_label(approved),
             output=output.name,
+            mode="stream",
         )
         return self.state.as_dict()
 
-    def stop(self) -> dict[str, Any]:
-        if self.process is not None and self.process.poll() is None:
-            self.process.send_signal(signal.SIGINT)
+    def voice_command_line(self, output: Path) -> list[str]:
+        """Build the fixed stereo ALSA capture command and emit level metadata."""
+        return [
+            _target_path_string(self.executable),
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "info",
+            "-f",
+            "alsa",
+            "-ac",
+            "2",
+            "-ar",
+            "48000",
+            "-i",
+            self.capture_device,
+            "-af",
+            "asetpts=N/SR/TB,astats=metadata=1:reset=24,ametadata=print",
+            "-c:a",
+            "libmp3lame",
+            "-b:a",
+            "160k",
+            "-write_xing",
+            "0",
+            "-id3v2_version",
+            "0",
+            "-write_id3v1",
+            "0",
+            "-vn",
+            str(output),
+        ]
+
+    def _new_voice_session(self) -> None:
+        started = datetime.now()
+        while True:
+            day = started.strftime("%y%m%d")
+            stem = started.strftime("%y%m%d_%H%M%S_VoiceRecorder")
+            output = self.voice_root / day / f"{stem}.mp3"
+            pending = self.voice_root / day / f".pending-{stem}"
+            if not output.exists() and not pending.exists():
+                break
+            started += timedelta(seconds=1)
+        pending.mkdir(parents=True, mode=0o750)
+        self._voice_session_dir = pending
+        self._voice_output = output
+        self._voice_segment_index = 0
+        self._voice_timeline.clear()
+        self._voice_levels = {1: 0, 2: 0}
+
+    @staticmethod
+    def _level_percent(raw: str) -> int:
+        try:
+            decibels = float(raw)
+        except ValueError:
+            return 0
+        if decibels == float("-inf"):
+            return 0
+        return max(0, min(100, round((decibels + 60.0) * (100.0 / 60.0))))
+
+    def _consume_voice_level_line(self, raw: bytes | str) -> None:
+        line = raw.decode("utf-8", "replace") if isinstance(raw, bytes) else raw
+        match = re.search(
+            r"lavfi\.astats\.(1|2)\.(?:RMS|Peak)_level=(-?(?:\d+(?:\.\d+)?|inf))",
+            line,
+            re.IGNORECASE,
+        )
+        if match is None:
+            return
+        channel = int(match.group(1))
+        with self._voice_lock:
+            self._voice_levels[channel] = self._level_percent(match.group(2))
+            if channel == 2:
+                # Channel 1 is the left microphone (drawn below), channel 2 is
+                # the right microphone (drawn above).
+                self._voice_timeline.append(
+                    [self._voice_levels[1], self._voice_levels[2]]
+                )
+                self.state.timeline = list(self._voice_timeline)
+
+    def _read_voice_levels(self, process: subprocess.Popen[bytes]) -> None:
+        stderr = getattr(process, "stderr", None)
+        if stderr is None:
+            return
+        try:
+            while True:
+                raw = stderr.readline()
+                if not raw:
+                    break
+                self._consume_voice_level_line(raw)
+        except (OSError, ValueError):
+            return
+
+    def voice_start(self, *, continuous: bool = False) -> dict[str, Any]:
+        with self._voice_lock:
+            if self.process is not None and self.process.poll() is None:
+                if self.state.mode == "voice":
+                    self.state.continuous = continuous or self.state.continuous
+                    return self.state.as_dict()
+                raise MediaError("a stream recording is already active")
+            if self._voice_session_dir is None or self._voice_output is None:
+                self._new_voice_session()
+            assert self._voice_session_dir is not None
+            assert self._voice_output is not None
+            self._voice_segment_index += 1
+            segment = self._voice_session_dir / f"segment-{self._voice_segment_index:06d}.mp3"
             try:
-                self.process.wait(timeout=5)
+                self.process = self.popen(
+                    self.voice_command_line(segment),
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    close_fds=True,
+                    start_new_session=True,
+                )
+            except OSError as exc:
+                self.state = RecordingState(
+                    state="error", error=str(exc), mode="voice", session_active=True
+                )
+                raise MediaError(f"cannot start Whisplay voice recorder: {exc}") from exc
+            self.state = RecordingState(
+                state="recording",
+                source="Whisplay microphones",
+                output=self._voice_output.name,
+                mode="voice",
+                continuous=continuous,
+                session_active=True,
+                timeline=list(self._voice_timeline),
+            )
+            self._voice_stats_thread = threading.Thread(
+                target=self._read_voice_levels,
+                args=(self.process,),
+                name="openr4d10-voice-levels",
+                daemon=True,
+            )
+            self._voice_stats_thread.start()
+            return self.state.as_dict()
+
+    def _stop_active_process(self) -> None:
+        process = self.process
+        if process is not None and process.poll() is None:
+            process.send_signal(signal.SIGINT)
+            try:
+                process.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                self.process.terminate()
-                self.process.wait(timeout=2)
+                process.terminate()
+                process.wait(timeout=2)
         self.process = None
+        thread = self._voice_stats_thread
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(timeout=1)
+        self._voice_stats_thread = None
+
+    def voice_pause(self) -> dict[str, Any]:
+        with self._voice_lock:
+            self._stop_active_process()
+            self.state.state = "paused" if self._voice_session_dir is not None else "stopped"
+            self.state.continuous = False
+            self.state.session_active = self._voice_session_dir is not None
+            self.state.timeline = list(self._voice_timeline)
+            return self.state.as_dict()
+
+    @staticmethod
+    def _merge_voice_segments(session_dir: Path, output: Path) -> Path | None:
+        segments = [item for item in sorted(session_dir.glob("segment-*.mp3")) if item.stat().st_size]
+        if not segments:
+            return None
+        output.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
+        temporary = output.with_suffix(".mp3.tmp")
+        with temporary.open("wb") as target:
+            for segment in segments:
+                with segment.open("rb") as source:
+                    while chunk := source.read(1024 * 1024):
+                        target.write(chunk)
+            target.flush()
+            os.fsync(target.fileno())
+        temporary.replace(output)
+        for segment in segments:
+            segment.unlink(missing_ok=True)
+        try:
+            session_dir.rmdir()
+        except OSError:
+            pass
+        return output
+
+    def _recover_voice_sessions(self) -> None:
+        if not self.voice_root.exists():
+            return
+        for session_dir in sorted(self.voice_root.glob("[0-9][0-9][0-9][0-9][0-9][0-9]/.pending-*")):
+            stem = session_dir.name.removeprefix(".pending-")
+            if not re.fullmatch(r"\d{6}_\d{6}_VoiceRecorder", stem):
+                continue
+            try:
+                self._merge_voice_segments(session_dir, session_dir.parent / f"{stem}.mp3")
+            except OSError:
+                continue
+
+    def voice_finalize(self) -> dict[str, Any]:
+        with self._voice_lock:
+            self.voice_pause()
+            output = self._voice_output
+            session_dir = self._voice_session_dir
+            finalized = None
+            if output is not None and session_dir is not None:
+                finalized = self._merge_voice_segments(session_dir, output)
+            self._voice_session_dir = None
+            self._voice_output = None
+            self._voice_segment_index = 0
+            self.state = RecordingState(
+                state="stopped",
+                output=finalized.name if finalized is not None else None,
+                mode="voice",
+                timeline=list(self._voice_timeline),
+            )
+            return self.state.as_dict()
+
+    def voice_snapshot(self) -> dict[str, Any]:
+        with self._voice_lock:
+            self.state.timeline = list(self._voice_timeline)
+            return self.state.as_dict()
+
+    def stop(self) -> dict[str, Any]:
+        self._stop_active_process()
         self.state.state = "stopped"
         self.state.source = None
         return self.state.as_dict()
 
     def close(self) -> None:
-        self.stop()
+        if self._voice_session_dir is not None:
+            self.voice_finalize()
+        else:
+            self.stop()

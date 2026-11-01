@@ -657,18 +657,37 @@ class StateStore:
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def upsert_media(self, service_id: str, path: Path, size_bytes: int) -> None:
+    def upsert_media(
+        self,
+        service_id: str,
+        path: Path,
+        size_bytes: int,
+        *,
+        source_kind: str = "local",
+    ) -> None:
+        if source_kind not in {"local", "radio", "voice"}:
+            raise ValueError("unsupported local media source kind")
         with self.transaction():
             self.connection.execute(
                 """
-                INSERT INTO media(service_id, path, title, size_bytes, created_at)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO media(
+                    service_id, path, title, size_bytes, source_kind, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(path) DO UPDATE SET
                     service_id = excluded.service_id,
                     title = excluded.title,
-                    size_bytes = excluded.size_bytes
+                    size_bytes = excluded.size_bytes,
+                    source_kind = excluded.source_kind
                 """,
-                (service_id, str(path), path.stem[:240], size_bytes, _now()),
+                (
+                    service_id,
+                    str(path),
+                    path.stem[:240],
+                    size_bytes,
+                    source_kind,
+                    _now(),
+                ),
             )
 
     def media_items(self, service_id: str = "local_media") -> list[dict[str, Any]]:
@@ -762,6 +781,17 @@ class StateStore:
                 ),
             )
             return int(cursor.lastrowid)
+
+    def relocate_media_path(self, old_path: Path, new_path: Path, size_bytes: int) -> bool:
+        """Move an indexed media row without losing favorites or track metadata."""
+        if not old_path.is_absolute() or not new_path.is_absolute():
+            raise ValueError("media relocation requires absolute paths")
+        with self.transaction():
+            cursor = self.connection.execute(
+                "UPDATE media SET path = ?, size_bytes = ? WHERE path = ?",
+                (str(new_path), size_bytes, str(old_path)),
+            )
+        return cursor.rowcount == 1
 
     def set_media_favorite(self, media_id: int, favorite: bool) -> bool:
         if isinstance(media_id, bool) or not isinstance(media_id, int):

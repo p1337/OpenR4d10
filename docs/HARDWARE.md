@@ -313,8 +313,18 @@ The real target has now completed that reboot with OpenR4d10 0.10.6. ALSA
 reports card `whisplaysound`, device `Whisplay HiFi wm8960-hifi-0`; the unified
 driver therefore detected this physical HAT as WM8960. Mixer control `speaker`
 exists with range 0 through 100 and was initialized to 80. These checks confirm
-driver, overlay and mixer activation, but not yet audible output from the
-speaker; the listening test remains separate.
+driver, overlay and mixer activation. A received BrandMeister HoseLine call was
+subsequently heard through the fitted speaker on 2026-10-31.
+
+On 2026-11-01 a one-second target probe captured `whisplaysound` through
+`ffmpeg` at 48 kHz with two channels and encoded a valid MP3 through the
+installed `libmp3lame`. Both ALSA channels produced independent `astats` level
+metadata. Resetting audio timestamps with `asetpts=N/SR/TB` removed the raw
+ALSA non-monotonic-DTS warning and is therefore part of the fixed recorder
+command. The temporary probe file was removed immediately. This confirms the
+stereo capture and encoding path; a supervised left/right capsule tap test is
+still required before treating the physical capsule-to-channel order as an
+independent hardware measurement.
 
 ## PiSugar 3 percentage telemetry
 
@@ -346,9 +356,10 @@ combined SMBus transaction with split raw I2C calls.
 
 ## Still deliberately unknown
 
-The Whisplay audio driver has identified the installed HAT as WM8960, and
-capture/playback devices plus `mic`/`speaker` controls are present; an actual
-microphone recording and audible speaker test remain separate physical checks.
+The Whisplay audio driver has identified the installed HAT as WM8960. Stereo
+microphone capture, MP3 encoding and audible speaker playback are confirmed on
+the real stack. Only the physical left/right capsule-to-channel assignment
+still awaits a supervised tap test.
 PiSugar charging control, RTC, watchdog and shutdown integration remain outside
 the percentage adapter until individually requested and verified. The Whisplay
 display backend is implemented and physically verified on the real stack.

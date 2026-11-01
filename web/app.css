@@ -382,6 +382,16 @@ kbd { display: inline-block; min-width: 24px; padding: 3px 6px; border: 1px soli
 .music-toolbar button { min-height: 38px; }
 .music-toolbar button.library-play { color: #151005; border-color: var(--cyan); background: var(--cyan); font-weight: 750; }
 .media-library-row { display: grid !important; grid-template-columns: 46px minmax(0, 1fr) auto; }
+.library-list .media-folder-row {
+  background: transparent;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--accent);
+  font-size: .82rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  padding: 14px 2px 6px;
+}
 .media-row-artwork { position: relative; width: 46px; height: 46px; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--cyan-soft); }
 .media-row-artwork::after { content: attr(data-initials); position: absolute; inset: 0; display: grid; place-items: center; color: var(--cyan); font-size: .7rem; font-weight: 800; }
 .media-row-artwork img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: cover; }

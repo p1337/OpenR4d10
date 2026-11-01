@@ -479,6 +479,68 @@ class DeviceUiTests(unittest.TestCase):
         self.assertNotEqual(image.getpixel((120, 71)), (6, 12, 15))
         self.assertNotEqual(image.getpixel((0, 180)), state.accent)
 
+    def test_voice_recorder_uses_red_glow_and_stereo_timeline_while_recording(self) -> None:
+        state = DeviceUiState(
+            service_index=SERVICES.index("REC"),
+            language="de",
+            recording=True,
+            recorder_continuous=True,
+            recorder_timeline=[[80, 20]],
+            recorder_output="261101_082159_VoiceRecorder.mp3",
+        )
+        image = render_device_ui(state)
+        glow = image.getpixel((7, 180))
+        self.assertGreater(glow[0], glow[1] * 2)
+        self.assertEqual(image.getpixel((17, 185)), (255, 92, 92))
+        self.assertEqual(image.getpixel((17, 240)), state.accent)
+
+    def test_radio_recording_uses_red_glow_but_dmr_never_does(self) -> None:
+        radio = render_device_ui(
+            DeviceUiState(
+                service_index=SERVICES.index("RADIO"),
+                recording=True,
+            )
+        )
+        dmr = render_device_ui(
+            DeviceUiState(
+                service_index=SERVICES.index("DMR"),
+                recording=True,
+            )
+        )
+        radio_glow = radio.getpixel((7, 80))
+        dmr_glow = dmr.getpixel((7, 80))
+        self.assertGreater(radio_glow[0], radio_glow[1] * 2)
+        self.assertLess(dmr_glow[0], dmr_glow[1] * 2)
+
+    def test_continuous_radio_recording_pulses_between_normal_and_double_glow(self) -> None:
+        state = DeviceUiState(
+            service_index=SERVICES.index("RADIO"),
+            recording=True,
+            recorder_continuous=True,
+        )
+        with patch("openr4d10.device_ui.datetime") as clock:
+            clock.now.return_value.strftime.return_value = "12:00"
+            clock.now.return_value.timestamp.return_value = 1.8
+            minimum = render_device_ui(state).getpixel((7, 80))
+            clock.now.return_value.timestamp.return_value = 0.6
+            maximum = render_device_ui(state).getpixel((7, 80))
+        self.assertGreater(sum(maximum), sum(minimum))
+
+    def test_voice_recorder_name_is_localized_on_the_device(self) -> None:
+        captured: list[str] = []
+        original_text = ImageDraw.ImageDraw.text
+
+        def capture_text(draw, xy, text, *args, **kwargs):
+            captured.append(str(text))
+            return original_text(draw, xy, text, *args, **kwargs)
+
+        state = DeviceUiState(
+            service_index=SERVICES.index("REC"), language="de"
+        )
+        with patch.object(ImageDraw.ImageDraw, "text", capture_text):
+            render_device_ui(state)
+        self.assertIn("Sprachaufzeichnung", captured)
+
     def test_play_control_is_below_battery_and_footer_is_empty(self) -> None:
         state = DeviceUiState(playing=True, service_index=1)
         image = render_device_ui(state)

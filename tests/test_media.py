@@ -17,6 +17,7 @@ class FakeProcess:
     def __init__(self) -> None:
         self.returncode = None
         self.signal = None
+        self.stderr = None
 
     def poll(self):
         return self.returncode
@@ -113,3 +114,73 @@ class ProcessBoundaryTests(unittest.TestCase):
             self.assertNotIn("shell", kwargs)
             stopped = recorder.stop()
             self.assertEqual(stopped["state"], "stopped")
+
+    def test_voice_recorder_uses_stereo_whisplay_alsa_and_resumable_mp3_segments(self) -> None:
+        calls = []
+
+        def fake_popen(command, **kwargs):
+            calls.append((command, kwargs))
+            Path(command[-1]).write_bytes(
+                b"first" if len(calls) == 1 else b"second"
+            )
+            return FakeProcess()
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            voice_root = root / "media" / "VoiceRecorder"
+            recorder = StreamRecorder(
+                root / "recordings",
+                voice_root=voice_root,
+                popen=fake_popen,
+            )
+            started = recorder.voice_start()
+            self.assertEqual(started["state"], "recording")
+            self.assertEqual(started["mode"], "voice")
+            command, kwargs = calls[0]
+            self.assertIn("alsa", command)
+            self.assertIn("whisplaysound", command)
+            self.assertIn("libmp3lame", command)
+            self.assertIn("2", command)
+            self.assertNotIn("shell", kwargs)
+            recorder.voice_pause()
+            recorder.voice_start()
+            recorder.voice_pause()
+            finalized = recorder.voice_finalize()
+            output = next(voice_root.glob("??????/??????_??????_VoiceRecorder.mp3"))
+            self.assertEqual(output.read_bytes(), b"firstsecond")
+            self.assertEqual(finalized["output"], output.name)
+            self.assertFalse(any(voice_root.rglob(".pending-*")))
+
+    def test_voice_recorder_recovers_pending_segments_after_restart(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            pending = (
+                root
+                / "media"
+                / "VoiceRecorder"
+                / "261101"
+                / ".pending-261101_082159_VoiceRecorder"
+            )
+            pending.mkdir(parents=True)
+            (pending / "segment-000001.mp3").write_bytes(b"recoverable")
+            StreamRecorder(
+                root / "recordings",
+                voice_root=root / "media" / "VoiceRecorder",
+            )
+            recovered = pending.parent / "261101_082159_VoiceRecorder.mp3"
+            self.assertEqual(recovered.read_bytes(), b"recoverable")
+            self.assertFalse(pending.exists())
+
+    def test_voice_level_metadata_keeps_left_and_right_channels_separate(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            recorder = StreamRecorder(root / "recordings")
+            recorder._consume_voice_level_line(
+                "lavfi.astats.1.RMS_level=-30.0"
+            )
+            recorder._consume_voice_level_line(
+                "lavfi.astats.2.RMS_level=-12.0"
+            )
+            timeline = recorder.voice_snapshot()["timeline"]
+            self.assertEqual(len(timeline), 1)
+            self.assertLess(timeline[0][0], timeline[0][1])

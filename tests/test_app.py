@@ -937,6 +937,221 @@ class AppTests(unittest.TestCase):
         self.assertEqual(services.requests, [{"action": "radio_keep_current"}])
         self.assertTrue(pressed["radio_buffer"]["keep_current"])
 
+    def test_voice_recorder_ptt_hold_double_click_and_continuous_stop(self) -> None:
+        class Recorder:
+            def __init__(self) -> None:
+                self.continuous = False
+
+            def voice_snapshot(self):
+                return {"continuous": self.continuous}
+
+        class InputDisplay:
+            def render(self, _frame) -> None:
+                pass
+
+            def snapshot(self):
+                return {"service": "REC", "menu_open": False}
+
+            def apply_input(self, _event):
+                return self.snapshot()
+
+        class Services:
+            active_service = "recorder"
+
+            def __init__(self) -> None:
+                self.requests = []
+                self.recorder = Recorder()
+
+            def control(self, request):
+                self.requests.append(request)
+                action = request["action"]
+                if action == "voice_recorder_continuous":
+                    self.recorder.continuous = True
+                elif action == "voice_recorder_pause":
+                    self.recorder.continuous = False
+                return {
+                    "recording": {
+                        "continuous": self.recorder.continuous,
+                        "state": "recording" if self.recorder.continuous else "paused",
+                    }
+                }
+
+            def receiver_overlay(self, _view_service=None):
+                return {"service": "REC", "recording": self.recorder.continuous}
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=InputDisplay(),
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,
+            )
+            with patch(
+                "openr4d10.app.time.monotonic",
+                side_effect=[10.0, 10.1, 10.2, 10.3, 11.0, 11.1],
+            ):
+                for active in (True, False, True, False, True, False):
+                    app.control(
+                        {
+                            "action": "device_input",
+                            "control": "ptt",
+                            "active": active,
+                        }
+                    )
+
+        self.assertEqual(
+            services.requests,
+            [
+                {"action": "voice_recorder_hold"},
+                {"action": "voice_recorder_pause"},
+                {"action": "voice_recorder_continuous"},
+                {"action": "voice_recorder_pause"},
+            ],
+        )
+
+    def test_radio_ptt_double_click_starts_and_next_click_stops_keep_all(self) -> None:
+        class Buffer:
+            def __init__(self) -> None:
+                self.continuous = False
+
+            def snapshot(self):
+                return {"continuous": self.continuous}
+
+        class InputDisplay:
+            def render(self, _frame) -> None:
+                pass
+
+            def snapshot(self):
+                return {"service": "RADIO", "menu_open": False}
+
+            def apply_input(self, _event):
+                return self.snapshot()
+
+        class Services:
+            active_service = "webradio"
+
+            def __init__(self) -> None:
+                self.requests = []
+                self.radio_buffer = Buffer()
+
+            def control(self, request):
+                self.requests.append(request)
+                if request["action"] == "radio_capture_mode":
+                    self.radio_buffer.continuous = request["enabled"]
+                return {"radio_buffer": self.radio_buffer.snapshot()}
+
+            def receiver_overlay(self, _view_service=None):
+                return {"service": "RADIO", "recording": self.radio_buffer.continuous}
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=InputDisplay(),
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,
+            )
+            with patch(
+                "openr4d10.app.time.monotonic",
+                side_effect=[20.0, 20.1, 20.2, 20.3, 21.0, 21.1],
+            ):
+                for active in (True, False, True, False, True, False):
+                    app.control(
+                        {"action": "device_input", "control": "ptt", "active": active}
+                    )
+
+        self.assertEqual(
+            services.requests,
+            [
+                {"action": "radio_keep_current"},
+                {"action": "radio_capture_mode", "enabled": True},
+                {"action": "radio_capture_mode", "enabled": False},
+            ],
+        )
+
+    def test_entering_and_leaving_voice_recorder_uses_service_lifecycle(self) -> None:
+        class InputDisplay:
+            def __init__(self) -> None:
+                self.service = "PLAYER"
+
+            def render(self, _frame) -> None:
+                pass
+
+            def snapshot(self):
+                return {"service": self.service, "menu_open": False}
+
+            def apply_input(self, _event):
+                self.service = "REC" if self.service == "PLAYER" else "SYSTEM"
+                return self.snapshot()
+
+        class Services:
+            active_service = "local_media"
+
+            def __init__(self) -> None:
+                self.requests = []
+
+            def control(self, request):
+                self.requests.append(request)
+                return {"recording": {"state": "stopped"}}
+
+            def receiver_overlay(self, view_service=None):
+                return {"service": view_service or "SYSTEM", "playing": False}
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            display = InputDisplay()
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=display,
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,
+            )
+            app.control(
+                {"action": "device_input", "control": "right_inner", "steps": 1}
+            )
+            app.control(
+                {"action": "device_input", "control": "right_inner", "steps": 1}
+            )
+
+        self.assertEqual(
+            services.requests,
+            [
+                {"action": "voice_recorder_open"},
+                {"action": "voice_recorder_close"},
+            ],
+        )
+
     def test_application_unit_provides_display_handoff_runtime(self) -> None:
         unit = (
             Path(__file__).resolve().parents[1]

@@ -54,6 +54,12 @@ class OpenR4d10App:
         self._status_lock = threading.Lock()
         self._view_initialized = False
         self._ptt_pressed_at: float | None = None
+        self._voice_last_release_at: float | None = None
+        self._voice_ignore_release = False
+        self._voice_ignore_until = 0.0
+        self._radio_last_release_at: float | None = None
+        self._radio_ignore_release = False
+        self._radio_ignore_until = 0.0
         self._latest_frame = Frame(
             screen="startup", title=config.title, body="Dienst wird gestartet"
         ).as_dict()
@@ -465,12 +471,104 @@ class OpenR4d10App:
         elif (
             self.services is not None
             and event.control == Control.PTT
-            and event.active is True
             and not menu_open
             and selected_service == "RADIO"
         ):
-            media_result = self.services.control({"action": "radio_keep_current"})
+            now = time.monotonic()
+            radio_buffer = getattr(self.services, "radio_buffer", None)
+            snapshot = getattr(radio_buffer, "snapshot", None)
+            buffered = snapshot() if callable(snapshot) else {}
+            if event.active is True:
+                if now < self._radio_ignore_until:
+                    self._radio_ignore_release = True
+                elif buffered.get("continuous") is True:
+                    media_result = self.services.control(
+                        {"action": "radio_capture_mode", "enabled": False}
+                    )
+                    self._radio_ignore_release = True
+                    self._radio_ignore_until = now + 0.6
+                    self._radio_last_release_at = None
+                elif (
+                    self._radio_last_release_at is not None
+                    and now - self._radio_last_release_at <= 0.45
+                ):
+                    media_result = self.services.control(
+                        {"action": "radio_capture_mode", "enabled": True}
+                    )
+                    self._radio_ignore_release = True
+                    self._radio_last_release_at = None
+                else:
+                    media_result = self.services.control(
+                        {"action": "radio_keep_current"}
+                    )
+                    self._radio_ignore_release = False
+            elif self._radio_ignore_release or now < self._radio_ignore_until:
+                self._radio_ignore_release = False
+            else:
+                self._radio_last_release_at = now
+        elif (
+            self.services is not None
+            and event.control == Control.PTT
+            and not menu_open
+            and selected_service == "REC"
+        ):
+            now = time.monotonic()
+            recorder = getattr(self.services, "recorder", None)
+            snapshot = getattr(recorder, "voice_snapshot", None)
+            voice = snapshot() if callable(snapshot) else {}
+            if event.active is True:
+                if now < self._voice_ignore_until:
+                    self._voice_ignore_release = True
+                elif voice.get("continuous") is True:
+                    media_result = self.services.control(
+                        {"action": "voice_recorder_pause"}
+                    )
+                    self._voice_ignore_release = True
+                    self._voice_ignore_until = now + 0.6
+                    self._voice_last_release_at = None
+                elif (
+                    self._voice_last_release_at is not None
+                    and now - self._voice_last_release_at <= 0.45
+                ):
+                    media_result = self.services.control(
+                        {"action": "voice_recorder_continuous"}
+                    )
+                    self._voice_ignore_release = True
+                    self._voice_last_release_at = None
+                else:
+                    media_result = self.services.control(
+                        {"action": "voice_recorder_hold"}
+                    )
+                    self._voice_ignore_release = False
+            elif self._voice_ignore_release or now < self._voice_ignore_until:
+                self._voice_ignore_release = False
+            else:
+                media_result = self.services.control(
+                    {"action": "voice_recorder_pause"}
+                )
+                self._voice_last_release_at = now
         device_state = handler(event)
+        new_service = (
+            str(device_state.get("service"))
+            if isinstance(device_state, dict) and device_state.get("service")
+            else selected_service
+        )
+        if self.services is not None and new_service != selected_service:
+            if selected_service == "RADIO":
+                self._radio_last_release_at = None
+                self._radio_ignore_release = False
+                self._radio_ignore_until = 0.0
+            if selected_service == "REC":
+                media_result = self.services.control(
+                    {"action": "voice_recorder_close"}
+                )
+                self._voice_last_release_at = None
+                self._voice_ignore_release = False
+                self._voice_ignore_until = 0.0
+            if new_service == "REC":
+                media_result = self.services.control(
+                    {"action": "voice_recorder_open"}
+                )
         self._view_initialized = True
         if media_result is not None:
             self.render_once()
@@ -502,6 +600,8 @@ class OpenR4d10App:
                 response["brandmeister"] = media_result["brandmeister"]
             if "radio_buffer" in media_result:
                 response["radio_buffer"] = media_result["radio_buffer"]
+            if "recording" in media_result:
+                response["recording"] = media_result["recording"]
         return response
 
     def device_screen(self) -> bytes | None:

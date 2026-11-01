@@ -616,7 +616,16 @@ function renderLibrary(catalog) {
   const media = Array.isArray(catalog?.media) ? catalog.media : [];
   const mediaList = byId("media-list");
   mediaList.replaceChildren();
+  let currentMediaFolder = null;
   for (const item of media) {
+    const folder = typeof item.folder === "string" && item.folder ? item.folder : "Music";
+    if (folder !== currentMediaFolder) {
+      const heading = document.createElement("li");
+      heading.className = "media-folder-row";
+      heading.textContent = folder.replaceAll("/", " / ");
+      mediaList.append(heading);
+      currentMediaFolder = folder;
+    }
     const row = document.createElement("li");
     row.className = "media-library-row";
     const artwork = document.createElement("div");
