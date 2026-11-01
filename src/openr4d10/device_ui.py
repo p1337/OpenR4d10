@@ -1398,7 +1398,7 @@ def _draw_hotspot_setup(
         )
 
 
-def _media_mask(size: tuple[int, int]) -> Image.Image:
+def media_mask(size: tuple[int, int]) -> Image.Image:
     """Return small top corners and panel-matched lower display corners."""
     width, height = size
     mask = Image.new("L", size, 0)
@@ -1429,7 +1429,7 @@ def _fill_media_shape(
 ) -> None:
     x0, y0, x1, y1 = bounds
     size = (x1 - x0 + 1, y1 - y0 + 1)
-    image.paste((*color, 255), (x0, y0, x1 + 1, y1 + 1), _media_mask(size))
+    image.paste((*color, 255), (x0, y0, x1 + 1, y1 + 1), media_mask(size))
 
 
 def _outline_media_shape(
@@ -1439,8 +1439,8 @@ def _outline_media_shape(
 ) -> None:
     x0, y0, x1, y1 = bounds
     size = (x1 - x0 + 1, y1 - y0 + 1)
-    outer = _media_mask(size)
-    inner_shape = _media_mask((size[0] - 2, size[1] - 2))
+    outer = media_mask(size)
+    inner_shape = media_mask((size[0] - 2, size[1] - 2))
     inner = Image.new("L", size, 0)
     inner.paste(inner_shape, (1, 1))
     border = ImageChops.subtract(outer, inner)
@@ -1850,7 +1850,7 @@ def render_device_ui(
             )
             weather_x = weather_xy[0] + (weather_size[0] - weather.width) // 2
             weather_y = weather_xy[1] + (weather_size[1] - weather.height) // 2
-            weather_mask = _media_mask(weather.size)
+            weather_mask = media_mask(weather.size)
             image.paste(weather, (weather_x, weather_y), weather_mask)
         else:
             _fill_media_shape(image, weather_bounds, (13, 31, 35))
@@ -1901,7 +1901,7 @@ def render_device_ui(
             method=Image.Resampling.LANCZOS,
             centering=(0.5, 0.35),
         )
-        mask = _media_mask(tile_size)
+        mask = media_mask(tile_size)
         image.paste(tile, tile_xy, mask)
     elif state.service == "DMR":
         _fill_media_shape(image, media_bounds, (13, 31, 35))
@@ -1961,10 +1961,8 @@ def frame_to_ui_state(frame: Frame, previous: DeviceUiState | None = None) -> De
     return state
 
 
-def image_to_rgb565(image: Image.Image) -> bytes:
+def _image_to_rgb565_bytes(image: Image.Image) -> bytes:
     rgb = image.convert("RGB")
-    if rgb.size != (WIDTH, HEIGHT):
-        raise ValueError(f"device image must be {WIDTH}x{HEIGHT}")
     red, green, blue = rgb.split()
     high = ImageChops.add(
         red.point(_RGB565_RED_HIGH),
@@ -1977,3 +1975,15 @@ def image_to_rgb565(image: Image.Image) -> bytes:
     # Pillow's two-channel LA storage interleaves the two byte planes.  Here
     # they are RGB565 high and low bytes, not luminance and alpha semantics.
     return Image.merge("LA", (high, low)).tobytes()
+
+
+def image_to_rgb565(image: Image.Image) -> bytes:
+    if image.size != (WIDTH, HEIGHT):
+        raise ValueError(f"device image must be {WIDTH}x{HEIGHT}")
+    return _image_to_rgb565_bytes(image)
+
+
+def image_region_to_rgb565(image: Image.Image) -> bytes:
+    """Convert an already bounded partial display rectangle to wire bytes."""
+
+    return _image_to_rgb565_bytes(image)

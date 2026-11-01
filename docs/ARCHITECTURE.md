@@ -340,7 +340,9 @@ they enter the bounded device-input API, so the resulting rotation is preserved
 without creating an HTTP or display backlog.
 Running Mediathek video is the other explicit partial-update exception: only its
 226 x 168 media rectangle may run at up to 25 FPS. Pausing or leaving video mode
-stops that cadence immediately and never raises the full-panel limit.
+stops that cadence immediately and never raises the full-panel limit. Each such
+frame bypasses both the complete UI renderer and complete 240 x 280 RGB565
+conversion; scaling, masking, conversion and SPI transfer are region-only.
 While a logical hardware or browser control is active, periodic recorder
 timeline frames yield their display slot. The resolved interaction frame still
 renders immediately; only the redundant periodic frame is skipped. After 200 ms

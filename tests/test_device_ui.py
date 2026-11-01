@@ -995,7 +995,12 @@ class WhisplayDisplayTests(unittest.TestCase):
         frame = BytesIO()
         Image.new("RGB", (320, 180), (31, 61, 91)).save(frame, format="JPEG")
 
-        display.present_video_frame(frame.getvalue())
+        with patch.object(
+            display,
+            "_render_image",
+            side_effect=AssertionError("full renderer used for video frame"),
+        ):
+            display.present_video_frame(frame.getvalue())
 
         self.assertEqual(len(panel.frames), 0)
         self.assertEqual(len(panel.regions), 1)

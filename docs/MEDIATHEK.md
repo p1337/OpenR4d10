@@ -28,7 +28,9 @@ Software-Screenshots werden ohne Warten über dieselbe private IPC angefordert,
 bei laufendem Video höchstens 25-mal pro Sekunde aus einer einzelnen JPEG-Datei
 unter `/run/openr4d10` übernommen und sofort gelöscht. Nur der 226-x-168-Pixel-
 Medienbereich wird in diesem Takt per SPI übertragen; Kopfzeile, Status und alle
-anderen UI-Ansichten behalten die normale Vollbildgrenze von 10 FPS. Es gibt keinen zweiten
+anderen UI-Ansichten behalten die normale Vollbildgrenze von 10 FPS. Auch
+Skalierung, Maskierung und RGB565-Konvertierung bearbeiten pro Videoframe nur
+diese Teilfläche und rufen den vollständigen UI-Renderer nicht auf. Es gibt keinen zweiten
 ffmpeg-/mpv-Prozess und keine dauerhaften Videoframes unter `/var/lib`.
 Pausieren hält deshalb Bild und Ton gemeinsam an. Ein fehlender oder verspäteter
 Frame blockiert weder Ton noch Eingaben; der Renderer behält das letzte gültige

@@ -3558,7 +3558,10 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   verboten. Während Video tatsächlich läuft, darf ausschließlich der
   226-x-168-Pixel-Medienbereich mit höchstens 25 FPS als SPI-Teilfläche
   aktualisiert werden. Normale Vollbilder, Kopfzeile, Menüs, Recorder und DMR
-  bleiben bei höchstens 10 FPS. Die
+  bleiben bei höchstens 10 FPS. Der Videotakt darf weder den vollständigen
+  UI-Renderer noch die vollständige 240-x-280-RGB565-Konvertierung aufrufen;
+  er skaliert, maskiert, konvertiert und überträgt ausschließlich diese
+  Teilfläche. Die
   Einzelbilder werden ausschließlich flüchtig unter `/run/openr4d10` erzeugt,
   sofort in den zentralen Renderer übernommen und niemals als 10-Hz-Schreiblast
   auf der SD-Karte gespeichert. Pause, Fortsetzen, Sprung und Kanalwechsel

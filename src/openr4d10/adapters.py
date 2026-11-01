@@ -18,12 +18,19 @@ import threading
 import time
 from typing import Any, Callable, Protocol
 
-from PIL import Image
+from PIL import Image, ImageChops, ImageOps
 
 from .ambient import AMBIENT_ARTWORK_ROOT, AMBIENT_BY_ID
 from .config import AdapterConfig, HardwareConfig
 from .cpu_affinity import pin_current_thread_to_ui_core
-from .device_ui import DISPLAY_TEXT, DeviceUiState, image_to_rgb565, render_device_ui
+from .device_ui import (
+    DISPLAY_TEXT,
+    DeviceUiState,
+    image_region_to_rgb565,
+    image_to_rgb565,
+    media_mask,
+    render_device_ui,
+)
 from .input_events import Control, InputEvent
 from .models import Frame
 from .whisplay import WhisplayError, WhisplayPanel
@@ -422,21 +429,45 @@ class WhisplayDisplay:
             if self.state.service != "PLAYER" or not self.state.video_active:
                 return
             self._video_frame = frame
-            image = self._render_image()
             x, y, width, height = VIDEO_REGION
+            region = (
+                self._last_image.crop((x, y, x + width, y + height))
+                if self._last_image is not None
+                else Image.new("RGB", (width, height), (4, 13, 16))
+            )
+            outer = media_mask((width, height))
+            region.paste((0, 0, 0), (0, 0, width, height), outer)
+            inner_shape = media_mask((width - 2, height - 2))
+            inner = Image.new("L", (width, height), 0)
+            inner.paste(inner_shape, (1, 1))
+            border = ImageChops.subtract(outer, inner)
+            region.paste((75, 92, 96), (0, 0, width, height), border)
+            tile_size = (width - 2, height - 2)
+            tile = ImageOps.contain(
+                frame,
+                tile_size,
+                method=Image.Resampling.BILINEAR,
+            )
+            tile_x = 1 + (tile_size[0] - tile.width) // 2
+            tile_y = 1 + (tile_size[1] - tile.height) // 2
+            region.paste(tile, (tile_x, tile_y))
             show_region = getattr(self.panel, "show_region", None)
             if not callable(show_region):
-                self._show_state()
+                image = self._last_image.copy() if self._last_image is not None else self._render_image()
+                image.paste(region, (x, y))
+                self.panel.show(image_to_rgb565(image))
+                self._last_image = image
                 return
-            rgb565 = image_to_rgb565(image)
             show_region(
-                self._rgb565_region(rgb565, x, y, width, height),
+                image_region_to_rgb565(region),
                 x,
                 y,
                 width,
                 height,
             )
-            self._last_image = image
+            if self._last_image is None:
+                self._last_image = Image.new("RGB", (240, 280), (4, 13, 16))
+            self._last_image.paste(region, (x, y))
 
     def render(self, frame: Frame) -> None:
         # Keep the approved native animation visible until the first real UI
