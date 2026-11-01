@@ -320,6 +320,11 @@ intermediate panel image, application entry/exit lifecycle work is resolved,
 and one final cached-telemetry frame is presented. Debouncing or coalescing may
 bound event pressure, but it must preserve the resulting rotary distance.
 
+The local control server uses persistent HTTP/1.1 connections and disables
+Nagle buffering on accepted LAN sockets. Browser key repeats therefore reuse a
+warm transport instead of paying a TCP setup and small-packet delay for each
+detent; the bounded ordered input queue remains the backpressure boundary.
+
 On the verified four-core Pi Zero 2 W, CPU affinity gives background work
 (including ffmpeg/mpv and the level parser) cores 0–1, native UI/SPI core 2 and
 the physical input poller core 3. Processes spawned from the input callback are

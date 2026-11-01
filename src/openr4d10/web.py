@@ -8,6 +8,7 @@ import json
 import logging
 from pathlib import Path
 import re
+import socket
 import threading
 from typing import Any
 from urllib.parse import urlsplit
@@ -37,6 +38,7 @@ class _DashboardHandler(BaseHTTPRequestHandler):
     screen_provider: ScreenProvider | None = None
     server_version = "OpenR4d10"
     sys_version = ""
+    protocol_version = "HTTP/1.1"
 
     def _headers(self, status: int, content_type: str, length: int) -> None:
         self.send_response(status)
@@ -164,6 +166,17 @@ class _DashboardHandler(BaseHTTPRequestHandler):
         LOG.debug("Web request: " + format_string, *args)
 
 
+class _LowLatencyHTTPServer(ThreadingHTTPServer):
+    """Keep small control responses off connection/setup and Nagle delays."""
+
+    request_queue_size = 16
+
+    def get_request(self) -> tuple[socket.socket, object]:
+        request, address = super().get_request()
+        request.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        return request, address
+
+
 class WebServer:
     def __init__(
         self,
@@ -186,7 +199,7 @@ class WebServer:
                 "screen_provider": staticmethod(screen_provider) if screen_provider else None,
             },
         )
-        self._server = ThreadingHTTPServer((host, port), handler)
+        self._server = _LowLatencyHTTPServer((host, port), handler)
         self._server.daemon_threads = True
         self._thread = threading.Thread(
             target=self._server.serve_forever,

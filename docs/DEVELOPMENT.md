@@ -93,6 +93,10 @@ once, but must not call the presentation-producing `apply_input()` first.
 Measure service entry and exit separately on the Pi; a result at or above the
 same 300 ms gate blocks release. Input debouncing may combine pressure only
 when it retains ordering and the complete logical movement.
+Web-control latency tests must use one persistent connection after one warm-up
+request and also report cold connection setup separately. The HTTP handler must
+remain HTTP/1.1 with a valid `Content-Length`; returning to per-request HTTP/1.0
+connections is a performance regression.
 
 ## Release gate and device provenance
 

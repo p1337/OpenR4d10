@@ -99,6 +99,8 @@ the installer report exactly which adapters still need configuration.
 - service navigation mutates the ordered UI state without drawing a stale
   intermediate screen, resolves entry/exit work, and then presents exactly one
   final frame from cached telemetry
+- browser controls reuse persistent HTTP/1.1 connections with delayed small
+  packet buffering disabled, avoiding connection setup for every key repeat
 - verified Pi Zero 2 W CPU placement uses all four cores by role: two for
   background/audio/web work, one for the fluid native UI and waveform, and one
   for BCM17 plus future measured encoder input; other platforms keep their

@@ -1,5 +1,6 @@
 from pathlib import Path
 from html import unescape
+from http.client import HTTPConnection
 import json
 import re
 import tempfile
@@ -277,6 +278,50 @@ class WebTests(unittest.TestCase):
                     self.assertEqual(response.headers["Content-Type"], "image/png")
                     self.assertEqual(response.read(), b"native-png")
             finally:
+                server.stop()
+
+    def test_control_connection_stays_open_for_low_latency_repeats(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            static = Path(raw)
+            static.joinpath("index.html").write_text("ok", encoding="utf-8")
+            server = WebServer(
+                "127.0.0.1",
+                0,
+                static,
+                lambda: {"service": "online"},
+                lambda request: {"accepted": request["steps"]},
+            )
+            server.start()
+            connection = None
+            try:
+                host, port = server.address
+                connection = HTTPConnection(host, port, timeout=2)
+                headers = {"Content-Type": "application/json"}
+                connection.request(
+                    "POST",
+                    "/api/control",
+                    body=b'{"action":"device_input","steps":1}',
+                    headers=headers,
+                )
+                first = connection.getresponse()
+                self.assertEqual(first.version, 11)
+                self.assertEqual(json.loads(first.read())["accepted"], 1)
+                first_socket = connection.sock
+                self.assertIsNotNone(first_socket)
+
+                connection.request(
+                    "POST",
+                    "/api/control",
+                    body=b'{"action":"device_input","steps":2}',
+                    headers=headers,
+                )
+                second = connection.getresponse()
+                self.assertEqual(second.version, 11)
+                self.assertEqual(json.loads(second.read())["accepted"], 2)
+                self.assertIs(connection.sock, first_socket)
+            finally:
+                if connection is not None:
+                    connection.close()
                 server.stop()
 
 

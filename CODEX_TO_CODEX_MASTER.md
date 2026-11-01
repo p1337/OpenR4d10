@@ -3285,3 +3285,10 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 - Debouncing und Coalescing dürfen Eingabedruck begrenzen, aber niemals den
   resultierenden Drehweg, die Reihenfolge oder eine PTT-Flanke verlieren. Sie
   sind Rückstauschutz und kein Ersatz für einen schnellen aufgelösten Pfad.
+- Die reale Pfadtrennung nach 0.10.76 ergab 30 vollständige lokale
+  Recorderbefehle einschließlich Display mit stabilen 79–89 ms, während der
+  LAN-Test einzelne höhere Werte zeigte. Der Webserver verwendete noch
+  HTTP/1.0 und erzeugte damit pro Kleinstbefehl unnötig neue Verbindungen.
+  Browsersteuerung nutzt deshalb persistentes HTTP/1.1, `Content-Length` und
+  `TCP_NODELAY`; kalten Verbindungsaufbau und warme Bedienlatenz immer getrennt
+  messen.
