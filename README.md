@@ -88,8 +88,11 @@ the installer report exactly which adapters still need configuration.
   and the red/idle glow changes through a small ST7789 region update
 - near-live VoiceRecorder cursor and playback display: encoder/browser seek
   performs one cached-telemetry repaint, RGB565 conversion is vectorized, the
-  native timeline keeps a deadline-based 5 Hz cadence and the browser preview
+  native timeline keeps a deadline-based 10 Hz ceiling and the browser preview
   reads the last drawn native frame without blocking SPI with a rerender
+- shared interaction-performance contract: normal panel presentation is capped
+  at 10 FPS, fonts and quantized glow layers are cached, adjacent browser rotary
+  repeats are coalesced in order, and 300 ms user-input latency blocks release
 - verified Pi Zero 2 W CPU placement uses all four cores by role: two for
   background/audio/web work, one for the fluid native UI and waveform, and one
   for BCM17 plus future measured encoder input; other platforms keep their

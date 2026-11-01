@@ -30,9 +30,12 @@ class WebTests(unittest.TestCase):
         ):
             self.assertIn(f'data-device-control="{control}"', html)
         self.assertIn('action: "device_input"', script)
-        self.assertIn("const RECORDER_SCREEN_REFRESH_MS = 200", script)
+        self.assertIn("const RECORDER_SCREEN_REFRESH_MS = 100", script)
         self.assertIn('latestDeviceState?.service === "REC"', script)
         self.assertIn("if (deviceScreenPending) return", script)
+        self.assertIn("const rotaryInputQueue = []", script)
+        self.assertIn("last.request.steps + request.steps", script)
+        self.assertIn("Math.max(-10, Math.min(10, combined))", script)
         for key_code in (
             "KeyW",
             "KeyS",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from functools import lru_cache
 import math
 from pathlib import Path
 from typing import Mapping
@@ -825,6 +826,7 @@ class DeviceUiState:
                 setattr(self, key, max(low, min(high, value)))
 
 
+@lru_cache(maxsize=48)
 def _font(size: int, *, bold: bool = False) -> ImageFont.ImageFont:
     size = max(MIN_DEVICE_FONT_PX, size)
     path = FONT_BOLD if bold else FONT_REGULAR
@@ -1059,14 +1061,15 @@ def _draw_back_or_ptt(
     )
 
 
-def _draw_player_edge_glow(
-    image: Image.Image,
+@lru_cache(maxsize=64)
+def _player_edge_glow_layer(
     top: int,
     accent: tuple[int, int, int],
-    *,
-    strength: float = 1.0,
-) -> None:
-    """Glow inward from the physical player contour without a crisp line."""
+    strength_tenths: int,
+) -> Image.Image:
+    """Build one immutable, reusable contour glow overlay."""
+
+    strength = strength_tenths / 10.0
     padding = 24
     outside_offset = 6
     left = padding - outside_offset
@@ -1144,7 +1147,23 @@ def _draw_player_edge_glow(
         ]
     )
     visible.putalpha(ImageChops.multiply(alpha, corner_balance))
-    image.alpha_composite(visible)
+    return visible
+
+
+def _draw_player_edge_glow(
+    image: Image.Image,
+    top: int,
+    accent: tuple[int, int, int],
+    *,
+    strength: float = 1.0,
+) -> None:
+    """Glow inward from the physical player contour without a crisp line."""
+
+    bounded = max(1.0, min(2.0, strength))
+    strength_tenths = round(bounded * 10)
+    image.alpha_composite(
+        _player_edge_glow_layer(top, accent, strength_tenths)
+    )
 
 
 def _draw_main_menu_items(

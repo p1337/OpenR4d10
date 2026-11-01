@@ -284,12 +284,12 @@ VoiceRecorder PTT edges are a separate latency-critical path inside that same
 recorder. The physical input callback reads only the display's lock-free routing
 context, starts or stops capture before any renderer call and never performs a
 synchronous full-frame transfer. The display queues a four-region ST7789 glow
-update, while the normal recorder frame loop renders the waveform at 5 Hz from
+update, while the normal recorder frame loop renders the waveform at up to 10 Hz from
 cached telemetry. Network, SSID and power reads are excluded from those fast
 frames. The playhead is a white two-pixel overlay drawn after every stereo bar,
 so it remains visible at the live end and at a paused seek position. Segment
 duration is probed from the closed audio file instead of trusting wall time.
-During recorder playback the 5 Hz overlay reads mpv's actual absolute position,
+During recorder playback the 10 Hz overlay reads mpv's actual absolute position,
 moves that same playhead and uses the central green audio-active glow; pausing
 leaves the cursor at the last reported position.
 
@@ -298,10 +298,18 @@ native repaint. They do not first repaint the presentation-only encoder state
 and then repaint the resolved recorder state, and they reuse cached receiver
 and power telemetry. RGB565 conversion is performed by Pillow channel
 operations rather than a Python per-pixel loop. The recorder loop schedules a
-fixed 5 Hz target by subtracting render time from the next wait. The display
+fixed 10 Hz ceiling by subtracting render time from the next wait. The display
 adapter also caches the last image it actually presented; the browser preview
 encodes that cached frame without rerendering or holding the SPI lock through a
 second complete composition.
+
+All normal panel presentations share a 10 FPS ceiling. The adapter spaces frame
+starts by at least 100 ms while the recorder's normal timeline uses up to 10 Hz;
+only the small priority PTT glow regions bypass the full-frame cadence. Cached
+TrueType fonts and quantized compositor glow layers remove repeated filesystem
+and Gaussian-blur work. Browser key-repeat detents are coalesced in order before
+they enter the bounded device-input API, so the resulting rotation is preserved
+without creating an HTTP or display backlog.
 
 On the verified four-core Pi Zero 2 W, CPU affinity gives background work
 (including ffmpeg/mpv and the level parser) cores 0–1, native UI/SPI core 2 and

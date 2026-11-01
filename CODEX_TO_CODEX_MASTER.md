@@ -3230,13 +3230,40 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   vektorisierte Pillow-Kanaloperationen statt einer Python-Schleife über 67.200
   Pixel. Auf dem realen Zero 2 W sank die isoliert gemessene Wandlung damit von
   ungefähr 299 ms auf ungefähr 11 ms pro Vollbild.
-- Der 5-Hz-Recorder-Takt ist ein fester Zielzeitpunkt und keine zusätzliche
-  Pause von 200 ms nach dem Zeichnen. Renderzeit wird vom nächsten Intervall
+- Der 10-Hz-Recorder-Takt ist ein fester Zielzeitpunkt und keine zusätzliche
+  Pause von 100 ms nach dem Zeichnen. Renderzeit wird vom nächsten Intervall
   abgezogen. Die physische Ansicht bleibt auf UI-Kern 2; die Kernzuordnung wird
   nicht aufgehoben, weil sie den gemessenen Stau nicht verursacht hat.
 - Die Browser-Liveansicht darf den schweren Gesamtstatus weiterhin nur im
   normalen Takt laden, fragt im sichtbaren Recorder aber das gecachte native
-  Bild begrenzt mit 5 Hz ab. Der Displayadapter hält das zuletzt tatsächlich
+  Bild begrenzt mit höchstens 10 Hz ab. Der Displayadapter hält das zuletzt tatsächlich
   gezeichnete Bild vor; `/api/device-screen.png` darf deshalb nicht für jede
   Browserabfrage nochmals die komplette Oberfläche rendern oder den SPI-Pfad
   blockieren. Gleichzeitige Bildanfragen werden im Browser nicht gestapelt.
+
+### 2026-11-01 – Harte Echtzeitnähe für jede Benutzereingabe
+
+- Das physische Display benötigt und erhält höchstens zehn normale Vollbilder
+  pro Sekunde. Zwischen den Startzeitpunkten zweier normaler Panelbilder liegen
+  mindestens 100 ms. Der Recorder nutzt für die laufende Timeline höchstens 10 Hz;
+  häufiger wird nur die bereits definierte kleine priorisierte PTT-Glow-
+  Teilfläche übertragen.
+- Jede Encoder-, Tasten- und Browserinteraktion muss sich wie ein direktes
+  Gerät anfühlen. Zielwert von Eingabe bis sichtbare Reaktion sind 100 ms;
+  300 ms oder mehr gelten als Release-blockierender Performancefehler. Eine
+  Funktion ist nicht releasefähig, wenn sie alte Eingaben sichtbar abarbeitet,
+  das Display hängen lässt oder den aktuellen Bedienwunsch hinter einem
+  Rückstau versteckt.
+- Wiederholte Browser-Rotationsereignisse werden in Reihenfolge gesammelt und
+  benachbarte Schritte derselben Achse bis zur API-Grenze zusammengefasst.
+  Es dürfen weder parallele HTTP-Threads noch einzelne Vollbilder pro
+  Betriebssystem-Keyrepeat auflaufen. Das ist Coalescing, kein Verlust des
+  resultierenden Drehwegs.
+- Statische Renderressourcen werden wiederverwendet: TrueType-Fonts und
+  quantisierte Glow-Layer werden gecacht, das native Vorschaubild verwendet
+  den letzten tatsächlich dargestellten Frame und die RGB565-Wandlung bleibt
+  vektorisiert. Neue Dienste dürfen diese gemeinsamen Pfade nicht umgehen.
+- Vor jedem Release sind Eingabe-, Renderer-, SPI- und Browserpfad getrennt am
+  realen Pi zu messen. Wird eine vermeidbare Schwachstelle gefunden, ist sie
+  vor der Freigabe zu beseitigen; zusätzliche CPU-Kerne rechtfertigen niemals
+  blockierende Arbeit im Eingabepfad.

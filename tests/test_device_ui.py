@@ -11,6 +11,7 @@ from unittest.mock import Mock, call, patch
 
 from PIL import Image, ImageDraw
 
+from openr4d10 import adapters
 from openr4d10.adapters import WhisplayDisplay
 from openr4d10.device_ui import (
     DEFAULT_ACCENT,
@@ -23,6 +24,7 @@ from openr4d10.device_ui import (
     WIDTH,
     _display_text,
     _font,
+    _player_edge_glow_layer,
     image_to_rgb565,
     render_device_ui,
 )
@@ -32,6 +34,19 @@ from openr4d10.whisplay import WhisplayPanel, _KernelPwmBacklight
 
 
 class DeviceUiTests(unittest.TestCase):
+    def test_fonts_and_static_glow_layers_are_reused_between_frames(self) -> None:
+        _font.cache_clear()
+        _player_edge_glow_layer.cache_clear()
+        first_font = _font(12, bold=True)
+        second_font = _font(12, bold=True)
+        first_glow = _player_edge_glow_layer(63, DEFAULT_ACCENT, 10)
+        second_glow = _player_edge_glow_layer(63, DEFAULT_ACCENT, 10)
+
+        self.assertIs(first_font, second_font)
+        self.assertIs(first_glow, second_glow)
+        self.assertGreaterEqual(_font.cache_info().hits, 1)
+        self.assertGreaterEqual(_player_edge_glow_layer.cache_info().hits, 1)
+
     def _drawn_text(self, state: DeviceUiState, artwork=None) -> list[str]:
         drawn: list[str] = []
         original_text = ImageDraw.ImageDraw.text
@@ -852,6 +867,21 @@ class FakePanel:
 
 
 class WhisplayDisplayTests(unittest.TestCase):
+    def test_normal_panel_frames_are_limited_to_ten_per_second(self) -> None:
+        panel = FakePanel()
+        display = WhisplayDisplay(panel=panel)  # type: ignore[arg-type]
+        clock = iter((10.0, 10.0, 10.0, 10.01, 10.01, 10.1))
+        with (
+            patch.object(adapters.time, "monotonic", side_effect=lambda: next(clock)),
+            patch.object(adapters.time, "sleep") as sleep,
+        ):
+            display.render(Frame(screen="main", title="First", body="Ready"))
+            display.render(Frame(screen="main", title="Second", body="Ready"))
+
+        sleep.assert_called_once()
+        self.assertAlmostEqual(sleep.call_args.args[0], 0.09, places=6)
+        display.close()
+
     def test_screen_png_encodes_the_last_drawn_frame_without_rerendering(self) -> None:
         panel = FakePanel()
         display = WhisplayDisplay(panel=panel)  # type: ignore[arg-type]

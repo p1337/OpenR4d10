@@ -125,7 +125,7 @@ if ([...document.querySelectorAll("[data-tab]")].some((item) => item.dataset.tab
   activateTab(requestedTab);
 }
 
-const RECORDER_SCREEN_REFRESH_MS = 200;
+const RECORDER_SCREEN_REFRESH_MS = 100;
 let deviceScreenPending = false;
 
 function refreshDeviceScreen() {
@@ -1320,10 +1320,50 @@ async function postDeviceInput(request, button = null) {
   }
 }
 
+const rotaryInputQueue = [];
+let rotaryInputRunning = false;
+
+function queueRotaryInput(request, button = null) {
+  const last = rotaryInputQueue.at(-1);
+  if (last && last.request.control === request.control) {
+    const combined = last.request.steps + request.steps;
+    if (combined === 0) {
+      rotaryInputQueue.pop();
+      return;
+    }
+    last.request.steps = Math.max(-10, Math.min(10, combined));
+    const remainder = combined - last.request.steps;
+    if (remainder) {
+      rotaryInputQueue.push({
+        request: { ...request, steps: remainder },
+        button,
+      });
+    }
+  } else {
+    rotaryInputQueue.push({ request: { ...request }, button });
+  }
+  if (rotaryInputRunning) return;
+  rotaryInputRunning = true;
+  void (async () => {
+    try {
+      while (rotaryInputQueue.length) {
+        const next = rotaryInputQueue.shift();
+        await postDeviceInput(next.request, next.button);
+      }
+    } finally {
+      rotaryInputRunning = false;
+    }
+  })();
+}
+
 function sendDeviceInput(button) {
   const request = { control: button.dataset.deviceControl };
   if (button.dataset.steps) request.steps = Number(button.dataset.steps);
   if (button.dataset.held) request.held_seconds = Number(button.dataset.held);
+  if (Object.hasOwn(request, "steps")) {
+    queueRotaryInput(request, button);
+    return Promise.resolve();
+  }
   return postDeviceInput(request, button);
 }
 
@@ -1382,7 +1422,8 @@ document.addEventListener("keydown", (event) => {
   if (!request) return;
   event.preventDefault();
   if (event.repeat && !Object.hasOwn(request, "steps")) return;
-  postDeviceInput(request);
+  if (Object.hasOwn(request, "steps")) queueRotaryInput(request);
+  else postDeviceInput(request);
 });
 
 document.addEventListener("keyup", (event) => {

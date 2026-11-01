@@ -64,17 +64,25 @@ path. The edge may queue only the priority glow update. Tests also require the
 ST7789 region coordinates and y-offset, a white two-pixel playhead rendered
 after dense waveform bars, live elapsed position, file-probed segment duration
 and the verified four-core split: background `{0,1}`, UI `{2}`, input `{3}`.
-Do not move telemetry or remote artwork lookup back into the 5 Hz recorder
+Do not move telemetry or remote artwork lookup back into the 10 Hz recorder
 frame path.
 
 Recorder seek, boundary and play/pause controls have a separate latency
 regression: one resolved input may cause exactly one recorder repaint and must
 not call the display adapter's presentation-only `apply_input()` first. The
-5 Hz loop is deadline-based, not `render time + 200 ms`. RGB565 tests must keep
+10 Hz loop is deadline-based, not `render time + 100 ms`. RGB565 tests must keep
 the exact big-endian wire bytes while the implementation stays free of a
 Python per-pixel loop. `/api/device-screen.png` reads the adapter's last drawn
-image; a recorder browser preview may poll that bounded endpoint at 5 Hz but
+image; a recorder browser preview may poll that bounded endpoint at 10 Hz but
 must never overlap its own image requests or raise the full `/api/status` rate.
+
+The real-device performance gate measures semantic control, renderer/RGB565,
+SPI presentation and browser preview separately. Normal full-frame starts are
+capped at 10 FPS, and the intended input-to-visible-response target is 100 ms;
+300 ms or more is a release blocker. Regression tests must preserve shared font
+and quantized glow caches plus ordered browser detent coalescing. Never solve
+backpressure by dropping the resulting rotary distance: combine adjacent steps
+within the API's bounded `-10..10` range and send any remainder next.
 
 ## Release gate and device provenance
 

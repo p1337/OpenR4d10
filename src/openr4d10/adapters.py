@@ -15,6 +15,7 @@ import stat
 import subprocess
 import tempfile
 import threading
+import time
 from typing import Any, Callable, Protocol
 
 from PIL import Image
@@ -28,6 +29,8 @@ from .models import Frame
 from .whisplay import WhisplayError, WhisplayPanel
 
 LOG = logging.getLogger(__name__)
+DISPLAY_MIN_FRAME_INTERVAL_SECONDS = 0.1
+HOTSPOT_REFRESH_INTERVAL_SECONDS = 1.0
 
 
 class AdapterError(RuntimeError):
@@ -159,6 +162,8 @@ class WhisplayDisplay:
         self._priority_recording = False
         self._priority_continuous = False
         self._last_image: Image.Image | None = None
+        self._last_frame_started_at = 0.0
+        self._next_hotspot_refresh_at = 0.0
 
     def set_input_handler(
         self, handler: Callable[[InputEvent], object] | None
@@ -259,6 +264,14 @@ class WhisplayDisplay:
     def _show_state(self) -> None:
         self._refresh_hotspot_setup()
         try:
+            remaining = (
+                self._last_frame_started_at
+                + DISPLAY_MIN_FRAME_INTERVAL_SECONDS
+                - time.monotonic()
+            )
+            if remaining > 0:
+                time.sleep(remaining)
+            self._last_frame_started_at = time.monotonic()
             image = self._render_image()
             self.panel.show(image_to_rgb565(image))
             self._last_image = image
@@ -285,6 +298,10 @@ class WhisplayDisplay:
                 os.close(descriptor)
 
     def _refresh_hotspot_setup(self) -> None:
+        now = time.monotonic()
+        if now < self._next_hotspot_refresh_at:
+            return
+        self._next_hotspot_refresh_at = now + HOTSPOT_REFRESH_INTERVAL_SECONDS
         self.state.hotspot_active = False
         self.state.hotspot_ssid = ""
         self.state.hotspot_passphrase = ""
