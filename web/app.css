@@ -328,7 +328,14 @@ kbd { display: inline-block; min-width: 24px; padding: 3px 6px; border: 1px soli
 .catalog-heading { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 16px; }
 .station-library-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
 .station-library-tabs button { align-items: center; display: flex; justify-content: space-between; gap: 10px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: rgba(255, 255, 255, .025); cursor: pointer; }
-.station-library-tabs button[aria-selected="true"] { border-color: color-mix(in srgb, var(--accent) 65%, var(--line)); color: #071011; background: var(--accent); font-weight: 800; }
+.station-library-tabs button[aria-selected="true"] {
+  border-color: var(--cyan);
+  color: var(--text);
+  background: rgba(253, 184, 19, .14);
+  background: color-mix(in srgb, var(--cyan) 18%, #071011);
+  box-shadow: inset 0 -3px 0 var(--cyan);
+  font-weight: 800;
+}
 .station-library-tabs button span:last-child { font-variant-numeric: tabular-nums; }
 .station-library-panel[hidden] { display: none; }
 .station-library-panel .services-note { margin: 12px 2px 0; }

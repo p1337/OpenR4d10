@@ -3299,3 +3299,12 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   lokale Pi-Pfad blieb bei 30 Wiederholungen zwischen 79 und 89 ms. Während der
   Messung meldete die Firmware `throttled=0x0`; die installierten Laufzeitdateien
   stimmten SHA-256-genau mit dem grünen GitHub-Commit überein.
+
+### 2026-11-01 – Beide Radio-Unterreiter bleiben sichtbar
+
+- Die beiden Browser-Unterreiter `Aktive Sender` und `Sender hinzufügen`
+  bleiben unabhängig von der aktuellen Auswahl immer gleichzeitig sichtbar.
+  Der aktive Reiter wird durch Akzentfarbe, Kontrast und den vorhandenen
+  Auswahlzustand hervorgehoben, aber weder ausgeblendet noch so dunkel
+  dargestellt, dass seine Beschriftung verschwindet. Der inaktive Reiter
+  bleibt klar lesbar und direkt anklickbar.

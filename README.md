@@ -421,7 +421,9 @@ search and language/category filters above two compact sub-tabs. **Active
 stations** contains the persistent personal order; **Add stations** contains
 only inactive reviewed presets. A newly entered custom station and an activated
 catalog station are appended to the personal order and immediately open the
-active tab. The Polish inactive catalog additionally contains Radio GRA Toruń,
+active tab. Both tab selectors remain visible at all times; the selected one is
+shown with a readable accent highlight rather than being hidden. The Polish
+inactive catalog additionally contains Radio GRA Toruń,
 Polskie Radio Dwójka, Polskie Radio Trójka, Radio 357 and Radio Nowy Świat;
 religious stations are intentionally not included.
 

@@ -333,7 +333,8 @@ The default seed is deliberately limited to the ten entries whose
 for each supported catalog language, prove that a new database activates only
 those ten, and prove that deleting one does not recreate it. Browser tests must
 require one active list, one inactive catalog list behind two accessible
-sub-tabs, shared add/search/language/category controls, and the `preset_save`
+sub-tabs whose two selectors remain visible while the selected one alone is
+accent-highlighted, shared add/search/language/category controls, and the `preset_save`
 activation path. Successful custom creation and preset activation must select
 the active tab without resetting the shared filters. The radio page does not
 render the generic direct-source URL input; its Play/Pause, Stop, current-song

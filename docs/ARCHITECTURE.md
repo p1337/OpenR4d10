@@ -435,7 +435,8 @@ The browser presents that one model through two radio sub-tabs rather than two
 simultaneously long lists. Shared custom-add, metadata search, language and
 category controls sit above both tabs. Creating a custom station or activating
 an inactive preset appends it to the persistent personal order and selects the
-active tab; no second catalog state exists in JavaScript or SQLite. The generic
+active tab; both selectors stay visible and only the selected selector receives
+the readable accent treatment. No second catalog state exists in JavaScript or SQLite. The generic
 direct-URL player is intentionally not exposed on the radio page, while the
 core's checked playback path remains available to other service adapters.
 

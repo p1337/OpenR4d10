@@ -146,6 +146,19 @@ class WebTests(unittest.TestCase):
         self.assertIn('function selectStationLibraryView(view)', script)
         self.assertIn('selectStationLibraryView("active")', script)
         self.assertIn('.station-library-tabs button[aria-selected="true"]', stylesheet)
+        self.assertIn('border-color: var(--cyan);', stylesheet)
+        self.assertIn('color: var(--text);', stylesheet)
+        self.assertIn('box-shadow: inset 0 -3px 0 var(--cyan);', stylesheet)
+        station_tab_rule = re.search(
+            r'\.station-library-tabs button\[aria-selected="true"\]\s*\{([^}]+)\}',
+            stylesheet,
+        )
+        self.assertIsNotNone(station_tab_rule)
+        self.assertNotIn('var(--accent)', station_tab_rule.group(1))
+        self.assertNotRegex(
+            html,
+            r'id="station-(?:active|catalog)-tab"[^>]*\shidden(?:\s|>)',
+        )
         self.assertIn('id="podcast-subscribe-form"', html)
         self.assertIn('id="podcast-subscription-list"', html)
         self.assertIn('id="podcast-episode-list"', html)
