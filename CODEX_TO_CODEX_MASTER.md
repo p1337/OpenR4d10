@@ -3292,3 +3292,10 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Browsersteuerung nutzt deshalb persistentes HTTP/1.1, `Content-Length` und
   `TCP_NODELAY`; kalten Verbindungsaufbau und warme Bedienlatenz immer getrennt
   messen.
+- Der reale 0.10.77-Abnahmelauf auf dem Pi bestand: 50 warme Recorderbefehle
+  über eine einzige LAN-Verbindung benötigten 86,8–178,4 ms bei 110 ms Mittel,
+  kein Wert lag bei 200 ms oder höher. Zehn vollständige Dienstwechsel lagen
+  bei 101,8–232,8 ms, kein Wert erreichte die blockierende 300-ms-Grenze. Der
+  lokale Pi-Pfad blieb bei 30 Wiederholungen zwischen 79 und 89 ms. Während der
+  Messung meldete die Firmware `throttled=0x0`; die installierten Laufzeitdateien
+  stimmten SHA-256-genau mit dem grünen GitHub-Commit überein.

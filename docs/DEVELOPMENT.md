@@ -98,6 +98,11 @@ request and also report cold connection setup separately. The HTTP handler must
 remain HTTP/1.1 with a valid `Content-Length`; returning to per-request HTTP/1.0
 connections is a performance regression.
 
+The verified 0.10.77 Pi gate measured 50 warm persistent-LAN recorder controls
+at 86.8–178.4 ms (110 ms mean, none at or above 200 ms), ten full service
+transitions at 101.8–232.8 ms (none at or above 300 ms), and 30 loopback
+controls at 79–89 ms. Keep these as comparison baselines, not simulated timing.
+
 ## Release gate and device provenance
 
 Local tests are necessary but never sufficient for a Pi release. After every
