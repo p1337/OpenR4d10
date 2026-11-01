@@ -33,6 +33,7 @@ DMR_FRAME_INTERVAL_SECONDS = 0.1
 PLAYER_FRAME_INTERVAL_SECONDS = 0.04
 RECORDER_INTERACTION_QUIET_SECONDS = 0.2
 DMR_PTT_HOLD_SECONDS = 2.0
+MEDIATHEK_PTT_HOLD_SECONDS = 2.0
 MEDIATHEK_SEEK_QUIET_SECONDS = 0.45
 
 
@@ -73,6 +74,10 @@ class OpenR4d10App:
         self._dmr_hold_timer: threading.Timer | None = None
         self._dmr_hold_generation = 0
         self._dmr_hold_triggered = False
+        self._mediathek_ptt_pressed_at: float | None = None
+        self._mediathek_hold_timer: threading.Timer | None = None
+        self._mediathek_hold_generation = 0
+        self._mediathek_hold_triggered = False
         self._mediathek_seek_timer: threading.Timer | None = None
         self._mediathek_seek_generation = 0
         self._voice_last_release_at: float | None = None
@@ -127,6 +132,7 @@ class OpenR4d10App:
             LOG.info("Received signal %s; stopping", signum)
         self.stop_event.set()
         self._cancel_dmr_hold_timer()
+        self._cancel_mediathek_hold_timer()
         self._cancel_mediathek_seek_timer()
 
     def _recorder_interaction_active(self) -> bool:
@@ -157,6 +163,28 @@ class OpenR4d10App:
         )
         timer.daemon = True
         self._dmr_hold_timer = timer
+        timer.start()
+
+    def _cancel_mediathek_hold_timer(self) -> None:
+        self._mediathek_hold_generation += 1
+        timer = self._mediathek_hold_timer
+        self._mediathek_hold_timer = None
+        if timer is not None:
+            timer.cancel()
+
+    def _start_mediathek_hold_timer(self) -> None:
+        """Open the Mediathek group picker while PTT is still held."""
+
+        self._cancel_mediathek_hold_timer()
+        self._mediathek_hold_triggered = False
+        generation = self._mediathek_hold_generation
+        timer = threading.Timer(
+            MEDIATHEK_PTT_HOLD_SECONDS,
+            self._on_mediathek_hold_threshold,
+            args=(generation,),
+        )
+        timer.daemon = True
+        self._mediathek_hold_timer = timer
         timer.start()
 
     def _cancel_mediathek_seek_timer(self) -> None:
@@ -256,6 +284,61 @@ class OpenR4d10App:
                     self._interaction_generation += 1
         except Exception:
             LOG.exception("DMR PTT hold action failed")
+
+    def _on_mediathek_hold_threshold(self, generation: int) -> None:
+        """Open Mediathek groups at two seconds without waiting for release."""
+
+        try:
+            with self._device_input_lock:
+                if (
+                    self.stop_event.is_set()
+                    or generation != self._mediathek_hold_generation
+                    or self._mediathek_ptt_pressed_at is None
+                    or self._mediathek_hold_triggered
+                    or self.services is None
+                ):
+                    return
+                fast_context = getattr(self.display, "input_context", None)
+                snapshot = getattr(self.display, "snapshot", None)
+                current_ui = (
+                    fast_context()
+                    if callable(fast_context)
+                    else snapshot()
+                    if callable(snapshot)
+                    else {}
+                )
+                if not isinstance(current_ui, dict) or (
+                    current_ui.get("service") != "PLAYER"
+                    or current_ui.get("menu_open") is True
+                ):
+                    return
+                self._mediathek_hold_timer = None
+                self._mediathek_hold_triggered = True
+                self._last_device_input_at = time.perf_counter()
+                self._interaction_generation += 1
+                try:
+                    self.services.control({"action": "mediathek_group_menu_open"})
+                    hold_event = InputEvent(
+                        Control.PTT,
+                        held_seconds=MEDIATHEK_PTT_HOLD_SECONDS,
+                        active=False,
+                    )
+                    state_only_handler = getattr(self.display, "apply_input_state", None)
+                    handler = getattr(self.display, "apply_input", None)
+                    if callable(state_only_handler):
+                        state_only_handler(hold_event)
+                    elif callable(handler):
+                        handler(hold_event)
+                    else:
+                        raise RuntimeError(
+                            "the configured display does not accept device input"
+                        )
+                    self.render_interaction_once("PLAYER")
+                finally:
+                    self._last_device_input_at = time.perf_counter()
+                    self._interaction_generation += 1
+        except Exception:
+            LOG.exception("Mediathek PTT hold action failed")
 
     def install_signal_handlers(self) -> None:
         signal.signal(signal.SIGTERM, self.request_stop)
@@ -519,6 +602,7 @@ class OpenR4d10App:
             }.get(getattr(self.services, "active_service", "system"), "SYSTEM")
         )
         dmr_hold_consumed = False
+        mediathek_hold_consumed = False
         if event.control == Control.PTT and selected_service == "DMR":
             if event.active is True and not menu_open:
                 if self._ptt_pressed_at is None:
@@ -530,6 +614,27 @@ class OpenR4d10App:
                 dmr_hold_consumed = self._dmr_hold_triggered
                 self._dmr_hold_triggered = False
                 self._cancel_dmr_hold_timer()
+                held_seconds = (
+                    max(0.0, time.monotonic() - started)
+                    if started is not None
+                    else 0.0
+                )
+                event = InputEvent(
+                    Control.PTT,
+                    held_seconds=held_seconds,
+                    active=False,
+                )
+        elif event.control == Control.PTT and selected_service == "PLAYER":
+            if event.active is True and not menu_open:
+                if self._mediathek_ptt_pressed_at is None:
+                    self._mediathek_ptt_pressed_at = time.monotonic()
+                    self._start_mediathek_hold_timer()
+            elif event.active is False:
+                started = self._mediathek_ptt_pressed_at
+                self._mediathek_ptt_pressed_at = None
+                mediathek_hold_consumed = self._mediathek_hold_triggered
+                self._mediathek_hold_triggered = False
+                self._cancel_mediathek_hold_timer()
                 held_seconds = (
                     max(0.0, time.monotonic() - started)
                     if started is not None
@@ -608,6 +713,24 @@ class OpenR4d10App:
             and menu_kind == "ambient_layers"
         ):
             media_result = self.services.control({"action": "ambient_layer_toggle"})
+        elif (
+            self.services is not None
+            and event.control == Control.RIGHT_OUTER
+            and menu_open
+            and menu_kind == "mediathek_groups"
+        ):
+            media_result = self.services.control(
+                {"action": "mediathek_group_step", "steps": event.steps}
+            )
+        elif (
+            self.services is not None
+            and event.control == Control.RIGHT_PRESS
+            and event.held_seconds < 2.0
+            and menu_open
+            and menu_kind == "mediathek_groups"
+        ):
+            media_result = self.services.control({"action": "mediathek_group_select"})
+            self._clear_device_video_frame()
         elif (
             self.services is not None
             and event.control == Control.RIGHT_OUTER
@@ -728,6 +851,11 @@ class OpenR4d10App:
                 and self.services.active_service in MEDIATHEK_SERVICE_IDS
             ):
                 action = "pause"
+            elif (
+                selected_service == "PLAYER"
+                and self.services.active_service == "brandmeister"
+            ):
+                action = "brandmeister_toggle"
             else:
                 action = None
             if action is not None:
@@ -746,10 +874,11 @@ class OpenR4d10App:
         elif (
             self.services is not None
             and event.control == Control.PTT
-            and event.active is True
+            and event.active is False
             and not menu_open
             and selected_service == "PLAYER"
             and self.services.active_service in MEDIATHEK_SERVICE_IDS
+            and not mediathek_hold_consumed
         ):
             media_result = self.services.control(
                 {"action": "mediathek_favorite_toggle"}
@@ -915,6 +1044,14 @@ class OpenR4d10App:
             if selected_service == "PLAYER":
                 self._cancel_mediathek_seek_timer()
                 self._clear_device_video_frame()
+                self._mediathek_ptt_pressed_at = None
+                self._mediathek_hold_triggered = False
+                self._cancel_mediathek_hold_timer()
+                group_loading = getattr(
+                    self.services, "mediathek_group_loading", lambda: False
+                )
+                if group_loading():
+                    self.services.control({"action": "mediathek_group_cancel"})
             if selected_service == "DMR":
                 self._ptt_pressed_at = None
                 self._dmr_hold_triggered = False

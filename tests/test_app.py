@@ -833,6 +833,164 @@ class AppTests(unittest.TestCase):
             ],
         )
 
+    def test_mediathek_hold_opens_groups_before_release_and_short_ptt_favorites(self) -> None:
+        class InputDisplay:
+            def __init__(self):
+                self.menu_open = False
+
+            def render(self, _frame):
+                pass
+
+            def snapshot(self):
+                return {
+                    "service": "PLAYER",
+                    "menu_open": self.menu_open,
+                    "menu_kind": "mediathek_groups" if self.menu_open else None,
+                }
+
+            input_context = snapshot
+
+            def apply_input(self, event):
+                if (
+                    event.control == Control.PTT
+                    and event.active is False
+                    and event.held_seconds >= 2.0
+                ):
+                    self.menu_open = True
+                return self.snapshot()
+
+            apply_input_state = apply_input
+
+            def set_input_handler(self, _handler):
+                pass
+
+        class Services:
+            active_service = "public_mediatheken"
+
+            def __init__(self):
+                self.requests = []
+
+            def control(self, request):
+                self.requests.append(request)
+                return {"favorite": True}
+
+            def receiver_overlay(self, _view_service=None):
+                return {"service": "PLAYER", "station": "ARD-alpha"}
+
+        class ManualTimer:
+            def __init__(self, _interval, callback, args=()):
+                self.callback = callback
+                self.args = args
+                self.cancelled = False
+                self.daemon = False
+
+            def start(self):
+                pass
+
+            def cancel(self):
+                self.cancelled = True
+
+            def fire(self):
+                if not self.cancelled:
+                    self.callback(*self.args)
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            services = Services()
+            display = InputDisplay()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=display,
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,
+            )
+            timers = []
+
+            def timer_factory(interval, callback, args=()):
+                timer = ManualTimer(interval, callback, args)
+                timers.append(timer)
+                return timer
+
+            with patch("openr4d10.app.threading.Timer", side_effect=timer_factory):
+                app.control({"action": "device_input", "control": "ptt", "active": True})
+                timers[0].fire()
+                self.assertTrue(display.menu_open)
+                app.control({"action": "device_input", "control": "ptt", "active": False})
+                self.assertEqual(
+                    services.requests,
+                    [{"action": "mediathek_group_menu_open"}],
+                )
+
+                display.menu_open = False
+                app.control({"action": "device_input", "control": "ptt", "active": True})
+                app.control({"action": "device_input", "control": "ptt", "active": False})
+
+        self.assertEqual(
+            services.requests,
+            [
+                {"action": "mediathek_group_menu_open"},
+                {"action": "mediathek_favorite_toggle"},
+            ],
+        )
+
+    def test_player_enter_stops_real_background_brandmeister_owner(self) -> None:
+        class Display:
+            def render(self, _frame):
+                pass
+
+            def snapshot(self):
+                return {"service": "PLAYER", "menu_open": False}
+
+            def apply_input(self, _event):
+                return self.snapshot()
+
+            apply_input_state = apply_input
+
+        class Services:
+            active_service = "brandmeister"
+
+            def __init__(self):
+                self.requests = []
+
+            def control(self, request):
+                self.requests.append(request)
+                self.active_service = "system"
+                return {"brandmeister": {"status": "stopped"}}
+
+            def receiver_overlay(self, _view_service=None):
+                return {"service": "PLAYER", "playing": False, "audio_active": False}
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            services = Services()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=Display(),
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,
+            )
+            app.control({"action": "device_input", "control": "right_press"})
+
+        self.assertEqual(services.requests, [{"action": "brandmeister_toggle"}])
+
     def test_ambient_quick_menu_routes_selection_toggle_and_layer_volume(self) -> None:
         class InputDisplay:
             def render(self, _frame) -> None:

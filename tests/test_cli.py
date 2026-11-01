@@ -9,6 +9,12 @@ from openr4d10.cli import main
 
 
 class CliTests(unittest.TestCase):
+    def test_real_run_never_autostarts_brandmeister_audio(self) -> None:
+        source = (Path(__file__).resolve().parents[1] / "src" / "openr4d10" / "cli.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("services.start_brandmeister_receiver()", source)
+
     def test_preview_ui_does_not_require_target_configuration(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             output = Path(raw) / "preview.png"

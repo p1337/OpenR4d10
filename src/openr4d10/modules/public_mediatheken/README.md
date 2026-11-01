@@ -24,3 +24,8 @@ Browser-/Gerätegrenze sind in `docs/MEDIATHEK.md` dokumentiert.
 Der zentrale Geräteplayer unterstützt einen entprellten Suchlauf ausschließlich
 über den unteren linken Encoder, echten mpv-Pufferfortschritt sowie den
 gemeinsamen persistenten Verlauf und Favoritenstellen aller Mediatheken.
+## Device groups
+
+Hold the physical Whisplay PTT button for two seconds in PLAYER to open the
+localized Favorites/search-group picker. Selection is non-blocking and starts
+a random low-resolution video through the central player when ready.

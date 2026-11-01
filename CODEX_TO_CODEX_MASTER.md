@@ -3741,3 +3741,21 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Regionalmediatheken. Die Browseransicht zeigt die Bereiche ausdrücklich und
   vollständig fünfsprachig. Die vorhandene zentrale Quellen- und
   Qualitätsauswahl darf dafür nicht dupliziert werden.
+# Audio boot safety
+
+- Persisted stations, talkgroups and last-visible UI views are configuration,
+  not playback consent. No network audio service, especially BrandMeister DMR,
+  may start automatically after boot. Audio starts only after an explicit user
+  PLAY/ENTER action, and stop/pause must address the real active audio owner.
+
+# Mediathek device groups
+
+- Physical Whisplay PTT held for two seconds in PLAYER opens a localized group
+  picker immediately. A short PTT release during active Mediathek playback
+  remains the favorite/bookmark action; a consumed long hold must never also
+  toggle the favorite.
+- Groups are Favorites plus the curated browser search collections. Labels and
+  search terms follow the device language. Selection and network lookup run
+  outside the input/SPI thread, use a cancellable generation token, and start
+  random video playback when ready. Further channel steps choose another random
+  result. Expiring stream URLs remain forbidden in persistent state.

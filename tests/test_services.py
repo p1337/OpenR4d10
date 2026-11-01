@@ -5,11 +5,12 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import threading
+import time
 import unittest
 from urllib.parse import urlsplit
 
 from openr4d10.services import BUILTIN_SERVICES, ServiceCatalog
-from openr4d10.content import DWD_RADAR_GIF_URL
+from openr4d10.content import DWD_RADAR_GIF_URL, MediathekEntry
 from openr4d10.presets import FEED_BY_ID, RADIO_BY_ID
 from openr4d10.radio_capture import BufferedTrack
 from openr4d10.storage import MIGRATION_1, SCHEMA_VERSION, StateStore
@@ -812,6 +813,175 @@ class ServiceCatalogTests(unittest.TestCase):
                 self.assertEqual(service_states["zdf_mediathek"]["readiness"], "ready")
             finally:
                 catalog.close()
+
+    def test_device_mediathek_groups_are_localized_and_play_random_video(self) -> None:
+        class State:
+            state = "stopped"
+            volume = 30
+            paused = False
+            source = None
+
+            def as_dict(self):
+                return {"state": self.state, "volume": self.volume, "paused": self.paused}
+
+        class Player:
+            def __init__(self):
+                self.state = State()
+                self.loaded = None
+                self.video_enabled = False
+
+            def load(self, source, *, video_enabled=False):
+                self.loaded = source
+                self.video_enabled = video_enabled
+                self.state.state = "playing"
+
+            def stop(self):
+                self.state.state = "stopped"
+
+            def close(self):
+                pass
+
+        class Recorder:
+            state = State()
+
+            def close(self):
+                pass
+
+        class Mediathek:
+            def __init__(self):
+                self.requests = []
+
+            def search(self, provider, query):
+                self.requests.append((provider, query))
+                return [
+                    MediathekEntry(
+                        item_id=f"{index:024d}",
+                        provider="Alle Mediatheken",
+                        service_id="public_mediatheken",
+                        channel="ARD-alpha",
+                        topic="Wissen",
+                        title=f"Dokumentation {index}",
+                        description="Test",
+                        duration_seconds=600,
+                        timestamp=1_793_520_000 - index,
+                        source_url=f"https://media.example.test/documentary-{index}.mp4",
+                        website_url=f"https://example.test/documentary-{index}",
+                    )
+                    for index in range(3)
+                ]
+
+        with tempfile.TemporaryDirectory() as raw:
+            player = Player()
+            mediathek = Mediathek()
+            catalog = ServiceCatalog(
+                Path(raw).resolve(),
+                executable_lookup=lambda _name: "/usr/bin/mpv",
+                player=player,
+                recorder=Recorder(),
+                mediathek_catalog=mediathek,
+            )
+            try:
+                catalog.set_display_language("de")
+                groups = catalog.control({"action": "mediathek_group_menu_open"})
+                self.assertEqual(groups["groups"][0]["name"], "Favoriten")
+                catalog.control({"action": "mediathek_group_step", "steps": 3})
+                selected = catalog.control({"action": "mediathek_group_select"})
+                self.assertTrue(selected["loading"])
+                deadline = time.monotonic() + 2
+                while time.monotonic() < deadline:
+                    snapshot = catalog.snapshot()
+                    if snapshot["mediathek"]["active_group"] == "documentaries":
+                        break
+                    time.sleep(0.01)
+                else:
+                    self.fail("Mediathek group worker did not finish")
+                first_item = snapshot["mediathek"]["active_item"]["item_id"]
+                stepped = catalog.control({"action": "mediathek_step", "steps": 1})
+            finally:
+                catalog.close()
+
+        self.assertEqual(mediathek.requests, [("all", "Dokumentation")])
+        self.assertEqual(snapshot["mediathek"]["active_group"], "documentaries")
+        self.assertEqual(snapshot["mediathek"]["playback_mode"], "video")
+        self.assertTrue(player.video_enabled)
+        self.assertNotEqual(stepped["item_id"], first_item)
+
+    def test_device_mediathek_group_lookup_never_blocks_input_and_can_cancel(self) -> None:
+        class State:
+            state = "stopped"
+            volume = 30
+            paused = False
+            source = None
+
+            def as_dict(self):
+                return {"state": self.state, "volume": self.volume, "paused": False}
+
+        class Player:
+            def __init__(self):
+                self.state = State()
+                self.loaded = None
+
+            def load(self, source, *, video_enabled=False):
+                self.loaded = source
+                self.state.state = "playing"
+
+            def stop(self):
+                self.state.state = "stopped"
+
+            def close(self):
+                pass
+
+        class Recorder:
+            state = State()
+
+            def close(self):
+                pass
+
+        entered = threading.Event()
+        release = threading.Event()
+
+        class SlowMediathek:
+            def search(self, _provider, _query):
+                entered.set()
+                release.wait(2)
+                return [
+                    MediathekEntry(
+                        item_id="0123456789abcdef01234567",
+                        provider="Alle Mediatheken",
+                        service_id="public_mediatheken",
+                        channel="ARD",
+                        topic="Neu",
+                        title="Später Treffer",
+                        description="Test",
+                        duration_seconds=60,
+                        timestamp=1_793_520_000,
+                        source_url="https://media.example.test/later.mp4",
+                        website_url="https://example.test/later",
+                    )
+                ]
+
+        with tempfile.TemporaryDirectory() as raw:
+            player = Player()
+            catalog = ServiceCatalog(
+                Path(raw).resolve(),
+                executable_lookup=lambda _name: "/usr/bin/mpv",
+                player=player,
+                recorder=Recorder(),
+                mediathek_catalog=SlowMediathek(),
+            )
+            try:
+                started = time.perf_counter()
+                result = catalog.control({"action": "mediathek_group_select"})
+                elapsed = time.perf_counter() - started
+                self.assertTrue(result["loading"])
+                self.assertLess(elapsed, 0.1)
+                self.assertTrue(entered.wait(0.5))
+                catalog.control({"action": "mediathek_group_cancel"})
+                release.set()
+            finally:
+                catalog.close()
+
+        self.assertIsNone(player.loaded)
 
     def test_catalog_covers_documented_services_without_claiming_credentials(self) -> None:
         available = {

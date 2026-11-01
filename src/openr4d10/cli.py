@@ -126,7 +126,9 @@ def main(argv: list[str] | None = None) -> int:
     if services is not None:
         services.prefetch_ambient_audio()
         services.prefetch_brandmeister_catalog()
-        services.start_brandmeister_receiver()
+        # Saved BrandMeister talkgroups are configuration, never permission to
+        # start network audio after a boot.  Playback always requires an
+        # explicit PLAY/ENTER action from the user.
     application = OpenR4d10App(
         app_config,
         display=display,

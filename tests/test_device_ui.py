@@ -34,6 +34,22 @@ from openr4d10.whisplay import WhisplayPanel, _KernelPwmBacklight
 
 
 class DeviceUiTests(unittest.TestCase):
+    def test_player_ptt_hold_opens_readable_mediathek_group_menu(self) -> None:
+        state = DeviceUiState(language="de")
+        state.service_index = SERVICES.index("PLAYER")
+        state.mediathek_group_rows = [
+            {"id": "favorites", "name": "Favoriten", "selected": True},
+            {"id": "latest", "name": "Neu", "selected": False},
+        ]
+        state.mediathek_group_position = 1
+        state.mediathek_group_count = 10
+        state.apply(InputEvent(Control.PTT, held_seconds=2.0, active=False))
+        drawn = self._drawn_text(state)
+
+        self.assertTrue(state.menu_open)
+        self.assertEqual(state.menu_kind, "mediathek_groups")
+        self.assertIn("Favoriten", drawn)
+
     def test_fonts_and_static_glow_layers_are_reused_between_frames(self) -> None:
         _font.cache_clear()
         _player_edge_glow_layer.cache_clear()

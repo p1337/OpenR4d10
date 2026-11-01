@@ -242,6 +242,11 @@ existing installation is changed, the installer must successfully create a
 consistent secret-free state backup below `/var/lib/openr4d10/backups`; a
 backup failure aborts the update.
 
+Saved BrandMeister talkgroups remain configured across restarts, but DMR audio
+never starts automatically after boot. The receiver starts only after an
+explicit PLAY/ENTER action and the same action stops its real HoseLine/ALSA
+owner again.
+
 On every boot a fixed root-owned recovery unit reconciles an older update
 record before the dashboard starts. A previous-boot `queued` or `running` state
 becomes retryable failure, while a previous-boot `rebooting` state becomes

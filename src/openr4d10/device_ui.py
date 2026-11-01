@@ -66,6 +66,7 @@ DISPLAY_TEXT = {
         "ambient_layers": "SOUND LAYERS",
         "dmr_countries": "COUNTRIES",
         "dmr_replace": "REPLACE TG?",
+        "mediathek_groups": "MEDIA GROUPS",
         "layer_on": "ON",
         "layer_off": "OFF",
         "display": "DISPLAY",
@@ -124,6 +125,7 @@ DISPLAY_TEXT = {
         "ambient_layers": "KLANGLAGEN",
         "dmr_countries": "LÄNDER",
         "dmr_replace": "TG ERSETZEN?",
+        "mediathek_groups": "MEDIATHEK-GRUPPEN",
         "layer_on": "AN",
         "layer_off": "AUS",
         "display": "ANZEIGE",
@@ -182,6 +184,7 @@ DISPLAY_TEXT = {
         "ambient_layers": "WARSTWY DŹWIĘKU",
         "dmr_countries": "KRAJE",
         "dmr_replace": "ZASTĄPIĆ TG?",
+        "mediathek_groups": "GRUPY MEDIATEKI",
         "layer_on": "WŁ",
         "layer_off": "WYŁ",
         "display": "EKRAN",
@@ -240,6 +243,7 @@ DISPLAY_TEXT = {
         "ambient_layers": "COUCHES SONORES",
         "dmr_countries": "PAYS",
         "dmr_replace": "REMPLACER TG ?",
+        "mediathek_groups": "GROUPES MÉDIATHÈQUE",
         "layer_on": "ON",
         "layer_off": "OFF",
         "display": "ÉCRAN",
@@ -298,6 +302,7 @@ DISPLAY_TEXT = {
         "ambient_layers": "CAPAS DE SONIDO",
         "dmr_countries": "PAÍSES",
         "dmr_replace": "¿SUSTITUIR TG?",
+        "mediathek_groups": "GRUPOS MEDIATECA",
         "layer_on": "ON",
         "layer_off": "OFF",
         "display": "PANTALLA",
@@ -394,6 +399,9 @@ class DeviceUiState:
     dmr_replacement_rows: list[dict[str, object]] = field(default_factory=list)
     dmr_replacement_position: int = 0
     dmr_replacement_count: int = 0
+    mediathek_group_rows: list[dict[str, object]] = field(default_factory=list)
+    mediathek_group_position: int = 0
+    mediathek_group_count: int = 0
     ambient_layer_rows: list[dict[str, object]] = field(default_factory=list)
     ambient_layer_position: int = 0
     ambient_layer_count: int = 0
@@ -467,6 +475,9 @@ class DeviceUiState:
             "dmr_replacement_rows": [dict(item) for item in self.dmr_replacement_rows],
             "dmr_replacement_position": self.dmr_replacement_position,
             "dmr_replacement_count": self.dmr_replacement_count,
+            "mediathek_group_rows": [dict(item) for item in self.mediathek_group_rows],
+            "mediathek_group_position": self.mediathek_group_position,
+            "mediathek_group_count": self.mediathek_group_count,
             "ambient_layer_rows": [dict(item) for item in self.ambient_layer_rows],
             "ambient_layer_position": self.ambient_layer_position,
             "ambient_layer_count": self.ambient_layer_count,
@@ -562,7 +573,9 @@ class DeviceUiState:
                     self._open_menu("quick_menu")
                     self.title = "Quick menu"
                     self.subtitle = "Recording and playback actions"
-            elif self.menu_open and self.menu_kind in {"dmr_countries", "dmr_replace"}:
+            elif self.menu_open and self.menu_kind in {
+                "dmr_countries", "dmr_replace", "mediathek_groups",
+            }:
                 self._menu_back()
             elif self.menu_open:
                 self._select_menu_item()
@@ -585,6 +598,15 @@ class DeviceUiState:
                     self._open_menu("dmr_countries")
                     self.title = "Countries"
                     self.subtitle = "Filter talkgroups by country"
+                elif (
+                    event.active is False
+                    and event.held_seconds >= 2.0
+                    and not self.menu_open
+                    and self.service == "PLAYER"
+                ):
+                    self._open_menu("mediathek_groups")
+                    self.title = "Mediathek groups"
+                    self.subtitle = "Choose a group for random playback"
 
     def update_from_frame(self, frame: Frame) -> None:
         fields = frame.fields
@@ -749,6 +771,34 @@ class DeviceUiState:
         self.dmr_replacement_count = (
             replacement_count
             if isinstance(replacement_count, int) and not isinstance(replacement_count, bool)
+            else 0
+        )
+        self.mediathek_group_rows = []
+        group_rows = receiver.get("mediathek_group_rows")
+        if isinstance(group_rows, list):
+            for item in group_rows[:5]:
+                if not isinstance(item, Mapping):
+                    continue
+                group_id = item.get("id")
+                if not isinstance(group_id, str):
+                    continue
+                self.mediathek_group_rows.append(
+                    {
+                        "id": group_id[:40],
+                        "name": str(item.get("name") or group_id)[:48],
+                        "selected": item.get("selected") is True,
+                    }
+                )
+        group_position = receiver.get("mediathek_group_position")
+        group_count = receiver.get("mediathek_group_count")
+        self.mediathek_group_position = (
+            group_position
+            if isinstance(group_position, int) and not isinstance(group_position, bool)
+            else 0
+        )
+        self.mediathek_group_count = (
+            group_count
+            if isinstance(group_count, int) and not isinstance(group_count, bool)
             else 0
         )
         if receiver.get("replacement_required") is True and self.menu_kind != "dmr_replace":
@@ -1355,6 +1405,51 @@ def _draw_dmr_countries(
         draw.text((59, top + 5), name, font=name_font, fill=(245, 248, 249))
 
 
+def _draw_mediathek_groups(
+    draw: ImageDraw.ImageDraw,
+    state: DeviceUiState,
+    content_top: int,
+) -> None:
+    """Draw the localized device-side Mediathek group picker."""
+
+    count_font = _font(9, bold=True)
+    count = (
+        f"{state.mediathek_group_position}/{state.mediathek_group_count}"
+        if state.mediathek_group_count
+        else "--"
+    )
+    count_width = draw.textbbox((0, 0), count, font=count_font)[2]
+    draw.text(
+        (MENU_COUNTER_RIGHT - count_width, content_top + 14),
+        count,
+        font=count_font,
+        fill=state.accent,
+    )
+    name_font = _font(12, bold=True)
+    for index, item in enumerate(state.mediathek_group_rows[:5]):
+        top = content_top + 35 + index * 31
+        selected = item.get("selected") is True
+        draw.rounded_rectangle(
+            (9, top, 230, top + 27),
+            radius=7,
+            fill=(35, 30, 14) if selected else (11, 22, 25),
+            outline=state.accent if selected else (45, 61, 65),
+            width=2 if selected else 1,
+        )
+        if selected:
+            draw.polygon(
+                ((17, top + 8), (25, top + 13), (17, top + 19)),
+                fill=state.accent,
+            )
+        name = _fit_text(draw, str(item.get("name") or ""), name_font, 187)
+        draw.text(
+            (33, top + 5),
+            name,
+            font=name_font,
+            fill=(245, 248, 249),
+        )
+
+
 def _draw_dmr_replacements(
     draw: ImageDraw.ImageDraw,
     state: DeviceUiState,
@@ -1754,6 +1849,8 @@ def render_device_ui(
             _draw_ambient_layers(draw, state, text, content_top)
         elif menu_key == "dmr_countries":
             _draw_dmr_countries(draw, state, content_top)
+        elif menu_key == "mediathek_groups":
+            _draw_mediathek_groups(draw, state, content_top)
         elif menu_key == "dmr_replace":
             _draw_dmr_replacements(draw, state, content_top)
         return image.convert("RGB")

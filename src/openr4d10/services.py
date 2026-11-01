@@ -64,6 +64,52 @@ DEFAULT_ENABLED_SERVICES = {
 MEDIATHEK_SERVICE_IDS = {
     "ard_mediathek", "zdf_mediathek", "public_mediatheken",
 }
+MEDIATHEK_GROUP_LABELS = {
+    "en": {
+        "favorites": "Favorites", "latest": "New", "news": "News",
+        "tatort": "Crime", "documentaries": "Documentaries",
+        "science": "Science", "terra_x": "Terra X",
+        "harald_lesch": "Harald Lesch", "history": "History", "nature": "Nature",
+    },
+    "de": {
+        "favorites": "Favoriten", "latest": "Neu", "news": "Nachrichten",
+        "tatort": "Tatort & Krimi", "documentaries": "Dokumentationen",
+        "science": "Wissenschaft", "terra_x": "Terra X",
+        "harald_lesch": "Harald Lesch", "history": "Geschichte", "nature": "Natur",
+    },
+    "pl": {
+        "favorites": "Ulubione", "latest": "Nowe", "news": "Wiadomości",
+        "tatort": "Kryminały", "documentaries": "Dokumentalne",
+        "science": "Nauka", "terra_x": "Terra X",
+        "harald_lesch": "Harald Lesch", "history": "Historia", "nature": "Przyroda",
+    },
+    "fr": {
+        "favorites": "Favoris", "latest": "Nouveautés", "news": "Actualités",
+        "tatort": "Policier", "documentaries": "Documentaires",
+        "science": "Sciences", "terra_x": "Terra X",
+        "harald_lesch": "Harald Lesch", "history": "Histoire", "nature": "Nature",
+    },
+    "es": {
+        "favorites": "Favoritos", "latest": "Nuevos", "news": "Noticias",
+        "tatort": "Crimen", "documentaries": "Documentales",
+        "science": "Ciencia", "terra_x": "Terra X",
+        "harald_lesch": "Harald Lesch", "history": "Historia", "nature": "Naturaleza",
+    },
+}
+MEDIATHEK_GROUP_QUERIES = {
+    "en": {"news": "News", "tatort": "Crime", "documentaries": "Documentary", "science": "Science", "history": "History", "nature": "Nature"},
+    "de": {"news": "Nachrichten", "tatort": "Tatort", "documentaries": "Dokumentation", "science": "Wissenschaft", "history": "Geschichte", "nature": "Natur"},
+    "pl": {"news": "Wiadomości", "tatort": "Kryminał", "documentaries": "Dokument", "science": "Nauka", "history": "Historia", "nature": "Przyroda"},
+    "fr": {"news": "Actualités", "tatort": "Polar", "documentaries": "Documentaire", "science": "Science", "history": "Histoire", "nature": "Nature"},
+    "es": {"news": "Noticias", "tatort": "Crimen", "documentaries": "Documental", "science": "Ciencia", "history": "Historia", "nature": "Naturaleza"},
+}
+MEDIATHEK_GROUP_STATUS_TEXT = {
+    "en": ("Mediathek", "Loading random video …", "Group could not be loaded"),
+    "de": ("Mediathek", "Zufälliges Video wird geladen …", "Gruppe konnte nicht geladen werden"),
+    "pl": ("Mediateka", "Ładowanie losowego filmu …", "Nie udało się wczytać grupy"),
+    "fr": ("Médiathèque", "Chargement d’une vidéo aléatoire …", "Impossible de charger le groupe"),
+    "es": ("Mediateca", "Cargando un vídeo aleatorio …", "No se pudo cargar el grupo"),
+}
 DISPLAY_BRIGHTNESS_KEY = "display.brightness_percent"
 DEFAULT_DISPLAY_BRIGHTNESS = 100
 AMBIENT_SOURCE_MIGRATION_KEY = "ambient.direct_sources_v1"
@@ -245,6 +291,11 @@ class ServiceCatalog:
         self._active_mediathek_results: tuple[MediathekEntry, ...] = ()
         self._active_mediathek_item: dict[str, object] | None = None
         self._active_mediathek_mode = "audio"
+        self.selected_mediathek_group = "latest"
+        self._active_mediathek_group: str | None = None
+        self._mediathek_group_generation = 0
+        self._mediathek_group_loading = False
+        self._mediathek_group_error: str | None = None
         self._mediathek_seek_pending_seconds = 0
         self._mediathek_progress_saved_at = 0.0
         external_ids = {
@@ -585,6 +636,111 @@ class ServiceCatalog:
             visible.append(row)
         return visible, selected + 1, len(rows)
 
+    def _mediathek_group_rows(self) -> list[dict[str, object]]:
+        """Return the device's localized, bounded Mediathek group catalog."""
+
+        language = self.display_language()
+        labels = MEDIATHEK_GROUP_LABELS.get(language, MEDIATHEK_GROUP_LABELS["en"])
+        identifiers = ["favorites"] + [
+            str(item["collection_id"]) for item in MediathekCatalog.collections()
+        ]
+        if self.selected_mediathek_group not in identifiers:
+            self.selected_mediathek_group = identifiers[0]
+        return [
+            {
+                "id": group_id,
+                "name": labels.get(group_id, group_id.replace("_", " ").title()),
+                "selected": group_id == self.selected_mediathek_group,
+            }
+            for group_id in identifiers
+        ]
+
+    def _mediathek_group_query(self, group_id: str) -> tuple[str, str]:
+        collection = next(
+            (
+                item
+                for item in MediathekCatalog.collections()
+                if item["collection_id"] == group_id
+            ),
+            None,
+        )
+        if collection is None:
+            raise ValueError("unknown Mediathek group")
+        language = self.display_language()
+        translated = MEDIATHEK_GROUP_QUERIES.get(
+            language, MEDIATHEK_GROUP_QUERIES["en"]
+        ).get(group_id)
+        query = str(translated if translated is not None else collection["query"])
+        return str(collection["provider"]), query
+
+    def _play_random_mediathek_group(
+        self, group_id: str, *, generation: int | None = None
+    ) -> MediathekEntry | None:
+        """Resolve and play one random item for a device-selected group."""
+
+        if group_id == "favorites":
+            favorites = [
+                item for item in self.store.mediathek_states() if item["favorite"] is True
+            ]
+            if not favorites:
+                raise ValueError("no Mediathek favorites are saved")
+            favorite = random.choice(favorites)
+            provider = "all"
+            query = str(favorite["title"])
+            results = self.mediathek_catalog.search(provider, query)
+            exact = [
+                item
+                for item in results
+                if item.content_id == favorite["content_id"]
+                or item.title.casefold() == str(favorite["title"]).casefold()
+            ]
+            results = exact or results
+        else:
+            provider, query = self._mediathek_group_query(group_id)
+            results = self.mediathek_catalog.search(provider, query)
+        if not results:
+            raise ValueError("the selected Mediathek group has no playable videos")
+        if generation is not None and generation != self._mediathek_group_generation:
+            return None
+        random.shuffle(results)
+        self._mediathek_results[provider] = results
+        self._mediathek_queries[provider] = query[:120]
+        self._mediathek_selected[provider] = results[0].item_id
+        mode = (
+            self._active_mediathek_mode
+            if self.active_service in MEDIATHEK_SERVICE_IDS
+            else "video"
+        )
+        self._play_mediathek_item(
+            provider,
+            results[0],
+            result_set=results,
+            mode=mode,
+        )
+        self._active_mediathek_group = group_id
+        return results[0]
+
+    def _queue_random_mediathek_group(self, group_id: str) -> None:
+        """Resolve a network-backed group without blocking the input thread."""
+
+        self._mediathek_group_generation += 1
+        generation = self._mediathek_group_generation
+        self._mediathek_group_loading = True
+        self._mediathek_group_error = None
+
+        def load() -> None:
+            try:
+                self._play_random_mediathek_group(group_id, generation=generation)
+            except (ContentError, OSError, RuntimeError, ValueError) as exc:
+                LOG.warning("Mediathek group %s unavailable: %s", group_id, exc)
+                if generation == self._mediathek_group_generation:
+                    self._mediathek_group_error = str(exc)[:160]
+            finally:
+                if generation == self._mediathek_group_generation:
+                    self._mediathek_group_loading = False
+
+        self._start_worker("openr4d10-mediathek-group", load)
+
     def _brandmeister_replacement_rows(self) -> list[dict[str, object]]:
         rows: list[dict[str, object]] = []
         for channel in self.store.channels("brandmeister"):
@@ -822,7 +978,12 @@ class ServiceCatalog:
     def _stop_brandmeister_for_audio_owner(self) -> None:
         if self.active_service == "ambient":
             self._stop_ambient_layers()
-        if self.active_service == "brandmeister":
+        brandmeister_status = str(
+            self.brandmeister.snapshot().get("status") or "stopped"
+        )
+        if self.active_service == "brandmeister" or brandmeister_status in {
+            "connecting", "listening", "call", "reconnecting",
+        }:
             self.brandmeister.stop()
 
     def _open_voice_recorder(self) -> dict[str, object]:
@@ -1757,6 +1918,11 @@ class ServiceCatalog:
                     else None
                 ),
                 "history": mediathek_history,
+                "selected_group": self.selected_mediathek_group,
+                "active_group": self._active_mediathek_group,
+                "groups": self._mediathek_group_rows(),
+                "group_loading": self._mediathek_group_loading,
+                "group_error": self._mediathek_group_error,
                 "limits": {
                     "results_per_provider": MediathekCatalog.MAX_RESULTS,
                     "response_bytes": MediathekCatalog.MAX_RESPONSE_BYTES,
@@ -2806,6 +2972,7 @@ class ServiceCatalog:
             self._mediathek_selected[provider] = (
                 results[0].item_id if results else None
             )
+            self._active_mediathek_group = None
             return {
                 "provider": provider,
                 "result_count": len(results),
@@ -2858,6 +3025,7 @@ class ServiceCatalog:
                 mode=mode,
                 start_seconds=float(start_seconds),
             )
+            self._active_mediathek_group = None
             return {
                 "provider": provider,
                 "item_id": item_id,
@@ -2895,7 +3063,12 @@ class ServiceCatalog:
                 ),
                 0,
             )
-            item = results[(current + steps) % len(results)]
+            if self._active_mediathek_group is not None and len(results) > 1:
+                item = random.choice(
+                    [candidate for candidate in results if candidate.item_id != active_item_id]
+                )
+            else:
+                item = results[(current + steps) % len(results)]
             self._play_mediathek_item(provider, item)
             return {
                 "provider": provider,
@@ -2903,6 +3076,36 @@ class ServiceCatalog:
                 "mode": self._active_mediathek_mode,
                 "playback": self.player.state.as_dict(),
             }
+        elif action == "mediathek_group_menu_open":
+            rows = self._mediathek_group_rows()
+            return {"groups": rows, "selected_group": self.selected_mediathek_group}
+        elif action == "mediathek_group_step":
+            steps = request.get("steps")
+            if (
+                isinstance(steps, bool)
+                or not isinstance(steps, int)
+                or steps == 0
+                or abs(steps) > 10
+            ):
+                raise ValueError(
+                    "Mediathek group steps must be between -10 and 10, excluding zero"
+                )
+            rows = self._mediathek_group_rows()
+            identifiers = [str(item["id"]) for item in rows]
+            current = identifiers.index(self.selected_mediathek_group)
+            self.selected_mediathek_group = identifiers[(current + steps) % len(identifiers)]
+            return {"selected_group": self.selected_mediathek_group}
+        elif action == "mediathek_group_select":
+            self._queue_random_mediathek_group(self.selected_mediathek_group)
+            return {
+                "selected_group": self.selected_mediathek_group,
+                "loading": True,
+            }
+        elif action == "mediathek_group_cancel":
+            self._mediathek_group_generation += 1
+            self._mediathek_group_loading = False
+            self._mediathek_group_error = None
+            return {"cancelled": True}
         elif action == "mediathek_seek_preview":
             steps = request.get("steps")
             if (
@@ -3357,6 +3560,11 @@ class ServiceCatalog:
             "buffered_until_seconds": values.get("buffered_until_seconds"),
             "seek_pending_seconds": self._mediathek_seek_pending_seconds,
         }
+
+    def mediathek_group_loading(self) -> bool:
+        """Return whether a device group lookup is still pending."""
+
+        return self._mediathek_group_loading
 
     def device_video_frame(self) -> bytes | None:
         """Poll one synchronized frame only for Mediathek video mode."""
@@ -3824,6 +4032,19 @@ class ServiceCatalog:
         requested = str(view_service or "").upper()
         playback = self.player.state
         brandmeister_state = self.brandmeister.snapshot()
+        group_rows, group_position, group_count = self._bounded_selection_window(
+            self._mediathek_group_rows()
+        )
+        mediathek_status_text = MEDIATHEK_GROUP_STATUS_TEXT.get(
+            self.display_language(), MEDIATHEK_GROUP_STATUS_TEXT["en"]
+        )
+        mediathek_group_overlay = {
+            "mediathek_group_rows": group_rows,
+            "mediathek_group_position": group_position,
+            "mediathek_group_count": group_count,
+            "mediathek_group_loading": self._mediathek_group_loading,
+            "mediathek_group_error": self._mediathek_group_error is not None,
+        }
         audio_active = (
             getattr(playback, "state", "stopped") == "playing"
             and not bool(getattr(playback, "paused", False))
@@ -4063,6 +4284,18 @@ class ServiceCatalog:
                 requested,
                 (requested or "OPENR4D10", requested or "System online", "Ready"),
             )
+            if requested == "PLAYER" and self._mediathek_group_loading:
+                station, title, subtitle = (
+                    mediathek_status_text[0],
+                    mediathek_status_text[0],
+                    mediathek_status_text[1],
+                )
+            elif requested == "PLAYER" and self._mediathek_group_error is not None:
+                station, title, subtitle = (
+                    mediathek_status_text[0],
+                    mediathek_status_text[0],
+                    mediathek_status_text[2],
+                )
             return {
                 "service": requested or "SYSTEM",
                 "station": station,
@@ -4071,6 +4304,7 @@ class ServiceCatalog:
                 "playing": False,
                 "audio_active": audio_active,
                 "volume": playback.volume,
+                **(mediathek_group_overlay if requested == "PLAYER" else {}),
             }
         if requested == "REC" or self.active_service == "recorder":
             self._sync_voice_playback_position()
@@ -4111,11 +4345,28 @@ class ServiceCatalog:
                 "volume": playback.volume,
             }
         if playback.state not in {"playing", "paused"}:
+            player_status = (
+                {
+                    "station": mediathek_status_text[0],
+                    "title": mediathek_status_text[0],
+                    "subtitle": (
+                        mediathek_status_text[1]
+                        if self._mediathek_group_loading
+                        else mediathek_status_text[2]
+                        if self._mediathek_group_error is not None
+                        else "Select media and press play"
+                    ),
+                }
+                if requested == "PLAYER"
+                else {}
+            )
             return {
                 "service": requested or "SYSTEM",
                 "playing": False,
                 "audio_active": audio_active,
                 "volume": playback.volume,
+                **player_status,
+                **(mediathek_group_overlay if requested == "PLAYER" else {}),
             }
         selected = self._selected_preset() if self.active_service == "webradio" else None
         active_ambient_scene = (
@@ -4184,6 +4435,11 @@ class ServiceCatalog:
                 and self._active_mediathek_mode == "video"
             ),
             "mediathek_active": self.active_service in MEDIATHEK_SERVICE_IDS,
+            **(
+                mediathek_group_overlay
+                if service_label == "PLAYER" or requested == "PLAYER"
+                else {}
+            ),
             **(
                 self.mediathek_playback_metrics()
                 if self.active_service in MEDIATHEK_SERVICE_IDS

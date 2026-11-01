@@ -714,3 +714,15 @@ standard `char-alsa` device class for media playback/recording; it still has no
 access to homes or unrelated hardware. Codec control
 and detection stay inside the kernel/ALSA driver installed by the privileged
 installer; the application itself never selects or guesses a codec revision.
+# Audio boot ownership
+
+BrandMeister talkgroups persist only as configuration. Process startup warms
+the public catalog but never calls the HoseLine receiver. A real DMR audio
+owner can be created only by explicit PLAY/ENTER input. New media playback also
+checks the receiver's actual runtime status, not only `active_service`, before
+stopping DMR, so a stale UI/service label cannot leave hidden ALSA audio alive.
+
+Device-side Mediathek group lookup is dispatched to a bounded background
+worker. The input/SPI path only changes selection and queues work; it never
+waits for the network query. A generation token prevents a superseded or
+cancelled lookup from taking playback ownership later.

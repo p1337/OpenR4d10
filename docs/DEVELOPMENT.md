@@ -478,3 +478,14 @@ Keep configuration ownership, adapter contracts, storage paths, service
 permissions and recurring diagnostic traps documented in `docs/`. Update tests
 with every contract change. Never add a second installation path or direct GPIO
 implementation until the existing adapter boundary has been evaluated first.
+# DMR boot and Mediathek device regression rules
+
+Tests must fail if the real `run` path calls
+`start_brandmeister_receiver()`: saved talkgroups must not imply playback after
+boot. Device input tests must also cover stopping a real background DMR owner
+from a mismatched PLAYER presentation.
+
+Mediathek device tests cover the two-second PTT threshold, consumed release,
+five-language group labels, non-blocking group lookup, video-first device
+playback and randomized next-item selection. Network fetching remains outside
+the serialized input path.
