@@ -48,9 +48,12 @@ and enables the selected talkgroup in the persistent quick list or disables an
 already saved entry when the button is released. Holding PTT for at least two
 seconds opens a country list derived from the bounded cached official catalog.
 The right outer axis selects a country and the right press applies that browse
-filter. The filter never changes the five current subscriptions. Inside a menu
-PTT keeps its normal back/cancel role. A long right press remains the service
-quick menu. The header changes with the service and shows the real DMR
+filter. The filter applies only to the inactive add-catalog below the
+enabled-first block: all currently enabled talkgroups remain visible and
+controllable regardless of country. `All countries` restores the complete
+inactive official catalog below them. The filter never changes the five current
+subscriptions. Inside a menu PTT keeps its normal back/cancel role. A long
+right press remains the service quick menu. The header changes with the service and shows the real DMR
 assignments instead of `SQL` and a generic channel label. Up to five checked
 talkgroups are subscribed at once. None of these controls transmits audio or a
 BrandMeister PTT message.

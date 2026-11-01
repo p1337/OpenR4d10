@@ -452,14 +452,19 @@ class ServiceCatalog:
                 }
             )
 
-        ordered: list[dict[str, object]] = []
+        enabled_entries: list[dict[str, object]] = []
+        inactive_entries: list[dict[str, object]] = []
         seen: set[int] = set()
-        for enabled in (True, False):
-            for item in saved:
-                talkgroup = int(item["talkgroup"])
-                if item["enabled"] is enabled and talkgroup not in seen:
-                    ordered.append(item)
-                    seen.add(talkgroup)
+        for item in saved:
+            talkgroup = int(item["talkgroup"])
+            if item["enabled"] is True and talkgroup not in seen:
+                enabled_entries.append(item)
+                seen.add(talkgroup)
+        for item in saved:
+            talkgroup = int(item["talkgroup"])
+            if item["enabled"] is False and talkgroup not in seen:
+                inactive_entries.append(item)
+                seen.add(talkgroup)
         for item in official:
             talkgroup = item.get("talkgroup")
             if (
@@ -468,7 +473,7 @@ class ServiceCatalog:
                 or talkgroup in seen
             ):
                 continue
-            ordered.append(
+            inactive_entries.append(
                 {
                     "talkgroup": talkgroup,
                     "name": str(item.get("name") or f"TG {talkgroup}"),
@@ -481,17 +486,18 @@ class ServiceCatalog:
             )
             seen.add(talkgroup)
         if self.brandmeister_country_filter is None:
-            return ordered
+            return enabled_entries + inactive_entries
         country_filter = self.brandmeister_country_filter
-        return [
+        filtered_inactive = [
             item
-            for item in ordered
+            for item in inactive_entries
             if (
                 str(item.get("country_code") or "") == country_filter
                 if country_filter != BRANDMEISTER_OTHER_COUNTRIES
                 else not str(item.get("country_code") or "")
             )
         ]
+        return enabled_entries + filtered_inactive
 
     def _brandmeister_country_entries(
         self, *, allow_network: bool
@@ -2264,7 +2270,11 @@ class ServiceCatalog:
             )
             entries = self._brandmeister_device_entries(allow_network=True)
             if entries:
-                talkgroup = int(entries[0]["talkgroup"])
+                selected = next(
+                    (item for item in entries if item.get("enabled") is False),
+                    entries[0],
+                )
+                talkgroup = int(selected["talkgroup"])
                 self.selected_brandmeister_talkgroup = talkgroup
                 saved = self._saved_brandmeister_channel_for_talkgroup(talkgroup)
                 self.selected_brandmeister_channel_id = (

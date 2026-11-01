@@ -822,10 +822,24 @@ class ServiceCatalogTests(unittest.TestCase):
                 catalog.selected_brandmeister_country = "DE"
                 selected = catalog.control({"action": "brandmeister_country_select"})
                 self.assertEqual(selected["country_code"], "DE")
+                self.assertEqual(catalog.selected_brandmeister_talkgroup, 262)
+                filtered_entries = catalog._brandmeister_device_entries(
+                    allow_network=False
+                )
+                self.assertEqual(
+                    [
+                        (entry["talkgroup"], entry["enabled"], entry["country_code"])
+                        for entry in filtered_entries
+                    ],
+                    [(91, True, ""), (262, False, "DE")],
+                )
                 country_frame = catalog.receiver_overlay("DMR")
                 self.assertEqual(country_frame["country_filter"], "DE")
                 self.assertTrue(
-                    all(row["country_code"] == "DE" for row in country_frame["catalog_rows"])
+                    all(
+                        row["enabled"] or row["country_code"] == "DE"
+                        for row in country_frame["catalog_rows"]
+                    )
                 )
 
                 catalog.brandmeister_country_filter = None

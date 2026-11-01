@@ -2901,6 +2901,14 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   `Andere` für nicht konservativ zuordenbare Gruppen. Rechts außen scrollt,
   rechter Druck übernimmt den Filter, PTT geht zurück. Ein Länderfilter ändert
   nur die Browse-Liste, niemals die fünf laufenden HoseLine-Abonnements.
+- Der Länderfilter gilt ausschließlich für den inaktiven Katalog, aus dem neue
+  Talkgroups hinzugefügt werden. Die bereits aktivierten Talkgroups bilden
+  weiterhin den festen enabled-first-Block am Anfang der normalen DMR-Liste
+  und bleiben unabhängig vom gewählten Land vollständig sichtbar und
+  bedienbar. `Alle` zeigt darunter wieder den vollständigen inaktiven
+  Standardkatalog; ein Land zeigt darunter nur die passenden noch inaktiven
+  Kandidaten. Aktive TGs dürfen durch einen Hinzufügen-Filter niemals
+  ausgeblendet werden.
 - Beim Aktivieren einer sechsten TG wird nicht mehr nur das Fünferlimit
   gemeldet. Stattdessen merkt der Dienst die gewünschte neue TG und öffnet
   `Welche ersetzen?` mit den fünf aktiven Gruppen. Rechts außen wählt die zu
