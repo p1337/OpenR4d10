@@ -810,18 +810,28 @@ class ServiceCatalog:
         snapshot = getattr(self.recorder, "voice_snapshot", None)
         return snapshot() if callable(snapshot) else self.recorder.state.as_dict()
 
-    def _sync_voice_playback_position(self) -> None:
+    def _sync_voice_playback_position(self, *, persist: bool = False) -> None:
         if not self._voice_playback_active:
             return
         position_reader = getattr(self.player, "position_seconds", None)
         position = position_reader() if callable(position_reader) else None
-        setter = getattr(self.recorder, "voice_set_position", None)
-        if isinstance(position, (int, float)) and not isinstance(position, bool) and callable(setter):
+        setter = getattr(
+            self.recorder,
+            "voice_set_position" if persist else "voice_follow_playback",
+            None,
+        )
+        if not callable(setter):
+            setter = getattr(self.recorder, "voice_set_position", None)
+        if (
+            isinstance(position, (int, float))
+            and not isinstance(position, bool)
+            and callable(setter)
+        ):
             setter(round(float(position) * 1000))
 
     def _stop_voice_playback(self, *, sync: bool = True) -> None:
         if sync:
-            self._sync_voice_playback_position()
+            self._sync_voice_playback_position(persist=True)
         if self._voice_playback_active:
             self.player.stop()
         self._voice_playback_active = False
@@ -1856,8 +1866,9 @@ class ServiceCatalog:
             if self.active_service != "recorder":
                 self._open_voice_recorder()
             if self._voice_playback_active and self.player.state.state == "playing":
-                self._sync_voice_playback_position()
-                return {"playback": self.player.toggle_pause()}
+                playback = self.player.toggle_pause()
+                self._sync_voice_playback_position(persist=True)
+                return {"playback": playback}
             if self._voice_playback_active and self.player.state.state == "paused":
                 return {"playback": self.player.toggle_pause()}
             path_reader = getattr(self.recorder, "voice_playback_path", None)
@@ -1865,10 +1876,15 @@ class ServiceCatalog:
             if not isinstance(path, Path):
                 raise ValueError("record something before playback")
             voice = self.recorder.voice_snapshot()
-            self.player.load(str(path))
-            seek = getattr(self.player, "seek_absolute", None)
-            if callable(seek):
-                seek(int(voice.get("position_ms") or 0) / 1000.0)
+            start_seconds = int(voice.get("position_ms") or 0) / 1000.0
+            load_at = getattr(self.player, "load_at", None)
+            if callable(load_at):
+                load_at(str(path), start_seconds)
+            else:
+                self.player.load(str(path))
+                seek = getattr(self.player, "seek_absolute", None)
+                if callable(seek):
+                    seek(start_seconds)
             self._voice_playback_active = True
             return {"playback": self.player.state.as_dict()}
         elif action == "voice_recorder_close":

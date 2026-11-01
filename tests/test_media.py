@@ -101,6 +101,24 @@ class ProcessBoundaryTests(unittest.TestCase):
         engine.seek_absolute(1.2)
         self.assertEqual(commands, [["seek", 1.2, "absolute", "exact"]])
 
+    def test_mpv_load_at_sets_initial_position_in_one_atomic_command(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw).resolve()
+            voice = root / "voice.mp3"
+            voice.write_bytes(b"voice")
+            commands = []
+            engine = MpvEngine(Path("/usr/bin/mpv"), media_roots=(root,))
+            engine._command = lambda command: commands.append(command) or {}
+
+            state = engine.load_at(str(voice), 1.2346)
+
+        self.assertEqual(
+            commands,
+            [["loadfile", str(voice), "replace", -1, {"start": "1.235"}]],
+        )
+        self.assertEqual(state["state"], "playing")
+        self.assertFalse(state["paused"])
+
     def test_recorder_builds_argument_array_and_redacts_source_status(self) -> None:
         calls = []
 
@@ -277,7 +295,18 @@ class ProcessBoundaryTests(unittest.TestCase):
             recorder._voice_duration_ms = 5000
             recorder._voice_cursor_ms = 2500
 
-            self.assertEqual(recorder.voice_seek(-100)["position_ms"], 2400)
+            manifest = recorder._voice_session_dir / "edit.json"
+            manifest_before_follow = manifest.read_text(encoding="utf-8")
+            self.assertEqual(
+                recorder.voice_follow_playback(2700)["position_ms"],
+                2700,
+            )
+            self.assertEqual(
+                manifest.read_text(encoding="utf-8"),
+                manifest_before_follow,
+            )
+
+            self.assertEqual(recorder.voice_seek(-100)["position_ms"], 2600)
             self.assertEqual(recorder.voice_boundary(end=False)["position_ms"], 0)
             self.assertEqual(recorder.voice_boundary(end=True)["position_ms"], 5000)
             recorder.voice_set_position(2000)

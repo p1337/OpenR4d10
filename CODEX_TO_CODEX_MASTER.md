@@ -3308,3 +3308,21 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Auswahlzustand hervorgehoben, aber weder ausgeblendet noch so dunkel
   dargestellt, dass seine Beschriftung verschwindet. Der inaktive Reiter
   bleibt klar lesbar und direkt anklickbar.
+
+### 2026-11-01 – Playhead folgt der Sprachwiedergabe sichtbar
+
+- Beim Start der Wiedergabe in `Sprachaufzeichnung` muss die Arbeitsdatei
+  atomar an der aktuell sichtbaren Cursorposition geladen werden. Ein
+  asynchrones `loadfile` mit unmittelbar folgendem separatem `seek` ist
+  verboten: mpv kann diesen Sprung vor `file-loaded` ablehnen, obwohl der Ton
+  bereits beginnt; OpenR4d10 würde dann den Player fälschlich als inaktiv
+  behandeln und der weiße Playhead bliebe stehen.
+- Während der Wiedergabe übernimmt der bestehende 10-Hz-Recorderpfad die reale
+  mpv-Position in denselben weißen, zwei Pixel breiten Playhead. Es gibt keinen
+  zweiten simulierten Browser-Timer. Pause und Stopp frieren und persistieren
+  die zuletzt tatsächlich gemeldete Position.
+- Die laufenden 100-ms-Positionsupdates sind flüchtiger Anzeigezustand und
+  dürfen nicht zehnmal pro Sekunde `edit.json` auf die SD-Karte schreiben.
+  Persistiert wird an semantischen Grenzen wie Pause, Stopp oder manueller
+  Positionsänderung. Tests müssen den atomaren Ladebefehl sowie mehrere
+  aufeinanderfolgende, sichtbar ansteigende Wiedergabepositionen abdecken.

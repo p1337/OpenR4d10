@@ -1382,15 +1382,22 @@ class ServiceCatalogTests(unittest.TestCase):
 
     def test_voice_playback_sync_moves_the_recorder_playhead(self) -> None:
         class Player:
+            def __init__(self) -> None:
+                self.positions = iter((0.125, 0.275, 0.4))
+
             def position_seconds(self):
-                return 2.375
+                return next(self.positions)
 
         class Recorder:
             def __init__(self) -> None:
-                self.positions = []
+                self.followed_positions = []
+                self.persisted_positions = []
+
+            def voice_follow_playback(self, position_ms):
+                self.followed_positions.append(position_ms)
 
             def voice_set_position(self, position_ms):
-                self.positions.append(position_ms)
+                self.persisted_positions.append(position_ms)
 
         catalog = object.__new__(ServiceCatalog)
         catalog.player = Player()  # type: ignore[assignment]
@@ -1398,8 +1405,17 @@ class ServiceCatalogTests(unittest.TestCase):
         catalog._voice_playback_active = True
 
         catalog._sync_voice_playback_position()
+        catalog._sync_voice_playback_position()
+        catalog._sync_voice_playback_position(persist=True)
 
-        self.assertEqual(catalog.recorder.positions, [2375])  # type: ignore[attr-defined]
+        self.assertEqual(  # type: ignore[attr-defined]
+            catalog.recorder.followed_positions,
+            [125, 275],
+        )
+        self.assertEqual(  # type: ignore[attr-defined]
+            catalog.recorder.persisted_positions,
+            [400],
+        )
 
     def test_voice_recorder_open_stops_playback_and_uses_one_resumable_session(self) -> None:
         class State:

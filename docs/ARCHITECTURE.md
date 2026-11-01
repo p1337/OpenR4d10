@@ -292,6 +292,13 @@ duration is probed from the closed audio file instead of trusting wall time.
 During recorder playback the 10 Hz overlay reads mpv's actual absolute position,
 moves that same playhead and uses the central green audio-active glow; pausing
 leaves the cursor at the last reported position.
+Playback is opened with one JSON-IPC `loadfile` command whose per-file `start`
+option contains the visible cursor position. Do not restore the former
+`loadfile`-then-`seek` sequence: loading is asynchronous and mpv can reject the
+early seek while already emitting audio, leaving the application unaware of
+the active playback. The 10 Hz following updates are deliberately not written
+to the recovery manifest; pause, stop and explicit seek boundaries persist the
+final cursor instead.
 
 Recorder seek, boundary and play/pause inputs use one semantic update and one
 native repaint. They do not first repaint the presentation-only encoder state

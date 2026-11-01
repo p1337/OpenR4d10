@@ -6,6 +6,7 @@ from collections import deque
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -182,6 +183,38 @@ class MpvEngine:
         with self._lock:
             try:
                 self._command(["loadfile", approved, "replace"])
+            except (OSError, json.JSONDecodeError, MediaError) as exc:
+                self.state.state = "error"
+                self.state.error = str(exc)
+                raise MediaError(str(exc)) from exc
+            self.state.state = "playing"
+            self.state.source = public_source_label(approved)
+            self.state.paused = False
+            self.state.error = None
+            return self.state.as_dict()
+
+    def load_at(self, source: str, start_seconds: float) -> dict[str, Any]:
+        """Load one source atomically at its initial playback position."""
+
+        if (
+            isinstance(start_seconds, bool)
+            or not isinstance(start_seconds, (int, float))
+            or not math.isfinite(float(start_seconds))
+        ):
+            raise ValueError("start position must be a finite number")
+        approved = validate_media_source(source, self.media_roots)
+        position = max(0.0, float(start_seconds))
+        with self._lock:
+            try:
+                self._command(
+                    [
+                        "loadfile",
+                        approved,
+                        "replace",
+                        -1,
+                        {"start": f"{position:.3f}"},
+                    ]
+                )
             except (OSError, json.JSONDecodeError, MediaError) as exc:
                 self.state.state = "error"
                 self.state.error = str(exc)
@@ -569,6 +602,17 @@ class StreamRecorder:
             self.state.position_ms = self._voice_cursor_ms
             self.state.duration_ms = self._voice_duration_ms
             self._persist_voice_manifest()
+            return self.state.as_dict()
+
+    def voice_follow_playback(self, position_ms: int) -> dict[str, Any]:
+        """Move the live playhead without writing the recovery manifest."""
+
+        if isinstance(position_ms, bool) or not isinstance(position_ms, int):
+            raise ValueError("voice position must be an integer")
+        with self._voice_lock:
+            self._voice_cursor_ms = max(0, min(self._voice_duration_ms, position_ms))
+            self.state.position_ms = self._voice_cursor_ms
+            self.state.duration_ms = self._voice_duration_ms
             return self.state.as_dict()
 
     def voice_playback_path(self) -> Path | None:

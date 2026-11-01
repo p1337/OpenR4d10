@@ -75,6 +75,11 @@ the exact big-endian wire bytes while the implementation stays free of a
 Python per-pixel loop. `/api/device-screen.png` reads the adapter's last drawn
 image; a recorder browser preview may poll that bounded endpoint at 10 Hz but
 must never overlap its own image requests or raise the full `/api/status` rate.
+Voice playback regression tests must also prove that the initial cursor is part
+of the single mpv `loadfile` command and that consecutive 10 Hz mpv positions
+advance the white playhead. Never reintroduce a separate seek immediately after
+an asynchronous load, and never persist every live 100 ms position sample to
+`edit.json`; only pause, stop and explicit navigation are persistence points.
 
 The real-device performance gate measures semantic control, renderer/RGB565,
 SPI presentation and browser preview separately. Normal full-frame starts are
