@@ -643,15 +643,28 @@ class AppTests(unittest.TestCase):
             ],
         )
 
-    def test_long_dmr_ptt_opens_country_list_instead_of_toggling_talkgroup(self) -> None:
+    def test_dmr_hold_opens_country_list_before_release_and_consumes_release(self) -> None:
         class InputDisplay:
+            def __init__(self):
+                self.menu_open = False
+
             def render(self, _frame) -> None:
                 pass
 
             def snapshot(self):
-                return {"service": "DMR", "menu_open": False}
+                return {
+                    "service": "DMR",
+                    "menu_open": self.menu_open,
+                    "menu_kind": "dmr_countries" if self.menu_open else None,
+                }
 
-            def apply_input(self, _event):
+            def apply_input(self, event):
+                if (
+                    event.control == Control.PTT
+                    and event.active is False
+                    and event.held_seconds >= 2.0
+                ):
+                    self.menu_open = True
                 return self.snapshot()
 
             def set_input_handler(self, _handler):
@@ -670,9 +683,27 @@ class AppTests(unittest.TestCase):
             def receiver_overlay(self, _view_service=None):
                 return {"service": "DMR", "station": "TG 91"}
 
+        class ManualTimer:
+            def __init__(self, _interval, callback, args=()):
+                self.callback = callback
+                self.args = args
+                self.cancelled = False
+                self.daemon = False
+
+            def start(self):
+                pass
+
+            def cancel(self):
+                self.cancelled = True
+
+            def fire(self):
+                if not self.cancelled:
+                    self.callback(*self.args)
+
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             services = Services()
+            display = InputDisplay()
             app = OpenR4d10App(
                 AppConfig(
                     log_level="INFO",
@@ -683,18 +714,49 @@ class AppTests(unittest.TestCase):
                     runtime_directory=root,
                     state_directory=root,
                 ),
-                display=InputDisplay(),
+                display=display,
                 power=UnconfiguredTelemetry("power"),
                 receiver=SystemTelemetry(),
                 services=services,
             )
-            with patch("openr4d10.app.time.monotonic", side_effect=[100.0, 102.1]):
+            timers = []
+
+            def timer_factory(interval, callback, args=()):
+                timer = ManualTimer(interval, callback, args)
+                timers.append(timer)
+                return timer
+
+            with patch("openr4d10.app.threading.Timer", side_effect=timer_factory):
+                app.control({"action": "device_input", "control": "ptt", "active": True})
+                self.assertEqual(services.requests, [])
+                self.assertFalse(display.menu_open)
+
+                timers[0].fire()
+                self.assertEqual(
+                    services.requests,
+                    [{"action": "brandmeister_country_menu_open"}],
+                )
+                self.assertTrue(display.menu_open)
+
+                app.control({"action": "device_input", "control": "ptt", "active": False})
+                self.assertEqual(
+                    services.requests,
+                    [{"action": "brandmeister_country_menu_open"}],
+                )
+                self.assertTrue(display.menu_open)
+
+                display.menu_open = False
                 app.control({"action": "device_input", "control": "ptt", "active": True})
                 app.control({"action": "device_input", "control": "ptt", "active": False})
+                self.assertTrue(timers[1].cancelled)
+                timers[1].fire()
 
         self.assertEqual(
             services.requests,
-            [{"action": "brandmeister_country_menu_open"}],
+            [
+                {"action": "brandmeister_country_menu_open"},
+                {"action": "brandmeister_toggle_selected"},
+            ],
         )
 
     def test_ambient_quick_menu_routes_selection_toggle_and_layer_volume(self) -> None:

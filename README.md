@@ -127,8 +127,9 @@ the installer report exactly which adapters still need configuration.
   the physical view pins the speaking TG above a scrollable enabled-first
   catalog window; a short right click starts reception of the enabled TGs,
   short PTT toggles the marked TG and a two-second PTT hold opens the country
-  filter without transmitting; activating a sixth TG explicitly asks which of
-  the five active TGs to replace;
+  filter immediately at the threshold while the button is still held, without
+  transmitting; the following release is consumed, and activating a sixth TG
+  explicitly asks which of the five active TGs to replace;
   no account password or user token
 - standard-library-only test suite and GitHub Actions CI
 - strict release gate: the exact commit must pass GitHub Actions before a Pi

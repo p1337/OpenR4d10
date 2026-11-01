@@ -30,6 +30,7 @@ VOICE_DOUBLE_CLICK_SECONDS = 0.45
 VOICE_TAP_MAX_SECONDS = 0.35
 RECORDER_FRAME_INTERVAL_SECONDS = 0.1
 RECORDER_INTERACTION_QUIET_SECONDS = 0.2
+DMR_PTT_HOLD_SECONDS = 2.0
 
 
 class OpenR4d10App:
@@ -65,6 +66,9 @@ class OpenR4d10App:
         self._view_initialized = False
         self._pending_initial_view_overlay: dict[str, object] | None = None
         self._ptt_pressed_at: float | None = None
+        self._dmr_hold_timer: threading.Timer | None = None
+        self._dmr_hold_generation = 0
+        self._dmr_hold_triggered = False
         self._voice_last_release_at: float | None = None
         self._voice_pressed_at: float | None = None
         self._voice_ignore_release = False
@@ -111,12 +115,87 @@ class OpenR4d10App:
         if signum is not None:
             LOG.info("Received signal %s; stopping", signum)
         self.stop_event.set()
+        self._cancel_dmr_hold_timer()
 
     def _recorder_interaction_active(self) -> bool:
         return (
             time.perf_counter() - self._last_device_input_at
             < RECORDER_INTERACTION_QUIET_SECONDS
         )
+
+    def _cancel_dmr_hold_timer(self) -> None:
+        """Invalidate and cancel the one pending DMR hold action, if any."""
+
+        self._dmr_hold_generation += 1
+        timer = self._dmr_hold_timer
+        self._dmr_hold_timer = None
+        if timer is not None:
+            timer.cancel()
+
+    def _start_dmr_hold_timer(self) -> None:
+        """Open the DMR country menu at the hold threshold, not on release."""
+
+        self._cancel_dmr_hold_timer()
+        self._dmr_hold_triggered = False
+        generation = self._dmr_hold_generation
+        timer = threading.Timer(
+            DMR_PTT_HOLD_SECONDS,
+            self._on_dmr_hold_threshold,
+            args=(generation,),
+        )
+        timer.daemon = True
+        self._dmr_hold_timer = timer
+        timer.start()
+
+    def _on_dmr_hold_threshold(self, generation: int) -> None:
+        """Resolve a still-held DMR PTT press through the serialized input path."""
+
+        try:
+            with self._device_input_lock:
+                if (
+                    self.stop_event.is_set()
+                    or generation != self._dmr_hold_generation
+                    or self._ptt_pressed_at is None
+                    or self._dmr_hold_triggered
+                    or self.services is None
+                ):
+                    return
+                fast_context = getattr(self.display, "input_context", None)
+                snapshot = getattr(self.display, "snapshot", None)
+                current_ui = (
+                    fast_context()
+                    if callable(fast_context)
+                    else snapshot()
+                    if callable(snapshot)
+                    else {}
+                )
+                if not isinstance(current_ui, dict) or (
+                    current_ui.get("service") != "DMR"
+                    or current_ui.get("menu_open") is True
+                ):
+                    return
+
+                self._dmr_hold_timer = None
+                self._dmr_hold_triggered = True
+                self._last_device_input_at = time.perf_counter()
+                self.services.control({"action": "brandmeister_country_menu_open"})
+
+                hold_event = InputEvent(
+                    Control.PTT,
+                    held_seconds=DMR_PTT_HOLD_SECONDS,
+                    active=False,
+                )
+                state_only_handler = getattr(self.display, "apply_input_state", None)
+                handler = getattr(self.display, "apply_input", None)
+                if callable(state_only_handler):
+                    state_only_handler(hold_event)
+                elif callable(handler):
+                    handler(hold_event)
+                else:
+                    raise RuntimeError("the configured display does not accept device input")
+                self.render_interaction_once("DMR")
+        except Exception:
+            LOG.exception("DMR PTT hold action failed")
 
     def install_signal_handlers(self) -> None:
         signal.signal(signal.SIGTERM, self.request_stop)
@@ -326,17 +405,23 @@ class OpenR4d10App:
                 "recorder": "REC",
             }.get(getattr(self.services, "active_service", "system"), "SYSTEM")
         )
-        if (
-            event.control == Control.PTT
-            and selected_service == "DMR"
-            and not menu_open
-        ):
-            if event.active is True:
-                self._ptt_pressed_at = time.monotonic()
-            else:
+        dmr_hold_consumed = False
+        if event.control == Control.PTT and selected_service == "DMR":
+            if event.active is True and not menu_open:
+                if self._ptt_pressed_at is None:
+                    self._ptt_pressed_at = time.monotonic()
+                    self._start_dmr_hold_timer()
+            elif event.active is False:
                 started = self._ptt_pressed_at
                 self._ptt_pressed_at = None
-                held_seconds = max(0.0, time.monotonic() - started) if started is not None else 0.0
+                dmr_hold_consumed = self._dmr_hold_triggered
+                self._dmr_hold_triggered = False
+                self._cancel_dmr_hold_timer()
+                held_seconds = (
+                    max(0.0, time.monotonic() - started)
+                    if started is not None
+                    else 0.0
+                )
                 event = InputEvent(
                     Control.PTT,
                     held_seconds=held_seconds,
@@ -513,15 +598,10 @@ class OpenR4d10App:
             and event.active is False
             and not menu_open
             and selected_service == "DMR"
+            and not dmr_hold_consumed
         ):
             media_result = self.services.control(
-                {
-                    "action": (
-                        "brandmeister_country_menu_open"
-                        if event.held_seconds >= 2.0
-                        else "brandmeister_toggle_selected"
-                    )
-                }
+                {"action": "brandmeister_toggle_selected"}
             )
         elif (
             self.services is not None
@@ -668,6 +748,10 @@ class OpenR4d10App:
         )
         service_changed = new_service != selected_service
         if self.services is not None and service_changed:
+            if selected_service == "DMR":
+                self._ptt_pressed_at = None
+                self._dmr_hold_triggered = False
+                self._cancel_dmr_hold_timer()
             if selected_service == "RADIO":
                 self._radio_last_release_at = None
                 self._radio_ignore_release = False
@@ -812,6 +896,7 @@ class OpenR4d10App:
         )
 
     def close(self) -> None:
+        self._cancel_dmr_hold_timer()
         close_display = getattr(self.display, "close", None)
         if callable(close_display):
             close_display()

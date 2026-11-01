@@ -3385,3 +3385,18 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 - Diese Rückkehr zum Anfang ist kein Loop: Nach dem nächsten natürlichen
   Dateiende bleibt die Wiedergabe wie bisher beendet. Erneutes Enter startet
   nur auf ausdrücklichen Benutzerwunsch wieder bei 0.
+
+### 2026-11-01 – DMR-Länderauswahl öffnet bereits beim Halten
+
+- Im normalen DMR-Bild startet die vorhandene PTT-Druckflanke genau einen
+  abbrechbaren Zwei-Sekunden-Timer. Erreicht der Druck diese Schwelle, öffnet
+  die vorhandene Länderauswahl sofort sichtbar, während der reale
+  Whisplay-Taster beziehungsweise Backspace noch gehalten wird. Der Benutzer
+  muss nicht raten, wann er loslassen darf.
+- Loslassen nach der ausgelösten Schwelle wird verbraucht: Es darf weder eine
+  Talkgroup umschalten noch das soeben geöffnete Menü wieder schließen. Ein
+  Loslassen vor der Schwelle bricht den Timer ab und behält die bestehende
+  Kurzdruckfunktion zum Umschalten der markierten Talkgroup.
+- Timer, Hardwaretaste und Browser-Simulation laufen weiterhin durch denselben
+  serialisierten Eingabepfad. Eine zweite GPIO-Auswertung oder ein paralleler
+  DMR-Menüzustand ist verboten.

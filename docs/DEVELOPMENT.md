@@ -279,8 +279,12 @@ touching playback. No
 GPIO number is accepted by this endpoint. Browser PTT uses held Backspace only
 outside editable fields and must release on key-up, focus loss and tab hiding.
 In the normal BrandMeister view the application measures those same physical
-or browser edges: a release before two seconds toggles the marked TG and a
-release after two seconds opens the country filter. A sixth activation must be
+or browser edges: a release before two seconds toggles the marked TG and one
+cancellable timer opens the country filter at the two-second threshold while
+PTT remains held. Releasing after that threshold is consumed and must neither
+toggle a TG nor close the country menu. Tests must drive the timer without a
+wall-clock sleep and prove both the pre-threshold cancellation and post-threshold
+release behavior. A sixth activation must be
 tested as an explicit five-row replacement transaction, including cancellation;
 it must never evict a TG implicitly.
 While the device menu is open, browser Up/Down must follow the visible list

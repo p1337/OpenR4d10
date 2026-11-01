@@ -45,8 +45,10 @@ The short right press while the BrandMeister view is open starts reception of
 the already enabled talkgroups. This is an explicit Play action and takes audio
 ownership from a running radio or another audio service. A short PTT press adds
 and enables the selected talkgroup in the persistent quick list or disables an
-already saved entry when the button is released. Holding PTT for at least two
-seconds opens a country list derived from the bounded cached official catalog.
+already saved entry when the button is released. Holding PTT for two seconds
+opens a country list immediately at the threshold while PTT remains held; the
+following release is consumed and cannot toggle a talkgroup or close the new
+menu. The list is derived from the bounded cached official catalog.
 The right outer axis selects a country and the right press applies that browse
 filter. The filter applies only to the inactive add-catalog below the
 enabled-first block: all currently enabled talkgroups remain visible and
