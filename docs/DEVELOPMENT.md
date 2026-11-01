@@ -162,11 +162,14 @@ The separately sandboxed early-boot unit also needs that exact runtime path in
 brightness request there; it receives no other writable system path.
 
 `display_appearance` accepts and persists only one `#RRGGBB` accent string.
-The Whisplay renderer used for the physical panel and PNG preview always draws
-the player edge glow; `screen_border_enabled` is no longer a public or active
-setting. Tests cover persistence, malformed colors, the straight top glow below
-the status row, the R5 curve, a clearly visible minimum glow intensity and the
-absence of any pixel in the glow samples that exactly equals the accent color.
+The Whisplay renderer used for the physical panel and PNG preview centrally
+draws the edge glow for every registered normal service view before dispatching
+to service-specific content. Recorder, system and future plugin views must not
+depend on their own glow call; only menus and WLAN setup bypass it.
+`screen_border_enabled` is no longer a public or active setting. Tests cover
+persistence, malformed colors, every registered service, the straight top glow
+below the status row, the R5 curve, a clearly visible minimum glow intensity
+and the absence of any pixel in the glow samples that exactly equals the accent color.
 The permanent glow strength is explicitly `1.3`; do not replace it with an
 unmeasured color or line-width change.
 That last assertion prevents a crisp line from returning. Device media use the

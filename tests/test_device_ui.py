@@ -458,6 +458,26 @@ class DeviceUiTests(unittest.TestCase):
             sum(image.getpixel((120, HEIGHT - 1))),
         )
 
+    def test_shared_glow_is_composited_for_every_registered_service(self) -> None:
+        background = (6, 12, 15)
+        for service in SERVICES:
+            with self.subTest(service=service):
+                image = render_device_ui(
+                    DeviceUiState(service_index=SERVICES.index(service))
+                )
+                self.assertNotEqual(image.getpixel((7, 180)), background)
+                self.assertNotEqual(image.getpixel((120, 71)), background)
+
+    def test_recorder_inherits_shared_glow_without_service_specific_drawing(self) -> None:
+        state = DeviceUiState(
+            service_index=SERVICES.index("REC"),
+            source="Recorder",
+            title="Recording controls",
+        )
+        image = render_device_ui(state)
+        self.assertNotEqual(image.getpixel((7, 180)), (6, 12, 15))
+        self.assertNotEqual(image.getpixel((120, 71)), (6, 12, 15))
+
     def test_play_control_is_below_battery_and_footer_is_empty(self) -> None:
         state = DeviceUiState(playing=True, service_index=1)
         image = render_device_ui(state)

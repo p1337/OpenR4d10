@@ -2902,3 +2902,17 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 - Die Ausnahme gilt ausschließlich für diese zwei Navigationspfeile bei
   `device_ui.menu_open=true`. Backspace bleibt in editierbaren Feldern die
   Löschtaste und alle anderen Schutzregeln bleiben unverändert.
+
+### 2026-11-01 – Zentraler Glow für jede Dienstansicht
+
+- Der permanente weiche Display-Glow ist keine Gestaltung einzelner Dienste.
+  Er wird einmal zentral vom gemeinsamen 240-x-280-Renderer nach Kopf- und
+  Statusleiste und vor dem dienstspezifischen Inhalt komponiert. Recorder,
+  Systemansicht und jeder zukünftig registrierte Plugin-Dienst erhalten ihn
+  dadurch automatisch und dürfen ihn weder selbst nachbauen noch auslassen.
+- Nur Vollbildzustände, die ausdrücklich keine normale Dienstansicht sind,
+  bleiben ohne Player-Glow: geöffnete Gerätemenüs sowie die WLAN-Hotspot-
+  Einrichtung. Deren eigene klare Navigationsmarkierung bleibt unverändert.
+- Ein Regressionstest prüft den Glow für sämtliche registrierten Dienste und
+  insbesondere für den Recorder. Neue Renderer-Zweige dürfen nicht vor der
+  zentralen Kompositionsstufe zurückkehren.

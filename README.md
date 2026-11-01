@@ -30,8 +30,9 @@ the installer report exactly which adapters still need configuration.
 - safe display handoff both at boot and during an in-session installation
 - real-device-confirmed Whisplay SPI transport, colour order and orientation
 - persistent, kernel-timed 0–100% Whisplay brightness control in the web settings
-- persistent accent color plus a permanent strong, soft player-edge glow following
-  the rounded display contour and closing below the status row
+- persistent accent color plus one centrally composited permanent strong, soft
+  service-view glow following the rounded display contour and closing below
+  the status row; recorder and future plugins inherit it automatically
 - read-only PiSugar 3 battery percentage over the manufacturer-documented I2C
   identity and capacity registers; no separate PiSugar web service or default
   account is installed
@@ -224,9 +225,12 @@ application publishes only a bounded 0–100 request below
 the kernel PWM interface. The native boot player no longer claims BCM22, keeps
 the backlight dark until its first complete frame and then uses the same
 bounded handoff. This transition needs the installer's automatic reboot.
-The same settings area stores the selected accent color. The normal player
-always receives a clearly visible strong, soft edge glow in that color along the physical rounded
-contour, including a straight upper glow immediately below the status row. It
+The same settings area stores the selected accent color. Every normal service
+view receives one centrally composited, clearly visible strong, soft edge glow
+in that color along the physical rounded contour, including a straight upper
+glow immediately below the status row. Recorder, system and future plugin
+views inherit it without service-specific drawing code. Menus and the WLAN
+setup screen deliberately retain their separate navigation treatment. The glow
 has no crisp border line and no disable switch. Media, weather and camera
 images use the same 43-pixel corner radius as the panel. Device text is never
 introduced below the SSID text size; battery percentage is at least that size

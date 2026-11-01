@@ -1410,6 +1410,12 @@ def render_device_ui(
             _draw_dmr_replacements(draw, state, content_top)
         return image.convert("RGB")
 
+    # The rounded glow is a compositor-owned service-view layer, not a service
+    # decoration. Keep it ahead of every service-specific early return so the
+    # recorder and newly registered plugin views inherit it automatically.
+    _draw_player_edge_glow(image, content_top, accent)
+    draw = ImageDraw.Draw(image)
+
     if state.service in {"SYSTEM", "REC"}:
         draw.rectangle((0, content_top, 3, HEIGHT - 1), fill=accent)
         heading_font = _font(19, bold=True)
@@ -1442,9 +1448,6 @@ def render_device_ui(
             spacing=4,
         )
         return image.convert("RGB")
-
-    _draw_player_edge_glow(image, content_top, accent)
-    draw = ImageDraw.Draw(image)
 
     if state.service == "DMR":
         active_row = next(

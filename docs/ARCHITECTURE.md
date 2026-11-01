@@ -22,6 +22,13 @@ native early-boot player is a separate, deliberately narrow path: it initializes
 the same panel and streams the checked-in animation until the application has
 its first complete dashboard frame and claims display ownership.
 
+The physical renderer owns the permanent rounded service-view glow as a
+central composition layer. It is applied after the shared header/status area
+and before any service-specific content branch, so recorder, system and future
+registered plugin views cannot accidentally omit it. Individual services must
+not draw a parallel frame. Only device menus and the WLAN setup screen bypass
+that layer because they use their own navigation treatment.
+
 Encoder hardware is isolated behind logical `InputEvent` values. Four rotary
 controls (`left_outer`, `left_inner`, `right_outer`, `right_inner`) and two
 press controls are already modeled and tested. A seventh held `ptt` control has
