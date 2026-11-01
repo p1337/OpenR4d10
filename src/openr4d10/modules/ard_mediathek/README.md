@@ -26,3 +26,7 @@ sofort sichtbar und mit rechtem Encoder plus Druck bedienbar. PTT-lang öffnet
 dieselbe Auswahl nur zusätzlich als Schnellzugriff. Die nicht blockierende
 Auswahl startet anschließend ein zufälliges Video niedriger Auflösung über den
 zentralen Player.
+
+PTT-lang pausiert eine laufende Wiedergabe vor dem Öffnen der Liste. Derselbe
+noch gehaltene Tastendruck wird bis zum Loslassen verbraucht und kann die Liste
+nicht als Zurück-Eingabe wieder schließen.

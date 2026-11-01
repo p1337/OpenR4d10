@@ -134,6 +134,14 @@ Suchsammlungen; der rechte Druck startet die markierte Gruppe. Ein zwei
 Sekunden gehaltener physischer Whisplay-PTT-Taster bleibt als alternativer
 Schnellzugriff auf dieselbe, nicht duplizierte Auswahl erhalten.
 
+Wird dieser PTT-Schnellzugriff während einer laufenden Mediathek-Wiedergabe
+ausgelöst, pausiert zuerst der zentrale mpv-Player und danach erscheint die
+Gruppenliste. Der auslösende physische Tastendruck bleibt bis zu seiner
+Loslassflanke vollständig verbraucht: wiederholte oder entprellte Druckflanken
+dürfen die gerade geöffnete Liste nicht als Zurück-Aktion schließen. Erst ein
+neuer, nach dem Loslassen begonnener PTT-Druck besitzt wieder die normale
+Menü-Zurück-Funktion.
+
 Beschriftungen und Suchbegriffe folgen der Gerätesprache (`de`, `en`, `pl`,
 `fr` oder `es`). MediathekView stellt kein verlässliches Sprachfeld bereit;
 deshalb ist die sprachspezifische Suche der durchsetzbare Filter, während die

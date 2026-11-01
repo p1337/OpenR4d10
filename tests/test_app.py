@@ -942,6 +942,127 @@ class AppTests(unittest.TestCase):
             ],
         )
 
+    def test_running_mediathek_hold_pauses_and_latches_ptt_until_release(self) -> None:
+        class InputDisplay:
+            def __init__(self):
+                self.menu_open = False
+
+            def render(self, _frame):
+                pass
+
+            def snapshot(self):
+                return {
+                    "service": "PLAYER",
+                    "menu_open": self.menu_open,
+                    "menu_kind": "mediathek_groups" if self.menu_open else None,
+                    "mediathek_active": True,
+                    "playing": not self.menu_open,
+                }
+
+            input_context = snapshot
+
+            def apply_input(self, event):
+                if (
+                    event.control == Control.PTT
+                    and event.active is False
+                    and event.held_seconds >= 2.0
+                ):
+                    self.menu_open = True
+                elif event.control == Control.PTT and event.active is True and self.menu_open:
+                    self.menu_open = False
+                return self.snapshot()
+
+            apply_input_state = apply_input
+
+            def set_input_handler(self, _handler):
+                pass
+
+        class Services:
+            active_service = "public_mediatheken"
+
+            def __init__(self):
+                self.requests = []
+
+            def control(self, request):
+                self.requests.append(request)
+                return {"playback": {"state": "paused"}}
+
+            def receiver_overlay(self, _view_service=None):
+                return {
+                    "service": "PLAYER",
+                    "station": "ARD-alpha",
+                    "mediathek_active": True,
+                    "playing": False,
+                }
+
+        class ManualTimer:
+            def __init__(self, _interval, callback, args=()):
+                self.callback = callback
+                self.args = args
+                self.cancelled = False
+                self.daemon = False
+
+            def start(self):
+                pass
+
+            def cancel(self):
+                self.cancelled = True
+
+            def fire(self):
+                if not self.cancelled:
+                    self.callback(*self.args)
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            services = Services()
+            display = InputDisplay()
+            app = OpenR4d10App(
+                AppConfig(
+                    log_level="INFO",
+                    refresh_interval_seconds=1.0,
+                    title="OpenR4d10 Test",
+                    boot_manifest=root / "missing.toml",
+                    boot_enabled=False,
+                    runtime_directory=root,
+                    state_directory=root,
+                ),
+                display=display,
+                power=UnconfiguredTelemetry("power"),
+                receiver=SystemTelemetry(),
+                services=services,
+            )
+            timers = []
+
+            def timer_factory(interval, callback, args=()):
+                timer = ManualTimer(interval, callback, args)
+                timers.append(timer)
+                return timer
+
+            with patch("openr4d10.app.threading.Timer", side_effect=timer_factory):
+                app.control({"action": "device_input", "control": "ptt", "active": True})
+                timers[0].fire()
+                self.assertTrue(display.menu_open)
+                self.assertEqual(
+                    services.requests,
+                    [{"action": "pause"}, {"action": "mediathek_group_menu_open"}],
+                )
+
+                # A repeated down edge from the same physical hold is ignored.
+                app.control({"action": "device_input", "control": "ptt", "active": True})
+                self.assertTrue(display.menu_open)
+
+                # Its release only clears the latch; it does not close the menu.
+                app.control({"action": "device_input", "control": "ptt", "active": False})
+                self.assertTrue(display.menu_open)
+                self.assertEqual(
+                    services.requests,
+                    [{"action": "pause"}, {"action": "mediathek_group_menu_open"}],
+                )
+
+                # A new, distinct PTT press keeps the ordinary menu-back behavior.
+                app.control({"action": "device_input", "control": "ptt", "active": True})
+                self.assertFalse(display.menu_open)
+
     def test_player_enter_stops_real_background_brandmeister_owner(self) -> None:
         class Display:
             def render(self, _frame):

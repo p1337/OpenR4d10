@@ -3758,6 +3758,11 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   group picker as an additional shortcut. A short PTT release during active
   Mediathek playback remains the favorite/bookmark action; a consumed long hold
   must never also toggle the favorite.
+- Öffnet PTT-lang die Gruppenauswahl während laufender Mediathek-Wiedergabe,
+  muss der zentrale Player vor dem Menüaufbau pausieren. Der auslösende Hold
+  bleibt bis zur echten Loslassflanke gelatcht und vollständig verbraucht;
+  Wiederholungs-/Bounce-Flanken dürfen die neue Liste nicht sofort wieder über
+  PTT-Zurück schließen. Erst der nächste eigenständige Druck darf zurückgehen.
 - Groups are Favorites plus the curated browser search collections. Labels and
   search terms follow the device language. Selection and network lookup run
   outside the input/SPI thread, use a cancellable generation token, and start

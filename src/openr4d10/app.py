@@ -317,6 +317,25 @@ class OpenR4d10App:
                 self._last_device_input_at = time.perf_counter()
                 self._interaction_generation += 1
                 try:
+                    player_state = getattr(
+                        getattr(self.services, "player", None), "state", None
+                    )
+                    real_playing = (
+                        getattr(player_state, "state", None) == "playing"
+                        and getattr(player_state, "paused", False) is not True
+                    )
+                    has_real_player_state = player_state is not None
+                    if (
+                        current_ui.get("mediathek_active") is True
+                        and (
+                            real_playing
+                            or (
+                                not has_real_player_state
+                                and current_ui.get("playing") is True
+                            )
+                        )
+                    ):
+                        self.services.control({"action": "pause"})
                     self.services.control({"action": "mediathek_group_menu_open"})
                     hold_event = InputEvent(
                         Control.PTT,
@@ -605,6 +624,28 @@ class OpenR4d10App:
                 "recorder": "REC",
             }.get(getattr(self.services, "active_service", "system"), "SYSTEM")
         )
+        if (
+            event.control == Control.PTT
+            and selected_service == "PLAYER"
+            and self._mediathek_hold_triggered
+        ):
+            # The threshold callback opened the picker while the physical PTT
+            # button was still down.  Consume every repeated/bounced down edge
+            # and the matching release so that this same press can never be
+            # reinterpreted as the menu's PTT/back action.
+            if event.active is False:
+                self._mediathek_ptt_pressed_at = None
+                self._mediathek_hold_triggered = False
+                self._cancel_mediathek_hold_timer()
+            return {
+                "accepted": {
+                    "control": event.control.value,
+                    "steps": event.steps,
+                    "held_seconds": event.held_seconds,
+                    "active": event.active,
+                },
+                "device_ui": current_ui if isinstance(current_ui, dict) else {},
+            }
         dmr_hold_consumed = False
         mediathek_hold_consumed = False
         if event.control == Control.PTT and selected_service == "DMR":
