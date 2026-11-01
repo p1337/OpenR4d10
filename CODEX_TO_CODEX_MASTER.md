@@ -3793,7 +3793,7 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
   Auswahl/Play beziehungsweise langes Quick-Menü; die Whisplay-Hardwaretaste
   bleibt PTT.
 
-### 2026-11-01 – Einheitliches Bedienhandbuch und Produktionsgrafiken
+### 2026-11-01 – Einheitliches Bedienhandbuch und Hardwaregrafiken
 
 - Jeder bereits tatsächlich implementierte Dienst erhält eine verständliche
   Nutzerbeschreibung mit Zweck, Gerätebedienung und Browserbedienung. Ein im
@@ -3808,9 +3808,16 @@ tatsächlich verwendete Hardwareversion verifiziert ist.
 - `docs/USER_GUIDE_CONTROLS.md` ist die nutzerbezogene Bedienwahrheit. Die
   skalierbaren SVGs `web/controls-overview.svg` und
   `docs/assets/openr4d10-service-controls.svg` bilden die kompakte
-  Quick-Start- und Dienstmatrix für Browser, README und Druck. Sie sind
-  Produktionsgrafiken, aber ausdrücklich keine maßhaltigen Gehäuse- oder
-  Bohrschablonen vor der realen Encodervermessung.
+  Quick-Start- und Dienstmatrix für Browser, README und Druck.
+- Eine Bediengrafik darf niemals aus dem gewünschten „Flipper-Zero-artig
+  verständlichen“ Dokumentationsstil ein fiktives Handheldgehäuse oder
+  erfundene Tasterpositionen ableiten. `controls-overview.svg` zeigt nur den
+  durch Herstelleransichten belegten realen Aufbau: Whisplay-Front und
+  -Rückseite, Raspberry Pi Zero 2 W in der Mitte, PiSugar 3 hinten und die
+  belegten Platinenmerkmale. Die noch nicht montierten ALPS-Doppelencoder
+  müssen optisch getrennt als Planung erscheinen. Ihre endgültige Position,
+  GPIOs und Gehäuseöffnungen bleiben bis zur realen Vermessung ausdrücklich
+  offen. Die Grafik ist keine Bohr-, Gehäuse- oder Leiterplattenschablone.
 - RSS und Webcams werden bis zur Implementierung eigener nativer Ansichten
   ehrlich als browserverwaltet dokumentiert. Podcasts und lokale Medien teilen
   die vorhandene PLAYER-Ausgabe, während Abos beziehungsweise Bibliothek im

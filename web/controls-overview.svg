@@ -1,79 +1,120 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title description">
-  <title id="title">OpenR4d10 Hardware-Bedienübersicht</title>
-  <desc id="description">Schematische Frontansicht mit zwei Doppelencodern, Whisplay-PTT und PiSugar-Powertaste.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1100" viewBox="0 0 1600 1100" role="img" aria-labelledby="title description">
+  <title id="title">OpenR4d10 Hardware-Komponenten und Bedienung</title>
+  <desc id="description">Quellenbasierte Komponentenansicht des echten Whisplay-, Raspberry-Pi-Zero-2-W- und PiSugar-3-Stapels. Die noch nicht montierten Doppelencoder sind getrennt als Planung markiert.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#071314"/><stop offset="1" stop-color="#0d2324"/></linearGradient>
-    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#18292a"/><stop offset="1" stop-color="#091314"/></linearGradient>
-    <radialGradient id="knob"><stop stop-color="#526061"/><stop offset="0.55" stop-color="#283536"/><stop offset="1" stop-color="#0b1112"/></radialGradient>
-    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="pcb" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#172526"/><stop offset="1" stop-color="#071011"/></linearGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#173336"/><stop offset="1" stop-color="#071112"/></linearGradient>
+    <linearGradient id="pi" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2d7650"/><stop offset="1" stop-color="#173b2c"/></linearGradient>
+    <linearGradient id="battery" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#32393a"/><stop offset="1" stop-color="#171c1d"/></linearGradient>
+    <filter id="amberGlow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
     <style>
-      text{font-family:Inter,"DejaVu Sans",Arial,sans-serif;fill:#edf7f4} .accent{fill:#fdb813}.muted{fill:#91aaa6}.line{stroke:#fdb813;stroke-width:3;fill:none}.hair{stroke:#456260;stroke-width:2;fill:none}.card{fill:#0a1718;stroke:#294142;stroke-width:2}.h1{font-size:54px;font-weight:800;letter-spacing:1px}.h2{font-size:29px;font-weight:800}.body{font-size:22px}.small{font-size:18px}.tag{font-size:17px;font-weight:800;letter-spacing:2px}
+      text{font-family:Inter,"DejaVu Sans",Arial,sans-serif;fill:#edf7f4}.accent{fill:#fdb813}.muted{fill:#94aaa7}.green{fill:#70d49e}.red{fill:#ef5b68}.blue{fill:#69b7e7}.white{fill:#fff}.line{stroke:#fdb813;stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round}.thin{stroke:#4c6866;stroke-width:2;fill:none}.dash{stroke:#fdb813;stroke-width:3;fill:none;stroke-dasharray:10 8}.card{fill:#091718;stroke:#2c4544;stroke-width:2}.board{fill:url(#pcb);stroke:#617473;stroke-width:3}.h1{font-size:48px;font-weight:850;letter-spacing:1px}.h2{font-size:28px;font-weight:800}.h3{font-size:22px;font-weight:800}.body{font-size:19px}.small{font-size:16px}.tag{font-size:15px;font-weight:800;letter-spacing:1.5px}.micro{font-size:13px;font-weight:700}
     </style>
   </defs>
-  <rect width="1600" height="1000" fill="url(#bg)"/>
-  <text x="72" y="86" class="h1">OPENR4D10 · BEDIENUNG</text>
-  <text x="74" y="124" class="body muted">Ein Griffmuster für jeden Dienst · schematische, nicht maßhaltige Darstellung</text>
 
-  <rect x="520" y="205" width="560" height="680" rx="105" fill="url(#body)" stroke="#395253" stroke-width="4"/>
-  <rect x="562" y="315" width="476" height="500" rx="68" fill="#020909" stroke="#fdb813" stroke-width="4" filter="url(#glow)"/>
-  <rect x="585" y="342" width="430" height="72" rx="16" fill="#0b191a" stroke="#274041" stroke-width="2"/>
-  <text x="608" y="374" class="tag accent">VOL 30%</text><text x="825" y="374" class="tag accent">CH 001</text>
-  <text x="608" y="400" class="tag muted">SQL 5</text><text x="825" y="400" class="tag muted">SRV RADIO</text>
-  <rect x="585" y="435" width="430" height="335" rx="45" fill="#102223"/>
-  <text x="800" y="590" text-anchor="middle" class="h2">240 × 280</text>
-  <text x="800" y="630" text-anchor="middle" class="body muted">Dienstinhalt</text>
+  <rect width="1600" height="1100" fill="url(#bg)"/>
+  <text x="52" y="68" class="h1">OPENR4D10 · ECHTER HARDWARE-STACK</text>
+  <text x="54" y="105" class="body muted">Komponentenkarte aus Herstelleransichten · kein erfundenes Gehäuse · keine Bohr- oder Maßschablone</text>
 
-  <circle cx="640" cy="210" r="82" fill="url(#knob)" stroke="#fdb813" stroke-width="4"/>
-  <circle cx="640" cy="210" r="47" fill="#172425" stroke="#81908f" stroke-width="4"/>
-  <circle cx="960" cy="210" r="82" fill="url(#knob)" stroke="#fdb813" stroke-width="4"/>
-  <circle cx="960" cy="210" r="47" fill="#172425" stroke="#81908f" stroke-width="4"/>
-  <path d="M640 131v20M960 131v20" class="line"/>
-  <text x="640" y="215" text-anchor="middle" class="tag">L</text><text x="960" y="215" text-anchor="middle" class="tag">R</text>
+  <!-- Planned encoders: intentionally outside the present hardware cards. -->
+  <rect x="52" y="138" width="1496" height="174" rx="28" class="card" stroke-dasharray="10 8"/>
+  <text x="82" y="176" class="tag accent">GEPLANTE BEDIENELEMENTE · NOCH NICHT MONTIERT</text>
+  <g transform="translate(150 205)">
+    <circle cx="42" cy="40" r="40" class="dash"/>
+    <circle cx="42" cy="40" r="22" class="thin"/>
+    <path d="M42 0v14" class="line"/>
+    <text x="104" y="24" class="h3">Linker ALPS-Doppelencoder</text>
+    <text x="104" y="52" class="body"><tspan class="accent">außen</tspan> Lautstärke · <tspan class="accent">innen</tspan> Sekundärfunktion / SQL</text>
+    <text x="104" y="79" class="small muted">Druck bewusst frei</text>
+  </g>
+  <g transform="translate(846 205)">
+    <circle cx="42" cy="40" r="40" class="dash"/>
+    <circle cx="42" cy="40" r="22" class="thin"/>
+    <path d="M42 0v14" class="line"/>
+    <text x="104" y="24" class="h3">Rechter ALPS-Doppelencoder</text>
+    <text x="104" y="52" class="body"><tspan class="accent">außen</tspan> Kanal / Eintrag · <tspan class="accent">innen</tspan> Dienst</text>
+    <text x="104" y="79" class="small muted">Druck Auswahl / Play · 2 s Quick-Menü</text>
+  </g>
+  <text x="800" y="298" text-anchor="middle" class="small muted">Vorgabe: oben, weit auseinander, innerhalb der Stackbreite · endgültige Position und GPIO erst nach realer Vermessung</text>
 
-  <rect x="499" y="350" width="28" height="92" rx="14" fill="#fdb813"/>
-  <rect x="1073" y="535" width="28" height="110" rx="14" fill="#e94d63"/>
+  <!-- Actual Whisplay front. -->
+  <rect x="52" y="338" width="476" height="648" rx="30" class="card"/>
+  <text x="78" y="379" class="tag accent">VORNE · HEUTE VORHANDEN</text>
+  <text x="78" y="413" class="h2">Whisplay HAT</text>
+  <g transform="translate(167 442)">
+    <rect x="0" y="0" width="246" height="480" rx="18" class="board"/>
+    <circle cx="20" cy="20" r="9" fill="#020607" stroke="#728381" stroke-width="3"/><circle cx="226" cy="20" r="9" fill="#020607" stroke="#728381" stroke-width="3"/>
+    <circle cx="20" cy="460" r="9" fill="#020607" stroke="#728381" stroke-width="3"/><circle cx="226" cy="460" r="9" fill="#020607" stroke="#728381" stroke-width="3"/>
+    <circle cx="123" cy="13" r="7" fill="#64e8ff" filter="url(#amberGlow)"/>
+    <text x="123" y="38" text-anchor="middle" class="micro muted">RGB LED</text>
+    <rect x="20" y="52" width="206" height="244" rx="31" fill="url(#screen)" stroke="#a3b6b3" stroke-width="3"/>
+    <path d="M34 84H212M34 119H212" stroke="#375857" stroke-width="2"/>
+    <text x="123" y="178" text-anchor="middle" class="h3 accent">240 × 280</text>
+    <text x="123" y="207" text-anchor="middle" class="small muted">ST7789 LCD</text>
+    <g fill="#617472"><rect x="32" y="323" width="21" height="11" rx="3"/><rect x="62" y="323" width="13" height="11" rx="3"/><rect x="83" y="323" width="13" height="11" rx="3"/><rect x="104" y="323" width="13" height="11" rx="3"/><rect x="136" y="319" width="46" height="39" rx="5"/><rect x="190" y="322" width="14" height="14" rx="3"/></g>
+    <rect x="93" y="386" width="38" height="22" rx="4" fill="#b7c3c0" stroke="#657572" stroke-width="2"/>
+    <text x="112" y="431" text-anchor="middle" class="micro muted">MIC_R</text>
+  </g>
+  <path d="M414 455H466V435" class="line"/><text x="338" y="434" class="small accent">RGB-LED oben</text>
+  <path d="M298 849H112V881" class="line"/><text x="78" y="910" class="small">rechtes Mikrofon</text>
+  <text x="78" y="948" class="small muted">Display und MIC_R sitzen auf der Frontplatine.</text>
+  <text x="78" y="972" class="small muted">Keine Fronttasten · kein Touchscreen.</text>
 
-  <rect x="65" y="175" width="370" height="232" rx="28" class="card"/>
-  <text x="92" y="220" class="h2">LINKER DOPPELENCODER</text>
-  <text x="92" y="263" class="body"><tspan class="accent">Außen</tspan><tspan> · Lautstärke ±10 %</tspan></text>
-  <text x="92" y="302" class="body"><tspan class="accent">Innen</tspan><tspan> · Sekundärfunktion / SQL</tspan></text>
-  <text x="92" y="341" class="body"><tspan class="accent">Klick</tspan><tspan> · bewusst frei</tspan></text>
-  <text x="92" y="377" class="small muted">Im Recorder: 0,1 s / Anfang–Ende</text>
-  <path d="M435 292H505L565 240" class="line"/>
+  <!-- Actual Whisplay back. -->
+  <rect x="562" y="338" width="476" height="648" rx="30" class="card"/>
+  <text x="588" y="379" class="tag accent">RÜCKSEITE DES WHISPLAY · HEUTE VORHANDEN</text>
+  <text x="588" y="413" class="h2">Audio, PTT und 40-Pin-Buchse</text>
+  <g transform="translate(677 442)">
+    <rect x="0" y="0" width="246" height="480" rx="18" class="board"/>
+    <circle cx="20" cy="20" r="9" fill="#020607" stroke="#728381" stroke-width="3"/><circle cx="226" cy="20" r="9" fill="#020607" stroke="#728381" stroke-width="3"/>
+    <circle cx="20" cy="460" r="9" fill="#020607" stroke="#728381" stroke-width="3"/><circle cx="226" cy="460" r="9" fill="#020607" stroke="#728381" stroke-width="3"/>
+    <rect x="195" y="34" width="31" height="390" rx="6" fill="#050909" stroke="#546a68" stroke-width="2"/>
+    <g fill="#263d3c">
+      <circle cx="205" cy="49" r="4"/><circle cx="216" cy="49" r="4"/><circle cx="205" cy="66" r="4"/><circle cx="216" cy="66" r="4"/><circle cx="205" cy="83" r="4"/><circle cx="216" cy="83" r="4"/><circle cx="205" cy="100" r="4"/><circle cx="216" cy="100" r="4"/><circle cx="205" cy="117" r="4"/><circle cx="216" cy="117" r="4"/><circle cx="205" cy="134" r="4"/><circle cx="216" cy="134" r="4"/><circle cx="205" cy="151" r="4"/><circle cx="216" cy="151" r="4"/><circle cx="205" cy="168" r="4"/><circle cx="216" cy="168" r="4"/><circle cx="205" cy="185" r="4"/><circle cx="216" cy="185" r="4"/><circle cx="205" cy="202" r="4"/><circle cx="216" cy="202" r="4"/><circle cx="205" cy="219" r="4"/><circle cx="216" cy="219" r="4"/><circle cx="205" cy="236" r="4"/><circle cx="216" cy="236" r="4"/><circle cx="205" cy="253" r="4"/><circle cx="216" cy="253" r="4"/><circle cx="205" cy="270" r="4"/><circle cx="216" cy="270" r="4"/><circle cx="205" cy="287" r="4"/><circle cx="216" cy="287" r="4"/><circle cx="205" cy="304" r="4"/><circle cx="216" cy="304" r="4"/><circle cx="205" cy="321" r="4"/><circle cx="216" cy="321" r="4"/><circle cx="205" cy="338" r="4"/><circle cx="216" cy="338" r="4"/><circle cx="205" cy="355" r="4"/><circle cx="216" cy="355" r="4"/><circle cx="205" cy="372" r="4"/><circle cx="216" cy="372" r="4"/>
+    </g>
+    <rect x="31" y="48" width="29" height="20" rx="4" fill="#b7c3c0"/><text x="46" y="83" text-anchor="middle" class="micro muted">MIC_L</text>
+    <rect x="8" y="112" width="58" height="82" rx="8" fill="#d5dedb" stroke="#758784" stroke-width="2"/>
+    <circle cx="37" cy="135" r="10" fill="#0b1516"/><circle cx="37" cy="171" r="10" fill="#0b1516"/>
+    <rect x="0" y="143" width="10" height="22" rx="4" fill="#ef4d54"/>
+    <rect x="18" y="220" width="54" height="44" rx="6" fill="#edf2ef" stroke="#758784" stroke-width="2"/>
+    <rect x="92" y="244" width="37" height="14" rx="4" fill="#dee6e3"/><text x="111" y="278" text-anchor="middle" class="micro muted">SP1 / SP2</text>
+    <rect x="24" y="296" width="157" height="128" rx="10" fill="#222d2e" stroke="#526664" stroke-width="3"/>
+    <path d="M52 330h101M52 349h101M52 368h101M52 387h101" stroke="#405151" stroke-width="3"/>
+  </g>
+  <g>
+    <circle cx="723" cy="500" r="12" fill="#fdb813"/><text x="723" y="506" text-anchor="middle" class="micro" fill="#071314">1</text>
+    <circle cx="682" cy="602" r="12" fill="#fdb813"/><text x="682" y="608" text-anchor="middle" class="micro" fill="#071314">2</text>
+    <circle cx="720" cy="685" r="12" fill="#fdb813"/><text x="720" y="691" text-anchor="middle" class="micro" fill="#071314">3</text>
+    <circle cx="788" cy="696" r="12" fill="#fdb813"/><text x="788" y="702" text-anchor="middle" class="micro" fill="#071314">4</text>
+    <circle cx="800" cy="824" r="12" fill="#fdb813"/><text x="800" y="830" text-anchor="middle" class="micro" fill="#071314">5</text>
+    <circle cx="888" cy="835" r="12" fill="#fdb813"/><text x="888" y="841" text-anchor="middle" class="micro" fill="#071314">6</text>
+  </g>
+  <text x="588" y="947" class="small"><tspan class="accent">1</tspan> MIC_L · <tspan class="accent">2</tspan> PTT · <tspan class="accent">3</tspan> externer Lautsprecher</text>
+  <text x="588" y="972" class="small"><tspan class="accent">4</tspan> SP1/SP2 · <tspan class="accent">5</tspan> 8 Ω / 1 W · <tspan class="accent">6</tspan> 40-Pin-Buchse</text>
 
-  <rect x="1165" y="175" width="370" height="250" rx="28" class="card"/>
-  <text x="1192" y="220" class="h2">RECHTER ENCODER</text>
-  <text x="1192" y="263" class="body"><tspan class="accent">Außen</tspan><tspan> · Kanal / Eintrag</tspan></text>
-  <text x="1192" y="302" class="body"><tspan class="accent">Innen</tspan><tspan> · Dienst wechseln</tspan></text>
-  <text x="1192" y="341" class="body"><tspan class="accent">Klick</tspan><tspan> · Auswahl / Play / Pause</tspan></text>
-  <text x="1192" y="380" class="body"><tspan class="accent">2 s</tspan><tspan> · Quick-Menü</tspan></text>
-  <path d="M1165 300H1095L1035 240" class="line"/>
+  <!-- Real stack order; no invented enclosure or button projection. -->
+  <rect x="1072" y="338" width="476" height="648" rx="30" class="card"/>
+  <text x="1098" y="379" class="tag accent">STACK · HEUTE VORHANDEN</text>
+  <text x="1098" y="413" class="h2">Front → Mitte → Rückseite</text>
+  <g>
+    <polygon points="1124,505 1372,455 1470,500 1222,550" fill="#19292a" stroke="#91aaa6" stroke-width="3"/>
+    <rect x="1170" y="472" width="190" height="49" rx="12" fill="#143134" stroke="#a7bcba" stroke-width="2" transform="rotate(-11 1170 472)"/>
+    <text x="1098" y="582" class="h3">1 · Whisplay HAT</text><text x="1098" y="608" class="small muted">Front: Display, Audio, PTT</text>
 
-  <rect x="65" y="470" width="370" height="190" rx="28" class="card"/>
-  <text x="92" y="515" class="h2">PISUGAR POWER</text>
-  <text x="92" y="560" class="body"><tspan class="accent">Kurz</tspan><tspan> · Hauptmenü</tspan></text>
-  <text x="92" y="599" class="body"><tspan class="accent">Lang</tspan><tspan> · Gerät ausschalten</tspan></text>
-  <text x="92" y="633" class="small muted">Langer Druck gehört nur PiSugar.</text>
-  <path d="M435 555H470V396H499" class="line"/>
+    <polygon points="1142,670 1390,620 1488,665 1240,715" fill="url(#pi)" stroke="#70d49e" stroke-width="3"/>
+    <rect x="1366" y="638" width="56" height="24" rx="4" fill="#c8d0cd"/><rect x="1422" y="658" width="43" height="22" rx="4" fill="#c8d0cd"/>
+    <text x="1098" y="747" class="h3">2 · Raspberry Pi Zero 2 W</text><text x="1098" y="773" class="small muted">Mitte · USB-Seite = Whisplay-PTT-Seite</text>
 
-  <rect x="1165" y="495" width="370" height="200" rx="28" class="card"/>
-  <text x="1192" y="540" class="h2">WHISPLAY PTT</text>
-  <text x="1192" y="584" class="body"><tspan class="accent">Menü</tspan><tspan> · eine Ebene zurück</tspan></text>
-  <text x="1192" y="623" class="body"><tspan class="accent">Dienst</tspan><tspan> · Kontextaktion</tspan></text>
-  <text x="1192" y="657" class="small muted">Radio behalten · REC aufnehmen · DMR wählen</text>
-  <path d="M1165 590H1102" class="line"/>
+    <polygon points="1160,835 1408,785 1506,830 1258,880" fill="#202829" stroke="#7e908e" stroke-width="3"/>
+    <polygon points="1200,841 1376,805 1445,836 1269,872" fill="url(#battery)" stroke="#586865" stroke-width="2"/>
+    <circle cx="1198" cy="829" r="7" class="red"/><circle cx="1234" cy="822" r="7" class="accent"/><circle cx="1270" cy="815" r="7" class="muted"/>
+    <text x="1098" y="912" class="h3">3 · PiSugar 3 + Akku</text>
+    <text x="1098" y="938" class="small"><tspan class="red">Power</tspan> · <tspan class="accent">Custom</tspan> · <tspan class="muted">Reset</tspan> auf der Rückplatine</text>
+    <text x="1098" y="964" class="small accent">Power kurz = Hauptmenü · lang = PiSugar AUS</text>
+  </g>
 
-  <rect x="65" y="748" width="370" height="137" rx="28" class="card"/>
-  <text x="92" y="790" class="h2">BROWSER</text>
-  <text x="92" y="830" class="body">W/S · A/D · Pfeile · Enter</text>
-  <text x="92" y="861" class="small muted">Leertaste = Menü · Backspace = PTT</text>
-
-  <rect x="1165" y="748" width="370" height="137" rx="28" class="card"/>
-  <text x="1192" y="790" class="h2">MERKSATZ</text>
-  <text x="1192" y="830" class="body">Rechts wählen. Rechts klicken.</text>
-  <text x="1192" y="861" class="body accent">PTT zurück oder Dienstaktion.</text>
-
-  <path d="M520 915H1080" class="hair"/>
-  <text x="800" y="955" text-anchor="middle" class="small muted">OpenR4d10 · Quick-Start-Grafik · Encoder-GPIOs und Gehäusepositionen noch nicht final vermessen</text>
+  <rect x="52" y="1012" width="1496" height="56" rx="18" fill="#0a1718" stroke="#2c4544" stroke-width="2"/>
+  <text x="80" y="1048" class="body"><tspan class="accent">Browser:</tspan> W/S Lautstärke · A/D Sekundärfunktion · Pfeile Kanal/Dienst · Enter rechter Druck · Leertaste Menü · Backspace halten PTT</text>
+  <text x="1548" y="1090" text-anchor="end" class="micro muted">Quellen: PiSugar Whisplay Overview + PiSugar3 PCB instructions · Stand 2026-11-01</text>
 </svg>
-

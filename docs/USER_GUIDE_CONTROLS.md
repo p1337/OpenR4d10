@@ -6,16 +6,28 @@ Nutzerübersicht; technische Entwicklerdetails bleiben in
 [`ARCHITECTURE.md`](ARCHITECTURE.md), [`HARDWARE.md`](HARDWARE.md) und
 [`MENU_TREE.md`](MENU_TREE.md).
 
-Die zugehörigen, frei skalierbaren Produktionsgrafiken sind:
+Die zugehörigen, frei skalierbaren Bediengrafiken sind:
 
 - [`controls-overview.svg`](../web/controls-overview.svg) – Hardware und
   Grundbelegung;
 - [`openr4d10-service-controls.svg`](assets/openr4d10-service-controls.svg) –
   Dienstmatrix mit allen heute nutzbaren Ansichten.
 
-Die Grafiken sind druckfähig und absichtlich schematisch. Sie sind keine
-maßhaltige Bohr-, Gehäuse- oder Leiterplattenzeichnung, solange die realen
-ALPS-Doppelencoder noch nicht vermessen und elektrisch zugeordnet sind.
+Die Hardwaregrafik bildet ausschließlich den belegten realen Platinenstack ab:
+Whisplay vorne, Raspberry Pi Zero 2 W in der Mitte und PiSugar 3 hinten. Ihre
+Whisplay-Front- und Rückseitenmerkmale sowie die PiSugar-Taster stammen aus den
+offiziellen Herstelleransichten. Sie erfindet weder ein Gehäuse noch seitliche
+Tasten. Die beiden ALPS-Doppelencoder stehen in einem klar getrennten,
+gestrichelten Planungsbereich, weil sie noch nicht montiert, vermessen oder
+elektrisch zugeordnet sind. Die Grafik ist druckfähig, aber ausdrücklich keine
+Bohr-, Gehäuse- oder Leiterplattenschablone.
+
+Verwendete Primärquellen:
+
+- [PiSugar Whisplay Overview](https://docs.pisugar.com/docs/product-wiki/whisplay/overview)
+  mit Herstelleransichten von Vorder- und Rückseite;
+- [PiSugar3 Series / PCB instructions](https://docs.pisugar.com/docs/product-wiki/battery/pisugar3/pisugar-3-series)
+  mit Stackreihenfolge und Kennzeichnung von Power-, Custom- und Reset-Taster.
 
 ## Ein Bedienmodell für das ganze Gerät
 

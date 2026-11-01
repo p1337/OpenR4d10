@@ -207,6 +207,16 @@ class WebTests(unittest.TestCase):
         self.assertIn('href="/controls-overview.svg"', html)
         self.assertIn('data-i18n="CONTROL GUIDE"', html)
         self.assertTrue(web_root.joinpath("controls-overview.svg").is_file())
+        hardware_guide = web_root.joinpath("controls-overview.svg").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("kein erfundenes Gehäuse", hardware_guide)
+        self.assertIn("GEPLANTE BEDIENELEMENTE · NOCH NICHT MONTIERT", hardware_guide)
+        self.assertIn("VORNE · HEUTE VORHANDEN", hardware_guide)
+        self.assertIn("RÜCKSEITE DES WHISPLAY · HEUTE VORHANDEN", hardware_guide)
+        self.assertIn("Whisplay HAT", hardware_guide)
+        self.assertIn("Raspberry Pi Zero 2 W", hardware_guide)
+        self.assertIn("PiSugar 3 + Akku", hardware_guide)
         self.assertEqual(translations["locales"], ["en", "de", "pl", "fr", "es"])
         messages = translations["messages"]
         html_keys = {

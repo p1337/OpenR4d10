@@ -374,8 +374,11 @@ interface accent is `#FDB813`.
 The complete user-facing control contract, hardware legend and honest mapping
 of every currently implemented service are maintained in
 [`docs/USER_GUIDE_CONTROLS.md`](docs/USER_GUIDE_CONTROLS.md). Its two scalable
-SVG quick-reference sheets are suitable for the browser, repository and print;
-they are deliberately schematic rather than unverified enclosure drawings.
+SVG quick-reference sheets are suitable for the browser, repository and print.
+The hardware sheet is a source-grounded component map of the real Whisplay
+front/back and Whisplay → Pi Zero 2 W → PiSugar 3 stack. It must never invent
+an enclosure or button position; planned encoders remain visibly separate from
+already fitted hardware until they have been measured.
 
 BrandMeister replaces the otherwise meaningless Squelch assignment in its
 device view. The right outer axis browses the complete official talkgroup
